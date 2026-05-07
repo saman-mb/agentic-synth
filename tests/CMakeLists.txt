@@ -7,7 +7,13 @@ FetchContent_Declare(
 )
 FetchContent_MakeAvailable(Catch2)
 
-add_executable(agentic_synth_tests placeholder_test.cpp)
+add_executable(agentic_synth_tests
+    placeholder_test.cpp
+    FilterTest.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/../src/engine/Filter.cpp
+)
+target_include_directories(agentic_synth_tests PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../src)
+target_compile_features(agentic_synth_tests PRIVATE cxx_std_20)
 target_link_libraries(agentic_synth_tests PRIVATE Catch2::Catch2WithMain)
 
 list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
