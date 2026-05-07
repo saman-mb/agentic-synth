@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Agentic Synth — Architecture Option 2</title>
+<style>
+@page { size: letter; margin: 0.5in; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  color: #1a1a2e;
+  line-height: 1.5;
+  max-width: 7.5in;
+  margin: 0 auto;
+  padding: 15px 20px;
+  background: #fff;
+}
+.cover { text-align: center; padding: 28px 0 18px; border-bottom: 3px solid #1a1a2e; margin-bottom: 16px; }
+.cover h1 { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
+.cover .subtitle { font-size: 14px; color: #1565c0; margin-top: 4px; font-weight: 600; }
+.cover .tagline { font-size: 12px; color: #666; margin-top: 6px; }
+.cover .meta { font-size: 10px; color: #999; margin-top: 8px; }
+.cover .meta span { margin: 0 8px; }
+h2 { font-size: 17px; font-weight: 700; margin: 18px 0 5px; padding-bottom: 4px; border-bottom: 2px solid #e0e0e0; color: #0b3d91; }
+h3 { font-size: 13px; font-weight: 600; color: #1565c0; margin: 10px 0 3px; }
+p { margin: 4px 0; font-size: 10.5px; color: #333; }
+ul, ol { margin: 3px 0 3px 16px; }
+li { font-size: 10.5px; color: #333; margin-bottom: 2px; }
+code { font-family: 'SF Mono', 'Consolas', monospace; font-size: 9.5px; background: #f4f4f8; padding: 1px 4px; border-radius: 2px; }
+pre { background: #1a1a2e; color: #e0e0e0; padding: 8px 10px; border-radius: 4px; font-size: 9px; line-height: 1.35; margin: 5px 0; white-space: pre-wrap; overflow-x: auto; }
+pre code { background: transparent; color: inherit; padding: 0; }
+
+/* HTML table-based diagram (weasyprint-safe) */
+.diagram { margin: 10px auto; width: 100%; border-collapse: collapse; font-size: 9px; }
+.diagram td { padding: 2px; vertical-align: middle; text-align: center; }
+.subsys { border: 2px solid #999; border-radius: 6px; background: #f5f5f8; padding: 5px; }
+.subsys-title { font-weight: 700; font-size: 10px; color: #555; margin-bottom: 3px; letter-spacing: 0.5px; }
+.comp { background: #0b3d91; color: white; border-radius: 5px; padding: 4px 7px; margin: 2px; display: inline-block; }
+.comp .name { font-weight: 600; font-size: 9px; display: block; }
+.comp .sub { font-size: 7px; color: #ccd; display: block; margin-top: 1px; }
+.arrow-down { font-size: 16px; color: #555; line-height: 0.8; }
+.arrow-label { font-size: 7px; color: #888; font-style: italic; padding: 0 2px; }
+
+/* Tables */
+table.tech { width: 100%; border-collapse: collapse; margin: 6px 0; font-size: 10px; }
+table.tech th { background: #0b3d91; color: white; padding: 5px 8px; text-align: left; font-weight: 600; }
+table.tech td { padding: 4px 8px; border-bottom: 1px solid #e0e0e0; vertical-align: top; font-size: 9.5px; }
+table.tech tr:nth-child(even) td { background: #f8f8fc; }
+
+hr { border: none; border-top: 1px solid #e0e0e0; margin: 12px 0; }
+.footer { text-align: center; font-size: 8px; color: #bbb; margin-top: 18px; padding-top: 5px; border-top: 1px solid #eee; }
+
+.compact-box { background: #f0f4ff; border: 1px solid #c0d0f0; border-radius: 5px; padding: 8px 10px; margin: 6px 0; font-size: 10px; }
+.compact-box strong { color: #0b3d91; }
+
+@media print { body { padding: 0; max-width: 100%; } h2, h3 { break-after: avoid; } pre, table { break-inside: avoid; } .diagram { break-inside: avoid; } }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <h1>Agentic Synth</h1>
+  <div class="subtitle">Option 2: Text-to-Audio Synthesis</div>
+  <div class="tagline">Direct waveform generation from natural language description</div>
+  <div class="meta"><span>VST3/AU Plugin + Desktop App</span> | <span>Generative Audio</span></div>
+</div>
+
+<h2>1. Overview</h2>
+<p><strong>Option 1</strong> (text-to-parameters) uses an LLM to translate descriptions into synth control parameters — oscillator tuning, filter cutoffs, envelopes, LFO routing — which drive a conventional synthesis engine. <em>Text → synth parameters → synth engine → audio.</em></p>
+<p><strong>Option 2</strong> (this document) eliminates the synth engine entirely. A generative audio model produces the <strong>raw audio waveform directly</strong> from the text description. No oscillators, no filters, no envelopes — just the sound itself, rendered by a model trained on real audio.</p>
+<p>The producer describes what they hear in their imagination: <em>"a dark, ominous bass that feels large and otherworldly, with rhythmic vibrations that speed up and slow down, building to a crescendo like an earthquake."</em> The model generates the audio directly.</p>
+
+<hr>
+
+<h2>2. System Architecture</h2>
+
+<table class="diagram">
+
+<!-- Row 1: User Input -->
+<tr>
+  <td colspan="4">
+    <div class="subsys">
+      <div class="subsys-title">USER INPUT LAYER</div>
+      <div style="display:flex; justify-content:center; gap:8px; flex-wrap:wrap;">
+        <div class="comp"><div class="name">Text Description</div><div class="sub">Free-form natural language</div></div>
+        <div style="display:flex; flex-direction:column; justify-content:center; font-size:10px; color:#555;">OR</div>
+        <div class="comp"><div class="name">Reference Audio</div><div class="sub">Drag-and-drop audio file</div></div>
+      </div>
+    </div>
+  </td>
+</tr>
+
+<!-- Down arrow -->
+<tr>
+  <td colspan="4" style="text-align:center; padding:1px;">
+    <span class="arrow-down">↓</span><br>
+    <span class="arrow-label">Raw text + optional audio features</span>
+  </td>
+</tr>
+
+<!-- Row 2: Prompt Processor -->
+<tr>
+  <td colspan="4">
+    <div class="subsys" style="border-color: #1565c0;">
+      <div class="subsys-title">PROMPT PROCESSOR / LLM</div>
+      <div style="display:flex; justify-content:center; gap:4px;">
+        <div class="comp" style="background:#1565c0;"><div class="name">Phi-4 / Llama 3.2 8B</div><div class="sub">On-device inference</div></div>
+        <div style="display:flex; flex-direction:column; justify-content:center; font-size:12px; color:#555;">→</div>
+        <div class="comp" style="background:#1565c0;"><div class="name">Prompt Expander</div><div class="sub">Disambiguate · Contextualize · Format</div></div>
+      </div>
+      <div style="margin-top:3px; font-size:7px; color:#888; font-style:italic;">Expands "dark bass" → enriched prompt: sub-heavy, low-mid forward, minor key, 60 BPM</div>
+    </div>
+  </td>
+</tr>
+
+<!-- Down arrow -->
+<tr>
+  <td colspan="4" style="text-align:center; padding:1px;">
+    <span class="arrow-down">↓</span><br>
+    <span class="arrow-label">Enriched prompt + guidance params (duration, tempo, key)</span>
+  </td>
+</tr>
+
+<!-- Row 3: Core Generation (spanning full width) -->
+<tr>
+  <td colspan="4">
+    <div class="subsys" style="border-color: #0b3d91; border-width: 2.5px;">
+      <div class="subsys-title">CORE GENERATION PIPELINE</div>
+      <div style="display:flex; justify-content:center; align-items:center; gap:3px;">
+        <div class="comp" style="background:#0b3d91;"><div class="name">Latent Generator</div><div class="sub">Stable Audio Open / MusicGen</div></div>
+        <div style="font-size:14px; color:#555;">→</div>
+        <div class="comp" style="background:#0b3d91;"><div class="name">Audio Decoder</div><div class="sub">HiFiGAN / DAC Vocoder</div></div>
+        <div style="font-size:14px; color:#555;">→</div>
+        <div class="comp" style="background:#0b3d91;"><div class="name">Audio Renderer</div><div class="sub">PCM waveform · Loop stitch</div></div>
+      </div>
+      <div style="margin-top:3px; font-size:7px; color:#888; font-style:italic;">Diffusion/transformer generates latent → vocoder decodes to raw waveform → sample-accurate playback</div>
+    </div>
+  </td>
+</tr>
+
+<!-- Row 4: Split — Left: Variation | Right: Editing -->
+<tr>
+  <td width="50%">
+    <div class="subsys">
+      <div class="subsys-title">VARIATION ENGINE</div>
+      <div class="comp"><div class="name">Seeded Sampling</div><div class="sub">Different seeds · CFG scales</div></div>
+      <div style="font-size:8px; padding:1px; color:#888;">N alternative takes from same prompt</div>
+      <div class="comp"><div class="name">Interpolation</div><div class="sub">Morph between two samples</div></div>
+    </div>
+  </td>
+  <td width="50%">
+    <div class="subsys">
+      <div class="subsys-title">EDITING LAYER</div>
+      <div class="comp"><div class="name">Trim · Fade · Loop</div><div class="sub">Basic waveform editing</div></div>
+      <div style="font-size:8px; padding:1px; color:#888;">No external tool needed</div>
+      <div class="comp"><div class="name">Time-Stretch · Pitch</div><div class="sub">Elastic audio</div></div>
+    </div>
+  </td>
+</tr>
+
+<!-- Row 5: Audio Output + Persistence side by side -->
+<tr>
+  <td width="50%">
+    <div class="subsys" style="border-color: #2e7d32;">
+      <div class="subsys-title">AUDIO OUTPUT</div>
+      <div class="comp" style="background:#2e7d32;"><div class="name">WAV / AIFF Export</div><div class="sub">Broadcast WAV, 44.1/48kHz</div></div>
+      <div style="font-size:8px; padding:1px; color:#888;">OR</div>
+      <div class="comp" style="background:#2e7d32;"><div class="name">VST3 Sample Player</div><div class="sub">Drag-to-DAW · Real-time stream</div></div>
+    </div>
+  </td>
+  <td width="50%">
+    <div class="subsys" style="border-color: #7b1fa2;">
+      <div class="subsys-title">PERSISTENCE</div>
+      <div class="comp" style="background:#7b1fa2;"><div class="name">Session Memory</div><div class="sub">Prompts · Samples · History</div></div>
+      <div style="font-size:10px; color:#555; line-height:0.8; padding:1px;">‖</div>
+      <div class="comp" style="background:#7b1fa2;"><div class="name">Preset Library</div><div class="sub">SQLite + WAV filesystem</div></div>
+    </div>
+  </td>
+</tr>
+
+<!-- Arrow labels between rows -->
+<tr>
+  <td colspan="2" style="text-align:center; padding:1px;">
+    <span class="arrow-down">↓</span><br>
+    <span class="arrow-label">Generated WAV to DAW or export</span>
+  </td>
+  <td colspan="2" style="text-align:center; padding:1px;">
+    <span class="arrow-down">↓</span><br>
+    <span class="arrow-label">Prompt + seed + rating → DB</span>
+  </td>
+</tr>
+
+</table>
+
+<div class="compact-box">
+  <strong>Key difference from Option 1:</strong> No synthesizer engine. No oscillators, filters, envelopes, or LFOs. The audio is generated directly by a diffusion/transformer model trained on real audio data. The trade-off: less precise control but can produce ANY sound — including evolving textures, realistic acoustics, and complex rhythms that a synth engine cannot create.
+</div>
+
+<hr>
+
+<h2>3. Component Descriptions</h2>
+
+<h3>3.1 User Input Layer</h3>
+<ul>
+  <li><strong>Text Description</strong> — free-form natural language. No templates or dropdowns. Short fragments ("dark bass, earthquake feel"), poetic descriptions, production directions ("build to a crescendo over 30 seconds") — all valid.</li>
+  <li><strong>Reference Audio (optional)</strong> — drag-and-drop audio file for the model to match in character/timbre/energy. If the generation model supports audio conditioning (Stable Audio does), features are extracted and used as additional guidance.</li>
+</ul>
+
+<h3>3.2 Prompt Processor / LLM</h3>
+<ul>
+  <li><strong>Model:</strong> Phi-4 (3.8B) or Llama 3.2 8B — small, fast, runs on CPU alongside the GPU-accelerated audio model.</li>
+  <li>Disambiguates vague terms ("dark" → "sub-heavy, low-mid forward, minimal highs, minor key"), adds production context (genre, BPM, key, mood), expands metaphors ("earthquake vibration" → "low-frequency tremolo, rumble 30-80Hz, rhythmic AM mimicking seismic waves").</li>
+  <li>Formats the enriched prompt for the latent generator model, which expects audio-domain language, not metaphor.</li>
+  <li>Incorporates session memory — if the user previously generated a related sound, carries that context forward.</li>
+</ul>
+
+<h3>3.3 Latent Generator Model</h3>
+<ul>
+  <li>The <strong>core generative AI</strong> — a diffusion or transformer model that has learned the mapping between text descriptions and audio waveforms.</li>
+  <li><strong>Primary option: Stable Audio Open 2</strong> — open-weight, generates up to 90s stereo audio at 44.1kHz from text prompts. Trained on Free Music Archive (CC-licensed). Runs on 6GB+ VRAM.</li>
+  <li><strong>Alternative: MusicGen (Meta)</strong> — good for musical sounds, single-channel, up to 30s. Smaller model sizes available (300M–3.3B params).</li>
+  <li>Outputs a latent audio representation (compressed frequency-domain encoding) rather than raw PCM — the decoder converts this to waveform.</li>
+</ul>
+
+<h3>3.4 Audio Decoder / Vocoder</h3>
+<ul>
+  <li>Converts the latent representation into raw PCM audio waveform.</li>
+  <li><strong>HiFiGAN</strong> or <strong>DAC (Descript Audio Codec)</strong> decoder — fast, high quality, runs in near real-time on GPU.</li>
+  <li>Outputs floating-point PCM samples ready for playback or export.</li>
+</ul>
+
+<h3>3.5 Audio Renderer</h3>
+<ul>
+  <li>Sample-accurate playback engine. Handles real-time streaming from the decoder to the audio output.</li>
+  <li>Loop stitching — seamlessly loops generated audio by finding zero-crossing points.</li>
+  <li>Multi-sample playback — layers separate generations (e.g., bass + pad + FX).</li>
+</ul>
+
+<h3>3.6 Variation Engine</h3>
+<ul>
+  <li>Generates N alternative takes from the same prompt by varying: random seed, classifier-free guidance scale, temperature in latent space, truncation threshold.</li>
+  <li>Interpolation between two saved samples along a morph axis — creates smooth transitions.</li>
+  <li>All variants rendered in background, shown as a grid for quick A/B comparison.</li>
+</ul>
+
+<h3>3.7 Editing Layer</h3>
+<ul>
+  <li>DAW-light editing: trim silence, fade in/out (linear/equal-power), set loop points, normalize gain.</li>
+  <li>Basic EQ (low/high cut), time-stretch, pitch-shift (offline, high quality via rubberband or similar).</li>
+  <li>The user should never need to open another tool just to trim silence or add a fade.</li>
+</ul>
+
+<h3>3.8 Audio Output</h3>
+<ul>
+  <li><strong>Export:</strong> Broadcast WAV (44.1kHz/48kHz, 16/24-bit), AIFF, MP3 (320kbps).</li>
+  <li><strong>DAW Integration:</strong> VST3/AU sample player shell — loads generated WAV files into the DAW as a playable instrument. Drag-and-drop from the app directly into the DAW timeline.</li>
+  <li>Real-time streaming via Rewire/Jack for live preview inside the DAW.</li>
+</ul>
+
+<h3>3.9 Session Memory &amp; Preset Library</h3>
+<ul>
+  <li>SQLite database stores: prompt text, enriched prompt, model version, seed, CFG scale, generation time, user rating (liked/discarded), edit history.</li>
+  <li>Audio files stored on filesystem at <code>~/.agentic-synth-samples/</code> with UUID filenames.</li>
+  <li>Liked prompts boost similar generations in the future. Discarded prompts suppress them.</li>
+  <li>Full-text search across all prompts and tags in the library.</li>
+</ul>
+
+<hr>
+
+<h2>4. Data Flow</h2>
+<p><em>"A dark, ominous bass with rhythmic earthquake vibrations building to a crescendo"</em></p>
+<pre><code>1. INPUT → User types or speaks the description
+2. PROMPT PROCESSOR → Phi-4 expands it:
+   "sub-heavy bass, 40-80Hz fundamental, minor key, 
+    rhythmic amplitude modulation (LFO rate accelerating 
+    from 0.5Hz to 8Hz over 24 seconds), distortion 
+    on attack, massive reverb tail, 30 seconds"
+3. LATENT GENERATOR → Stable Audio Open runs diffusion:
+   Text embedding → latent diffusion (30 steps) → 
+   latent audio representation (~12 seconds generation time)
+4. DECODER → HiFiGAN converts latent → 44.1kHz PCM stereo
+5. RENDER → Preview plays in app UI
+6. USER SAYS → "Make it 15 seconds shorter"
+7. REFINE → Prompt updated with new duration, 
+   model re-runs with changed guidance parameters
+8. SAVE → User likes it → saved to library with 
+   prompt, seed, model version, tags
+9. EXPORT → Drag WAV into Ableton Live, 
+   or open in VST3 sample player</code></pre>
+
+<hr>
+
+<h2>5. Technology Choices</h2>
+<table class="tech">
+<tr><th>Component</th><th>Choice</th><th>Rationale</th></tr>
+<tr><td><strong>Core generation model</strong></td><td>Stable Audio Open 2</td><td>Open-weight, 90s stereo at 44.1kHz, trained on CC-licensed data, runs on 6GB+ VRAM</td></tr>
+<tr><td><strong>Audio decoder</strong></td><td>HiFiGAN / DAC</td><td>Fast, high-quality reconstruction from latent. Near real-time on GPU</td></tr>
+<tr><td><strong>Prompt LLM</strong></td><td>Phi-4 or Llama 3.2 8B</td><td>Small, fast, runs on CPU alongside GPU audio model. No VRAM contention</td></tr>
+<tr><td><strong>Variation</strong></td><td>Seed + CFG scale sampling</td><td>Simple, effective. Different seeds produce meaningfully different takes</td></tr>
+<tr><td><strong>DAW integration</strong></td><td>VST3 sample player (JUCE)</td><td>Loads generated WAV as playable instrument in any DAW</td></tr>
+<tr><td><strong>Local hardware</strong></td><td>RTX 3060+ / Apple M2+ (16GB RAM)</td><td>Generation target: &lt;10s for 10s of audio. Quantized models reduce requirement</td></tr>
+<tr><td><strong>UI</strong></td><td>React + TypeScript + WebSocket</td><td>Same as Option 1. Rich chat UX, fast iteration</td></tr>
+<tr><td><strong>Storage</strong></td><td>SQLite + filesystem WAV</td><td>SQLite for metadata, WAV files on disk. No DB needed for large blobs</td></tr>
+</table>
+
+<hr>
+
+<h2>6. Key Risks &amp; Mitigations</h2>
+
+<h3>Generation Latency</h3>
+<p><strong>Risk:</strong> 5-30 seconds per generation on consumer GPU breaks the creative flow. User can't iterate quickly.</p>
+<p><strong>Mitigation:</strong> Streaming generation (play first 2 seconds while rest continues), cached "quick start" prompt library, background pre-generation of 3 variants on idle, optional cloud GPU fallback for faster generation.</p>
+
+<h3>Quality Inconsistency</h3>
+<p><strong>Risk:</strong> Model may not understand unusual descriptions ("glitchy granular bass that sounds like a dying robot"). Output quality varies with prompt specificity.</p>
+<p><strong>Mitigation:</strong> Prompt processor enriches vague descriptions. User rating feedback loops. Future: fine-tune model on synth/sound-design datasets for better understanding of sound design vocabulary.</p>
+
+<h3>Local Hardware Requirements</h3>
+<p><strong>Risk:</strong> Needs GPU with 6GB+ VRAM. Many producers have laptops with integrated graphics only.</p>
+<p><strong>Mitigation:</strong> Quantized models (4-bit, 2GB VRAM), CPU fallback (slower but works), optional cloud inference tier with faster generation, progressive enhancement — basic features on lower hardware, full quality on GPU.</p>
+
+<h3>Lack of Precise Control</h3>
+<p><strong>Risk:</strong> Unlike a synth where you can set "filter cutoff = 800Hz", text-to-audio is probabilistic. You can't say "reduce resonance by 15%."</p>
+<p><strong>Mitigation:</strong> Hybrid approach — Option 2 for initial sound, Option 1 for refinement. Audio-to-parameters analysis (spectral analysis of generated audio → parameter suggestions). Editing layer compensates (trim, EQ, fade, time-stretch).</p>
+
+<h3>Training Data / Copyright</h3>
+<p><strong>Risk:</strong> Model may reproduce elements from training data (timbres, samples, recognizable audio).</p>
+<p><strong>Mitigation:</strong> Use models trained on licensed data (Stable Audio Open uses Free Music Archive — CC-by licensed). User indemnification, no commercial use of model outputs without verification, optional audio fingerprinting for copyright detection.</p>
+
+<hr>
+
+<h2>7. Implementation Phases</h2>
+
+<h3>Phase 1 — Core Loop (Standalone App)</h3>
+<p><strong>Goal:</strong> Text → audio in under 30 seconds. Proof of concept.</p>
+<ul>
+  <li>Package Stable Audio Open behind a Python/FastAPI server</li>
+  <li>Basic React UI: text input → generate → play → export WAV</li>
+  <li>No prompt processor yet — raw text goes directly to model</li>
+  <li>No editing, no variations, no session memory</li>
+  <li>Target: 15s generation for 10s of audio on RTX 3060</li>
+</ul>
+
+<h3>Phase 2 — Prompt LLM + Variations</h3>
+<ul>
+  <li>Integrate Phi-4 for prompt expansion and enrichment</li>
+  <li>Variation engine: seed sampling, CFG scale sweep</li>
+  <li>SQLite session memory: prompt history, liked/discarded tracking</li>
+  <li>Preset library browser with full-text search</li>
+  <li>Basic editing: trim + fade</li>
+</ul>
+
+<h3>Phase 3 — DAW Integration</h3>
+<ul>
+  <li>VST3/AU sample player shell (JUCE) — loads generated WAV files</li>
+  <li>Drag-and-drop from app to DAW timeline</li>
+  <li>Plugin recall: DAW saves reference to generated sample</li>
+  <li>Basic EQ and gain editing</li>
+</ul>
+
+<h3>Phase 4 — Advanced Features</h3>
+<ul>
+  <li><strong>Style transfer:</strong> "Make this sound like [reference sample]" — audio-to-audio generation</li>
+  <li><strong>Multi-track generation:</strong> Generate bass + pad + FX simultaneously</li>
+  <li><strong>Cloud GPU offload:</strong> Faster generation via cloud, optional subscription tier</li>
+  <li><strong>Real-time streaming:</strong> Generate and play simultaneously, infinite evolving textures</li>
+  <li><strong>Hybrid mode:</strong> Option 2 generation → Option 1 synth analysis → tweak with parameters</li>
+</ul>
+
+<hr>
+
+<h2>8. Option 1 vs Option 2 — When to Use Which</h2>
+<table class="tech">
+<tr><th>Scenario</th><th>Option 1 (Parameters)</th><th>Option 2 (Direct Audio)</th></tr>
+<tr><td>Classic synth sound (lead, bass, pad)</td><td>✅ Excellent — precise control</td><td>🟡 Good — may not match exact vision</td></tr>
+<tr><td>Evolving, complex textures</td><td>❌ Hard — multi-LFO routing tedious</td><td>✅ Excellent — model handles evolution</td></tr>
+<tr><td>Realistic / acoustic sounds</td><td>❌ Impossible — synth can't do this</td><td>✅ Excellent — model trained on real audio</td></tr>
+<tr><td>Precise parameter tweaking</td><td>✅ "Cutoff at 800Hz"</td><td>❌ "Make it darker" — probabilistic</td></tr>
+<tr><td>Sound design exploration</td><td>🟡 Good — but limited by synth arch</td><td>✅ Endless — model has no boundaries</td></tr>
+<tr><td>Low-end laptop (no GPU)</td><td>✅ Runs on anything</td><td>❌ Needs GPU</td></tr>
+<tr><td>Real-time performance</td><td>✅ Instant parameter changes</td><td>🟡 5-30s generation latency</td></tr>
+</table>
+
+<div class="footer">Agentic Synth — Architecture Option 2 · Direct Audio Generation · Generated 2026-05-07</div>
+
+</body>
+</html>
