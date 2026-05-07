@@ -26,6 +26,7 @@ CTestTestfile.cmake
 *.so
 *.vst3
 *.component
+*.app
 
 # UI dependencies and outputs
 node_modules/
@@ -48,3 +49,7 @@ __pycache__/
 *.wav
 *.gguf
 session.db
+*.jucer
+
+# JUCE generated
+JuceLibraryCode/
