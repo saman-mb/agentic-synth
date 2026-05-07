@@ -1,0 +1,17 @@
+* text=auto eol=lf
+
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+*.aif binary
+*.aiff binary
+*.component binary
+*.dll binary
+*.exe binary
+*.gguf binary
+*.jpg binary
+*.mp3 binary
+*.pdf binary
+*.png binary
+*.vst3 binary
+*.wav binary

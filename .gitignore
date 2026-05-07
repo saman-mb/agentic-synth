@@ -1,14 +1,50 @@
-*.wav
-*.aif
-*.mp3
+# OS and editor files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+
+# Build outputs
+build/
+cmake-build-*/
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+compile_commands.json
+Testing/
+CTestTestfile.cmake
+
+# C++ artifacts
+*.a
+*.dylib
 *.exe
+*.lib
 *.dll
+*.o
+*.obj
+*.so
 *.vst3
 *.component
-.DS_Store
-build/
+
+# UI dependencies and outputs
 node_modules/
+ui/dist/
+ui/.vite/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Python helper artifacts
 __pycache__/
 *.pyc
+
+# Audio/model/local runtime data
+*.aif
+*.aiff
+*.mp3
+*.wav
 *.gguf
 session.db
