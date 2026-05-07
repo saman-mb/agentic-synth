@@ -1,0 +1,524 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Agentic Synth — Architecture Option 2</title>
+<style>
+@page {
+  size: Letter;
+  margin: 0.75in 0.75in 0.85in 0.75in;
+  @bottom-center {
+    content: "Agentic Synth — Architecture Option 2  •  Page " counter(page) " of " counter(pages);
+    font-family: 'Inter', sans-serif;
+    font-size: 9pt;
+    color: #607d8b;
+  }
+}
+html { font-family: 'Inter', 'Helvetica Neue', Arial, sans-serif; color: #0d1b2a; }
+body { font-size: 10.5pt; line-height: 1.55; }
+h1 {
+  font-size: 22pt; color: #0b3d91; border-bottom: 3px solid #1565c0;
+  padding-bottom: 0.25em; margin-top: 0; margin-bottom: 0.6em;
+  page-break-after: avoid;
+}
+h2 {
+  font-size: 15pt; color: #0b3d91; margin-top: 1.4em;
+  border-bottom: 1px solid #b0bec5; padding-bottom: 0.15em;
+  page-break-after: avoid; page-break-before: auto;
+}
+h3 {
+  font-size: 12.5pt; color: #1565c0; margin-top: 1.1em;
+  page-break-after: avoid;
+}
+h4 { font-size: 11pt; color: #263238; margin-top: 0.9em; page-break-after: avoid; }
+p { margin: 0.45em 0; }
+strong { color: #0b3d91; }
+code {
+  font-family: 'JetBrains Mono', 'Menlo', monospace;
+  background: #eceff1; color: #0d47a1;
+  padding: 1px 5px; border-radius: 3px; font-size: 9.5pt;
+}
+pre {
+  background: #0d1b2a; color: #e0f2f1;
+  padding: 12px 14px; border-radius: 6px;
+  font-family: 'JetBrains Mono', 'Menlo', monospace;
+  font-size: 8.8pt; line-height: 1.45;
+  overflow-x: auto; page-break-inside: avoid;
+  border-left: 4px solid #1565c0;
+}
+pre code { background: transparent; color: inherit; padding: 0; }
+table {
+  border-collapse: collapse; width: 100%;
+  margin: 0.8em 0; font-size: 9.5pt;
+  page-break-inside: avoid;
+}
+th {
+  background: #1565c0; color: white; padding: 8px 10px;
+  text-align: left; font-weight: 600; border: 1px solid #0b3d91;
+}
+td { padding: 7px 10px; border: 1px solid #cfd8dc; vertical-align: top; }
+tr:nth-child(even) td { background: #f5f7fa; }
+ul, ol { margin: 0.4em 0 0.6em 1.4em; padding: 0; }
+li { margin: 0.18em 0; }
+hr { border: 0; border-top: 1px solid #cfd8dc; margin: 1.4em 0; }
+blockquote {
+  border-left: 4px solid #1565c0; background: #f1f8ff;
+  margin: 0.6em 0; padding: 0.4em 0.9em; color: #263238;
+}
+.diagram {
+  text-align: center; margin: 1.2em 0;
+  page-break-inside: avoid; page-break-before: auto;
+}
+.diagram img {
+  max-width: 100%; max-height: 9in;
+  border: 1px solid #cfd8dc; border-radius: 4px;
+  background: white; padding: 8px;
+}
+</style>
+</head>
+<body>
+<h1 id="agentic-synth-option-2-text-to-audio-synthesis-direct-waveform-generation">Agentic Synth — Option 2: Text-to-Audio Synthesis (Direct Waveform Generation)</h1>
+<h2 id="high-level-architecture-document">High-Level Architecture Document</h2>
+<hr />
+<h2 id="1-overview">1. Overview</h2>
+<h3 id="the-fundamental-shift">The Fundamental Shift</h3>
+<p>Option 1 (text-to-parameters) uses an LLM to translate a natural-language sound description into synthesizer control parameters — oscillator tuning, filter cutoffs, envelope times, LFO routing — which then drive a conventional synthesis engine. The architecture is: <strong>text → synth parameters → synth engine → audio</strong>.</p>
+<p>Option 2 eliminates the synthesis engine entirely. The model doesn't configure an instrument. It <strong>renders the audio waveform directly from the description</strong>. There are no oscillators. No filter envelopes. No LFO routing tables. The model has internalized what "dark and ominous" or "earthquake vibration" sounds like and produces raw PCM samples.</p>
+<p>Architecture: <strong>text → generative audio model → waveform</strong>.</p>
+<h3 id="why-this-matters">Why This Matters</h3>
+<p>A traditional synthesizer is a formal system: its parameter space is bounded and its vocabulary is technical (<code>filter_cutoff = 800Hz</code>, <code>osc1_wave = sawtooth</code>). A producer who says <em>"sounds like the floor is about to collapse but in a musical way"</em> cannot express that in synth parameters without first translating it internally to a technical specification.</p>
+<p>The text-to-audio approach accepts the description as-is. The model has learned the mapping from human-expressive language to perceptual audio qualities by training on vast corpora of audio paired with descriptions. The producer's mental model is the interface.</p>
+<h3 id="tradeoffs-vs-option-1">Tradeoffs vs Option 1</h3>
+<table>
+<thead>
+<tr>
+<th>Dimension</th>
+<th>Option 1 (Text → Parameters)</th>
+<th>Option 2 (Text → Waveform)</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Precision</td>
+<td>High — exact Hz, dB, ms</td>
+<td>Low — probabilistic</td>
+</tr>
+<tr>
+<td>Expressiveness</td>
+<td>Low — limited to synth vocabulary</td>
+<td>High — unlimited natural language</td>
+</tr>
+<tr>
+<td>Latency</td>
+<td>Near-instant (parameter set)</td>
+<td>5–30s per generation</td>
+</tr>
+<tr>
+<td>Editability</td>
+<td>Parametric — tweak any control</td>
+<td>Post-hoc — edit rendered audio</td>
+</tr>
+<tr>
+<td>Hardware req.</td>
+<td>CPU-capable</td>
+<td>GPU required (6GB+ VRAM)</td>
+</tr>
+<tr>
+<td>Reproducibility</td>
+<td>Exact (same params = same sound)</td>
+<td>Near-exact (seed-controlled)</td>
+</tr>
+<tr>
+<td>Surprise factor</td>
+<td>Low</td>
+<td>High — model may exceed expectation</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="2-system-architecture-diagram">2. System Architecture Diagram</h2>
+<p><strong>MERMAID_DIAGRAM</strong></p>
+<hr />
+<h2 id="3-component-descriptions">3. Component Descriptions</h2>
+<h3 id="31-user-input-layer">3.1 User Input Layer</h3>
+<p><strong>Text Description</strong> — free-form natural language. No template, no dropdowns, no required fields. The producer types what they hear in their imagination. Short fragments ("dark bass, earthquake feel"), poetic descriptions, references to existing sounds ("like that Burial sub-bass but evolving"), production directions ("build to a crescendo over 30 seconds") — all valid input.</p>
+<p><strong>Reference Audio (optional)</strong> — a drag-and-drop audio file the user wants the model to match in character, timbre, or energy. The Prompt Processor encodes salient features into the text prompt or uses audio conditioning if the model supports it (Stable Audio supports optional audio prompts).</p>
+<hr />
+<h3 id="32-prompt-processor-llm">3.2 Prompt Processor / LLM</h3>
+<p><strong>Role:</strong> Bridge between human expressive language and the precise structured prompts that audio generation models respond well to.</p>
+<p><strong>Model:</strong> Phi-4 (3.8B) or Llama 3.2 8B — small, fast, runs on the same machine as the audio model without competing for VRAM. Can be offloaded to CPU while the audio model runs on GPU.</p>
+<p><strong>What it does:</strong>
+- <strong>Disambiguates vague terms</strong> — "dark" → "sub-heavy, low mid-forward, minimal high-frequency content, minor key or atonal"
+- <strong>Adds production context</strong> — infers genre, BPM, key, mood from description and adds it explicitly
+- <strong>Expands metaphors</strong> — "earthquake vibration" → "low-frequency tremolo/vibrato, rumble in 30–80Hz range, rhythmic amplitude modulation mimicking seismic P-waves"
+- <strong>Formats for model</strong> — produces a structured prompt suitable for the latent generator (which expects audio-domain language, not metaphor)
+- <strong>Incorporates session memory</strong> — if the user previously generated a related sound, carries that context forward</p>
+<p><strong>Input:</strong> Raw user text (+ optional reference audio features)
+<strong>Output:</strong> Enriched prompt string + optional guidance parameters (duration, tempo, key)</p>
+<hr />
+<h3 id="33-latent-generator-model">3.3 Latent Generator Model</h3>
+<p>The <strong>core generative AI</strong> — the component that has learned the mapping between audio descriptions and sound.</p>
+<p><strong>Architecture options:</strong></p>
+<table>
+<thead>
+<tr>
+<th>Model</th>
+<th>Type</th>
+<th>Max Duration</th>
+<th>Quality</th>
+<th>VRAM</th>
+<th>License</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Stable Audio Open 2</strong></td>
+<td>Latent diffusion (transformer)</td>
+<td>47s stereo</td>
+<td>Excellent (sound design)</td>
+<td>8GB</td>
+<td>Apache 2.0</td>
+</tr>
+<tr>
+<td><strong>MusicGen (Meta)</strong></td>
+<td>Autoregressive transformer</td>
+<td>30s</td>
+<td>Very good (musical)</td>
+<td>6–16GB</td>
+<td>CC-BY-NC</td>
+</tr>
+<tr>
+<td><strong>AudioLDM 2</strong></td>
+<td>Latent diffusion (U-Net)</td>
+<td>~10s</td>
+<td>Good</td>
+<td>8GB</td>
+<td>Apache 2.0</td>
+</tr>
+<tr>
+<td><strong>Custom fine-tuned</strong></td>
+<td>Any of above, fine-tuned</td>
+<td>Variable</td>
+<td>Best for synth sounds</td>
+<td>Same</td>
+<td>Project-owned</td>
+</tr>
+</tbody>
+</table>
+<p><strong>Preferred default: Stable Audio Open 2</strong> — open-source (Apache 2.0), trained on FMA (Free Music Archive, CC-licensed audio), excellent at non-musical sound design, generates up to 47 seconds stereo at 44.1kHz.</p>
+<p><strong>What it produces:</strong> A latent tensor — a compressed high-dimensional representation of the audio, not yet a waveform. This passes to the Audio Decoder.</p>
+<p><strong>Guidance:</strong> Classifier-free guidance (CFG) scale controls how strictly the model follows the prompt vs. how creative it is. Lower CFG = more variation, higher = more literal.</p>
+<hr />
+<h3 id="34-audio-decoder-vocoder">3.4 Audio Decoder / Vocoder</h3>
+<p>Converts the latent representation to a raw PCM waveform that can be played back.</p>
+<p><strong>Options:</strong>
+- <strong>DAC (Descript Audio Codec)</strong> — state-of-the-art, 44.1kHz, high fidelity, fast inference. Used by Stable Audio Open natively. Preferred.
+- <strong>HiFiGAN</strong> — fast, battle-tested GAN-based vocoder, slightly lower fidelity at extreme frequencies but near real-time on GPU.
+- <strong>EnCodec (Meta)</strong> — pairs naturally with MusicGen models.</p>
+<p><strong>Performance target:</strong> Decode 10 seconds of audio in &lt; 1 second on RTX 3060. This is achievable with DAC on CUDA.</p>
+<p><strong>Output:</strong> Interleaved stereo PCM float32 at 44.1kHz or 48kHz, ready for playback or file write.</p>
+<hr />
+<h3 id="35-variation-engine">3.5 Variation Engine</h3>
+<p>Generates N distinct alternatives from the same prompt so the user can select the best take — like getting multiple mic takes in recording.</p>
+<p><strong>Mechanisms:</strong>
+- <strong>Seed variation</strong> — same prompt, different random seed. Deterministic given seed (reproducible).
+- <strong>Temperature sampling</strong> — vary sampling temperature in the latent diffusion process. Higher temp = more variation.
+- <strong>CFG scale sweep</strong> — generate variants at CFG 3, 5, 7. Lower CFG introduces creative deviation from the prompt.
+- <strong>Latent interpolation</strong> — if user likes elements from take A and take B, interpolate their latents to produce a blend (experimental).</p>
+<p><strong>UI:</strong> Renders 3–6 variants simultaneously (parallel inference jobs if VRAM allows, sequential otherwise). User auditions and picks or blends.</p>
+<hr />
+<h3 id="36-editing-layer">3.6 Editing Layer</h3>
+<p>Minimal post-generation editing so the user doesn't need to open a DAW for basic operations.</p>
+<p><strong>Capabilities:</strong>
+- <strong>Trim</strong> — remove silence or unwanted content from start/end
+- <strong>Fade in / Fade out</strong> — linear or equal-power curves, adjustable duration
+- <strong>Loop point editor</strong> — detect and set loop points for seamless looping; crossfade editor for loop transitions
+- <strong>Gain</strong> — clip-level gain adjustment
+- <strong>Basic EQ</strong> — high-pass, low-pass, simple shelf EQ (not a full EQ plugin — just correction)
+- <strong>Time-stretch</strong> — stretch/compress audio to match a BPM target without pitch change (Rubber Band library or similar)
+- <strong>Pitch-shift</strong> — semitone/cent shift without time change</p>
+<p><strong>What it deliberately does NOT do:</strong> Replace a DAW. Complex effects chains, MIDI, arrangement, multi-track mixing — those stay in the DAW. This layer is for preparation and basic refinement only.</p>
+<hr />
+<h3 id="37-audio-renderer">3.7 Audio Renderer</h3>
+<p>Handles real-time playback within the application.</p>
+<p><strong>Responsibilities:</strong>
+- Sample-accurate playback start/stop/loop
+- Real-time waveform visualization (rendered in React canvas)
+- <strong>Streaming preview</strong> — as the Audio Decoder produces audio, stream the first decoded chunk to the audio output before full generation is complete (reduces perceived latency)
+- Loop stitching — seamless loop playback with crossfade at boundary
+- Transport controls (play, pause, loop, scrub)</p>
+<p><strong>Backend:</strong> PortAudio (cross-platform) or platform-native audio API (CoreAudio on macOS, WASAPI on Windows). Exposed to the React UI via WebSocket audio streaming or a native module bridge.</p>
+<hr />
+<h3 id="38-session-memory">3.8 Session Memory</h3>
+<p>Ephemeral per-session store that gives the system context across multiple generations within a working session.</p>
+<p><strong>Stores:</strong>
+- All prompts issued this session (raw + expanded)
+- All generated samples (paths + metadata)
+- Liked / discarded / neutral ratings per sample
+- Edit operations applied
+- Iteration chain — which generations were derived from which prior generation</p>
+<p><strong>Used by:</strong>
+- Prompt Processor — carries forward context when user says "make it longer" or "more aggressive" (understands what "it" and "more" refer to)
+- Variation Engine — knows which seeds to avoid (already generated) or explore (away from discarded clusters)</p>
+<p><strong>Storage:</strong> In-memory during session. Serialized to SQLite on session save.</p>
+<hr />
+<h3 id="39-preset-library">3.9 Preset Library</h3>
+<p>Persistent long-term storage of approved samples and their full generation metadata.</p>
+<p><strong>Per entry:</strong>
+- Audio file (WAV, full quality)
+- Raw user prompt
+- Expanded prompt (post-Prompt Processor)
+- Model name + version
+- Seed
+- CFG scale
+- Generation timestamp
+- User-applied tags (freeform)
+- Edit history
+- BPM, key, duration (extracted or user-set)</p>
+<p><strong>Storage:</strong> SQLite for metadata index, flat filesystem for WAV files. Optional export to a folder structure compatible with DAW sample library browsers (e.g., compatible with Ableton's Places or Logic's Loop Browser via standard folder hierarchy).</p>
+<hr />
+<h2 id="4-data-flow-end-to-end-walk-through">4. Data Flow — End-to-End Walk-Through</h2>
+<h3 id="scenario-a-dark-ominous-bass-with-rhythmic-earthquake-vibrations">Scenario: "A dark, ominous bass with rhythmic earthquake vibrations"</h3>
+<pre><code>1. USER INPUT
+   User types: &quot;a dark, ominous bass that feels large and otherworldly,
+   with a syncopated vibrating feel like an earthquake, rhythmic elements
+   that come in and out, speeding up and slowing down, building to a crescendo&quot;
+
+2. PROMPT PROCESSOR (Phi-4, local)
+   Interprets: bass sound, dark timbre, sub-heavy, large/roomy, alien quality,
+   syncopated LFO-like amplitude modulation, tremolo variation in rate,
+   dynamic build (crescendo = increasing amplitude + density over time)
+
+   Produces enriched prompt:
+   &quot;Deep sub-bass synthesizer, dark and cavernous, 40–80Hz fundamental with
+   sparse upper harmonics, slow tremolo modulation (0.5–2Hz) with irregular
+   syncopated rhythm, amplitude envelope building from -18dB to 0dB over 20
+   seconds, subtle pitch wobble suggesting instability, reverberant space,
+   minor/atonal tonality, BPM: free, duration: 20s&quot;
+
+   Guidance params: duration=20s, steps=50, CFG=6.0
+
+3. LATENT GENERATOR (Stable Audio Open 2, GPU)
+   Runs diffusion inference: 50 DDIM steps on enriched prompt
+   Produces: latent tensor [batch=1, channels=64, time=T]
+   Time: ~8–15s on RTX 3060 Ti
+
+4. AUDIO DECODER (DAC, GPU)
+   Decodes latent → PCM float32, 44.1kHz stereo, 20 seconds
+   Streams first 2s to Audio Renderer before full decode complete
+   Time: &lt;2s for full 20s audio
+
+5. AUDIO RENDERER
+   Streams first 2 seconds to speakers immediately (user hears preview)
+   Full waveform renders in UI as decode completes
+   User listens to the 20-second generation
+
+6. USER REFINEMENT
+   User types: &quot;make it 30 seconds and build more dramatically,
+   the earthquake rhythm should accelerate at the end&quot;
+
+7. PROMPT PROCESSOR (with session context)
+   Carries forward previous enriched prompt
+   Updates: duration=30s, adds &quot;acceleration of tremolo rate from 0.3Hz
+   to 4Hz over final 10 seconds&quot;, &quot;amplitude envelope more aggressive
+   gain staging in final 8 seconds&quot;
+
+8. LATENT GENERATOR
+   Re-runs with updated prompt + same base seed (so character is preserved)
+   New latent → Audio Decoder → new 30s waveform
+
+9. USER APPROVES
+   Rates take as &quot;liked&quot;
+   Trims 2s of silence from start using Editing Layer
+   Sets loop points at 0.5s → 28.3s
+   Tags: &quot;bass / dark / earthquake / evolving&quot;
+
+10. SAVE TO PRESET LIBRARY
+    Writes WAV to filesystem
+    Inserts SQLite record: all metadata, prompt, seed, CFG, edit history
+
+11. DAW EXPORT
+    User drags from Preset Library into Ableton Live session
+    OR: VST3 sample player shell loaded in DAW, loads this preset,
+    plays it on MIDI note-on trigger
+</code></pre>
+<hr />
+<h2 id="5-technology-choices">5. Technology Choices</h2>
+<table>
+<thead>
+<tr>
+<th>Component</th>
+<th>Choice</th>
+<th>Rationale</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td><strong>Core generation model</strong></td>
+<td>Stable Audio Open 2</td>
+<td>Open-weight (Apache 2.0), 44.1kHz stereo, up to 47s, excellent sound design quality, trained on CC-licensed audio</td>
+</tr>
+<tr>
+<td><strong>Fallback model</strong></td>
+<td>MusicGen Medium</td>
+<td>Better for melodic/harmonic content; pairs with EnCodec decoder</td>
+</tr>
+<tr>
+<td><strong>Audio decoder</strong></td>
+<td>DAC (Descript Audio Codec)</td>
+<td>Native to Stable Audio Open, fast, high fidelity, 44.1kHz</td>
+</tr>
+<tr>
+<td><strong>Prompt LLM</strong></td>
+<td>Phi-4 (3.8B)</td>
+<td>Small enough to run on CPU (offloaded from GPU), fast, good instruction following</td>
+</tr>
+<tr>
+<td><strong>Prompt LLM fallback</strong></td>
+<td>Llama 3.2 8B (4-bit GGUF)</td>
+<td>Stronger reasoning, still fits in 6GB RAM on CPU</td>
+</tr>
+<tr>
+<td><strong>Variation</strong></td>
+<td>Seed sweep + CFG sweep</td>
+<td>Deterministic, reproducible, no additional model required</td>
+</tr>
+<tr>
+<td><strong>Editing</strong></td>
+<td>Rubber Band (time-stretch), libsndfile (I/O)</td>
+<td>Best-in-class OSS time-stretching; libsndfile is industry standard</td>
+</tr>
+<tr>
+<td><strong>DAW integration</strong></td>
+<td>VST3 sample player (JUCE)</td>
+<td>Universal DAW support; JUCE framework handles AU/VST3/CLAP from single codebase</td>
+</tr>
+<tr>
+<td><strong>UI</strong></td>
+<td>React + WebSocket</td>
+<td>Same stack as Option 1; WebSocket handles real-time audio streaming and waveform data push</td>
+</tr>
+<tr>
+<td><strong>Session/preset storage</strong></td>
+<td>SQLite + filesystem WAV</td>
+<td>Zero infrastructure, fast queries, portable</td>
+</tr>
+<tr>
+<td><strong>Audio I/O</strong></td>
+<td>PortAudio</td>
+<td>Cross-platform, low-latency, well-maintained</td>
+</tr>
+<tr>
+<td><strong>Local hardware minimum</strong></td>
+<td>RTX 3060 (6GB VRAM) / Apple M2 (16GB unified)</td>
+<td>Stable Audio Open 2 requires ~5.5GB VRAM; M2 can run via MPS backend</td>
+</tr>
+<tr>
+<td><strong>Local hardware recommended</strong></td>
+<td>RTX 4070 (12GB VRAM) / Apple M3 Max</td>
+<td>Enables larger batch sizes (parallel variation generation)</td>
+</tr>
+<tr>
+<td><strong>Generation latency target</strong></td>
+<td>&lt; 10s for 10s audio</td>
+<td>Achievable on RTX 3060 with Stable Audio Open 2 at 50 steps</td>
+</tr>
+<tr>
+<td><strong>Cloud fallback</strong></td>
+<td>Replicate / Modal (Stable Audio API)</td>
+<td>For users without capable GPU; adds ~2–5s network latency but removes hardware barrier</td>
+</tr>
+</tbody>
+</table>
+<hr />
+<h2 id="6-key-risks-mitigations">6. Key Risks &amp; Mitigations</h2>
+<h3 id="risk-1-generation-latency-breaks-real-time-feel">Risk 1: Generation Latency — Breaks Real-Time Feel</h3>
+<p><strong>Problem:</strong> 5–30 seconds per generation on consumer GPU. A producer adjusting a sound expects immediate feedback. Waiting 15 seconds per iteration is workable for deliberate generation but kills the flow state of sound design.</p>
+<p><strong>Mitigations:</strong>
+- <strong>Streaming decode</strong> — Audio Decoder streams the first 2 seconds of audio to playback before full generation is complete. User hears something within 2–3 seconds even if the full render takes 15.
+- <strong>Background pre-generation</strong> — while user is listening/editing the current take, the Variation Engine pre-generates 2–3 variants in the background with the current seed neighborhood.
+- <strong>Cached quick-start presets</strong> — a small library of pre-generated stems for common categories (bass, pad, FX, percussion). User can start playing with these immediately while the custom generation runs.
+- <strong>Progressive step streaming</strong> — for diffusion models, output intermediate noisy-but-recognizable versions at step 10, 20, 30, 50 so user can abort early if clearly wrong direction.</p>
+<hr />
+<h3 id="risk-2-quality-inconsistency">Risk 2: Quality Inconsistency</h3>
+<p><strong>Problem:</strong> The model may not understand unusual or idiosyncratic descriptions. "Sounds like the floor is about to collapse" might produce an incoherent result.</p>
+<p><strong>Mitigations:</strong>
+- <strong>Prompt Processor as buffer</strong> — the LLM translates metaphor into audio-domain language the generative model understands. This is the primary quality improvement lever.
+- <strong>User rating feedback loop</strong> — liked/disliked ratings stored per session. Over time, fine-tune the Prompt Processor on (raw_prompt, expanded_prompt, rating) pairs.
+- <strong>Fine-tuning on synth/sound-design datasets</strong> — curate a dataset of (description, audio) pairs from sound design libraries, fine-tune Stable Audio Open 2 on this domain. Custom fine-tune dramatically improves performance for the specific vocabulary of electronic music production.
+- <strong>Reference audio conditioning</strong> — when the model supports it, a reference audio drop-in steers generation even when text is vague.</p>
+<hr />
+<h3 id="risk-3-local-hardware-requirements">Risk 3: Local Hardware Requirements</h3>
+<p><strong>Problem:</strong> 6GB+ VRAM excludes a significant portion of potential users (integrated graphics, older cards, 4GB VRAM cards).</p>
+<p><strong>Mitigations:</strong>
+- <strong>Quantized models</strong> — 4-bit or 8-bit quantization reduces VRAM from 6GB to ~3–4GB with modest quality loss. GGUF format for LLM components.
+- <strong>CPU fallback</strong> — Stable Audio Open 2 can run on CPU via PyTorch. Generation takes 3–5x longer (30–90s) but works on any machine. Acceptable for non-time-critical use.
+- <strong>Cloud inference fallback</strong> — optional setting routes generation to Replicate or Modal API. Adds API cost (~$0.02–0.05 per generation) and 2–5s network round-trip but removes hardware barrier entirely.
+- <strong>Smaller model tier</strong> — AudioLDM 2 "small" variant runs in ~4GB VRAM with reduced quality. Present as "quick" mode.</p>
+<hr />
+<h3 id="risk-4-lack-of-precise-control">Risk 4: Lack of Precise Control</h3>
+<p><strong>Problem:</strong> Unlike a synthesizer, you cannot say "set the filter cutoff to exactly 800Hz and the resonance to 0.6". The output is probabilistic. A producer who needs a specific harmonic characteristic must describe it in natural language and hope the model interprets it correctly.</p>
+<p><strong>Mitigations:</strong>
+- <strong>Hybrid approach</strong> — after generation, offer audio analysis that extracts approximate tonal parameters and feeds them into a lightweight synthesis layer for fine-tuning (audio-to-parameters → small parameter-based synth for correction). This recovers some precision at the cost of complexity.
+- <strong>Iterative refinement vocabulary</strong> — train the Prompt Processor to understand relative instructions: "less high end", "more attack", "cut the reverb tail". These map to prompt delta operations rather than re-description from scratch.
+- <strong>Spectrum display + EQ in Editing Layer</strong> — even if the source can't be re-synthesized, the user can EQ the output to correct tonal issues. This is often sufficient for production use.</p>
+<hr />
+<h3 id="risk-5-copyright-and-training-data-concerns">Risk 5: Copyright and Training Data Concerns</h3>
+<p><strong>Problem:</strong> Generative models trained on scraped internet audio may reproduce copyrighted material. A generated sample that resembles a copyrighted sound could expose the product to legal risk.</p>
+<p><strong>Mitigations:</strong>
+- <strong>License-compliant models only</strong> — Stable Audio Open 2 is trained exclusively on Free Music Archive audio under CC licenses. This is the primary mitigation. MusicGen uses CC-BY-NC and is only suitable for non-commercial or research use.
+- <strong>No fine-tuning on commercial audio</strong> — any custom fine-tuning uses only CC0 / public domain / purpose-licensed sound design datasets (e.g., Freesound CC0 collection).
+- <strong>Watermarking</strong> — consider AudioSeal or similar imperceptible audio watermarking on all generated content to establish provenance.
+- <strong>Terms of service</strong> — explicit user acknowledgment that generated audio is for their own use and not to be represented as samples from specific commercial recordings.</p>
+<hr />
+<h2 id="7-implementation-phases">7. Implementation Phases</h2>
+<h3 id="phase-1-core-loop-standalone-desktop-app">Phase 1 — Core Loop (Standalone Desktop App)</h3>
+<p><strong>Goal:</strong> Working text-in, audio-out pipeline on a single machine.</p>
+<ul>
+<li>Electron or Tauri desktop app wrapper around the Python inference backend</li>
+<li>Text input → Stable Audio Open 2 inference → WAV playback in UI</li>
+<li>Basic waveform display</li>
+<li>WAV export (no editing, no DAW integration)</li>
+<li>No variation engine yet</li>
+<li>Session memory: in-memory only (lost on close)</li>
+<li>Hardware: RTX 3060+ required</li>
+</ul>
+<p><strong>Success metric:</strong> Producer types a description, hears generated audio within 15 seconds, exports a WAV.</p>
+<hr />
+<h3 id="phase-2-prompt-intelligence-library">Phase 2 — Prompt Intelligence + Library</h3>
+<p><strong>Goal:</strong> Make generation smart and persistent.</p>
+<ul>
+<li>Integrate local LLM (Phi-4) as Prompt Processor</li>
+<li>Variation Engine: 3-seed sweep, side-by-side comparison UI</li>
+<li>Session Memory: serialize to SQLite on save</li>
+<li>Preset Library: save/tag/recall generated samples</li>
+<li>Iteration flow: "make it more X" operates on previous generation context</li>
+<li>CPU fallback mode (slow but works without GPU)</li>
+</ul>
+<p><strong>Success metric:</strong> Producer can build a library of generated sounds across multiple sessions, iterate on descriptions naturally.</p>
+<hr />
+<h3 id="phase-3-daw-integration-editing">Phase 3 — DAW Integration + Editing</h3>
+<p><strong>Goal:</strong> Make generated audio usable in a professional production workflow.</p>
+<ul>
+<li>Editing Layer: trim, fade, loop points, crossfade, basic EQ, time-stretch, pitch-shift</li>
+<li>Streaming decode: first 2s plays before generation complete</li>
+<li>VST3 sample player shell (JUCE): loads generated WAV, plays on MIDI trigger</li>
+<li>Drag-and-drop to DAW: exported file opens in DAW on drag</li>
+<li>Preset Library: folder structure compatible with DAW sample browser imports</li>
+<li>Cloud inference option (Replicate API)</li>
+</ul>
+<p><strong>Success metric:</strong> Producer uses the VST3 in a DAW session, triggers generated samples on MIDI notes, exports a track that includes generated audio.</p>
+<hr />
+<h3 id="phase-4-advanced-generation">Phase 4 — Advanced Generation</h3>
+<p><strong>Goal:</strong> Unlock capabilities beyond single-shot generation.</p>
+<ul>
+<li><strong>Style transfer</strong> — "make this sound like that" using reference audio conditioning</li>
+<li><strong>Audio morphing</strong> — latent interpolation between two generated samples (blend A and B)</li>
+<li><strong>Multi-track generation</strong> — single prompt spawns multiple correlated layers (bass + pad + FX simultaneously, musically coherent)</li>
+<li><strong>Accelerated generation</strong> — consistency model or DDIM fewer-step variants (10-step generation at 3x speed with modest quality tradeoff)</li>
+<li><strong>Cloud GPU offload</strong> — route inference to cloud worker for users on lower-end hardware</li>
+<li><strong>Fine-tuned model</strong> — release domain-specific checkpoint fine-tuned on curated synth/sound-design corpus</li>
+</ul>
+<p><strong>Success metric:</strong> Producer generates a multi-layer sound design stem set from a single text description in under 30 seconds total.</p>
+</body>
+</html>

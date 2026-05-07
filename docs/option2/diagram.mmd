@@ -1,0 +1,83 @@
+flowchart TD
+    subgraph INPUT["User Input Layer"]
+        TXT[/"Text Description (natural language)"/]
+        REF[/"Reference Audio (drag and drop, optional)"/]
+    end
+
+    subgraph PROMPT["Prompt Processing"]
+        PP["Prompt Processor / LLM (Phi-4 / Llama 3.2 8B)
+- Disambiguates vague terms
+- Adds musical context
+- Injects key / genre / mood
+- Formats for audio model"]
+    end
+
+    subgraph GENERATION["Core Generative Pipeline"]
+        LG["Latent Generator (Stable Audio Open 2 / MusicGen)
+- Diffusion or transformer inference
+- Runs on GPU
+- Text + guidance --> latent repr."]
+        AD["Audio Decoder / Vocoder (HiFiGAN / DAC)
+- Latent --> raw PCM waveform
+- 44.1kHz / 48kHz stereo
+- Near real-time decoding"]
+        VE["Variation Engine
+- N generations, different seeds
+- Temperature sampling
+- CFG scale variation
+- Latent interpolation"]
+    end
+
+    subgraph RENDER["Audio Renderer"]
+        AR["Audio Renderer
+- Sample-accurate playback
+- Loop stitching
+- Real-time streaming preview
+- Waveform visualization"]
+    end
+
+    subgraph EDIT["Editing Layer"]
+        EL["Editing Layer
+- Trim / silence removal
+- Fade in / fade out
+- Loop point detection
+- Crossfade editor
+- Gain / basic EQ
+- Time-stretch / pitch-shift"]
+    end
+
+    subgraph OUTPUT["Audio Output"]
+        EXP["Export (WAV / AIFF / MP3)"]
+        DAW["DAW Integration
+- Drag-to-DAW file drop
+- VST3 sample player shell
+- ReWire / JACK streaming"]
+    end
+
+    subgraph MEMORY["Session and Library"]
+        SM["Session Memory
+- Prompt history
+- Generated samples
+- Liked / discarded flags
+- Edit history"]
+        PL["Preset Library
+- Stored samples + metadata
+- Prompt, seed, model version
+- Tags, BPM, key, mood
+- SQLite index + WAV files"]
+    end
+
+    TXT --> PP
+    REF --> PP
+    PP -->|"enriched prompt + guidance params"| LG
+    LG -->|"latent representation"| AD
+    LG -->|"latent space"| VE
+    VE -->|"varied latents"| AD
+    AD -->|"raw PCM waveform"| AR
+    AR -->|"preview audio"| EL
+    EL -->|"edited waveform"| EXP
+    EL -->|"edited waveform"| DAW
+    EL -->|"approved take"| PL
+    AR -->|"session state"| SM
+    SM -->|"prompt context (re-generation)"| PP
+    PL -->|"recalled preset"| AR
