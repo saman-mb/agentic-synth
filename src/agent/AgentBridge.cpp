@@ -2,8 +2,6 @@
 
 namespace agentic_synth::agent {
 
-std::string AgentBridge::status() const {
-    return "agent-bridge-placeholder";
-}
+std::string AgentBridge::status() const { return "agent-bridge-placeholder"; }
 
 } // namespace agentic_synth::agent
