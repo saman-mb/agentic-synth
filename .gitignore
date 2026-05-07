@@ -1,0 +1,14 @@
+*.wav
+*.aif
+*.mp3
+*.exe
+*.dll
+*.vst3
+*.component
+.DS_Store
+build/
+node_modules/
+__pycache__/
+*.pyc
+*.gguf
+session.db
