@@ -5,6 +5,7 @@
 *.dll
 *.vst3
 *.component
+*.app
 .DS_Store
 build/
 node_modules/
@@ -12,3 +13,7 @@ __pycache__/
 *.pyc
 *.gguf
 session.db
+*.jucer
+
+# JUCE generated
+JuceLibraryCode/
