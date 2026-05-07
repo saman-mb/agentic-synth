@@ -1,0 +1,318 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Agentic Synth — Architecture</title>
+<style>
+@page { size: letter; margin: 0.5in; }
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif;
+  color: #1a1a2e;
+  line-height: 1.5;
+  max-width: 7.5in;
+  margin: 0 auto;
+  padding: 15px 20px;
+  background: #fff;
+}
+.cover { text-align: center; padding: 28px 0 18px; border-bottom: 3px solid #1a1a2e; margin-bottom: 16px; }
+.cover h1 { font-size: 24px; font-weight: 800; letter-spacing: -0.5px; }
+.cover .tagline { font-size: 13px; color: #666; margin-top: 6px; }
+.cover .meta { font-size: 10px; color: #999; margin-top: 8px; }
+.cover .meta span { margin: 0 8px; }
+h2 { font-size: 17px; font-weight: 700; margin: 20px 0 6px; padding-bottom: 4px; border-bottom: 2px solid #e0e0e0; }
+h3 { font-size: 13px; font-weight: 600; color: #2d3436; margin: 12px 0 4px; }
+p { margin: 4px 0; font-size: 10.5px; color: #333; }
+ul, ol { margin: 3px 0 3px 16px; }
+li { font-size: 10.5px; color: #333; margin-bottom: 2px; }
+code { font-family: 'SF Mono', 'Consolas', monospace; font-size: 9.5px; background: #f4f4f8; padding: 1px 4px; border-radius: 2px; }
+pre { background: #1a1a2e; color: #e0e0e0; padding: 8px 10px; border-radius: 4px; font-size: 9px; line-height: 1.35; margin: 5px 0; white-space: pre-wrap; }
+pre code { background: transparent; color: inherit; padding: 0; }
+
+/* Diagram as HTML table layout (fully weasyprint compatible) */
+.diagram { margin: 10px auto; width: 100%; border-collapse: collapse; font-size: 9px; }
+.diagram td { padding: 3px; vertical-align: middle; text-align: center; position: relative; }
+
+/* Subsystem boxes */
+.subsys { border: 2px solid #999; border-radius: 6px; background: #f5f5f8; padding: 6px; }
+.subsys-title { font-weight: 700; font-size: 10px; color: #555; margin-bottom: 4px; letter-spacing: 0.5px; }
+
+/* Component boxes */
+.comp { background: #1a1a2e; color: white; border-radius: 5px; padding: 5px 8px; margin: 3px; display: inline-block; }
+.comp .name { font-weight: 600; font-size: 9.5px; }
+.comp .sub { font-size: 7.5px; color: #ccc; }
+
+/* Arrows */
+.arrow { font-size: 14px; color: #555; text-align: center; line-height: 1; padding: 0 2px; }
+.arrow-label { font-size: 7.5px; color: #666; text-align: center; font-style: italic; padding: 0 1px; }
+.arrow-down { font-size: 18px; color: #555; line-height: 0.8; }
+.hline { border-top: 1.5px solid #555; height: 0; width: 100%; }
+.vline { border-left: 1.5px solid #555; }
+.dashed-hline { border-top: 1.5px dashed #555; height: 0; width: 100%; }
+.dashed-vline { border-left: 1.5px dashed #555; }
+
+/* Tables */
+table.tech { width: 100%; border-collapse: collapse; margin: 6px 0; font-size: 10px; }
+table.tech th { background: #1a1a2e; color: white; padding: 5px 8px; text-align: left; font-weight: 600; }
+table.tech td { padding: 4px 8px; border-bottom: 1px solid #e0e0e0; vertical-align: top; }
+table.tech tr:nth-child(even) td { background: #f8f8fc; }
+
+hr { border: none; border-top: 1px solid #e0e0e0; margin: 14px 0; }
+
+.footer { text-align: center; font-size: 8px; color: #bbb; margin-top: 20px; padding-top: 6px; border-top: 1px solid #eee; }
+
+@media print {
+  body { padding: 0; max-width: 100%; }
+  h2, h3 { break-after: avoid; }
+  pre, table { break-inside: avoid; page-break-inside: avoid; }
+  .diagram { break-inside: avoid; page-break-inside: avoid; }
+}
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <h1>Agentic Synth</h1>
+  <div class="tagline">High-Level Architecture Document</div>
+  <div class="meta"><span>VST3/AU Plugin + Desktop App</span> | <span>Agent-Driven Sound Design</span></div>
+</div>
+
+<h2>1. Overview</h2>
+<p><strong>Agentic Synth</strong> is a VST3/AU plugin and companion desktop app that lets music producers describe sounds in natural language and receive synthesizer patches in real time. A producer speaks or types a description like "a dark, ominous bass with rhythmic earthquake-like vibrations" and an on-device AI agent translates that into oscillator configs, filter settings, envelopes, and LFO routing — then renders the patch immediately.</p>
+<p><strong>Core value:</strong> Close the gap between sonic imagination and patch creation. The agent understands musical semantics, remembers liked/discarded sounds, generates variations, and adjusts when you say "make it wider."</p>
+
+<hr>
+
+<h2>2. System Architecture</h2>
+
+<table class="diagram">
+<!-- Row 1: UI Layer + Persistence + DAW Host -->
+<tr>
+  <td width="50%" colspan="2">
+    <div class="subsys">
+      <div class="subsys-title">UI LAYER</div>
+      <div style="display:flex; justify-content:space-around; gap:3px;">
+        <div class="comp"><div class="name">Chat Interface</div><div class="sub">NL input - History</div></div>
+        <div style="display:flex; flex-direction:column; justify-content:center; font-size:12px; color:#555;">→</div>
+        <div class="comp"><div class="name">Waveform Preview</div><div class="sub">Spectrum / Waveform</div></div>
+        <div style="display:flex; flex-direction:column; justify-content:center; font-size:12px; color:#555;">→</div>
+        <div class="comp"><div class="name">Patch Explorer</div><div class="sub">Knob / Parameter override</div></div>
+      </div>
+      <div style="margin-top:3px; font-size:7.5px; color:#888; font-style:italic;">WebSocket / gRPC ↔ Agent Layer &amp; Audio Engine</div>
+    </div>
+  </td>
+  <td width="25%">
+    <div class="subsys">
+      <div class="subsys-title">PERSISTENCE</div>
+      <div class="comp"><div class="name">Session Memory</div><div class="sub">Liked - Discarded - Context</div></div>
+      <div style="font-size:10px; color:#555; line-height:0.7; padding:1px;">‖</div>
+      <div class="comp"><div class="name">Preset Database</div><div class="sub">SQLite</div></div>
+    </div>
+  </td>
+  <td width="25%">
+    <div class="subsys">
+      <div class="subsys-title">DAW HOST</div>
+      <div class="comp"><div class="name">VST3/AU Shell</div><div class="sub">JUCE / iPlug2</div></div>
+      <div style="font-size:7px; color:#666; margin-top:2px; font-style:italic;">Plugin API: MIDI + Audio</div>
+    </div>
+  </td>
+</tr>
+
+<!-- Row 2: downward arrows -->
+<tr>
+  <td colspan="2" style="text-align:center; padding:1px;">
+    <span style="font-size:18px; color:#555;">↓</span><br>
+    <span style="font-size:7.5px; color:#666; font-style:italic;">WebSocket / gRPC</span>
+  </td>
+  <td style="text-align:center; padding:1px;">
+    <span style="font-size:18px; color:#555;">↓</span><br>
+    <span style="font-size:7px; color:#666; font-style:italic;">Context feed</span>
+  </td>
+  <td style="text-align:center; padding:1px;">
+    <span style="font-size:18px; color:#555;">↓</span><br>
+    <span style="font-size:7.5px; color:#666; font-style:italic;">IPC: gRPC/HTTP</span>
+  </td>
+</tr>
+
+<!-- Row 3: Agent Layer -->
+<tr>
+  <td width="100%" colspan="4">
+    <div class="subsys">
+      <div class="subsys-title">AGENT LAYER</div>
+      <div style="display:flex; justify-content:space-around; align-items:center; gap:2px;">
+        <div class="comp"><div class="name">Agent Runtime</div><div class="sub">llama.cpp · Phi-4 / Llama 3.2 8B</div></div>
+        <div style="font-size:12px; color:#555;">→</div>
+        <div class="comp"><div class="name">NL→Parameter Mapper</div><div class="sub">Semantic Embeddings + Tables</div></div>
+        <div style="font-size:12px; color:#555;">→</div>
+        <div class="comp"><div class="name">Variation Engine</div><div class="sub">Branch - Morph - Explore</div></div>
+      </div>
+      <div style="margin-top:3px; font-size:7px; color:#888; font-style:italic;">All agent processes run off the audio thread. PatchStruct delivered via wait-free queue.</div>
+    </div>
+  </td>
+</tr>
+
+<!-- Row 4: downward arrow -->
+<tr>
+  <td colspan="2" style="text-align:center; padding:1px;">
+    <span style="font-size:18px; color:#555;">↓</span><br>
+    <span style="font-size:7.5px; color:#666; font-style:italic;">Patch struct</span>
+  </td>
+  <td colspan="2" style="text-align:center; padding:1px;">
+    <span style="font-size:18px; color:#555;">↓</span><br>
+    <span style="font-size:7.5px; color:#666; font-style:italic;">Patch variants → DB</span>
+  </td>
+</tr>
+
+<!-- Row 5: Audio Engine -->
+<tr>
+  <td width="50%" colspan="2">
+    <div class="subsys">
+      <div class="subsys-title">AUDIO ENGINE</div>
+      <div style="display:flex; justify-content:center; gap:3px;">
+        <div class="comp"><div class="name">Synthesizer Core</div><div class="sub">Wavetable · FM · VA</div></div>
+        <div style="display:flex; flex-direction:column; justify-content:center; font-size:12px; color:#555;">→</div>
+        <div class="comp"><div class="name">Real-Time Audio</div><div class="sub">Low-latency thread</div></div>
+      </div>
+      <div style="font-size:7px; color:#888; font-style:italic; margin-top:2px;">Lock-free DSP. Atomic double-buffered params. &lt;2ms latency.</div>
+    </div>
+  </td>
+  <td colspan="2" style="font-size:7.5px; color:#666; font-style:italic; text-align:center; vertical-align:middle;">
+    ← Preset recall from DB<br>
+    ← Plugin API: MIDI + Audio from DAW
+  </td>
+</tr>
+</table>
+
+<hr>
+
+<h2>3. Component Descriptions</h2>
+
+<h3>VST3/AU Shell</h3>
+<ul>
+  <li><strong>Framework:</strong> JUCE 7 (preferred) or iPlug2</li>
+  <li>Exposes the plugin to any DAW via VST3 and AU APIs. Owns the audio callback — the only component on the real-time thread.</li>
+  <li>Bridges MIDI/automation events into the audio engine. Launches companion app via local gRPC or named pipe.</li>
+</ul>
+
+<h3>Synthesizer Engine</h3>
+<ul>
+  <li>Hybrid wavetable + FM + virtual-analog core in C++. Wavetable: 256-sample, morphable. FM: 4-6 operator. VA: Moog-ladder/SVF filters.</li>
+  <li>All DSP lock-free on the audio thread. Parameter changes via atomic double-buffered structs.</li>
+</ul>
+
+<h3>Agent Runtime</h3>
+<ul>
+  <li><strong>Inference:</strong> llama.cpp with GGUF quantized models, CPU + Metal/CUDA offload.</li>
+  <li><strong>Models:</strong> Phi-4 (14B Q4_K_M ~8GB VRAM) or Llama 3.2 8B (Q4_K_M ~5GB).</li>
+  <li>Separate process from audio thread. Exposes gRPC: <code>GeneratePatch(description)</code> and <code>RefinePatch(patch, delta)</code>.</li>
+</ul>
+
+<h3>NL-to-Synth-Parameter Mapper</h3>
+<ul>
+  <li>The core glue: converts agent output → <code>PatchStruct</code>. Agent outputs structured JSON (osc config, filter, ADSR, LFO, effects).</li>
+  <li>Semantic tags (<code>"warm"</code>, <code>"dark"</code>) resolve via embedding lookup → delta vectors in parameter space. Handles context ambiguity ("dark" for bass vs pad).</li>
+</ul>
+
+<h3>Audio Rendering Pipeline</h3>
+<ul>
+  <li>Runs on the real-time thread. Reads <code>PatchStruct</code> from wait-free SPSC queue. &lt;2ms parameter-to-audio latency.</li>
+</ul>
+
+<h3>UI Layer</h3>
+<ul>
+  <li>React + TypeScript + Vite + WebSocket (recommended) or native JUCE UI.</li>
+  <li>Chat panel with text/speech input (whisper.cpp for offline STT). Patch explorer, waveform/spectrum viz, preset browser.</li>
+</ul>
+
+<h3>Session &amp; Preset DB</h3>
+<ul>
+  <li>SQLite at <code>~/.agentic-synth/session.db</code>. Tables: <code>patches</code>, <code>session_events</code>, <code>embeddings</code>.</li>
+  <li>Session context feeds agent prompt. Liked patches boost neighborhood; discarded patches suppressed.</li>
+</ul>
+
+<h3>Variation Engine</h3>
+<ul>
+  <li>Generates N variations (default 5) via temperature-varied prompts, param perturbation (±15%), or interpolation between patches.</li>
+</ul>
+
+<hr>
+
+<h2>4. Data Flow</h2>
+<p><em>"A dark evolving pad" — end-to-end trace:</em></p>
+<pre><code>1. INPUT → User: "a dark evolving pad"
+2. STT → whisper.cpp transcribes (if speech)
+3. AGENT → llama.cpp produces JSON patch spec:
+   { osc1: {type: wavetable, detune: 8},
+     osc2: {type: VA, saw, octave: -1},
+     filter: {type: SVF_LP, cutoff: 800, resonance: 0.3},
+     env: {attack: 1200ms, decay: 400ms, sustain: 0.7, release: 2800ms},
+     lfo1: {target: filter_cutoff, rate: 0.25Hz, depth: 0.4},
+     lfo2: {target: wavetable_pos, rate: 0.08Hz, depth: 0.6},
+     reverb: {size: 0.85, damp: 0.4} }
+4. MAPPER → Semantic tags: "dark"→filter -30%, "evolving"→LFO +20%
+5. QUEUE → PatchStruct pushed to wait-free queue
+6. AUDIO → Synth renders. Waveform preview → UI via WebSocket
+7. USER HEARS → ~50-200ms total latency
+8. TWEAK → "Make filter more open, add rhythmic gating"
+9. REFINE → Agent updates filter.cutoff (+40%), adds trem LFO
+10. MEMORY → Session logs patch_id, description, feedback</code></pre>
+
+<hr>
+
+<h2>5. Technology Choices</h2>
+<table class="tech">
+<tr><th>Component</th><th>Choice</th><th>Rationale</th></tr>
+<tr><td><strong>Audio framework</strong></td><td>JUCE 7 (C++)</td><td>Battle-tested VST3/AU/standalone, large community, commercial license</td></tr>
+<tr><td><strong>Agent inference</strong></td><td>llama.cpp</td><td>CPU + Metal/CUDA, GGUF quantization, proven real-time performance</td></tr>
+<tr><td><strong>LLM model</strong></td><td>Phi-4 14B Q4 / Llama 3.2 8B Q4</td><td>Best instruction-following per size. Runs on 2022+ hardware</td></tr>
+<tr><td><strong>Parameter mapping</strong></td><td>Semantic embeddings + tables</td><td>LLM output too noisy alone; tables provide guardrails</td></tr>
+<tr><td><strong>UI</strong></td><td>React + TS + Vite + WebSocket</td><td>Richer chat UX, faster iteration than native JUCE</td></tr>
+<tr><td><strong>IPC</strong></td><td>gRPC (local)</td><td>Type-safe, low overhead, bidirectional streaming</td></tr>
+<tr><td><strong>Persistence</strong></td><td>SQLite</td><td>Zero-dependency, embedded, sufficient for this scale</td></tr>
+<tr><td><strong>Speech input</strong></td><td>whisper.cpp (offline)</td><td>Privacy-first, no API cost, runs alongside agent</td></tr>
+</table>
+
+<hr>
+
+<h2>6. Key Risks &amp; Mitigations</h2>
+
+<h3>Real-Time Audio Safety</h3>
+<p><strong>Risk:</strong> Agent inference blocks audio thread → dropouts.<br>
+<strong>Mitigation:</strong> Agent in separate process. Audio reads from wait-free queue only. Double-buffered params. Agent never on audio call stack.</p>
+
+<h3>Harmful Frequency Generation</h3>
+<p><strong>Risk:</strong> Extreme param values (0Hz filter, DC offset).<br>
+<strong>Mitigation:</strong> All values clamped in Mapper before reaching synth. Hard limits in PatchStruct validator. Resonance capped.</p>
+
+<h3>NL Inference Latency</h3>
+<p><strong>Risk:</strong> 2-5s lag before hearing a patch.<br>
+<strong>Mitigation:</strong> Persistent KV cache, speculative decoding, streaming partial patches, instant preview mode (&lt;200ms heuristic pre-patch while full inference completes).</p>
+
+<h3>Semantic Ambiguity</h3>
+<p><strong>Risk:</strong> "Dark" means different things per context/user.<br>
+<strong>Mitigation:</strong> Domain-grounded system prompt. Session history disambiguates. Clarifying question if low confidence. User-editable semantic dictionary.</p>
+
+<hr>
+
+<h2>7. Implementation Phases</h2>
+
+<h3>Phase 1 — Standalone App (Foundation)</h3>
+<p>JUCE standalone + wavetable/VA core. Hardcoded ~50 descriptors → presets. Basic React UI. SQLite storage. No LLM yet.</p>
+<p><em>Deliverable:</em> Type 20-30 descriptors, hear a reasonable patch.</p>
+
+<h3>Phase 2 — Local LLM + Chat</h3>
+<p>Integrate llama.cpp with Phi-4/Llama. Build mapper with embeddings. gRPC bridge. Chat + streaming. Variation engine (5 variants). Session memory.</p>
+<p><em>Deliverable:</em> Full NL patch generation with session awareness and variations.</p>
+
+<h3>Phase 3 — VST3/AU Plugin</h3>
+<p>JUCE wrapper around synth core. Plugin ↔ app IPC. MIDI/automation handling. DAW save/restore. Real-time safety audit.</p>
+<p><em>Deliverable:</em> Runs stably in Ableton Live and Logic Pro.</p>
+
+<h3>Phase 4 — Advanced Agentic Features</h3>
+<p>Style transfer ("make this like [reference]"). Session-aware generation. Smart morphing (MIDI-driven interpolation). Multi-modal input (hum/tap → timbre). Collaborative iteration. Export to Serum/Vital formats.</p>
+<p><em>Deliverable:</em> A creative tool that feels like a sound designer in the session.</p>
+
+<div class="footer">Agentic Synth — Architecture Document · Generated 2026-05-07</div>
+
+</body>
+</html>
