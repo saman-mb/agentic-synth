@@ -26,21 +26,18 @@ namespace agentic_synth {
 //   if (auto p = queue.pop()) { ... }       // consumer (audio thread)
 // ---------------------------------------------------------------------------
 
-template <typename T, std::size_t Capacity>
-class SPSCQueue {
-    static_assert(std::is_trivially_copyable_v<T>,
-                  "SPSCQueue requires a trivially copyable element type");
-    static_assert(Capacity >= 2 && (Capacity & (Capacity - 1)) == 0,
-                  "SPSCQueue Capacity must be a power of two >= 2");
+template <typename T, std::size_t Capacity> class SPSCQueue {
+    static_assert(std::is_trivially_copyable_v<T>, "SPSCQueue requires a trivially copyable element type");
+    static_assert(Capacity >= 2 && (Capacity & (Capacity - 1)) == 0, "SPSCQueue Capacity must be a power of two >= 2");
 
 public:
     SPSCQueue() noexcept = default;
 
     // Not copyable or movable — contains atomic members.
-    SPSCQueue(const SPSCQueue&)            = delete;
+    SPSCQueue(const SPSCQueue&) = delete;
     SPSCQueue& operator=(const SPSCQueue&) = delete;
-    SPSCQueue(SPSCQueue&&)                 = delete;
-    SPSCQueue& operator=(SPSCQueue&&)      = delete;
+    SPSCQueue(SPSCQueue&&) = delete;
+    SPSCQueue& operator=(SPSCQueue&&) = delete;
 
     // -----------------------------------------------------------------------
     // push — called ONLY by the producer thread.
@@ -89,8 +86,7 @@ public:
     // Diagnostic observers — do NOT use for real-time flow control.
     // -----------------------------------------------------------------------
     [[nodiscard]] bool empty() const noexcept {
-        return tail_.load(std::memory_order_acquire) ==
-               head_.load(std::memory_order_acquire);
+        return tail_.load(std::memory_order_acquire) == head_.load(std::memory_order_acquire);
     }
 
     [[nodiscard]] std::size_t size_approx() const noexcept {
