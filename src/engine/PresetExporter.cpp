@@ -28,15 +28,15 @@ PresetExporter::MigrationReport PresetExporter::exportSerum(const PatchStruct& p
     file.write(reinterpret_cast<const char*>(chunk.data()), chunk.size());
     file.close();
 
-    report.mappedParams = {"oscillatorMix (approximate type map)",
-                           "filterCutoffHz",
-                           "filterResonance",
-                           "ampAttackMs",
-                           "ampDecayMs",
-                           "ampSustainLevel",
-                           "ampReleaseMs",
-                           "lfoRateHz",
-                           "lfoDepth"};
+    report.mappedParams = {"osc[0..2].volume (approximate type map)",
+                           "filter.cutoff_hz",
+                           "filter.resonance",
+                           "amp_env.attack_s",
+                           "amp_env.decay_s",
+                           "amp_env.sustain",
+                           "amp_env.release_s",
+                           "lfo[0].rate_hz",
+                           "lfo[0].depth"};
     report.notes = "Serum export complete. Unmapped: wavetable index, modulation matrix.";
 
     return report;
@@ -62,15 +62,15 @@ PresetExporter::MigrationReport PresetExporter::exportVital(const PatchStruct& p
     file.write(reinterpret_cast<const char*>(chunk.data()), chunk.size());
     file.close();
 
-    report.mappedParams = {"oscillatorMix (source level map)",
-                           "filterCutoffHz",
-                           "filterResonance",
-                           "ampAttackMs",
-                           "ampDecayMs",
-                           "ampSustainLevel",
-                           "ampReleaseMs",
-                           "lfoRateHz",
-                           "lfoDepth"};
+    report.mappedParams = {"osc[0..2].volume (source level map)",
+                           "filter.cutoff_hz",
+                           "filter.resonance",
+                           "amp_env.attack_s",
+                           "amp_env.decay_s",
+                           "amp_env.sustain",
+                           "amp_env.release_s",
+                           "lfo[0].rate_hz",
+                           "lfo[0].depth"};
     report.unmappedParams = {"Wavetable position/index", "Modulation matrix routing", "Effect chain parameters"};
     report.notes =
         "Vital export complete. " + std::to_string(report.unmappedParams.size()) + " parameters could not be mapped.";
@@ -81,39 +81,33 @@ PresetExporter::MigrationReport PresetExporter::exportVital(const PatchStruct& p
 // ── Internal helpers ───────────────────────────────────────────────────
 
 std::vector<uint8_t> PresetExporter::buildSerumChunk(const PatchStruct& patch) {
-    // Build a simplified parameter block — actual Serum format
-    // requires reverse-engineering their .fxp structure.
-    // Here we store parameters in a structured block.
     std::vector<uint8_t> data;
     data.reserve(256);
 
     // Version
     data.push_back(1);
 
-    // Oscillator mix (encoded as 4 floats)
     auto addFloat = [&](float f) {
         auto* fp = reinterpret_cast<const uint8_t*>(&f);
         data.insert(data.end(), fp, fp + 4);
     };
 
-    for (int i = 0; i < 4; ++i) {
-        addFloat(patch.oscillatorMix[i]);
-    }
+    for (int i = 0; i < kMaxOscillators; ++i)
+        addFloat(patch.osc[i].volume);
 
-    addFloat(patch.filterCutoffHz);
-    addFloat(patch.filterResonance);
-    addFloat(patch.ampAttackMs);
-    addFloat(patch.ampDecayMs);
-    addFloat(patch.ampSustainLevel);
-    addFloat(patch.ampReleaseMs);
-    addFloat(patch.lfoRateHz);
-    addFloat(patch.lfoDepth);
+    addFloat(patch.filter.cutoff_hz);
+    addFloat(patch.filter.resonance);
+    addFloat(patch.amp_env.attack_s);
+    addFloat(patch.amp_env.decay_s);
+    addFloat(patch.amp_env.sustain);
+    addFloat(patch.amp_env.release_s);
+    addFloat(patch.lfo[0].rate_hz);
+    addFloat(patch.lfo[0].depth);
 
     return data;
 }
 
 std::vector<uint8_t> PresetExporter::buildVitalChunk(const PatchStruct& patch) {
-    // Similar to Serum but with Vital's parameter layout
     std::vector<uint8_t> data;
     data.reserve(256);
 
@@ -124,18 +118,17 @@ std::vector<uint8_t> PresetExporter::buildVitalChunk(const PatchStruct& patch) {
         data.insert(data.end(), fp, fp + 4);
     };
 
-    for (int i = 0; i < 4; ++i) {
-        addFloat(patch.oscillatorMix[i]);
-    }
+    for (int i = 0; i < kMaxOscillators; ++i)
+        addFloat(patch.osc[i].volume);
 
-    addFloat(patch.filterCutoffHz);
-    addFloat(patch.filterResonance);
-    addFloat(patch.ampAttackMs);
-    addFloat(patch.ampDecayMs);
-    addFloat(patch.ampSustainLevel);
-    addFloat(patch.ampReleaseMs);
-    addFloat(patch.lfoRateHz);
-    addFloat(patch.lfoDepth);
+    addFloat(patch.filter.cutoff_hz);
+    addFloat(patch.filter.resonance);
+    addFloat(patch.amp_env.attack_s);
+    addFloat(patch.amp_env.decay_s);
+    addFloat(patch.amp_env.sustain);
+    addFloat(patch.amp_env.release_s);
+    addFloat(patch.lfo[0].rate_hz);
+    addFloat(patch.lfo[0].depth);
 
     return data;
 }
