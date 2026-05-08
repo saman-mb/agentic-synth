@@ -14,6 +14,12 @@ class VariationEngine {
 public:
     static constexpr int kVariationCount = 5;
 
+    enum class Strategy {
+        TemperatureSweep,
+        Perturbation,
+        Morph,
+    };
+
     // Temperature sweep: interpolate from base toward a "hot" (maximally
     // contrasting) version at temperatures [0.2, 0.4, 0.6, 0.8, 1.0].
     [[nodiscard]] std::array<PatchStruct, kVariationCount> temperatureSweep(const PatchStruct& base) const noexcept;
