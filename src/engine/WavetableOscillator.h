@@ -15,7 +15,8 @@ public:
 
     [[nodiscard]] float processSample() noexcept { return 0.0f; }
     void processBlock(float* output, int numSamples) noexcept {
-        for (int i = 0; i < numSamples; ++i) output[i] = processSample();
+        for (int i = 0; i < numSamples; ++i)
+            output[i] = processSample();
     }
 
 private:
