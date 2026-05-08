@@ -12,15 +12,15 @@ namespace agentic_synth::agent {
 // ---------------------------------------------------------------------------
 
 float SessionMemory::normalizeCutoff(float hz) noexcept {
-    constexpr float kMinLog = std::log(20.0f);
-    constexpr float kMaxLog = std::log(20000.0f);
+    const float kMinLog = std::log(20.0f);
+    const float kMaxLog = std::log(20000.0f);
     float clamped = std::clamp(hz, 20.0f, 20000.0f);
     return (std::log(clamped) - kMinLog) / (kMaxLog - kMinLog);
 }
 
 float SessionMemory::denormalizeCutoff(float norm) noexcept {
-    constexpr float kMinLog = std::log(20.0f);
-    constexpr float kMaxLog = std::log(20000.0f);
+    const float kMinLog = std::log(20.0f);
+    const float kMaxLog = std::log(20000.0f);
     return std::exp(kMinLog + std::clamp(norm, 0.0f, 1.0f) * (kMaxLog - kMinLog));
 }
 

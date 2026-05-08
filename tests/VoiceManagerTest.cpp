@@ -207,3 +207,27 @@ TEST_CASE("VoiceManager renderNextSample returns 0 with no active voices") {
     vm.prepare(44100.0);
     CHECK(vm.renderNextSample() == 0.0f);
 }
+
+// ── Edge-case robustness ──────────────────────────────────────────────────────
+
+TEST_CASE("VoiceManager noteOn without prepare does not crash") {
+    VoiceManager vm(4);
+    REQUIRE_NOTHROW(vm.noteOn(60, 0.8f));
+    REQUIRE_NOTHROW(vm.noteOff(60));
+}
+
+TEST_CASE("VoiceManager handles extreme MIDI note values (0 and 127)") {
+    VoiceManager vm(4);
+    vm.prepare(44100.0);
+
+    REQUIRE_NOTHROW(vm.noteOn(0, 0.8f));
+    REQUIRE_NOTHROW(vm.noteOn(127, 0.8f));
+
+    std::vector<float> buf(256, 0.0f);
+    vm.renderBlock(buf.data(), static_cast<int>(buf.size()));
+
+    bool hasNaN = false;
+    for (float s : buf)
+        hasNaN = hasNaN || std::isnan(s);
+    CHECK_FALSE(hasNaN);
+}

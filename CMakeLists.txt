@@ -11,7 +11,9 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 include(cmake/ProjectOptions.cmake)
 
-if(AGENTIC_SYNTH_BUILD_PLUGIN)
+# JUCE is needed by engine_lib (PatchStateManager) and agent_lib (WebSocketBridge).
+# Load it whenever the plugin or tests are built so library targets are always usable.
+if(AGENTIC_SYNTH_BUILD_PLUGIN OR AGENTIC_SYNTH_BUILD_TESTS)
     add_subdirectory(third_party/JUCE)
     add_subdirectory(src)
 endif()
