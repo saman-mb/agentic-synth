@@ -5,22 +5,22 @@ namespace agentic_synth::engine {
 StyleTransfer::StyleProfile StyleTransfer::extract(const PatchStruct& ref) {
     StyleProfile profile{};
 
-    // Filter character: map cutoff to 0-1 range
-    profile.filterCharacter = 1.0f - std::clamp(ref.filterCutoffHz / 10000.0f, 0.0f, 1.0f);
+    // Filter character: map cutoff to 0-1 range (0 = open, 1 = closed)
+    profile.filterCharacter = 1.0f - std::clamp(ref.filter.cutoff_hz / 10000.0f, 0.0f, 1.0f);
 
     // Envelope shape: longer attack + longer decay = more sustained
-    float attackNorm = std::clamp(ref.ampAttackMs / 2000.0f, 0.0f, 1.0f);
-    float decayNorm = std::clamp(ref.ampDecayMs / 2000.0f, 0.0f, 1.0f);
-    float sustainNorm = ref.ampSustainLevel;
+    float attackNorm  = std::clamp(ref.amp_env.attack_s / 2.0f, 0.0f, 1.0f);
+    float decayNorm   = std::clamp(ref.amp_env.decay_s / 2.0f, 0.0f, 1.0f);
+    float sustainNorm = ref.amp_env.sustain;
     profile.envelopeShape = (attackNorm * 0.3f + decayNorm * 0.3f + sustainNorm * 0.4f);
 
     // Modulation feel
-    profile.modulationFeel = std::clamp(ref.lfoDepth / 1.0f, 0.0f, 1.0f);
+    profile.modulationFeel = std::clamp(ref.lfo[0].depth / 1.0f, 0.0f, 1.0f);
 
     // Brightness based on filter cutoff and oscillator mix
-    float cutoffBrightness = std::clamp(ref.filterCutoffHz / 12000.0f, 0.0f, 1.0f);
-    float oscBrightness = 0.5f + 0.5f * (1.0f - ref.oscillatorMix[2]);
-    profile.brightness = (cutoffBrightness * 0.6f + oscBrightness * 0.4f);
+    float cutoffBrightness = std::clamp(ref.filter.cutoff_hz / 12000.0f, 0.0f, 1.0f);
+    float oscBrightness    = 0.5f + 0.5f * (1.0f - ref.osc[2].volume);
+    profile.brightness     = (cutoffBrightness * 0.6f + oscBrightness * 0.4f);
 
     return profile;
 }
@@ -29,32 +29,31 @@ PatchStruct StyleTransfer::apply(const PatchStruct& target, const StyleProfile& 
     PatchStruct result = target;
 
     // Blend filter character
-    float targetCutoff = result.filterCutoffHz;
-    float styledCutoff = 10000.0f * (1.0f - style.filterCharacter);
-    result.filterCutoffHz = targetCutoff * (1.0f - blend) + styledCutoff * blend;
+    float targetCutoff  = result.filter.cutoff_hz;
+    float styledCutoff  = 10000.0f * (1.0f - style.filterCharacter);
+    result.filter.cutoff_hz = targetCutoff * (1.0f - blend) + styledCutoff * blend;
 
-    // Blend envelope shape
     // style.envelopeShape 0 = percussive (short A/D, low S), 1 = sustained (long A/D, high S)
-    float styledAttack = style.envelopeShape * 1500.0f + 10.0f;
-    float styledDecay = style.envelopeShape * 1500.0f + 10.0f;
+    float styledAttack  = style.envelopeShape * 1.5f + 0.01f;
+    float styledDecay   = style.envelopeShape * 1.5f + 0.01f;
     float styledSustain = style.envelopeShape;
-    float styledRelease = style.envelopeShape * 2000.0f + 10.0f;
+    float styledRelease = style.envelopeShape * 2.0f + 0.01f;
 
-    result.ampAttackMs = result.ampAttackMs * (1.0f - blend) + styledAttack * blend;
-    result.ampDecayMs = result.ampDecayMs * (1.0f - blend) + styledDecay * blend;
-    result.ampSustainLevel = result.ampSustainLevel * (1.0f - blend) + styledSustain * blend;
-    result.ampReleaseMs = result.ampReleaseMs * (1.0f - blend) + styledRelease * blend;
+    result.amp_env.attack_s  = result.amp_env.attack_s  * (1.0f - blend) + styledAttack  * blend;
+    result.amp_env.decay_s   = result.amp_env.decay_s   * (1.0f - blend) + styledDecay   * blend;
+    result.amp_env.sustain   = result.amp_env.sustain   * (1.0f - blend) + styledSustain * blend;
+    result.amp_env.release_s = result.amp_env.release_s * (1.0f - blend) + styledRelease * blend;
 
     // Blend modulation feel
-    result.lfoDepth = result.lfoDepth * (1.0f - blend) + style.modulationFeel * blend;
+    result.lfo[0].depth = result.lfo[0].depth * (1.0f - blend) + style.modulationFeel * blend;
 
-    // Blend brightness
+    // Blend brightness via oscillator volumes
     if (style.brightness > 0.5f) {
-        result.oscillatorMix[0] = 0.6f; // saw
-        result.oscillatorMix[2] = 0.2f; // less triangle
+        result.osc[0].volume = 0.6f; // saw
+        result.osc[2].volume = 0.2f; // less triangle
     } else {
-        result.oscillatorMix[0] = 0.2f; // less saw
-        result.oscillatorMix[2] = 0.6f; // more triangle
+        result.osc[0].volume = 0.2f; // less saw
+        result.osc[2].volume = 0.6f; // more triangle
     }
 
     return result;
