@@ -17,6 +17,7 @@ add_library(agentic_synth_engine
     engine/LFO.cpp
     engine/VoiceManager.cpp
     agent/AgentBridge.cpp
+    agent/SessionMemory.cpp
 )
 
 target_include_directories(agentic_synth_engine PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
