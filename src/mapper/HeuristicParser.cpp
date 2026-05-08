@@ -124,19 +124,19 @@ const std::vector<Rule>& get_rules() {
         {"evolving",  [](PatchStruct& p) {
             p.lfo[0].rate_hz = 0.1f;
             p.lfo[0].depth   = 0.7f;
-            p.lfo[0].target  = LfoTarget::Filter;
+            p.lfo[0].target  = LfoTarget::FilterCutoff;
         }},
         {"morphing",  [](PatchStruct& p) {
             p.lfo[0].rate_hz = 0.05f;
             p.lfo[0].depth   = 0.9f;
-            p.lfo[0].target  = LfoTarget::Filter;
+            p.lfo[0].target  = LfoTarget::FilterCutoff;
         }},
         {"static",    [](PatchStruct& p) {
             p.lfo[0].depth = 0.0f;
             p.lfo[1].depth = 0.0f;
         }},
         {"tremolo",   [](PatchStruct& p) {
-            p.lfo[0].target  = LfoTarget::Volume;
+            p.lfo[0].target  = LfoTarget::Amplitude;
             p.lfo[0].rate_hz = 5.0f;
             p.lfo[0].depth   = 0.5f;
         }},
@@ -146,7 +146,7 @@ const std::vector<Rule>& get_rules() {
             p.lfo[0].depth   = 0.3f;
         }},
         {"wobble",    [](PatchStruct& p) {
-            p.lfo[0].target  = LfoTarget::Filter;
+            p.lfo[0].target  = LfoTarget::FilterCutoff;
             p.lfo[0].rate_hz = 3.0f;
             p.lfo[0].depth   = 0.8f;
         }},
@@ -210,8 +210,8 @@ const std::vector<Rule>& get_rules() {
             p.osc[0].type      = OscType::Sine;
             p.filter.resonance = 0.05f;
         }},
-        {"saw",       [](PatchStruct& p) { p.osc[0].type = OscType::Saw; }},
-        {"sawtooth",  [](PatchStruct& p) { p.osc[0].type = OscType::Saw; }},
+        {"saw",       [](PatchStruct& p) { p.osc[0].type = OscType::Sawtooth; }},
+        {"sawtooth",  [](PatchStruct& p) { p.osc[0].type = OscType::Sawtooth; }},
         {"square",    [](PatchStruct& p) {
             p.osc[0].type        = OscType::Square;
             p.osc[0].pulse_width = 0.5f;
@@ -237,7 +237,7 @@ const std::vector<Rule>& get_rules() {
             p.osc[0].type            = OscType::Sine;
         }},
         {"lead",      [](PatchStruct& p) {
-            p.osc[0].type      = OscType::Saw;
+            p.osc[0].type      = OscType::Sawtooth;
             p.filter.cutoff_hz = 4500.0f;
             p.filter.resonance = 0.35f;
         }},
@@ -299,7 +299,7 @@ const std::vector<Rule>& get_rules() {
         {"aggressive",[](PatchStruct& p) {
             p.filter.resonance = 0.7f;
             p.filter.drive     = 0.6f;
-            p.osc[0].type      = OscType::Saw;
+            p.osc[0].type      = OscType::Sawtooth;
             p.filter.cutoff_hz = 5000.0f;
         }},
         {"peaceful",  [](PatchStruct& p) {
