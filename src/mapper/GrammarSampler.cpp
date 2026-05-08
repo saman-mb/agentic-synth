@@ -7,6 +7,7 @@
 #include <charconv>
 #include <cstdio>
 #include <cstring>
+#include <cstdlib>
 #include <fstream>
 #include <sstream>
 #include <stdexcept>
@@ -97,12 +98,11 @@ struct JsonReader {
     std::optional<float> read_float() {
         skip_ws();
         const char* begin = s.data() + pos;
-        const char* end = s.data() + s.size();
-        float val{};
-        auto [ptr, ec] = std::from_chars(begin, end, val);
-        if (ec != std::errc{})
+        char* end = nullptr;
+        float val = std::strtof(begin, &end);
+        if (end == begin)
             return std::nullopt;
-        pos = static_cast<size_t>(ptr - s.data());
+        pos = static_cast<size_t>(end - s.data());
         return val;
     }
 
