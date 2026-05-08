@@ -4,15 +4,12 @@
 
 namespace agentic_synth::engine {
 
-VAOscillator::VAOscillator()
-    : rng_(std::random_device{}())
-{}
+VAOscillator::VAOscillator() : rng_(std::random_device{}()) {}
 
 void VAOscillator::prepare(double sampleRate) {
-    sampleRate_      = sampleRate;
+    sampleRate_ = sampleRate;
     // drift target updates every 1–5 s
-    driftPeriodDist_ = std::uniform_real_distribution<double>(sampleRate * 1.0,
-                                                               sampleRate * 5.0);
+    driftPeriodDist_ = std::uniform_real_distribution<double>(sampleRate * 1.0, sampleRate * 5.0);
     // exponential smoothing: tau ≈ 2 s so drift moves imperceptibly fast
     constexpr double tau = 2.0;
     driftAlpha_ = 1.0 - std::exp(-1.0 / (tau * sampleRate_));
@@ -33,12 +30,12 @@ void VAOscillator::setDetuneCents(double cents) noexcept {
 }
 
 void VAOscillator::reset() noexcept {
-    phase_       = 0.0;
-    triAccum_    = -1.0;
-    driftCents_  = 0.0;
+    phase_ = 0.0;
+    triAccum_ = -1.0;
+    driftCents_ = 0.0;
     driftTarget_ = 0.0;
     driftPeriod_ = driftPeriodDist_(rng_);
-    driftTimer_  = driftPeriod_;
+    driftTimer_ = driftPeriod_;
     updatePhaseInc();
 }
 
@@ -46,7 +43,7 @@ double VAOscillator::getDriftCents() const noexcept { return driftCents_; }
 
 void VAOscillator::updatePhaseInc() noexcept {
     double effectiveCents = detuneCents_ + driftCents_;
-    double effectiveFreq  = frequency_ * std::pow(2.0, effectiveCents / 1200.0);
+    double effectiveFreq = frequency_ * std::pow(2.0, effectiveCents / 1200.0);
     phaseInc_ = effectiveFreq / sampleRate_;
 }
 
@@ -55,7 +52,7 @@ void VAOscillator::tickDrift() noexcept {
     if (driftTimer_ <= 0.0) {
         driftTarget_ = driftTargetDist_(rng_);
         driftPeriod_ = driftPeriodDist_(rng_);
-        driftTimer_  = driftPeriod_;
+        driftTimer_ = driftPeriod_;
     }
     // Invariant: |driftCents_| ≤ 5 because |(1-a)*x + a*y| ≤ max(|x|,|y|) for a∈[0,1]
     driftCents_ += driftAlpha_ * (driftTarget_ - driftCents_);
@@ -66,11 +63,11 @@ void VAOscillator::tickDrift() noexcept {
 double VAOscillator::polyBlep(double t, double dt) noexcept {
     if (t < dt) {
         t /= dt;
-        return t + t - t * t - 1.0;   // rises from -1 to 0 over one dt window
+        return t + t - t * t - 1.0; // rises from -1 to 0 over one dt window
     }
     if (t > 1.0 - dt) {
         t = (t - 1.0) / dt;
-        return t * t + t + t + 1.0;   // rises from 0 to +1 approaching the wrap
+        return t * t + t + t + 1.0; // rises from 0 to +1 approaching the wrap
     }
     return 0.0;
 }
@@ -103,13 +100,20 @@ float VAOscillator::processSample() noexcept {
 
     double out = 0.0;
     switch (waveform_) {
-        case Waveform::Saw:      out = saw();      break;
-        case Waveform::Square:   out = square();   break;
-        case Waveform::Triangle: out = triangle(); break;
+    case Waveform::Saw:
+        out = saw();
+        break;
+    case Waveform::Square:
+        out = square();
+        break;
+    case Waveform::Triangle:
+        out = triangle();
+        break;
     }
 
     phase_ += phaseInc_;
-    if (phase_ >= 1.0) phase_ -= 1.0;
+    if (phase_ >= 1.0)
+        phase_ -= 1.0;
 
     return static_cast<float>(out);
 }
