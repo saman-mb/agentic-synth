@@ -32,6 +32,10 @@ add_executable(agentic_synth_tests
     ../src/agent/PrePatchPipeline.cpp
     VariationEngineTest.cpp
     ../src/engine/VariationEngine.cpp
+    GrammarSamplerTest.cpp
+    ../src/mapper/GrammarSampler.cpp
+    SemanticMapperTest.cpp
+    ../src/mapper/SemanticMapper.cpp
 )
 target_include_directories(agentic_synth_tests PRIVATE ../src)
 target_link_libraries(agentic_synth_tests PRIVATE Catch2::Catch2WithMain)
