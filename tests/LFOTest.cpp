@@ -1,6 +1,6 @@
+#include "engine/LFO.h"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
-#include "engine/LFO.h"
 
 using namespace agentic_synth::engine;
 
@@ -78,7 +78,7 @@ TEST_CASE("LFO phase reset on key trigger", "[LFO][trigger]") {
     SECTION("trigger in free-run mode has no effect") {
         lfo.setKeyTrigger(false);
         // advance well past zero crossing
-        for (int i = 0; i < 11025; ++i)  // quarter cycle at 1 Hz / 44100 Hz
+        for (int i = 0; i < 11025; ++i) // quarter cycle at 1 Hz / 44100 Hz
             lfo.processSample();
         lfo.trigger();
         float val = lfo.processSample();
@@ -168,22 +168,27 @@ TEST_CASE("LFO depth scales output", "[LFO][depth]") {
 }
 
 TEST_CASE("LFO division beats per cycle table", "[LFO][division]") {
-    REQUIRE_THAT(LFO::divisionBeatsPerCycle(LfoSyncDivision::Whole),            Catch::Matchers::WithinRel(4.0,       0.001));
-    REQUIRE_THAT(LFO::divisionBeatsPerCycle(LfoSyncDivision::Half),             Catch::Matchers::WithinRel(2.0,       0.001));
-    REQUIRE_THAT(LFO::divisionBeatsPerCycle(LfoSyncDivision::Quarter),          Catch::Matchers::WithinRel(1.0,       0.001));
-    REQUIRE_THAT(LFO::divisionBeatsPerCycle(LfoSyncDivision::Eighth),           Catch::Matchers::WithinRel(0.5,       0.001));
-    REQUIRE_THAT(LFO::divisionBeatsPerCycle(LfoSyncDivision::Sixteenth),        Catch::Matchers::WithinRel(0.25,      0.001));
-    REQUIRE_THAT(LFO::divisionBeatsPerCycle(LfoSyncDivision::ThirtySecond),     Catch::Matchers::WithinRel(0.125,     0.001));
-    REQUIRE_THAT(LFO::divisionBeatsPerCycle(LfoSyncDivision::SixtyFourth),      Catch::Matchers::WithinRel(0.0625,    0.001));
-    REQUIRE_THAT(LFO::divisionBeatsPerCycle(LfoSyncDivision::WholeDotted),      Catch::Matchers::WithinRel(6.0,       0.001));
-    REQUIRE_THAT(LFO::divisionBeatsPerCycle(LfoSyncDivision::HalfDotted),       Catch::Matchers::WithinRel(3.0,       0.001));
-    REQUIRE_THAT(LFO::divisionBeatsPerCycle(LfoSyncDivision::QuarterDotted),    Catch::Matchers::WithinRel(1.5,       0.001));
-    REQUIRE_THAT(LFO::divisionBeatsPerCycle(LfoSyncDivision::EighthDotted),     Catch::Matchers::WithinRel(0.75,      0.001));
-    REQUIRE_THAT(LFO::divisionBeatsPerCycle(LfoSyncDivision::SixteenthDotted),  Catch::Matchers::WithinRel(0.375,     0.001));
-    REQUIRE_THAT(LFO::divisionBeatsPerCycle(LfoSyncDivision::HalfTriplet),      Catch::Matchers::WithinRel(4.0 / 3.0, 0.001));
-    REQUIRE_THAT(LFO::divisionBeatsPerCycle(LfoSyncDivision::QuarterTriplet),   Catch::Matchers::WithinRel(2.0 / 3.0, 0.001));
-    REQUIRE_THAT(LFO::divisionBeatsPerCycle(LfoSyncDivision::EighthTriplet),    Catch::Matchers::WithinRel(1.0 / 3.0, 0.001));
-    REQUIRE_THAT(LFO::divisionBeatsPerCycle(LfoSyncDivision::SixteenthTriplet), Catch::Matchers::WithinRel(1.0 / 6.0, 0.001));
+    REQUIRE_THAT(LFO::divisionBeatsPerCycle(LfoSyncDivision::Whole), Catch::Matchers::WithinRel(4.0, 0.001));
+    REQUIRE_THAT(LFO::divisionBeatsPerCycle(LfoSyncDivision::Half), Catch::Matchers::WithinRel(2.0, 0.001));
+    REQUIRE_THAT(LFO::divisionBeatsPerCycle(LfoSyncDivision::Quarter), Catch::Matchers::WithinRel(1.0, 0.001));
+    REQUIRE_THAT(LFO::divisionBeatsPerCycle(LfoSyncDivision::Eighth), Catch::Matchers::WithinRel(0.5, 0.001));
+    REQUIRE_THAT(LFO::divisionBeatsPerCycle(LfoSyncDivision::Sixteenth), Catch::Matchers::WithinRel(0.25, 0.001));
+    REQUIRE_THAT(LFO::divisionBeatsPerCycle(LfoSyncDivision::ThirtySecond), Catch::Matchers::WithinRel(0.125, 0.001));
+    REQUIRE_THAT(LFO::divisionBeatsPerCycle(LfoSyncDivision::SixtyFourth), Catch::Matchers::WithinRel(0.0625, 0.001));
+    REQUIRE_THAT(LFO::divisionBeatsPerCycle(LfoSyncDivision::WholeDotted), Catch::Matchers::WithinRel(6.0, 0.001));
+    REQUIRE_THAT(LFO::divisionBeatsPerCycle(LfoSyncDivision::HalfDotted), Catch::Matchers::WithinRel(3.0, 0.001));
+    REQUIRE_THAT(LFO::divisionBeatsPerCycle(LfoSyncDivision::QuarterDotted), Catch::Matchers::WithinRel(1.5, 0.001));
+    REQUIRE_THAT(LFO::divisionBeatsPerCycle(LfoSyncDivision::EighthDotted), Catch::Matchers::WithinRel(0.75, 0.001));
+    REQUIRE_THAT(LFO::divisionBeatsPerCycle(LfoSyncDivision::SixteenthDotted),
+                 Catch::Matchers::WithinRel(0.375, 0.001));
+    REQUIRE_THAT(LFO::divisionBeatsPerCycle(LfoSyncDivision::HalfTriplet),
+                 Catch::Matchers::WithinRel(4.0 / 3.0, 0.001));
+    REQUIRE_THAT(LFO::divisionBeatsPerCycle(LfoSyncDivision::QuarterTriplet),
+                 Catch::Matchers::WithinRel(2.0 / 3.0, 0.001));
+    REQUIRE_THAT(LFO::divisionBeatsPerCycle(LfoSyncDivision::EighthTriplet),
+                 Catch::Matchers::WithinRel(1.0 / 3.0, 0.001));
+    REQUIRE_THAT(LFO::divisionBeatsPerCycle(LfoSyncDivision::SixteenthTriplet),
+                 Catch::Matchers::WithinRel(1.0 / 6.0, 0.001));
 }
 
 TEST_CASE("LFO target slot routing", "[LFO][routing]") {
