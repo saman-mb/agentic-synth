@@ -1,6 +1,8 @@
 #pragma once
 
+#include "agent/AgentBridge.h"
 #include "engine/ADSREnvelope.h"
+#include "engine/PatchStruct.h"
 #include "engine/VoiceManager.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -41,8 +43,10 @@ public:
 
 private:
     void applyParameters() noexcept;
+    void applyPatch(const PatchStruct& patch) noexcept;
 
     agentic_synth::engine::VoiceManager voiceManager_;
+    agentic_synth::agent::AgentBridge agentBridge_;
     juce::AudioProcessorValueTreeState apvts_;
 
     std::atomic<float>* masterGainParam_ = nullptr;
