@@ -80,7 +80,7 @@ jobs:
             libfontconfig-dev \
             libgl-dev \
             libgtk-3-dev \
-            libwebkit2gtk-4.0-dev \
+            libwebkit2gtk-4.1-dev \
             lcov
 
       - name: Install system dependencies (macOS)
