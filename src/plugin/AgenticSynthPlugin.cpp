@@ -71,10 +71,35 @@ void AgenticSynthPlugin::applyParameters() noexcept {
     voiceManager_.setPortamento(portamentoParam_->load());
 }
 
+void AgenticSynthPlugin::applyPatch(const PatchStruct& patch) noexcept {
+    voiceManager_.setFilterCutoff(patch.filter.cutoff_hz);
+    voiceManager_.setFilterResonance(patch.filter.resonance);
+
+    agentic_synth::engine::ADSREnvelope::Params env;
+    env.attackSeconds = patch.amp_env.attack_s;
+    env.decaySeconds = patch.amp_env.decay_s;
+    env.sustainLevel = patch.amp_env.sustain;
+    env.releaseSeconds = patch.amp_env.release_s;
+    voiceManager_.setAmpEnvelope(env);
+
+    voiceManager_.setPortamento(patch.portamento_s);
+}
+
 void AgenticSynthPlugin::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) {
     juce::ScopedNoDenormals noDenormals;
 
     applyParameters();
+
+    // Sync DAW transport tempo to all voice LFOs.
+    if (auto* ph = getPlayHead()) {
+        if (const auto pos = ph->getPosition())
+            if (const auto bpm = pos->getBpm())
+                voiceManager_.setHostTempo(*bpm);
+    }
+
+    // Apply any AI-generated patch from the AgentBridge pipeline.
+    if (const auto patch = agentBridge_.pollPatch())
+        applyPatch(*patch);
 
     for (const auto metadata : midiMessages) {
         const auto msg = metadata.getMessage();

@@ -59,6 +59,11 @@ public:
     void setFilterResonance(float resonance) noexcept;
     void setAmpEnvelope(ADSREnvelope::Params params) noexcept;
 
+    // Forward host DAW tempo to all voice LFOs for tempo-sync.
+    void setHostTempo(double bpm) noexcept;
+    // Release all held and sounding voices (MIDI All Notes Off).
+    void allNotesOff() noexcept;
+
     float renderNextSample() noexcept;
     void renderBlock(float* output, int numSamples) noexcept;
 

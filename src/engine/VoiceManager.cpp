@@ -107,6 +107,19 @@ void VoiceManager::setAmpEnvelope(ADSREnvelope::Params params) noexcept {
         v.ampEnv.setParams(params);
 }
 
+void VoiceManager::setHostTempo(double bpm) noexcept {
+    for (auto& v : voices_)
+        for (auto& lfo : v.lfos)
+            lfo.setHostTempo(bpm);
+}
+
+void VoiceManager::allNotesOff() noexcept {
+    for (auto& v : voices_) {
+        v.noteIsOn = false;
+        v.ampEnv.noteOff();
+    }
+}
+
 float VoiceManager::renderNextSample() noexcept {
     float sum = 0.0f;
     const float alpha = portamentoAlpha();
