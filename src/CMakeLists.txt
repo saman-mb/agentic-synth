@@ -34,6 +34,7 @@ agentic_synth_configure_target(agentic_synth_engine)
 target_link_libraries(agentic_synth_engine
     PUBLIC
         agentic_synth_mapper
+        juce::juce_core
         juce::juce_audio_basics
         juce::juce_data_structures
 )
