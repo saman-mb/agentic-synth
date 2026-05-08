@@ -1,6 +1,8 @@
 #pragma once
 
+#include <atomic>
 #include <chrono>
+#include <mutex>
 #include <optional>
 #include <string>
 
@@ -43,7 +45,12 @@ public:
     // Push a patch directly (no interpolation). Used for real-time user knob tweaks.
     void injectPatch(const PatchStruct& patch);
 
-    [[nodiscard]] const PatchStruct& currentPatch() const noexcept { return lastHeuristicPatch_; }
+    [[nodiscard]] PatchStruct currentPatch() const;
+
+    // Number of patches silently dropped because the SPSC queue was full.
+    [[nodiscard]] int droppedPatchCount() const noexcept {
+        return droppedPatches_.load(std::memory_order_relaxed);
+    }
 
 private:
     agentsynth::HeuristicParser parser_;
@@ -51,6 +58,12 @@ private:
     PatchStruct lastHeuristicPatch_{make_default_patch()};
     std::chrono::steady_clock::time_point submitTime_;
     double dispatchLatencyMs_{0.0};
+    // Serialises all producer push() calls: submit/refinePatch/injectPatch may be
+    // called from different threads, violating SPSCQueue's single-producer contract.
+    mutable std::mutex producerMutex_;
+    // Incremented when queue_.push() returns false (queue full). Atomic so it can
+    // be read from any thread without holding producerMutex_.
+    std::atomic<int> droppedPatches_{0};
 };
 
 } // namespace agentic_synth::agent

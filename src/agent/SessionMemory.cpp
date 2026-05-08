@@ -128,10 +128,12 @@ PatchVector SessionMemory::promptToVector(const std::string& prompt) noexcept {
 // ---------------------------------------------------------------------------
 
 void SessionMemory::recordFeedback(FeedbackKind kind, const std::string& prompt, const PatchStruct& patch) {
+    std::lock_guard lock(mutex_);
     events_.push_back({kind, prompt, patch});
 }
 
 std::string SessionMemory::buildRecap(const std::string& currentPrompt, int maxEvents) const {
+    std::lock_guard lock(mutex_);
     if (events_.empty())
         return {};
 
@@ -176,6 +178,7 @@ std::string SessionMemory::buildRecap(const std::string& currentPrompt, int maxE
 }
 
 PatchVector SessionMemory::computeParameterBias(const std::string& currentPrompt) const {
+    std::lock_guard lock(mutex_);
     PatchVector bias{};
     if (events_.empty())
         return bias;
@@ -214,6 +217,9 @@ PatchVector SessionMemory::computeParameterBias(const std::string& currentPrompt
     return bias;
 }
 
-void SessionMemory::clear() { events_.clear(); }
+void SessionMemory::clear() {
+    std::lock_guard lock(mutex_);
+    events_.clear();
+}
 
 } // namespace agentic_synth::agent

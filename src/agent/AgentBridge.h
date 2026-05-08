@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <atomic>
 #include <optional>
 #include <string>
 #include <string_view>
@@ -112,12 +113,12 @@ private:
     mapper::GrammarSampler sampler_;
     mapper::SemanticMapper semanticMapper_;
     StreamParser streamParser_;
-    Telemetry telemetry_{"agentic_synth_telemetry.json"};
+    Telemetry telemetry_{Telemetry::defaultLogPath()};
     WebSocketBridge* wsb_{nullptr};
 
-    // Normalised [0,1] last-seen values from MIDI CC; injected into system prompt.
-    float midiCutoffNorm_{0.5f};
-    float midiResonanceNorm_{0.0f};
+    // Written by the MIDI/audio thread; read by UI/control thread — must be atomic.
+    std::atomic<float> midiCutoffNorm_{0.5f};
+    std::atomic<float> midiResonanceNorm_{0.0f};
 };
 
 } // namespace agentic_synth::agent

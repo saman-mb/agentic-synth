@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <mutex>
 #include <string>
 #include <vector>
 
@@ -52,6 +53,7 @@ public:
     static PatchVector promptToVector(const std::string& prompt) noexcept;
 
 private:
+    mutable std::mutex mutex_;
     std::vector<FeedbackEvent> events_;
 
     static constexpr float kSimilarityThreshold = 0.3f;

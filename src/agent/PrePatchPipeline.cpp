@@ -59,18 +59,25 @@ PatchStruct lerpPatch(const PatchStruct& a, const PatchStruct& b, float t) noexc
 
 PatchStruct PrePatchPipeline::submit(const std::string& prompt) {
     submitTime_ = std::chrono::steady_clock::now();
-    lastHeuristicPatch_ = validate_patch(parser_.parse(prompt));
-    queue_.push(lastHeuristicPatch_);
+    const PatchStruct p = validate_patch(parser_.parse(prompt));
+    {
+        std::lock_guard lock(producerMutex_);
+        lastHeuristicPatch_ = p;
+        if (!queue_.push(p))
+            droppedPatches_.fetch_add(1, std::memory_order_relaxed);
+    }
     dispatchLatencyMs_ =
         std::chrono::duration<double, std::milli>(std::chrono::steady_clock::now() - submitTime_).count();
-    return lastHeuristicPatch_;
+    return p;
 }
 
 void PrePatchPipeline::refinePatch(const PatchStruct& llmPatch) {
     const PatchStruct safeTarget = validate_patch(llmPatch);
+    std::lock_guard lock(producerMutex_);
     for (int step = 1; step <= kTransitionSteps; ++step) {
         const float t = static_cast<float>(step) / kTransitionSteps;
-        queue_.push(validate_patch(lerpPatch(lastHeuristicPatch_, safeTarget, t)));
+        if (!queue_.push(validate_patch(lerpPatch(lastHeuristicPatch_, safeTarget, t))))
+            droppedPatches_.fetch_add(1, std::memory_order_relaxed);
     }
 }
 
@@ -79,8 +86,15 @@ std::optional<PatchStruct> PrePatchPipeline::poll() noexcept { return queue_.pop
 double PrePatchPipeline::lastDispatchLatencyMs() const noexcept { return dispatchLatencyMs_; }
 
 void PrePatchPipeline::injectPatch(const PatchStruct& patch) {
+    std::lock_guard lock(producerMutex_);
     lastHeuristicPatch_ = validate_patch(patch);
-    queue_.push(lastHeuristicPatch_);
+    if (!queue_.push(lastHeuristicPatch_))
+        droppedPatches_.fetch_add(1, std::memory_order_relaxed);
+}
+
+PatchStruct PrePatchPipeline::currentPatch() const {
+    std::lock_guard lock(producerMutex_);
+    return lastHeuristicPatch_;
 }
 
 } // namespace agentic_synth::agent
