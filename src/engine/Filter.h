@@ -31,13 +31,13 @@ private:
     void updateCoefficients();
 
     double sampleRate_ = 44100.0;
-    float cutoff_    = 1000.0f;
+    float cutoff_ = 1000.0f;
     float resonance_ = 0.0f;
 
     double g_ = 0.0;
-    double a_ = 0.0;  // g / (1 + g)
-    double b_ = 0.0;  // 1 / (1 + g)
-    double k_ = 0.0;  // feedback gain; capped at 3.8 < 4 (self-oscillation threshold)
+    double a_ = 0.0; // g / (1 + g)
+    double b_ = 0.0; // 1 / (1 + g)
+    double k_ = 0.0; // feedback gain; capped at 3.8 < 4 (self-oscillation threshold)
 
     std::array<double, 4> s_ = {};
 };
@@ -60,11 +60,11 @@ private:
 
     FilterMode mode_;
     double sampleRate_ = 44100.0;
-    float cutoff_    = 1000.0f;
+    float cutoff_ = 1000.0f;
     float resonance_ = 0.0f;
 
     double a1_ = 0.0, a2_ = 0.0, a3_ = 0.0;
-    double k_ = 2.0;  // damping = 1/Q; clamped >= 0.1 to prevent self-oscillation
+    double k_ = 2.0; // damping = 1/Q; clamped >= 0.1 to prevent self-oscillation
 
     double ic1eq_ = 0.0;
     double ic2eq_ = 0.0;
