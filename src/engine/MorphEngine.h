@@ -70,7 +70,7 @@ public:
 private:
     std::array<std::optional<PatchStruct>, kMaxTargets> targets_{};
     float position_{0.0f};
-    int   morphCc_{2};  // CC#2 = Breath Controller
+    int morphCc_{2}; // CC#2 = Breath Controller
     MorphCallback callback_;
 
     static PatchStruct lerp(const PatchStruct& a, const PatchStruct& b, float t) noexcept;

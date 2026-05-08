@@ -20,14 +20,14 @@ namespace agentic_synth::agent {
 
 class WebSocketBridge : private juce::Thread {
 public:
-    using TextCallback   = std::function<void(std::string json, int clientId)>;
+    using TextCallback = std::function<void(std::string json, int clientId)>;
     using BinaryCallback = std::function<void(std::vector<uint8_t> data, int clientId)>;
 
     WebSocketBridge();
     ~WebSocketBridge() override;
 
     // Non-copyable, non-movable.
-    WebSocketBridge(const WebSocketBridge&)            = delete;
+    WebSocketBridge(const WebSocketBridge&) = delete;
     WebSocketBridge& operator=(const WebSocketBridge&) = delete;
 
     void start(int port = 9002);
@@ -39,8 +39,8 @@ public:
     // Send a text frame to one specific client.
     void sendToClient(int clientId, const std::string& json);
 
-    void setTextCallback(TextCallback cb)   { textCb_   = std::move(cb); }
-    void setBinaryCallback(BinaryCallback cb){ binaryCb_ = std::move(cb); }
+    void setTextCallback(TextCallback cb) { textCb_ = std::move(cb); }
+    void setBinaryCallback(BinaryCallback cb) { binaryCb_ = std::move(cb); }
 
 private:
     // juce::Thread entry point.
@@ -53,16 +53,13 @@ private:
     static bool performHandshake(juce::StreamingSocket* sock);
 
     // Read one WebSocket frame.  Returns false on disconnect / error.
-    static bool readFrame(juce::StreamingSocket* sock,
-                          uint8_t&              opcode,
-                          std::vector<uint8_t>& payload);
+    static bool readFrame(juce::StreamingSocket* sock, uint8_t& opcode, std::vector<uint8_t>& payload);
 
     // Write a server-side (unmasked) text frame.
     static bool writeTextFrame(juce::StreamingSocket* sock, const std::string& text);
 
     // Write a raw frame with given opcode.
-    static bool writeFrame(juce::StreamingSocket* sock,
-                           uint8_t opcode, const void* data, size_t len);
+    static bool writeFrame(juce::StreamingSocket* sock, uint8_t opcode, const void* data, size_t len);
 
     // WebSocket handshake helpers.
     static std::string computeAcceptKey(const std::string& clientKey);
@@ -72,7 +69,7 @@ private:
     int port_{9002};
     std::atomic<int> nextClientId_{0};
 
-    TextCallback   textCb_;
+    TextCallback textCb_;
     BinaryCallback binaryCb_;
 
     struct ClientEntry {
@@ -80,7 +77,7 @@ private:
         juce::StreamingSocket* sock; // owned by the client thread
     };
 
-    juce::CriticalSection   clientsMutex_;
+    juce::CriticalSection clientsMutex_;
     std::vector<ClientEntry> clients_;
 
     juce::StreamingSocket serverSock_;

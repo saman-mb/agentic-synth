@@ -6,9 +6,7 @@ namespace agentic_synth::ipc {
 
 // ── CompanionConnection ───────────────────────────────────────────────────────
 
-CompanionConnection::CompanionConnection(uint32_t connId,
-                                         PatchRequestCallback onRequest,
-                                         CompanionIpcServer&  owner)
+CompanionConnection::CompanionConnection(uint32_t connId, PatchRequestCallback onRequest, CompanionIpcServer& owner)
     : connId_(connId), onRequest_(std::move(onRequest)), owner_(owner) {}
 
 void CompanionConnection::sendPatchUpdate(const std::string& patchJson) {
@@ -23,48 +21,43 @@ void CompanionConnection::sendShutdown() {
 
 void CompanionConnection::connectionMade() {}
 
-void CompanionConnection::connectionLost() {
-    owner_.onClientDisconnected(connId_);
-}
+void CompanionConnection::connectionLost() { owner_.onClientDisconnected(connId_); }
 
 void CompanionConnection::messageReceived(const juce::MemoryBlock& data) {
     IpcMsgHeader hdr;
     std::string payload;
-    if (!parseMessage(data, hdr, payload)) return;
+    if (!parseMessage(data, hdr, payload))
+        return;
 
     switch (hdr.type) {
-        case IpcMsgType::PatchRequest:
-            if (onRequest_) onRequest_(hdr.instanceId, payload);
-            break;
-        case IpcMsgType::Bye:
-            disconnect();
-            break;
-        default:
-            break;
+    case IpcMsgType::PatchRequest:
+        if (onRequest_)
+            onRequest_(hdr.instanceId, payload);
+        break;
+    case IpcMsgType::Bye:
+        disconnect();
+        break;
+    default:
+        break;
     }
 }
 
 // ── CompanionIpcServer ────────────────────────────────────────────────────────
 
-CompanionIpcServer::CompanionIpcServer(PatchRequestCallback  onRequest,
-                                       std::function<void()> onEmpty)
+CompanionIpcServer::CompanionIpcServer(PatchRequestCallback onRequest, std::function<void()> onEmpty)
     : onRequest_(std::move(onRequest)), onEmpty_(std::move(onEmpty)) {}
 
-CompanionIpcServer::~CompanionIpcServer() {
-    shutdown();
-}
+CompanionIpcServer::~CompanionIpcServer() { shutdown(); }
 
-bool CompanionIpcServer::start() {
-    return beginWaitingForSocket(kCompanionPort, "127.0.0.1");
-}
+bool CompanionIpcServer::start() { return beginWaitingForSocket(kCompanionPort, "127.0.0.1"); }
 
 void CompanionIpcServer::broadcastPatchUpdate(const std::string& patchJson) {
     std::lock_guard lock(connsMutex_);
-    for (auto& c : conns_) c->sendPatchUpdate(patchJson);
+    for (auto& c : conns_)
+        c->sendPatchUpdate(patchJson);
 }
 
-void CompanionIpcServer::sendPatchUpdate(uint32_t instanceId,
-                                         const std::string& patchJson) {
+void CompanionIpcServer::sendPatchUpdate(uint32_t instanceId, const std::string& patchJson) {
     std::lock_guard lock(connsMutex_);
     for (auto& c : conns_) {
         if (c->connId() == instanceId) {
@@ -77,7 +70,8 @@ void CompanionIpcServer::sendPatchUpdate(uint32_t instanceId,
 void CompanionIpcServer::shutdown() {
     {
         std::lock_guard lock(connsMutex_);
-        for (auto& c : conns_) c->sendShutdown();
+        for (auto& c : conns_)
+            c->sendShutdown();
         conns_.clear();
     }
     stop();
@@ -93,13 +87,13 @@ void CompanionIpcServer::onClientDisconnected(uint32_t connId) {
     {
         std::lock_guard lock(connsMutex_);
         conns_.erase(
-            std::remove_if(conns_.begin(), conns_.end(),
-                           [connId](const auto& c) { return c->connId() == connId; }),
+            std::remove_if(conns_.begin(), conns_.end(), [connId](const auto& c) { return c->connId() == connId; }),
             conns_.end());
         remaining = static_cast<int>(conns_.size());
     }
     // Notify companion logic when the last plugin instance leaves.
-    if (remaining == 0 && onEmpty_) onEmpty_();
+    if (remaining == 0 && onEmpty_)
+        onEmpty_();
 }
 
 juce::InterprocessConnection* CompanionIpcServer::createConnectionObject() {
@@ -110,4 +104,4 @@ juce::InterprocessConnection* CompanionIpcServer::createConnectionObject() {
     return conn.get();
 }
 
-}  // namespace agentic_synth::ipc
+} // namespace agentic_synth::ipc

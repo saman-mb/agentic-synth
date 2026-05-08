@@ -1,18 +1,18 @@
-#include <catch2/catch_test_macros.hpp>
-#include "engine/PatchStruct.h"
-#include "engine/VoiceManager.h"
-#include "engine/SynthEngine.h"
-#include "engine/PatchValidator.h"
 #include "agent/AgentBridge.h"
-#include "agent/StreamParser.h"
 #include "agent/PrePatchPipeline.h"
+#include "agent/SessionMemory.h"
+#include "agent/StreamParser.h"
+#include "agent/Telemetry.h"
+#include "engine/MorphEngine.h"
+#include "engine/PatchStruct.h"
+#include "engine/PatchValidator.h"
+#include "engine/SynthEngine.h"
+#include "engine/VariationEngine.h"
+#include "engine/VoiceManager.h"
+#include "mapper/GrammarSampler.h"
 #include "mapper/HeuristicParser.h"
 #include "mapper/SemanticMapper.h"
-#include "mapper/GrammarSampler.h"
-#include "engine/VariationEngine.h"
-#include "engine/MorphEngine.h"
-#include "agent/SessionMemory.h"
-#include "agent/Telemetry.h"
+#include <catch2/catch_test_macros.hpp>
 
 using namespace agentic_synth::engine;
 using namespace agentic_synth::agent;
@@ -30,8 +30,8 @@ TEST_CASE("Phase 2: NL descriptor produces valid PatchStruct", "[phase2][accepta
     REQUIRE(validator.validate(patch).valid());
 
     // Key parameters should be set non-zero
-    REQUIRE(patch.filterCutoffHz < 1000.0f);  // "warm" = lower cutoff
-    REQUIRE(patch.ampAttackMs > 200.0f);       // "slow attack"
+    REQUIRE(patch.filterCutoffHz < 1000.0f); // "warm" = lower cutoff
+    REQUIRE(patch.ampAttackMs > 200.0f);     // "slow attack"
 }
 
 TEST_CASE("Phase 2: NL refinement updates existing patch", "[phase2][acceptance]") {
@@ -93,8 +93,7 @@ TEST_CASE("Phase 2: Variation generation from base patch", "[phase2][acceptance]
     // Each variation should differ from the base
     int differing = 0;
     for (const auto& v : variations) {
-        if (v.filterCutoffHz != base.filterCutoffHz ||
-            v.oscillatorMix[0] != base.oscillatorMix[0]) {
+        if (v.filterCutoffHz != base.filterCutoffHz || v.oscillatorMix[0] != base.oscillatorMix[0]) {
             ++differing;
         }
     }

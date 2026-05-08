@@ -11,7 +11,7 @@ bool WhisperClient::init(const std::string& modelPath) {
     // whisper_ = ctx;
     // initialized_ = (ctx != nullptr);
     (void)modelPath;
-    return false;  // whisper not bundled yet
+    return false; // whisper not bundled yet
 }
 
 std::string WhisperClient::transcribe(const int16_t* samples, int numSamples, int sampleRate) {
@@ -39,7 +39,8 @@ void WhisperClient::stopStreaming() {
 }
 
 void WhisperClient::feedAudio(const int16_t* samples, int numSamples) {
-    if (!streaming_) return;
+    if (!streaming_)
+        return;
 
     for (int i = 0; i < numSamples && streamPos_ < kStreamBufferSize; ++i) {
         streamBuffer_[streamPos_++] = samples[i];

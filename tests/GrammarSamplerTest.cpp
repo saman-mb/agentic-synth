@@ -1,20 +1,21 @@
-#include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
+#include <catch2/catch_test_macros.hpp>
 
 #include "mapper/GrammarSampler.h"
 
-using agentic_synth::mapper::GrammarSampler;
-using agentic_synth::OscType;
 using agentic_synth::FilterType;
+using agentic_synth::kPatchStructVersion;
 using agentic_synth::LfoTarget;
 using agentic_synth::LfoWaveform;
-using agentic_synth::kPatchStructVersion;
+using agentic_synth::OscType;
+using agentic_synth::mapper::GrammarSampler;
 
 // Minimal valid PatchStruct JSON that matches the GBNF grammar field order.
 static std::string make_valid_json(uint32_t patch_id = 0) {
     return R"({
   "version": 1,
-  "patch_id": )" + std::to_string(patch_id) + R"(,
+  "patch_id": )" +
+           std::to_string(patch_id) + R"(,
   "osc": [
     {"type": "Sawtooth", "semitone_offset": 0.0, "detune_cents": 0.0, "wavetable_pos": 0.0,
      "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 1.0, "pan": 0.0, "pulse_width": 0.5, "enabled": true},
@@ -41,20 +42,20 @@ static std::string make_valid_json(uint32_t patch_id = 0) {
 TEST_CASE("parse_patch_json: valid JSON round-trips to correct PatchStruct") {
     auto result = GrammarSampler::parse_patch_json(make_valid_json(42));
     REQUIRE(result.has_value());
-    CHECK(result->version    == kPatchStructVersion);
-    CHECK(result->patch_id   == 42u);
+    CHECK(result->version == kPatchStructVersion);
+    CHECK(result->patch_id == 42u);
     CHECK(result->osc[0].type == OscType::Sawtooth);
     CHECK(result->osc[0].enabled == 1);
     CHECK(result->osc[1].enabled == 0);
-    CHECK(result->filter.type      == FilterType::LowPass);
+    CHECK(result->filter.type == FilterType::LowPass);
     CHECK(result->filter.cutoff_hz == Catch::Approx(18000.0f));
-    CHECK(result->amp_env.sustain  == Catch::Approx(1.0f));
+    CHECK(result->amp_env.sustain == Catch::Approx(1.0f));
     CHECK(result->voice_count == 8);
     CHECK(result->master_gain == Catch::Approx(1.0f));
 }
 
 TEST_CASE("parse_patch_json: all OscType enum values accepted") {
-    for (const char* t : {"Sine","Triangle","Sawtooth","Square","Pulse","Wavetable","FM","Noise"}) {
+    for (const char* t : {"Sine", "Triangle", "Sawtooth", "Square", "Pulse", "Wavetable", "FM", "Noise"}) {
         std::string json = make_valid_json();
         // Replace first "Sawtooth"
         auto pos = json.find("\"Sawtooth\"");
@@ -66,7 +67,7 @@ TEST_CASE("parse_patch_json: all OscType enum values accepted") {
 }
 
 TEST_CASE("parse_patch_json: all FilterType enum values accepted") {
-    for (const char* t : {"LowPass","HighPass","BandPass","Notch","Peak"}) {
+    for (const char* t : {"LowPass", "HighPass", "BandPass", "Notch", "Peak"}) {
         std::string json = make_valid_json();
         auto pos = json.find("\"LowPass\"");
         json.replace(pos, 9, std::string("\"") + t + "\"");
@@ -77,7 +78,7 @@ TEST_CASE("parse_patch_json: all FilterType enum values accepted") {
 }
 
 TEST_CASE("parse_patch_json: all LfoTarget enum values accepted") {
-    for (const char* t : {"None","Pitch","FilterCutoff","Amplitude","Pan","WavetablePos","FmRatio"}) {
+    for (const char* t : {"None", "Pitch", "FilterCutoff", "Amplitude", "Pan", "WavetablePos", "FmRatio"}) {
         std::string json = make_valid_json();
         auto pos = json.find("\"None\"");
         json.replace(pos, 6, std::string("\"") + t + "\"");
@@ -88,11 +89,12 @@ TEST_CASE("parse_patch_json: all LfoTarget enum values accepted") {
 }
 
 TEST_CASE("parse_patch_json: all LfoWaveform enum values accepted") {
-    for (const char* t : {"Sine","Triangle","Sawtooth","Square","SampleAndHold"}) {
+    for (const char* t : {"Sine", "Triangle", "Sawtooth", "Square", "SampleAndHold"}) {
         std::string json = make_valid_json();
         // Replace first lfo waveform "Sine"
         auto pos = json.find("\"waveform\": \"Sine\"");
-        if (pos == std::string::npos) pos = json.find("\"waveform\":\"Sine\"");
+        if (pos == std::string::npos)
+            pos = json.find("\"waveform\":\"Sine\"");
         auto val_start = json.find("\"Sine\"", pos + 10);
         json.replace(val_start, 6, std::string("\"") + t + "\"");
         auto r = GrammarSampler::parse_patch_json(json);
@@ -105,7 +107,8 @@ TEST_CASE("parse_patch_json: bpm_sync bool accepted as true") {
     std::string json = make_valid_json();
     // Replace first "bpm_sync": false with true
     auto pos = json.find("\"bpm_sync\": false");
-    if (pos != std::string::npos) json.replace(pos, 17, "\"bpm_sync\": true");
+    if (pos != std::string::npos)
+        json.replace(pos, 17, "\"bpm_sync\": true");
     auto r = GrammarSampler::parse_patch_json(json);
     REQUIRE(r.has_value());
 }
@@ -146,7 +149,7 @@ TEST_CASE("parse_patch_json: returns nullopt for unknown enum string") {
 TEST_CASE("parse_patch_json: returns nullopt when cutoff_hz out of valid range") {
     std::string json = make_valid_json();
     auto pos = json.find("18000.0");
-    json.replace(pos, 7, "5.0");  // below 20 Hz minimum
+    json.replace(pos, 7, "5.0"); // below 20 Hz minimum
     CHECK_FALSE(GrammarSampler::parse_patch_json(json).has_value());
 }
 

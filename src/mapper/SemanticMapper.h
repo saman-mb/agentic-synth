@@ -12,9 +12,9 @@ namespace agentic_synth::mapper {
 // Issue #90: a user-defined (keyword, context, delta) triple with an owned keyword string.
 // Stored in SemanticMapper::customEntries_; takes priority over the static dataset.
 struct CustomEntry {
-    std::string  keyword;
+    std::string keyword;
     SoundContext context{SoundContext::Generic};
-    PatchDelta   delta;
+    PatchDelta delta;
 };
 
 // Configuration for SemanticMapper.
@@ -22,8 +22,8 @@ struct CustomEntry {
 // When server_url is empty the mapper falls back to tokenised word-overlap
 // similarity (no network required, suitable for offline / unit-test use).
 struct SemanticMapperConfig {
-    std::string server_url;       // e.g. "http://127.0.0.1:8080"
-    int embedding_dims{384};      // all-MiniLM-L6-v2 dimensionality
+    std::string server_url;  // e.g. "http://127.0.0.1:8080"
+    int embedding_dims{384}; // all-MiniLM-L6-v2 dimensionality
     float similarity_threshold{0.25f};
     int timeout_ms{5000};
 };
@@ -47,8 +47,8 @@ public:
     // Retrieve the best-matching DescriptorEntry for one descriptor word.
     // Uses embedding similarity when a server is configured, otherwise uses
     // word-overlap scoring.
-    [[nodiscard]] std::optional<const DescriptorEntry*>
-    best_match(const std::string& descriptor, SoundContext ctx) const;
+    [[nodiscard]] std::optional<const DescriptorEntry*> best_match(const std::string& descriptor,
+                                                                   SoundContext ctx) const;
 
     // ── Issue #90: runtime dictionary editing ─────────────────────────────────
 
@@ -68,7 +68,7 @@ public:
     [[nodiscard]] const std::vector<CustomEntry>& customEntries() const noexcept { return customEntries_; }
 
 private:
-    SemanticMapperConfig     cfg_;
+    SemanticMapperConfig cfg_;
     std::vector<CustomEntry> customEntries_;
 
     // Tokenise prompt into lowercase words
@@ -78,12 +78,10 @@ private:
     [[nodiscard]] std::vector<float> fetch_embedding(const std::string& text) const;
 
     // Cosine similarity between two equal-length vectors (returns -1..1)
-    [[nodiscard]] static float cosine(const std::vector<float>& a,
-                                      const std::vector<float>& b) noexcept;
+    [[nodiscard]] static float cosine(const std::vector<float>& a, const std::vector<float>& b) noexcept;
 
     // Word-overlap similarity score (fallback when no embedding server)
-    [[nodiscard]] static float word_overlap_score(const std::string& query,
-                                                   std::string_view   entry_keyword) noexcept;
+    [[nodiscard]] static float word_overlap_score(const std::string& query, std::string_view entry_keyword) noexcept;
 
     // HTTP POST to embedding endpoint; returns raw JSON response body
     [[nodiscard]] std::string http_post_embedding(const std::string& text) const;

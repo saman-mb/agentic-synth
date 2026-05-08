@@ -27,8 +27,7 @@ public:
 
     // Generate a PatchStruct from a free-form natural-language prompt.
     // Returns nullopt on HTTP failure, JSON parse error, or range violation.
-    [[nodiscard]] std::optional<PatchStruct> generate(const std::string& user_prompt,
-                                                       uint32_t patch_id = 0) const;
+    [[nodiscard]] std::optional<PatchStruct> generate(const std::string& user_prompt, uint32_t patch_id = 0) const;
 
     // Parse a GBNF-constrained JSON string into a PatchStruct.
     // Pure function — no network calls. Used for unit tests and offline validation.
@@ -39,7 +38,7 @@ public:
 
 private:
     GrammarSamplerConfig cfg_;
-    std::string grammar_text_;   // content of the .gbnf file
+    std::string grammar_text_; // content of the .gbnf file
 
     // Build llama.cpp /completion request body (JSON)
     [[nodiscard]] std::string build_request(const std::string& user_prompt, uint32_t patch_id) const;

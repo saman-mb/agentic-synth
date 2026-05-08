@@ -41,7 +41,7 @@ public:
 
 private:
     // Serum .fxp header: 4-byte chunk magic + 4-byte size
-    static constexpr uint32_t kFxpMagic = 0x4B736466;  // "Ksfd" in LE
+    static constexpr uint32_t kFxpMagic = 0x4B736466; // "Ksfd" in LE
     static constexpr int kFxpVersion = 1;
 
     std::vector<uint8_t> buildSerumChunk(const PatchStruct& patch);

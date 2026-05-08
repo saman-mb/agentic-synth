@@ -12,12 +12,12 @@ namespace agentic_synth::engine {
 // In release builds all checks compile away to zero overhead.
 
 #if defined(DEBUG) || defined(_DEBUG) || !defined(NDEBUG)
-#define REALTIME_ASSERT(cond, msg) \
-    do { \
-        if (!(cond)) { \
-            /* Intentionally crash in debug so the violation is unmistakable */ \
-            ::assert((cond) && (msg)); \
-        } \
+#define REALTIME_ASSERT(cond, msg)                                                                                     \
+    do {                                                                                                               \
+        if (!(cond)) {                                                                                                 \
+            /* Intentionally crash in debug so the violation is unmistakable */                                        \
+            ::assert((cond) && (msg));                                                                                 \
+        }                                                                                                              \
     } while (false)
 #else
 #define REALTIME_ASSERT(cond, msg) ((void)0)
@@ -43,33 +43,31 @@ public:
 // ── Audit helpers ─────────────────────────────────────────────────────
 
 // Call at the start of any audio-thread function
-#define CHECK_REALTIME() \
-    REALTIME_ASSERT(isRealtimeContext().load(), \
-        "Audio-thread function called outside realtime context")
+#define CHECK_REALTIME()                                                                                               \
+    REALTIME_ASSERT(isRealtimeContext().load(), "Audio-thread function called outside realtime context")
 
 // Override operator new on the audio thread to trip on allocation
 #if defined(REALTIME_STRICT)
 void* operator new(std::size_t sz) {
-    REALTIME_ASSERT(!isRealtimeContext().load(),
-        "Heap allocation on audio thread!");
+    REALTIME_ASSERT(!isRealtimeContext().load(), "Heap allocation on audio thread!");
     return std::malloc(sz);
 }
 void operator delete(void* ptr) noexcept {
-    REALTIME_ASSERT(!isRealtimeContext().load(),
-        "Heap deallocation on audio thread!");
+    REALTIME_ASSERT(!isRealtimeContext().load(), "Heap deallocation on audio thread!");
     std::free(ptr);
 }
 #endif
 
 // ── Pre-allocated ring buffer for realtime-safe parameter updates ─────
-template<typename T, size_t Capacity>
-class LockFreeRingBuffer {
+template <typename T, size_t Capacity> class LockFreeRingBuffer {
     static_assert((Capacity & (Capacity - 1)) == 0, "Capacity must be power of two");
+
 public:
     bool push(T value) noexcept {
         auto w = writePos_.load(std::memory_order_relaxed);
         auto r = readPos_.load(std::memory_order_acquire);
-        if ((w - r) >= Capacity) return false;  // full
+        if ((w - r) >= Capacity)
+            return false; // full
         buffer_[w & (Capacity - 1)] = value;
         writePos_.store(w + 1, std::memory_order_release);
         return true;
@@ -78,7 +76,8 @@ public:
     bool pop(T& value) noexcept {
         auto r = readPos_.load(std::memory_order_relaxed);
         auto w = writePos_.load(std::memory_order_acquire);
-        if (r >= w) return false;  // empty
+        if (r >= w)
+            return false; // empty
         value = buffer_[r & (Capacity - 1)];
         readPos_.store(r + 1, std::memory_order_release);
         return true;

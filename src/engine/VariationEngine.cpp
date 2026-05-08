@@ -176,12 +176,12 @@ std::array<PatchStruct, VariationEngine::kVariationCount>
 VariationEngine::generateVariationsWithSeed(const PatchStruct& base, uint32_t perturbSeed) const {
     const PatchStruct morphTarget = makeHotPatch(make_default_patch());
 
-    auto futTemp  = std::async(std::launch::async, [&] { return temperatureSweep(base); });
-    auto futPert  = std::async(std::launch::async, [&] { return perturbation(base, perturbSeed); });
+    auto futTemp = std::async(std::launch::async, [&] { return temperatureSweep(base); });
+    auto futPert = std::async(std::launch::async, [&] { return perturbation(base, perturbSeed); });
     auto futMorph = std::async(std::launch::async, [&] { return morph(base, morphTarget); });
 
-    const auto temps  = futTemp.get();
-    const auto perts  = futPert.get();
+    const auto temps = futTemp.get();
+    const auto perts = futPert.get();
     const auto morphs = futMorph.get();
 
     std::array<PatchStruct, kVariationCount> result;

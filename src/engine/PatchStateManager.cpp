@@ -12,7 +12,8 @@ juce::String PatchStateManager::saveToXml(const PatchStruct& patch) {
 
 PatchStruct PatchStateManager::loadFromXml(const juce::String& xml) {
     auto xml = juce::XmlDocument::parse(xml);
-    if (xml == nullptr) return PatchStruct{};
+    if (xml == nullptr)
+        return PatchStruct{};
 
     auto tree = juce::ValueTree::fromXml(*xml);
     return fromValueTree(tree);
@@ -25,7 +26,8 @@ bool PatchStateManager::saveToFile(const juce::File& file, const PatchStruct& pa
 
 PatchStruct PatchStateManager::loadFromFile(const juce::File& file) {
     auto xml = juce::XmlDocument::parse(file);
-    if (xml == nullptr) return PatchStruct{};
+    if (xml == nullptr)
+        return PatchStruct{};
 
     auto tree = juce::ValueTree::fromXml(*xml);
     return fromValueTree(tree);
@@ -48,14 +50,16 @@ juce::ValueTree PatchStateManager::toValueTree(const PatchStruct& patch) {
 
     // Oscillator mix as array
     juce::Array<juce::var> oscMix;
-    for (int i = 0; i < 5; ++i) oscMix.add(patch.oscillatorMix[i]);
+    for (int i = 0; i < 5; ++i)
+        oscMix.add(patch.oscillatorMix[i]);
     tree.setProperty("oscillatorMix", oscMix, nullptr);
 
     return tree;
 }
 
 PatchStruct PatchStateManager::fromValueTree(const juce::ValueTree& tree) {
-    if (!tree.hasType(kTreeType)) return PatchStruct{};
+    if (!tree.hasType(kTreeType))
+        return PatchStruct{};
 
     PatchStruct patch{};
     patch.filterCutoffHz = tree.getProperty("filterCutoffHz", 500.0f);
@@ -66,8 +70,7 @@ PatchStruct PatchStateManager::fromValueTree(const juce::ValueTree& tree) {
     patch.ampReleaseMs = tree.getProperty("ampReleaseMs", 500.0f);
     patch.lfoRateHz = tree.getProperty("lfoRateHz", 5.0f);
     patch.lfoDepth = tree.getProperty("lfoDepth", 0.0f);
-    patch.lfoShape = static_cast<decltype(patch.lfoShape)>(
-        static_cast<int>(tree.getProperty("lfoShape", 0)));
+    patch.lfoShape = static_cast<decltype(patch.lfoShape)>(static_cast<int>(tree.getProperty("lfoShape", 0)));
 
     auto oscMix = tree.getProperty("oscillatorMix", juce::Array<juce::var>());
     if (auto* arr = oscMix.getArray()) {
@@ -84,8 +87,6 @@ void PatchStateManager::saveUIState(const UIState& state) {
     // TODO: persist UI state to file
 }
 
-PatchStateManager::UIState PatchStateManager::loadUIState() {
-    return UIState{};
-}
+PatchStateManager::UIState PatchStateManager::loadUIState() { return UIState{}; }
 
 } // namespace agentic_synth::engine

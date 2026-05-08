@@ -22,13 +22,15 @@ inline constexpr float kSafeResonanceCeiling = 0.85f;   // below Moog self-oscil
 struct DcBlocker {
     float x1 = 0.0f;
     float y1 = 0.0f;
-    float R  = 0.99715f; // 20 Hz at 44100 Hz
+    float R = 0.99715f; // 20 Hz at 44100 Hz
 
     void prepare(float sampleRate, float cutoffHz = 20.0f) noexcept {
         constexpr float kTwoPi = 6.28318530718f;
         R = 1.0f - (kTwoPi * cutoffHz / sampleRate);
-        if (R < 0.0f)    R = 0.0f;
-        if (R > 0.9999f) R = 0.9999f;
+        if (R < 0.0f)
+            R = 0.0f;
+        if (R > 0.9999f)
+            R = 0.9999f;
         x1 = y1 = 0.0f;
     }
 

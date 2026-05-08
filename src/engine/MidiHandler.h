@@ -15,18 +15,16 @@ struct RawMidiMsg {
     uint8_t data2{0};
 
     static RawMidiMsg noteOn(int note, int vel, int ch = 0) noexcept {
-        return {static_cast<uint8_t>(0x90u | (static_cast<unsigned>(ch) & 0x0Fu)),
-                static_cast<uint8_t>(note & 0x7F),
+        return {static_cast<uint8_t>(0x90u | (static_cast<unsigned>(ch) & 0x0Fu)), static_cast<uint8_t>(note & 0x7F),
                 static_cast<uint8_t>(vel & 0x7F)};
     }
     static RawMidiMsg noteOff(int note, int ch = 0) noexcept {
-        return {static_cast<uint8_t>(0x80u | (static_cast<unsigned>(ch) & 0x0Fu)),
-                static_cast<uint8_t>(note & 0x7F), 0};
+        return {static_cast<uint8_t>(0x80u | (static_cast<unsigned>(ch) & 0x0Fu)), static_cast<uint8_t>(note & 0x7F),
+                0};
     }
     static RawMidiMsg cc(int controller, int value, int ch = 0) noexcept {
         return {static_cast<uint8_t>(0xB0u | (static_cast<unsigned>(ch) & 0x0Fu)),
-                static_cast<uint8_t>(controller & 0x7F),
-                static_cast<uint8_t>(value & 0x7F)};
+                static_cast<uint8_t>(controller & 0x7F), static_cast<uint8_t>(value & 0x7F)};
     }
 };
 
@@ -44,10 +42,10 @@ public:
     void setHostTempo(double bpm) noexcept;
 
     // Expose current CC values for upstream inspection / AI context.
-    [[nodiscard]] float modWheelValue()     const noexcept { return modWheel_; }
-    [[nodiscard]] float volumeValue()       const noexcept { return ccVolume_; }
-    [[nodiscard]] float currentCutoffHz()   const noexcept { return cutoffHz_; }
-    [[nodiscard]] float currentResonance()  const noexcept { return resonance_; }
+    [[nodiscard]] float modWheelValue() const noexcept { return modWheel_; }
+    [[nodiscard]] float volumeValue() const noexcept { return ccVolume_; }
+    [[nodiscard]] float currentCutoffHz() const noexcept { return cutoffHz_; }
+    [[nodiscard]] float currentResonance() const noexcept { return resonance_; }
 
 private:
     void handleNoteOn(int note, float velocity) noexcept;

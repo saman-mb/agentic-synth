@@ -1,9 +1,9 @@
-#include <catch2/catch_test_macros.hpp>
+#include "agent/AgentBridge.h"
+#include "engine/MidiHandler.h"
 #include "engine/PatchStruct.h"
 #include "engine/VoiceManager.h"
-#include "engine/MidiHandler.h"
 #include "plugin/AgenticSynthPlugin.h"
-#include "agent/AgentBridge.h"
+#include <catch2/catch_test_macros.hpp>
 
 using namespace agentic_synth::engine;
 
@@ -20,7 +20,7 @@ TEST_CASE("Phase 3: Plugin processes audio without crash", "[phase3][acceptance]
     // Simulate sustained play
     voices.noteOn(60, 100.0f);
     float sample = 0.0f;
-    for (int i = 0; i < 44100; ++i) {  // 1 second of audio
+    for (int i = 0; i < 44100; ++i) { // 1 second of audio
         sample = voices.renderNextSample();
     }
     voices.allNotesOff();

@@ -34,7 +34,7 @@ private:
     void applyField(const std::string& key, const std::string& value);
 
     State state_{State::Idle};
-    int depth_{0};       // nesting depth inside the current field value
+    int depth_{0}; // nesting depth inside the current field value
     bool inString_{false};
     bool escape_{false};
 

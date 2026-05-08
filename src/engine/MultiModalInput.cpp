@@ -7,8 +7,7 @@
 
 namespace agentic_synth::engine {
 
-MultiModalInput::SpectralProfile MultiModalInput::analyzeHum(
-    const float* samples, int numSamples, int sampleRate) {
+MultiModalInput::SpectralProfile MultiModalInput::analyzeHum(const float* samples, int numSamples, int sampleRate) {
 
     auto mag = computeMagnitudeSpectrum(samples, numSamples);
     float centroid = computeCentroid(mag, sampleRate, static_cast<int>(mag.size()));
@@ -25,9 +24,7 @@ MultiModalInput::SpectralProfile MultiModalInput::analyzeHum(
             weightedSum += mag[i] * std::abs(freq - centroid);
             totalMag += mag[i];
         }
-        profile.roughness = totalMag > 0
-            ? std::clamp((weightedSum / totalMag) / 1000.0f, 0.0f, 1.0f)
-            : 0.0f;
+        profile.roughness = totalMag > 0 ? std::clamp((weightedSum / totalMag) / 1000.0f, 0.0f, 1.0f) : 0.0f;
     }
 
     return profile;
@@ -53,7 +50,7 @@ float MultiModalInput::detectTapTempo(const float* samples, int numSamples, int 
         return std::clamp(60.0f / periodSeconds, 40.0f, 240.0f);
     }
 
-    return 0.0f;  // No clear tempo
+    return 0.0f; // No clear tempo
 }
 
 PatchStruct MultiModalInput::spectralToPatch(const SpectralProfile& profile) {
@@ -61,16 +58,16 @@ PatchStruct MultiModalInput::spectralToPatch(const SpectralProfile& profile) {
 
     // Bright hum → more saw, higher cutoff
     if (profile.brightness > 0.6f) {
-        patch.oscillatorMix[0] = 0.7f;  // saw
-        patch.oscillatorMix[1] = 0.3f;  // square
+        patch.oscillatorMix[0] = 0.7f; // saw
+        patch.oscillatorMix[1] = 0.3f; // square
         patch.filterCutoffHz = 3000.0f;
     } else if (profile.brightness > 0.3f) {
         patch.oscillatorMix[0] = 0.4f;
-        patch.oscillatorMix[2] = 0.6f;  // triangle
+        patch.oscillatorMix[2] = 0.6f; // triangle
         patch.filterCutoffHz = 1200.0f;
     } else {
-        patch.oscillatorMix[2] = 0.8f;  // triangle
-        patch.oscillatorMix[3] = 0.2f;  // sine
+        patch.oscillatorMix[2] = 0.8f; // triangle
+        patch.oscillatorMix[3] = 0.2f; // sine
         patch.filterCutoffHz = 400.0f;
     }
 
@@ -82,18 +79,18 @@ PatchStruct MultiModalInput::spectralToPatch(const SpectralProfile& profile) {
 }
 
 void MultiModalInput::applyTempoToPatch(float bpm, PatchStruct& patch) {
-    if (bpm <= 0) return;
+    if (bpm <= 0)
+        return;
     previousTempo_ = bpm;
 
     // Map BPM to LFO rate (1/4, 1/8, 1/16 note sync)
     float beatHz = bpm / 60.0f;
-    patch.lfoRateHz = beatHz;          // 1/4 note
+    patch.lfoRateHz = beatHz; // 1/4 note
     patch.lfoDepth = 0.3f;
     patch.ampAttackMs = std::clamp(60000.0f / bpm * 0.1f, 5.0f, 1000.0f);
 }
 
-std::vector<float> MultiModalInput::computeMagnitudeSpectrum(
-    const float* samples, int numSamples) {
+std::vector<float> MultiModalInput::computeMagnitudeSpectrum(const float* samples, int numSamples) {
 
     std::vector<float> window(kFftSize, 0.0f);
     int copyLen = std::min(numSamples, kFftSize);
@@ -119,8 +116,7 @@ std::vector<float> MultiModalInput::computeMagnitudeSpectrum(
     return mag;
 }
 
-float MultiModalInput::computeCentroid(
-    const std::vector<float>& mag, int sampleRate, int fftSize) {
+float MultiModalInput::computeCentroid(const std::vector<float>& mag, int sampleRate, int fftSize) {
 
     float weightedSum = 0, totalMag = 0;
     for (int i = 0; i < fftSize; ++i) {

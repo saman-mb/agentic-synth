@@ -2,8 +2,8 @@
 
 #include "engine/PatchStruct.h"
 
-#include <vector>
 #include <complex>
+#include <vector>
 
 namespace agentic_synth::engine {
 
@@ -15,9 +15,9 @@ public:
     // Analyze hummed/buzzed audio buffer to extract spectral profile
     // Returns spectral centroid and formant-like shape hints
     struct SpectralProfile {
-        float centroidHz = 400.0f;     // Spectral centroid
-        float brightness = 0.5f;       // 0 = dark, 1 = bright
-        float roughness = 0.0f;        // 0 = smooth, 1 = rough
+        float centroidHz = 400.0f; // Spectral centroid
+        float brightness = 0.5f;   // 0 = dark, 1 = bright
+        float roughness = 0.0f;    // 0 = smooth, 1 = rough
     };
 
     // Analyze a buffer of microphone audio samples

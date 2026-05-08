@@ -1,7 +1,7 @@
 #pragma once
 
-#include <string>
 #include <functional>
+#include <string>
 
 namespace agentic_synth::agent {
 
@@ -42,10 +42,10 @@ public:
 private:
     bool initialized_ = false;
     bool streaming_ = false;
-    void* whisper_ = nullptr;  // Opaque whisper context
+    void* whisper_ = nullptr; // Opaque whisper context
 
     // Buffer for streaming
-    static constexpr int kStreamBufferSize = 16000;  // 1 second at 16kHz
+    static constexpr int kStreamBufferSize = 16000; // 1 second at 16kHz
     int16_t streamBuffer_[16000]{};
     int streamPos_ = 0;
 };

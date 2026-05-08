@@ -17,13 +17,11 @@ using PatchRequestCallback = std::function<void(uint32_t instanceId, const std::
 // ── CompanionConnection ───────────────────────────────────────────────────────
 // Represents one connected plugin instance from the companion's perspective.
 
-class CompanionIpcServer;  // forward
+class CompanionIpcServer; // forward
 
 class CompanionConnection final : public juce::InterprocessConnection {
 public:
-    CompanionConnection(uint32_t connId,
-                        PatchRequestCallback onRequest,
-                        CompanionIpcServer&  owner);
+    CompanionConnection(uint32_t connId, PatchRequestCallback onRequest, CompanionIpcServer& owner);
 
     // Send a PatchUpdate message to this plugin instance.
     void sendPatchUpdate(const std::string& patchJson);
@@ -34,13 +32,13 @@ public:
     [[nodiscard]] uint32_t connId() const noexcept { return connId_; }
 
 private:
-    void connectionMade()                        override;
-    void connectionLost()                        override;
+    void connectionMade() override;
+    void connectionLost() override;
     void messageReceived(const juce::MemoryBlock&) override;
 
-    uint32_t             connId_;
+    uint32_t connId_;
     PatchRequestCallback onRequest_;
-    CompanionIpcServer&  owner_;
+    CompanionIpcServer& owner_;
 };
 
 // ── CompanionIpcServer ────────────────────────────────────────────────────────
@@ -52,8 +50,7 @@ class CompanionIpcServer final : public juce::InterprocessConnectionServer {
 public:
     // onRequest : called on the JUCE message thread for each PatchRequest.
     // onEmpty   : called when the last plugin instance disconnects.
-    explicit CompanionIpcServer(PatchRequestCallback  onRequest,
-                                std::function<void()> onEmpty = {});
+    explicit CompanionIpcServer(PatchRequestCallback onRequest, std::function<void()> onEmpty = {});
     ~CompanionIpcServer() override;
 
     // Bind and begin accepting on kCompanionPort. Returns false on failure.
@@ -76,11 +73,11 @@ public:
 private:
     juce::InterprocessConnection* createConnectionObject() override;
 
-    PatchRequestCallback      onRequest_;
-    std::function<void()>     onEmpty_;
-    std::atomic<uint32_t>     nextConnId_{1};
-    mutable std::mutex        connsMutex_;
+    PatchRequestCallback onRequest_;
+    std::function<void()> onEmpty_;
+    std::atomic<uint32_t> nextConnId_{1};
+    mutable std::mutex connsMutex_;
     std::vector<std::shared_ptr<CompanionConnection>> conns_;
 };
 
-}  // namespace agentic_synth::ipc
+} // namespace agentic_synth::ipc
