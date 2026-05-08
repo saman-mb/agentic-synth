@@ -14,26 +14,27 @@ namespace {
 
 std::vector<float> render(VAOscillator& osc, int n) {
     std::vector<float> buf(n);
-    for (auto& s : buf) s = osc.processSample();
+    for (auto& s : buf)
+        s = osc.processSample();
     return buf;
 }
 
 double mean(const std::vector<float>& v) {
     double sum = 0.0;
-    for (float s : v) sum += s;
+    for (float s : v)
+        sum += s;
     return sum / static_cast<double>(v.size());
 }
 
 double rms(const std::vector<float>& v) {
     double sum = 0.0;
-    for (float s : v) sum += static_cast<double>(s) * s;
+    for (float s : v)
+        sum += static_cast<double>(s) * s;
     return std::sqrt(sum / static_cast<double>(v.size()));
 }
 
 // Samples covering ~100 complete cycles at 440 Hz
-int cycleCount(double freq, int cycles) {
-    return static_cast<int>(kSampleRate / freq * cycles);
-}
+int cycleCount(double freq, int cycles) { return static_cast<int>(kSampleRate / freq * cycles); }
 
 } // namespace
 
@@ -84,7 +85,8 @@ TEST_CASE("VAOscillator aliasing threshold - Saw at 10 kHz") {
     osc.setFrequency(10000.0);
 
     auto buf = render(osc, static_cast<int>(kSampleRate));
-    for (float s : buf) REQUIRE(std::abs(s) <= 1.5f);
+    for (float s : buf)
+        REQUIRE(std::abs(s) <= 1.5f);
 }
 
 TEST_CASE("VAOscillator aliasing threshold - Square at 10 kHz") {
@@ -94,7 +96,8 @@ TEST_CASE("VAOscillator aliasing threshold - Square at 10 kHz") {
     osc.setFrequency(10000.0);
 
     auto buf = render(osc, static_cast<int>(kSampleRate));
-    for (float s : buf) REQUIRE(std::abs(s) <= 1.5f);
+    for (float s : buf)
+        REQUIRE(std::abs(s) <= 1.5f);
 }
 
 TEST_CASE("VAOscillator aliasing threshold - Triangle at 10 kHz") {
@@ -104,7 +107,8 @@ TEST_CASE("VAOscillator aliasing threshold - Triangle at 10 kHz") {
     osc.setFrequency(10000.0);
 
     auto buf = render(osc, static_cast<int>(kSampleRate));
-    for (float s : buf) REQUIRE(std::abs(s) <= 1.5f);
+    for (float s : buf)
+        REQUIRE(std::abs(s) <= 1.5f);
 }
 
 // ---------------------------------------------------------------------------
@@ -120,7 +124,7 @@ TEST_CASE("VAOscillator RMS - Saw") {
 
     auto buf = render(osc, cycleCount(440.0, 200));
     double r = rms(buf);
-    constexpr double expected = 1.0 / 1.7320508075688772;  // 1/sqrt(3)
+    constexpr double expected = 1.0 / 1.7320508075688772; // 1/sqrt(3)
     REQUIRE(r > expected * 0.90);
     REQUIRE(r < expected * 1.10);
 }
@@ -166,8 +170,9 @@ TEST_CASE("VAOscillator drift within ±5 cents over 60 s") {
         (void)osc.processSample();
         double d = osc.getDriftCents();
         REQUIRE(d >= -5.0);
-        REQUIRE(d <=  5.0);
-        if (std::abs(d) > 0.001) driftMoved = true;
+        REQUIRE(d <= 5.0);
+        if (std::abs(d) > 0.001)
+            driftMoved = true;
     }
     REQUIRE(driftMoved);
 }
@@ -181,8 +186,9 @@ TEST_CASE("VAOscillator detune in cents") {
     osc.prepare(kSampleRate);
     osc.setWaveform(VAOscillator::Waveform::Saw);
     osc.setFrequency(440.0);
-    osc.setDetuneCents(100.0);  // one semitone up
+    osc.setDetuneCents(100.0); // one semitone up
 
     auto buf = render(osc, static_cast<int>(kSampleRate * 0.1));
-    for (float s : buf) REQUIRE(std::abs(s) <= 2.0f);
+    for (float s : buf)
+        REQUIRE(std::abs(s) <= 2.0f);
 }
