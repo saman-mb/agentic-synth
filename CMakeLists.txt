@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 3.24)
 
-project(AgenticSynth LANGUAGES CXX)
+project(AgenticSynth LANGUAGES C CXX)
 
 option(AGENTIC_SYNTH_BUILD_TESTS "Build Agentic Synth tests" ON)
 
