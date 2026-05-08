@@ -72,8 +72,8 @@ PatchStruct MultiModalInput::spectralToPatch(const SpectralProfile& profile) {
     }
 
     patch.filter.resonance = profile.roughness * 0.5f;
-    patch.amp_env.attack_s = 0.05f;  // 50 ms
-    patch.amp_env.release_s = 0.2f;  // 200 ms
+    patch.amp_env.attack_s = 0.05f; // 50 ms
+    patch.amp_env.release_s = 0.2f; // 200 ms
 
     return patch;
 }

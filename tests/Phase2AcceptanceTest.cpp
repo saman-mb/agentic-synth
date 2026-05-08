@@ -30,7 +30,7 @@ TEST_CASE("Phase 2: NL descriptor produces valid PatchStruct", "[phase2][accepta
 
     // Key parameters should be set non-zero
     REQUIRE(patch.filter.cutoff_hz < 1000.0f); // "warm" = lower cutoff
-    REQUIRE(patch.amp_env.attack_s > 0.2f);     // "slow attack"
+    REQUIRE(patch.amp_env.attack_s > 0.2f);    // "slow attack"
 }
 
 TEST_CASE("Phase 2: NL refinement updates existing patch", "[phase2][acceptance]") {

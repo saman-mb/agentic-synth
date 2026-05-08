@@ -20,8 +20,7 @@ std::string Telemetry::defaultLogPath() {
     std::string dir;
 #if defined(_WIN32)
     const char* appdata = std::getenv("APPDATA");
-    dir = appdata ? (std::string(appdata) + "\\agentic-synth\\telemetry")
-                  : "agentic-synth-telemetry";
+    dir = appdata ? (std::string(appdata) + "\\agentic-synth\\telemetry") : "agentic-synth-telemetry";
 #elif defined(__APPLE__)
     const char* home = std::getenv("HOME");
     dir = home ? (std::string(home) + "/Library/Application Support/agentic-synth/telemetry")
@@ -33,8 +32,7 @@ std::string Telemetry::defaultLogPath() {
         dir = std::string(xdg) + "/agentic-synth/telemetry";
     } else {
         const char* home = std::getenv("HOME");
-        dir = home ? (std::string(home) + "/.local/share/agentic-synth/telemetry")
-                   : "/tmp/agentic-synth-telemetry";
+        dir = home ? (std::string(home) + "/.local/share/agentic-synth/telemetry") : "/tmp/agentic-synth-telemetry";
     }
 #endif
     std::error_code ec;
@@ -63,12 +61,23 @@ static std::string jsonEscape(const std::string& s) {
     out.reserve(s.size());
     for (char c : s) {
         switch (c) {
-            case '"': out += "\\\""; break;
-            case '\\': out += "\\\\"; break;
-            case '\n': out += "\\n"; break;
-            case '\r': out += "\\r"; break;
-            case '\t': out += "\\t"; break;
-            default: out += c;
+        case '"':
+            out += "\\\"";
+            break;
+        case '\\':
+            out += "\\\\";
+            break;
+        case '\n':
+            out += "\\n";
+            break;
+        case '\r':
+            out += "\\r";
+            break;
+        case '\t':
+            out += "\\t";
+            break;
+        default:
+            out += c;
         }
     }
     return out;

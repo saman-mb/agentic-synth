@@ -1,10 +1,13 @@
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
+#include <cmath>
 
 #include "agent/SessionMemory.h"
 #include "engine/PatchStruct.h"
 
 using namespace agentic_synth;
 using namespace agentic_synth::agent;
+using Catch::Approx;
 
 static PatchStruct makePatchWithCutoff(float cutoff_hz) {
     PatchStruct p = make_default_patch();
@@ -121,4 +124,50 @@ TEST_CASE("SessionMemory: clear removes all events") {
     PatchVector bias = mem.computeParameterBias("dark pad");
     for (float b : bias)
         CHECK(b == 0.0f);
+}
+
+TEST_CASE("SessionMemory: Tweak feedback kind recorded and shown in recap") {
+    SessionMemory mem;
+    auto patch = makePatchWithCutoff(1000.0f);
+    mem.recordFeedback(FeedbackKind::Tweak, "tweak filter", patch);
+
+    REQUIRE(mem.events().size() == 1);
+    CHECK(mem.events()[0].kind == FeedbackKind::Tweak);
+    CHECK(mem.events()[0].prompt == "tweak filter");
+
+    std::string recap = mem.buildRecap("tweak filter", 5);
+    CHECK(recap.find("TWEAKED") != std::string::npos);
+}
+
+TEST_CASE("SessionMemory: denormalizeCutoff inverts normalizeCutoff") {
+    for (float hz : {20.0f, 100.0f, 440.0f, 1000.0f, 8000.0f, 20000.0f}) {
+        float norm = SessionMemory::normalizeCutoff(hz);
+        float back = SessionMemory::denormalizeCutoff(norm);
+        CHECK(std::abs(back - hz) < 1.0f);
+    }
+}
+
+TEST_CASE("SessionMemory: extractVector maps patch fields to [0,1] range") {
+    PatchStruct patch = make_default_patch();
+    patch.filter.cutoff_hz = 18000.0f;
+    patch.filter.resonance = 0.5f;
+    patch.amp_env.attack_s = 0.005f;
+    patch.amp_env.sustain = 1.0f;
+    patch.lfo[0].depth = 0.0f;
+    patch.reverb.mix = 0.0f;
+    patch.master_gain = 1.0f;
+    patch.osc[0].volume = 1.0f;
+
+    PatchVector v = SessionMemory::extractVector(patch);
+
+    CHECK(v[0] > 0.9f);          // near top of log cutoff scale
+    CHECK(v[1] == Approx(0.5f)); // resonance passthrough
+    CHECK(v[3] == Approx(1.0f)); // sustain passthrough
+    CHECK(v[6] == Approx(1.0f)); // master_gain passthrough
+    CHECK(v[7] == Approx(1.0f)); // osc[0].volume passthrough
+
+    for (float x : v)
+        CHECK(x >= 0.0f);
+    for (float x : v)
+        CHECK(x <= 1.0f);
 }

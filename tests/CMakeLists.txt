@@ -8,7 +8,6 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(Catch2)
 
 add_executable(agentic_synth_tests
-    placeholder_test.cpp
     ADSREnvelopeTest.cpp
     WavetableOscillatorTest.cpp
     VAOscillatorTest.cpp
@@ -29,6 +28,11 @@ add_executable(agentic_synth_tests
     Phase3AcceptanceTest.cpp
     RealtimeSafetyTest.cpp
     PresetDatabaseTest.cpp
+    WhisperClientTest.cpp
+    VariationRecommenderTest.cpp
+    MultiModalInputTest.cpp
+    PresetExporterTest.cpp
+    StyleTransferTest.cpp
 )
 
 target_include_directories(agentic_synth_tests PRIVATE ../src)

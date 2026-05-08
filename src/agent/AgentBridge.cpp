@@ -287,7 +287,7 @@ void AgentBridge::handleTextMessage(const std::string& json, int clientId) {
 
     if (type == "knob_tweak") {
         const std::string param = obj->getProperty("param").toString().toStdString();
-        const float value       = static_cast<float>(static_cast<double>(obj->getProperty("value")));
+        const float value = static_cast<float>(static_cast<double>(obj->getProperty("value")));
         handleKnobTweak(param, value);
 
     } else if (type == "get_dictionary") {
@@ -309,7 +309,7 @@ void AgentBridge::handleTextMessage(const std::string& json, int clientId) {
     } else if (type == "generate") {
         // Issue #85: submit prompt, then send back narrative rationale.
         const std::string userPrompt = obj->getProperty("prompt").toString().toStdString();
-        const PatchStruct patch      = submitPrompt(userPrompt);
+        const PatchStruct patch = submitPrompt(userPrompt);
         if (wsb_) {
             const std::string rationale = generateRationale(userPrompt, patch);
             // Escape for JSON

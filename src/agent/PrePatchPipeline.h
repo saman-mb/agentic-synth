@@ -48,9 +48,7 @@ public:
     [[nodiscard]] PatchStruct currentPatch() const;
 
     // Number of patches silently dropped because the SPSC queue was full.
-    [[nodiscard]] int droppedPatchCount() const noexcept {
-        return droppedPatches_.load(std::memory_order_relaxed);
-    }
+    [[nodiscard]] int droppedPatchCount() const noexcept { return droppedPatches_.load(std::memory_order_relaxed); }
 
 private:
     agentsynth::HeuristicParser parser_;

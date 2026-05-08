@@ -101,28 +101,28 @@ TEST_CASE("morph discrete fields snap at t=0.5") {
     PatchStruct base = make_default_patch();
     PatchStruct target = make_default_patch();
 
-    base.osc[0].type      = OscType::Sawtooth;
-    target.osc[0].type    = OscType::Square;
-    base.filter.type      = FilterType::LowPass;
-    target.filter.type    = FilterType::HighPass;
-    base.lfo[0].waveform  = LfoWaveform::Sine;
+    base.osc[0].type = OscType::Sawtooth;
+    target.osc[0].type = OscType::Square;
+    base.filter.type = FilterType::LowPass;
+    target.filter.type = FilterType::HighPass;
+    base.lfo[0].waveform = LfoWaveform::Sine;
     target.lfo[0].waveform = LfoWaveform::Square;
 
     const auto vars = eng.morph(base, target);
 
     // vars[1] = t=0.4  (<0.5)  — discrete fields still from base
-    CHECK(vars[1].osc[0].type    == base.osc[0].type);
-    CHECK(vars[1].filter.type    == base.filter.type);
+    CHECK(vars[1].osc[0].type == base.osc[0].type);
+    CHECK(vars[1].filter.type == base.filter.type);
     CHECK(vars[1].lfo[0].waveform == base.lfo[0].waveform);
 
     // vars[2] = t=0.6  (>=0.5) — discrete fields snap to target
-    CHECK(vars[2].osc[0].type    == target.osc[0].type);
-    CHECK(vars[2].filter.type    == target.filter.type);
+    CHECK(vars[2].osc[0].type == target.osc[0].type);
+    CHECK(vars[2].filter.type == target.filter.type);
     CHECK(vars[2].lfo[0].waveform == target.lfo[0].waveform);
 
     // vars[4] = t=1.0  — discrete fields remain at target
-    CHECK(vars[4].osc[0].type    == target.osc[0].type);
-    CHECK(vars[4].filter.type    == target.filter.type);
+    CHECK(vars[4].osc[0].type == target.osc[0].type);
+    CHECK(vars[4].filter.type == target.filter.type);
     CHECK(vars[4].lfo[0].waveform == target.lfo[0].waveform);
 }
 
