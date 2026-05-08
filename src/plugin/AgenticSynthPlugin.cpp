@@ -58,34 +58,33 @@ void AgenticSynthPlugin::prepareToPlay(double sampleRate, int /*samplesPerBlock*
 void AgenticSynthPlugin::releaseResources() {}
 
 void AgenticSynthPlugin::applyParameters() noexcept {
-    const float cutoff     = filterCutoffParam_->load();
-    const float res        = filterResParam_->load();
-    const float attack     = ampAttackParam_->load();
-    const float decay      = ampDecayParam_->load();
-    const float sustain    = ampSustainParam_->load();
-    const float release    = ampReleaseParam_->load();
+    const float cutoff = filterCutoffParam_->load();
+    const float res = filterResParam_->load();
+    const float attack = ampAttackParam_->load();
+    const float decay = ampDecayParam_->load();
+    const float sustain = ampSustainParam_->load();
+    const float release = ampReleaseParam_->load();
     const float portamento = portamentoParam_->load();
 
-    if (cutoff == lastCutoff_ && res == lastRes_ && attack == lastAttack_ &&
-        decay == lastDecay_ && sustain == lastSustain_ && release == lastRelease_ &&
-        portamento == lastPortamento_)
+    if (cutoff == lastCutoff_ && res == lastRes_ && attack == lastAttack_ && decay == lastDecay_ &&
+        sustain == lastSustain_ && release == lastRelease_ && portamento == lastPortamento_)
         return;
 
-    lastCutoff_     = cutoff;
-    lastRes_        = res;
-    lastAttack_     = attack;
-    lastDecay_      = decay;
-    lastSustain_    = sustain;
-    lastRelease_    = release;
+    lastCutoff_ = cutoff;
+    lastRes_ = res;
+    lastAttack_ = attack;
+    lastDecay_ = decay;
+    lastSustain_ = sustain;
+    lastRelease_ = release;
     lastPortamento_ = portamento;
 
     voiceManager_.setFilterCutoff(cutoff);
     voiceManager_.setFilterResonance(res);
 
     agentic_synth::engine::ADSREnvelope::Params env;
-    env.attackSeconds  = attack;
-    env.decaySeconds   = decay;
-    env.sustainLevel   = sustain;
+    env.attackSeconds = attack;
+    env.decaySeconds = decay;
+    env.sustainLevel = sustain;
     env.releaseSeconds = release;
     voiceManager_.setAmpEnvelope(env);
 

@@ -50,9 +50,12 @@ TEST_CASE("PresetDatabase: listing presets returns saved names", "[presets]") {
     // Order is not guaranteed, but all names should be present
     bool foundA = false, foundB = false, foundC = false;
     for (const auto& n : names) {
-        if (n == "preset_a") foundA = true;
-        if (n == "preset_b") foundB = true;
-        if (n == "preset_c") foundC = true;
+        if (n == "preset_a")
+            foundA = true;
+        if (n == "preset_b")
+            foundB = true;
+        if (n == "preset_c")
+            foundC = true;
     }
     REQUIRE(foundA);
     REQUIRE(foundB);
@@ -113,7 +116,8 @@ TEST_CASE("PresetDatabase: export/import round-trip", "[presets]") {
     auto names = db2.listPresets();
     bool found = false;
     for (const auto& n : names) {
-        if (n == "export_test") found = true;
+        if (n == "export_test")
+            found = true;
     }
     REQUIRE(found);
 

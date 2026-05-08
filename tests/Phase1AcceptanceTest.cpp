@@ -8,6 +8,7 @@
 #include "engine/VAOscillator.h"
 #include "engine/VoiceManager.h"
 #include "engine/WavetableOscillator.h"
+#include "mapper/HeuristicParser.h"
 #include <catch2/catch_test_macros.hpp>
 
 using namespace agentic_synth::engine;
@@ -33,31 +34,15 @@ static const TestDescriptor kDescriptors[] = {
 };
 
 TEST_CASE("Phase 1: 25 natural-language descriptors produce valid patches", "[phase1][acceptance]") {
+    agentsynth::HeuristicParser parser;
     PatchValidator validator;
     int validCount = 0;
 
     for (const auto& d : kDescriptors) {
-        // Use HeuristicParser to produce a patch from the descriptor
-        // (HeuristicParser should handle these via keyword matching)
-        PatchStruct patch{};
-        // Simulate heuristic parse: map descriptor to plausible parameters
-        if (strstr(d.input, "bass") || strstr(d.input, "boomy") || strstr(d.input, "sub") || strstr(d.input, "thick") ||
-            strstr(d.input, "growling")) {
-            patch.filter.cutoff_hz = d.expectedMinCutoff + 50.0f;
-        } else if (strstr(d.input, "bright") || strstr(d.input, "harsh") || strstr(d.input, "aggressive") ||
-                   strstr(d.input, "crisp") || strstr(d.input, "glassy") || strstr(d.input, "tinny") ||
-                   strstr(d.input, "airy") || strstr(d.input, "shimmering")) {
-            patch.filter.cutoff_hz = d.expectedMinCutoff + 500.0f;
-        } else {
-            patch.filter.cutoff_hz = d.expectedMinCutoff + 200.0f;
-        }
-        patch.filter.resonance = 0.3f;
-        patch.amp_env.attack_s = 0.05f;
-        patch.osc[0].volume = 1.0f;
-
+        PatchStruct patch = parser.parse(d.input);
         auto result = validator.validate(patch);
-        REQUIRE(result.valid());
-        ++validCount;
+        if (result.valid())
+            ++validCount;
     }
 
     REQUIRE(validCount >= 20); // At least 20 of 25 must produce valid patches

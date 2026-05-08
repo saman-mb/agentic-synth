@@ -1,8 +1,8 @@
+#include "engine/PatchStateManager.h"
+#include "engine/PatchStruct.h"
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 #include <juce_core/juce_core.h>
-#include "engine/PatchStateManager.h"
-#include "engine/PatchStruct.h"
 
 using namespace agentic_synth;
 using namespace agentic_synth::engine;

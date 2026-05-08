@@ -11,9 +11,9 @@ namespace agentsynth {
 using agentic_synth::FilterType;
 using agentic_synth::LfoTarget;
 using agentic_synth::LfoWaveform;
+using agentic_synth::make_default_patch;
 using agentic_synth::OscType;
 using agentic_synth::PatchStruct;
-using agentic_synth::make_default_patch;
 
 // Phase 1 placeholder: pure rule-based NL → PatchStruct mapping.
 // Maps ~50 semantic descriptor keywords to synth parameter presets

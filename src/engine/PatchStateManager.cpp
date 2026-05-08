@@ -60,15 +60,15 @@ PatchStruct PatchStateManager::fromValueTree(const juce::ValueTree& tree) {
         return PatchStruct{};
 
     PatchStruct patch{};
-    patch.filter.cutoff_hz  = tree.getProperty("filter_cutoff_hz", 500.0f);
-    patch.filter.resonance  = tree.getProperty("filter_resonance", 0.0f);
-    patch.amp_env.attack_s  = tree.getProperty("amp_attack_s", 0.005f);
-    patch.amp_env.decay_s   = tree.getProperty("amp_decay_s", 0.1f);
-    patch.amp_env.sustain   = tree.getProperty("amp_sustain", 1.0f);
+    patch.filter.cutoff_hz = tree.getProperty("filter_cutoff_hz", 500.0f);
+    patch.filter.resonance = tree.getProperty("filter_resonance", 0.0f);
+    patch.amp_env.attack_s = tree.getProperty("amp_attack_s", 0.005f);
+    patch.amp_env.decay_s = tree.getProperty("amp_decay_s", 0.1f);
+    patch.amp_env.sustain = tree.getProperty("amp_sustain", 1.0f);
     patch.amp_env.release_s = tree.getProperty("amp_release_s", 0.1f);
-    patch.lfo[0].rate_hz    = tree.getProperty("lfo0_rate_hz", 1.0f);
-    patch.lfo[0].depth      = tree.getProperty("lfo0_depth", 0.0f);
-    patch.lfo[0].waveform   = static_cast<LfoWaveform>(static_cast<int>(tree.getProperty("lfo0_waveform", 0)));
+    patch.lfo[0].rate_hz = tree.getProperty("lfo0_rate_hz", 1.0f);
+    patch.lfo[0].depth = tree.getProperty("lfo0_depth", 0.0f);
+    patch.lfo[0].waveform = static_cast<LfoWaveform>(static_cast<int>(tree.getProperty("lfo0_waveform", 0)));
 
     auto oscVolumes = tree.getProperty("osc_volumes", juce::Array<juce::var>());
     if (auto* arr = oscVolumes.getArray()) {

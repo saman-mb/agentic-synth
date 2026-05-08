@@ -147,7 +147,7 @@ void VoiceManager::renderBlock(float* left, float* right, int numSamples) noexce
         float sum = 0.0f;
         for (auto& v : voices_)
             sum += v.render(alpha);
-        left[i]  = sum;
+        left[i] = sum;
         right[i] = sum;
     }
 }
