@@ -23,6 +23,22 @@ void Telemetry::recordGeneration(double latency_ms, int tokens, double elapsed_s
     records_.push_back(std::move(r));
 }
 
+static std::string jsonEscape(const std::string& s) {
+    std::string out;
+    out.reserve(s.size());
+    for (char c : s) {
+        switch (c) {
+            case '"': out += "\\\""; break;
+            case '\\': out += "\\\\"; break;
+            case '\n': out += "\\n"; break;
+            case '\r': out += "\\r"; break;
+            case '\t': out += "\\t"; break;
+            default: out += c;
+        }
+    }
+    return out;
+}
+
 std::string Telemetry::toJson() const {
     const int total = static_cast<int>(records_.size());
     int errors = 0;
@@ -65,7 +81,7 @@ std::string Telemetry::toJson() const {
         ss << "{\"ts\":" << r.timestamp_ms << ",\"latency_ms\":" << r.latency_ms << ",\"tokens\":" << r.token_count
            << ",\"tps\":" << r.tokens_per_second << ",\"ok\":" << (r.success ? "true" : "false");
         if (!r.error_type.empty())
-            ss << ",\"error\":\"" << r.error_type << '"';
+            ss << ",\"error\":\"" << jsonEscape(r.error_type) << '"';
         ss << '}';
     }
     ss << "]}";

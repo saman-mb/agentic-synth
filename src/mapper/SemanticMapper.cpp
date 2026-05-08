@@ -632,7 +632,7 @@ PatchDelta parseDeltaFromJson(const std::string& json) {
 
     if (mapHasKey(json, "lfo0_waveform")) {
         const auto lw = mapJsStr(json, "lfo0_waveform");
-        d.lfo0_waveform = (lw == "Square") ? LfoWaveform::Square : LfoWaveform::Square;
+        d.lfo0_waveform = (lw == "Square") ? LfoWaveform::Square : LfoWaveform::Sine;
     }
 
     const auto lt = mapJsStr(json, "lfo0_target");

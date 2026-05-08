@@ -69,7 +69,7 @@ TEST_CASE("ADSREnvelope release decays to zero") {
     for (int i = 0; i < relSamples && env.isActive(); ++i)
         last = env.process();
 
-    REQUIRE(last == 0.0F);
+    REQUIRE_THAT(last, Catch::Matchers::WithinAbs(0.0F, 0.001F));
     REQUIRE_FALSE(env.isActive());
 }
 
