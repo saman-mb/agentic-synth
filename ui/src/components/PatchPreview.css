@@ -1,0 +1,52 @@
+.patch-preview {
+  background: rgb(255 255 255 / 4%);
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 0.75rem;
+  padding: 0.75rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  min-width: 180px;
+}
+
+.patch-preview-label {
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #91e8ff;
+  margin-bottom: 0.25rem;
+}
+
+.param-bar {
+  display: grid;
+  grid-template-columns: 3.5rem 1fr 3rem;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.param-label {
+  font-size: 0.7rem;
+  color: #a09ab8;
+  text-align: right;
+}
+
+.param-track {
+  height: 4px;
+  background: rgb(255 255 255 / 10%);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.param-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #7b5cff, #0cb7f2);
+  border-radius: 2px;
+  transition: width 0.3s ease;
+}
+
+.param-value {
+  font-size: 0.65rem;
+  color: #d7d0ea;
+  font-variant-numeric: tabular-nums;
+}
