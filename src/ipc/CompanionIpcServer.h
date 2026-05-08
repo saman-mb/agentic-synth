@@ -4,7 +4,6 @@
 
 #include <atomic>
 #include <functional>
-#include <memory>
 #include <mutex>
 #include <vector>
 
@@ -77,7 +76,10 @@ private:
     std::function<void()> onEmpty_;
     std::atomic<uint32_t> nextConnId_{1};
     mutable std::mutex connsMutex_;
-    std::vector<std::shared_ptr<CompanionConnection>> conns_;
+    // Raw pointers only — JUCE's InterprocessConnectionServer owns and deletes
+    // these objects via its internal OwnedArray.  Using shared_ptr here would
+    // cause a double-free when JUCE deletes the connection (issue #176).
+    std::vector<CompanionConnection*> conns_;
 };
 
 } // namespace agentic_synth::ipc

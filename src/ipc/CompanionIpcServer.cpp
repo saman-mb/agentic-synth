@@ -53,13 +53,13 @@ bool CompanionIpcServer::start() { return beginWaitingForSocket(kCompanionPort, 
 
 void CompanionIpcServer::broadcastPatchUpdate(const std::string& patchJson) {
     std::lock_guard lock(connsMutex_);
-    for (auto& c : conns_)
+    for (auto* c : conns_)
         c->sendPatchUpdate(patchJson);
 }
 
 void CompanionIpcServer::sendPatchUpdate(uint32_t instanceId, const std::string& patchJson) {
     std::lock_guard lock(connsMutex_);
-    for (auto& c : conns_) {
+    for (auto* c : conns_) {
         if (c->connId() == instanceId) {
             c->sendPatchUpdate(patchJson);
             return;
@@ -70,9 +70,9 @@ void CompanionIpcServer::sendPatchUpdate(uint32_t instanceId, const std::string&
 void CompanionIpcServer::shutdown() {
     {
         std::lock_guard lock(connsMutex_);
-        for (auto& c : conns_)
+        for (auto* c : conns_)
             c->sendShutdown();
-        conns_.clear();
+        conns_.clear(); // drop raw pointers; JUCE deletes the objects
     }
     stop();
 }
@@ -87,7 +87,8 @@ void CompanionIpcServer::onClientDisconnected(uint32_t connId) {
     {
         std::lock_guard lock(connsMutex_);
         conns_.erase(
-            std::remove_if(conns_.begin(), conns_.end(), [connId](const auto& c) { return c->connId() == connId; }),
+            std::remove_if(conns_.begin(), conns_.end(),
+                           [connId](CompanionConnection* c) { return c->connId() == connId; }),
             conns_.end());
         remaining = static_cast<int>(conns_.size());
     }
@@ -98,10 +99,12 @@ void CompanionIpcServer::onClientDisconnected(uint32_t connId) {
 
 juce::InterprocessConnection* CompanionIpcServer::createConnectionObject() {
     const uint32_t id = nextConnId_.fetch_add(1);
-    auto conn = std::make_shared<CompanionConnection>(id, onRequest_, *this);
+    // Allocate with new — JUCE's InterprocessConnectionServer stores this in its
+    // internal OwnedArray and will delete it.  We keep only a raw pointer.
+    auto* conn = new CompanionConnection(id, onRequest_, *this);
     std::lock_guard lock(connsMutex_);
     conns_.push_back(conn);
-    return conn.get();
+    return conn;
 }
 
 } // namespace agentic_synth::ipc
