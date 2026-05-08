@@ -21,7 +21,8 @@ void WavetableData::buildFromFrames(const float* samples, int numFrames) {
 
 void WavetableData::buildMipLevel(int level) {
     const int dstSize = kWavetableSize >> level;
-    if (dstSize < 1) return;
+    if (dstSize < 1)
+        return;
     for (int f = 0; f < frameCount; ++f) {
         const auto& src = mips[level - 1][f];
         auto& dst = mips[level][f];
@@ -52,15 +53,11 @@ void WavetableOscillator::setFrequency(double hz) noexcept {
     phaseIncrement_ = frequency_ / sampleRate_;
 }
 
-void WavetableOscillator::setMorphPosition(float position) noexcept {
-    morphPos_ = std::clamp(position, 0.0f, 1.0f);
-}
+void WavetableOscillator::setMorphPosition(float position) noexcept { morphPos_ = std::clamp(position, 0.0f, 1.0f); }
 
 void WavetableOscillator::reset() noexcept { phase_ = 0.0; }
 
-void WavetableOscillator::setTable(std::shared_ptr<const WavetableData> table) {
-    table_ = std::move(table);
-}
+void WavetableOscillator::setTable(std::shared_ptr<const WavetableData> table) { table_ = std::move(table); }
 
 void WavetableOscillator::loadFromFrames(const float* samples, int numFrames) {
     auto data = std::make_shared<WavetableData>();
@@ -71,18 +68,22 @@ void WavetableOscillator::loadFromFrames(const float* samples, int numFrames) {
 int WavetableOscillator::selectMipLevel() const noexcept {
     // Select smallest table where (tableSize * phaseIncrement) <= 0.5,
     // i.e., we advance at most half a table sample per output sample.
-    if (phaseIncrement_ <= 0.0) return kNumMipLevels - 1;
+    if (phaseIncrement_ <= 0.0)
+        return kNumMipLevels - 1;
     const double ratio = static_cast<double>(kWavetableSize) * phaseIncrement_ * 2.0;
-    if (ratio <= 1.0) return 0;
+    if (ratio <= 1.0)
+        return 0;
     int level = static_cast<int>(std::ceil(std::log2(ratio)));
     return std::clamp(level, 0, kNumMipLevels - 1);
 }
 
 float WavetableOscillator::readMorphedSample(int mipLevel, double phase) const noexcept {
-    if (!table_ || table_->frameCount == 0) return 0.0f;
+    if (!table_ || table_->frameCount == 0)
+        return 0.0f;
 
     const int tableSize = kWavetableSize >> mipLevel;
-    if (tableSize < 1) return 0.0f;
+    if (tableSize < 1)
+        return 0.0f;
 
     const double tablePhase = phase * tableSize;
     const int idx0 = static_cast<int>(tablePhase) % tableSize;
@@ -94,7 +95,8 @@ float WavetableOscillator::readMorphedSample(int mipLevel, double phase) const n
 
     if (frameCount == 1) {
         const auto& frame = mip[0];
-        if (static_cast<int>(frame.size()) < tableSize) return 0.0f;
+        if (static_cast<int>(frame.size()) < tableSize)
+            return 0.0f;
         return frame[idx0] + frac * (frame[idx1] - frame[idx0]);
     }
 
@@ -116,7 +118,8 @@ float WavetableOscillator::readMorphedSample(int mipLevel, double phase) const n
 float WavetableOscillator::processSample() noexcept {
     const float out = readMorphedSample(selectMipLevel(), phase_);
     phase_ += phaseIncrement_;
-    if (phase_ >= 1.0) phase_ -= 1.0;
+    if (phase_ >= 1.0)
+        phase_ -= 1.0;
     return out;
 }
 
@@ -125,7 +128,8 @@ void WavetableOscillator::processBlock(float* output, int numSamples) noexcept {
     for (int i = 0; i < numSamples; ++i) {
         output[i] = readMorphedSample(mipLevel, phase_);
         phase_ += phaseIncrement_;
-        if (phase_ >= 1.0) phase_ -= 1.0;
+        if (phase_ >= 1.0)
+            phase_ -= 1.0;
     }
 }
 
@@ -135,13 +139,14 @@ namespace {
 
 bool parseWav(const std::string& path, std::vector<float>& out) {
     std::ifstream f(path, std::ios::binary);
-    if (!f) return false;
+    if (!f)
+        return false;
 
     auto read4 = [&]() -> uint32_t {
         uint8_t b[4]{};
         f.read(reinterpret_cast<char*>(b), 4);
-        return static_cast<uint32_t>(b[0]) | (static_cast<uint32_t>(b[1]) << 8) |
-               (static_cast<uint32_t>(b[2]) << 16) | (static_cast<uint32_t>(b[3]) << 24);
+        return static_cast<uint32_t>(b[0]) | (static_cast<uint32_t>(b[1]) << 8) | (static_cast<uint32_t>(b[2]) << 16) |
+               (static_cast<uint32_t>(b[3]) << 24);
     };
     auto read2 = [&]() -> uint16_t {
         uint8_t b[2]{};
@@ -154,9 +159,11 @@ bool parseWav(const std::string& path, std::vector<float>& out) {
         return {buf, 4};
     };
 
-    if (tag() != "RIFF") return false;
+    if (tag() != "RIFF")
+        return false;
     read4(); // file size
-    if (tag() != "WAVE") return false;
+    if (tag() != "WAVE")
+        return false;
 
     uint16_t audioFmt = 0, channels = 0, bitsPerSample = 0;
     bool foundFmt = false, foundData = false;
@@ -217,7 +224,8 @@ bool parseWav(const std::string& path, std::vector<float>& out) {
 
 bool WavetableOscillator::loadFromWav(const std::string& path) {
     std::vector<float> samples;
-    if (!parseWav(path, samples)) return false;
+    if (!parseWav(path, samples))
+        return false;
 
     const int totalSamples = static_cast<int>(samples.size());
     const int numFrames = std::clamp(totalSamples / kWavetableSize, 1, kMaxWavetableFrames);
