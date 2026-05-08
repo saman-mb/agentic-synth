@@ -89,6 +89,10 @@ public:
         return tail_.load(std::memory_order_acquire) == head_.load(std::memory_order_acquire);
     }
 
+    // Returns the number of slots currently occupied (items waiting to be popped).
+    // This is the count of enqueued-but-not-yet-consumed items, not a cumulative
+    // total of all items ever pushed.  May transiently undercount under concurrent
+    // push/pop — for diagnostics only, never for flow control.
     [[nodiscard]] std::size_t size_approx() const noexcept {
         const std::size_t h = head_.load(std::memory_order_acquire);
         const std::size_t t = tail_.load(std::memory_order_acquire);
