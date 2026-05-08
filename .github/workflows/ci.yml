@@ -68,6 +68,11 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cmake-juce-
 
+      - name: Set up pkg-config path for self-hosted runner
+        run: |
+          export PKG_CONFIG_PATH=/home/saman/local-sysroot/usr/lib/x86_64-linux-gnu/pkgconfig:$PKG_CONFIG_PATH
+          echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> $GITHUB_ENV
+
       - name: Configure CMake
         run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DAGENTIC_SYNTH_BUILD_TESTS=ON
 
