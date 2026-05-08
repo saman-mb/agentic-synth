@@ -138,6 +138,17 @@ void VoiceManager::renderBlock(float* output, int numSamples) noexcept {
     }
 }
 
+void VoiceManager::renderBlock(float* left, float* right, int numSamples) noexcept {
+    const float alpha = portamentoAlpha();
+    for (int i = 0; i < numSamples; ++i) {
+        float sum = 0.0f;
+        for (auto& v : voices_)
+            sum += v.render(alpha);
+        left[i]  = sum;
+        right[i] = sum;
+    }
+}
+
 int VoiceManager::activeVoiceCount() const noexcept {
     int count = 0;
     for (const auto& v : voices_)
