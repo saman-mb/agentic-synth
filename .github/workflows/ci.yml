@@ -73,6 +73,7 @@ jobs:
             libcurl4-openssl-dev \
             libfontconfig-dev \
             libgl-dev
+            libgtk-3-dev
 
       - name: Setup CMake
         uses: jwlawson/actions-setup-cmake@v2
