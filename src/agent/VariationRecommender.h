@@ -15,7 +15,7 @@ struct VariationSuggestion {
     std::string label;     // e.g. "More aggressive"
     std::string rationale; // e.g. "Increase resonance and swap to saw wave"
     PatchStruct patch;
-    VariationEngine::Strategy strategy;
+    engine::VariationEngine::Strategy strategy;
 };
 
 class VariationRecommender {
@@ -24,10 +24,10 @@ public:
     std::vector<VariationSuggestion> suggest(const PatchStruct& current);
 
     // Set variation engine (with random seed for reproducibility)
-    void setVariationEngine(const VariationEngine& engine) { engine_ = engine; }
+    void setVariationEngine(const engine::VariationEngine& eng) { engine_ = eng; }
 
 private:
-    VariationEngine engine_;
+    engine::VariationEngine engine_;
 };
 
 } // namespace agentic_synth::agent
