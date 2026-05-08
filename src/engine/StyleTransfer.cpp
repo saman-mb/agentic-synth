@@ -1,5 +1,7 @@
 #include "StyleTransfer.h"
 
+#include <algorithm>
+
 namespace agentic_synth::engine {
 
 StyleTransfer::StyleProfile StyleTransfer::extract(const PatchStruct& ref) {
