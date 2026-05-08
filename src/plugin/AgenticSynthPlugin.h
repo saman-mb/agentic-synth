@@ -2,6 +2,7 @@
 
 #include "agent/AgentBridge.h"
 #include "engine/ADSREnvelope.h"
+#include "engine/MidiHandler.h"
 #include "engine/PatchStruct.h"
 #include "engine/VoiceManager.h"
 
@@ -47,6 +48,7 @@ private:
 
     agentic_synth::engine::VoiceManager voiceManager_;
     agentic_synth::agent::AgentBridge agentBridge_;
+    agentic_synth::engine::MidiHandler midiHandler_;
     juce::AudioProcessorValueTreeState apvts_;
 
     std::atomic<float>* masterGainParam_ = nullptr;

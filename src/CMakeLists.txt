@@ -20,6 +20,7 @@ add_library(agentic_synth_engine STATIC
     engine/VoiceManager.cpp
     engine/PatchValidator.cpp
     engine/VariationEngine.cpp
+    engine/MidiHandler.cpp
     agent/AgentBridge.cpp
     agent/SessionMemory.cpp
     agent/PrePatchPipeline.cpp

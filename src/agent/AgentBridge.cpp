@@ -60,13 +60,23 @@ void AgentBridge::recordFeedback(FeedbackKind kind, const std::string& prompt, c
 }
 
 std::string AgentBridge::buildSystemPrompt(const std::string& userPrompt) const {
-    // Use the synth-domain system prompt if loaded; fall back to a terse default.
     const std::string& base = sampler_.systemPrompt().empty()
         ? std::string("You are a synthesizer patch designer. Generate synth parameters as structured JSON.\n")
         : sampler_.systemPrompt();
+
+    std::string prompt = base;
+
+    // Append MIDI CC context so the AI respects the user's current performance state.
+    if (midiCutoffNorm_ < 0.25f)
+        prompt += "MIDI context: filter is currently closed (dark sound).\n";
+    else if (midiCutoffNorm_ > 0.75f)
+        prompt += "MIDI context: filter is currently open (bright sound).\n";
+    if (midiResonanceNorm_ > 0.5f)
+        prompt += "MIDI context: high resonance is active.\n";
+
     std::string recap = memory_.buildRecap(userPrompt);
-    if (recap.empty()) return base;
-    return base + "\n## Session Feedback\n" + recap + "\nUse the above feedback to guide parameter choices.\n";
+    if (recap.empty()) return prompt;
+    return prompt + "\n## Session Feedback\n" + recap + "\nUse the above feedback to guide parameter choices.\n";
 }
 
 PatchVector AgentBridge::getParameterBias(const std::string& userPrompt) const {
@@ -82,6 +92,16 @@ std::optional<PatchStruct> AgentBridge::generateLlmPatch(const std::string& prom
 
 void AgentBridge::feedChunk(std::string_view chunk) {
     streamParser_.feedChunk(chunk);
+}
+
+void AgentBridge::onMidiCC(int controller, int value) noexcept {
+    // Track CC74 (brightness/filter cutoff) and CC71 (resonance) so the
+    // system prompt can reflect the user's current timbral preference.
+    switch (controller) {
+        case 71: midiResonanceNorm_ = static_cast<float>(value) / 127.0f; break;
+        case 74: midiCutoffNorm_    = static_cast<float>(value) / 127.0f; break;
+        default: break;
+    }
 }
 
 } // namespace agentic_synth::agent
