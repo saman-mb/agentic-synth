@@ -40,6 +40,11 @@ public:
     // Must be < 200 ms to meet the time-to-first-audio requirement.
     [[nodiscard]] double lastDispatchLatencyMs() const noexcept;
 
+    // Push a patch directly (no interpolation). Used for real-time user knob tweaks.
+    void injectPatch(const PatchStruct& patch);
+
+    [[nodiscard]] const PatchStruct& currentPatch() const noexcept { return lastHeuristicPatch_; }
+
 private:
     agentsynth::HeuristicParser parser_;
     PatchQueue queue_;
