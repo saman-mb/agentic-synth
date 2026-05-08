@@ -1,11 +1,23 @@
 #include "VAOscillator.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
+#include <random>
 
 namespace agentic_synth::engine {
 
-VAOscillator::VAOscillator() : rng_(std::random_device{}()) {}
+namespace {
+// Called once per process; subsequent oscillators derive unique seeds from a counter.
+uint64_t nextOscSeed() noexcept {
+    static const uint64_t base = std::random_device{}();
+    static std::atomic<uint64_t> counter{0};
+    // Mix counter into base so each oscillator gets a different seed.
+    return base ^ (counter.fetch_add(1, std::memory_order_relaxed) * 6364136223846793005ULL + 1442695040888963407ULL);
+}
+} // namespace
+
+VAOscillator::VAOscillator() : rng_(nextOscSeed()) {}
 
 void VAOscillator::prepare(double sampleRate) {
     sampleRate_ = sampleRate;
