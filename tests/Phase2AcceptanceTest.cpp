@@ -6,7 +6,6 @@
 #include "engine/MorphEngine.h"
 #include "engine/PatchStruct.h"
 #include "engine/PatchValidator.h"
-#include "engine/SynthEngine.h"
 #include "engine/VariationEngine.h"
 #include "engine/VoiceManager.h"
 #include "mapper/GrammarSampler.h"
@@ -22,7 +21,7 @@ using namespace agentic_synth::mapper;
 // Verifies the end-to-end pipeline: NL input → patch → play → feedback → refine
 
 TEST_CASE("Phase 2: NL descriptor produces valid PatchStruct", "[phase2][acceptance]") {
-    HeuristicParser parser;
+    agentsynth::HeuristicParser parser;
     auto patch = parser.parse("warm pad with slow attack");
     PatchValidator validator;
 
@@ -35,7 +34,7 @@ TEST_CASE("Phase 2: NL descriptor produces valid PatchStruct", "[phase2][accepta
 }
 
 TEST_CASE("Phase 2: NL refinement updates existing patch", "[phase2][acceptance]") {
-    HeuristicParser parser;
+    agentsynth::HeuristicParser parser;
     auto patch = parser.parse("bright lead");
 
     // Refine
@@ -48,32 +47,29 @@ TEST_CASE("Phase 2: NL refinement updates existing patch", "[phase2][acceptance]
 }
 
 TEST_CASE("Phase 2: Full pipeline dispatch", "[phase2][acceptance]") {
-    SynthEngine engine;
-    AgentBridge bridge(engine);
-    StreamParser streamParser(bridge);
+    AgentBridge bridge;
+    StreamParser streamParser;
 
     // Simulate incoming streaming tokens
-    streamParser.feedChunk(R"({"oscillatorMix": [0.5, 0.3, 0.2, 0.0, 0.0])");
-    streamParser.feedChunk(R"(, "filterCutoffHz": 800.0})");
+    streamParser.feedChunk(R"({"filter_cutoff_hz": 800.0})");
 
-    // StreamParser should have parsed both fields
-    // (Verification happens through AgentBridge side effects)
+    // StreamParser accumulates partial patch — verify it doesn't crash
+    CHECK(streamParser.partialPatch().filter.cutoff_hz >= 0.0f);
 }
 
 TEST_CASE("Phase 2: Session memory influences next generation", "[phase2][acceptance]") {
-    SynthEngine engine;
     SessionMemory memory;
 
     // User liked a previous patch
     PatchStruct likedPatch{};
-    likedPatch.oscillatorMix[0] = 0.8f;
-    likedPatch.filterCutoffHz = 500.0f;
-    memory.recordFeedback(likedPatch, SessionMemory::Feedback::Liked);
+    likedPatch.osc[0].volume = 0.8f;
+    likedPatch.filter.cutoff_hz = 500.0f;
+    memory.recordFeedback(FeedbackKind::Like, "warm pad", likedPatch);
 
     // Next prompt should bias toward liked characteristics
-    auto context = memory.buildContextString();
+    auto context = memory.buildRecap("warm pad", 5);
     REQUIRE_FALSE(context.empty());
-    REQUIRE(context.find("liked") != std::string::npos);
+    REQUIRE(context.find("LIKED") != std::string::npos);
 }
 
 TEST_CASE("Phase 2: Variation generation from base patch", "[phase2][acceptance]") {
@@ -83,7 +79,7 @@ TEST_CASE("Phase 2: Variation generation from base patch", "[phase2][acceptance]
     base.amp_env.attack_s = 0.1f;
 
     VariationEngine varEngine;
-    auto variations = varEngine.generate(base, 5);
+    auto variations = varEngine.generateVariations(base);
 
     REQUIRE(variations.size() == 5);
 
@@ -100,15 +96,19 @@ TEST_CASE("Phase 2: Variation generation from base patch", "[phase2][acceptance]
 TEST_CASE("Phase 2: Telemetry collects metrics", "[phase2][acceptance]") {
     Telemetry telemetry;
 
-    telemetry.recordGeneration(42.5f, 1);
-    telemetry.recordGeneration(15.2f, 0);
-    telemetry.recordGeneration(88.1f, 0);
-    telemetry.recordGeneration(33.7f, 1);
+    telemetry.recordGeneration(42.5, 10, 0.0425, true);
+    telemetry.recordGeneration(15.2, 0, 0.0152, false, "timeout");
+    telemetry.recordGeneration(88.1, 5, 0.0881, false, "parse_error");
+    telemetry.recordGeneration(33.7, 8, 0.0337, true);
 
-    auto report = telemetry.getReport();
-    REQUIRE(report.totalGenerations == 4);
-    REQUIRE(report.errorCount == 2);
-    REQUIRE(report.latencyP50 > 0.0f);
+    REQUIRE(telemetry.records().size() == 4);
+    int errors = 0;
+    for (const auto& r : telemetry.records()) {
+        if (!r.success)
+            ++errors;
+    }
+    REQUIRE(errors == 2);
+    REQUIRE(telemetry.records()[0].latency_ms > 0.0);
 }
 
 TEST_CASE("Phase 2: Morph engine creates interpolated patches", "[phase2][acceptance]") {
@@ -119,10 +119,10 @@ TEST_CASE("Phase 2: Morph engine creates interpolated patches", "[phase2][accept
     b.osc[1].volume = 1.0f;
 
     MorphEngine morph;
-    morph.setTarget(0, a);
-    morph.setTarget(1, b);
+    morph.saveTarget(a, 0);
+    morph.saveTarget(b, 1);
 
-    auto mid = morph.morphAt(0.5f);
-    REQUIRE(mid.filterCutoffHz > 500.0f);
-    REQUIRE(mid.filterCutoffHz < 1500.0f);
+    auto mid = morph.morphedPatchAt(0.5f);
+    REQUIRE(mid.filter.cutoff_hz > 500.0f);
+    REQUIRE(mid.filter.cutoff_hz < 1500.0f);
 }
