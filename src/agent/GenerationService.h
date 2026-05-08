@@ -1,7 +1,7 @@
 #pragma once
 
-#include <string>
 #include <functional>
+#include <string>
 
 namespace agentic_synth::agent {
 
@@ -24,13 +24,13 @@ public:
 
     // Request types
     struct GenerateRequest {
-        std::string descriptor;       // NL description
+        std::string descriptor; // NL description
         int numVariations = 1;
         bool useHeuristicFirst = true;
     };
 
     struct RefineRequest {
-        std::string descriptor;       // Refinement description
+        std::string descriptor; // Refinement description
         float currentFilterCutoffHz;
         float currentFilterResonance;
         float currentAmpAttackMs;
@@ -50,7 +50,7 @@ public:
 private:
     bool running_ = false;
     int port_ = 50051;
-    void* serverThread_ = nullptr;  // pthread handle
+    void* serverThread_ = nullptr; // pthread handle
 
     static void* serverLoop(void* arg);
 };

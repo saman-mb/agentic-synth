@@ -1,14 +1,13 @@
 #include "PresetExporter.h"
 
-#include <fstream>
 #include <cstring>
+#include <fstream>
 
 namespace agentic_synth::engine {
 
 // ── Serum .fxp ─────────────────────────────────────────────────────────
 
-PresetExporter::MigrationReport PresetExporter::exportSerum(
-    const PatchStruct& patch, const std::string& path) {
+PresetExporter::MigrationReport PresetExporter::exportSerum(const PatchStruct& patch, const std::string& path) {
 
     MigrationReport report;
     auto chunk = buildSerumChunk(patch);
@@ -22,21 +21,22 @@ PresetExporter::MigrationReport PresetExporter::exportSerum(
     }
 
     // Write minimal fxp header
-    uint8_t magic[4] = {'C', 'c', 'n', 'k'};  // Chunk magic
+    uint8_t magic[4] = {'C', 'c', 'n', 'k'}; // Chunk magic
     int32_t size = static_cast<int32_t>(chunk.size());
     file.write(reinterpret_cast<const char*>(magic), 4);
     file.write(reinterpret_cast<const char*>(&size), 4);
     file.write(reinterpret_cast<const char*>(chunk.data()), chunk.size());
     file.close();
 
-    report.mappedParams = {
-        "oscillatorMix (approximate type map)",
-        "filterCutoffHz",
-        "filterResonance",
-        "ampAttackMs", "ampDecayMs",
-        "ampSustainLevel", "ampReleaseMs",
-        "lfoRateHz", "lfoDepth"
-    };
+    report.mappedParams = {"oscillatorMix (approximate type map)",
+                           "filterCutoffHz",
+                           "filterResonance",
+                           "ampAttackMs",
+                           "ampDecayMs",
+                           "ampSustainLevel",
+                           "ampReleaseMs",
+                           "lfoRateHz",
+                           "lfoDepth"};
     report.notes = "Serum export complete. Unmapped: wavetable index, modulation matrix.";
 
     return report;
@@ -44,8 +44,7 @@ PresetExporter::MigrationReport PresetExporter::exportSerum(
 
 // ── Vital .vital ───────────────────────────────────────────────────────
 
-PresetExporter::MigrationReport PresetExporter::exportVital(
-    const PatchStruct& patch, const std::string& path) {
+PresetExporter::MigrationReport PresetExporter::exportVital(const PatchStruct& patch, const std::string& path) {
 
     MigrationReport report;
     auto chunk = buildVitalChunk(patch);
@@ -63,22 +62,18 @@ PresetExporter::MigrationReport PresetExporter::exportVital(
     file.write(reinterpret_cast<const char*>(chunk.data()), chunk.size());
     file.close();
 
-    report.mappedParams = {
-        "oscillatorMix (source level map)",
-        "filterCutoffHz",
-        "filterResonance",
-        "ampAttackMs", "ampDecayMs",
-        "ampSustainLevel", "ampReleaseMs",
-        "lfoRateHz", "lfoDepth"
-    };
-    report.unmappedParams = {
-        "Wavetable position/index",
-        "Modulation matrix routing",
-        "Effect chain parameters"
-    };
-    report.notes = "Vital export complete. " +
-        std::to_string(report.unmappedParams.size()) +
-        " parameters could not be mapped.";
+    report.mappedParams = {"oscillatorMix (source level map)",
+                           "filterCutoffHz",
+                           "filterResonance",
+                           "ampAttackMs",
+                           "ampDecayMs",
+                           "ampSustainLevel",
+                           "ampReleaseMs",
+                           "lfoRateHz",
+                           "lfoDepth"};
+    report.unmappedParams = {"Wavetable position/index", "Modulation matrix routing", "Effect chain parameters"};
+    report.notes =
+        "Vital export complete. " + std::to_string(report.unmappedParams.size()) + " parameters could not be mapped.";
 
     return report;
 }
@@ -122,7 +117,7 @@ std::vector<uint8_t> PresetExporter::buildVitalChunk(const PatchStruct& patch) {
     std::vector<uint8_t> data;
     data.reserve(256);
 
-    data.push_back(1);  // version
+    data.push_back(1); // version
 
     auto addFloat = [&](float f) {
         auto* fp = reinterpret_cast<const uint8_t*>(&f);
@@ -146,11 +141,7 @@ std::vector<uint8_t> PresetExporter::buildVitalChunk(const PatchStruct& patch) {
 }
 
 std::vector<std::string> PresetExporter::unmappedParameters(const PatchStruct&) {
-    return {
-        "Wavetable position/index",
-        "Modulation matrix routing",
-        "Effect chain parameters"
-    };
+    return {"Wavetable position/index", "Modulation matrix routing", "Effect chain parameters"};
 }
 
 } // namespace agentic_synth::engine

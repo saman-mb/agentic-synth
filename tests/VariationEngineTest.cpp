@@ -1,5 +1,5 @@
-#include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
+#include <catch2/catch_test_macros.hpp>
 
 #include "engine/VariationEngine.h"
 
@@ -11,12 +11,9 @@ namespace {
 float patchDistance(const PatchStruct& a, const PatchStruct& b) noexcept {
     auto sq = [](float x) { return x * x; };
     return sq(a.filter.cutoff_hz / 18000.0f - b.filter.cutoff_hz / 18000.0f) +
-           sq(a.filter.resonance   - b.filter.resonance) +
-           sq(a.amp_env.attack_s / 10.0f - b.amp_env.attack_s / 10.0f) +
-           sq(a.amp_env.sustain    - b.amp_env.sustain) +
-           sq(a.reverb.mix         - b.reverb.mix) +
-           sq(a.lfo[0].depth       - b.lfo[0].depth) +
-           sq(a.master_gain        - b.master_gain);
+           sq(a.filter.resonance - b.filter.resonance) + sq(a.amp_env.attack_s / 10.0f - b.amp_env.attack_s / 10.0f) +
+           sq(a.amp_env.sustain - b.amp_env.sustain) + sq(a.reverb.mix - b.reverb.mix) +
+           sq(a.lfo[0].depth - b.lfo[0].depth) + sq(a.master_gain - b.master_gain);
 }
 } // namespace
 
@@ -145,9 +142,9 @@ TEST_CASE("generateVariationsWithSeed: same seed yields identical results") {
     const auto v2 = eng.generateVariationsWithSeed(base, 123);
     for (int i = 0; i < VariationEngine::kVariationCount; ++i) {
         CHECK(v1[i].filter.cutoff_hz == Catch::Approx(v2[i].filter.cutoff_hz));
-        CHECK(v1[i].reverb.mix       == Catch::Approx(v2[i].reverb.mix));
+        CHECK(v1[i].reverb.mix == Catch::Approx(v2[i].reverb.mix));
         CHECK(v1[i].amp_env.attack_s == Catch::Approx(v2[i].amp_env.attack_s));
-        CHECK(v1[i].master_gain      == Catch::Approx(v2[i].master_gain));
+        CHECK(v1[i].master_gain == Catch::Approx(v2[i].master_gain));
     }
 }
 
@@ -157,8 +154,7 @@ TEST_CASE("generateVariationsWithSeed: different seeds produce different perturb
     const auto v1 = eng.generateVariationsWithSeed(base, 42);
     const auto v2 = eng.generateVariationsWithSeed(base, 9999);
     // Perturbation slots are indices 2 and 3; at least one must differ.
-    bool anyDiff = (v1[2].filter.cutoff_hz != v2[2].filter.cutoff_hz) ||
-                   (v1[3].reverb.mix       != v2[3].reverb.mix);
+    bool anyDiff = (v1[2].filter.cutoff_hz != v2[2].filter.cutoff_hz) || (v1[3].reverb.mix != v2[3].reverb.mix);
     CHECK(anyDiff);
 }
 

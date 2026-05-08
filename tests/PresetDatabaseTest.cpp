@@ -1,5 +1,5 @@
-#include <catch2/catch_test_macros.hpp>
 #include "engine/PresetDatabase.h"
+#include <catch2/catch_test_macros.hpp>
 
 using namespace agentic_synth::engine;
 

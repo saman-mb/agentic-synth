@@ -38,8 +38,7 @@ APVTS::ParameterLayout AgenticSynthPlugin::createParameterLayout() {
 //==============================================================================
 AgenticSynthPlugin::AgenticSynthPlugin()
     : AudioProcessor(BusesProperties().withOutput("Output", juce::AudioChannelSet::stereo(), true)),
-      midiHandler_(voiceManager_),
-      apvts_(*this, nullptr, "Parameters", createParameterLayout()) {
+      midiHandler_(voiceManager_), apvts_(*this, nullptr, "Parameters", createParameterLayout()) {
     masterGainParam_ = apvts_.getRawParameterValue("masterGain");
     filterCutoffParam_ = apvts_.getRawParameterValue("filterCutoff");
     filterResParam_ = apvts_.getRawParameterValue("filterResonance");
@@ -109,8 +108,8 @@ void AgenticSynthPlugin::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
         const int sz = msg.getRawDataSize();
         agentic_synth::engine::RawMidiMsg rmsg;
         rmsg.status = raw[0];
-        rmsg.data1  = sz > 1 ? raw[1] : 0;
-        rmsg.data2  = sz > 2 ? raw[2] : 0;
+        rmsg.data1 = sz > 1 ? raw[1] : 0;
+        rmsg.data2 = sz > 2 ? raw[2] : 0;
         midiHandler_.process(rmsg);
 
         // Notify AgentBridge of CC movements for AI context.

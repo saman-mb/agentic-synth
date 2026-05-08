@@ -1,9 +1,9 @@
 #pragma once
 
 #include "engine/PatchStruct.h"
+#include <functional>
 #include <string>
 #include <vector>
-#include <functional>
 
 namespace agentic_synth::engine {
 
@@ -39,7 +39,7 @@ public:
     bool importFromJson(const std::string& path);
 
 private:
-    void* db_ = nullptr;  // opaque SQLite3 handle
+    void* db_ = nullptr; // opaque SQLite3 handle
     bool ensureTables();
     PatchStruct blobToPatchStruct(const std::vector<uint8_t>& blob);
     std::vector<uint8_t> patchStructToBlob(const PatchStruct& patch);

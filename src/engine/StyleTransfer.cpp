@@ -25,9 +25,7 @@ StyleTransfer::StyleProfile StyleTransfer::extract(const PatchStruct& ref) {
     return profile;
 }
 
-PatchStruct StyleTransfer::apply(const PatchStruct& target,
-                                  const StyleProfile& style,
-                                  float blend) {
+PatchStruct StyleTransfer::apply(const PatchStruct& target, const StyleProfile& style, float blend) {
     PatchStruct result = target;
 
     // Blend filter character
@@ -52,19 +50,17 @@ PatchStruct StyleTransfer::apply(const PatchStruct& target,
 
     // Blend brightness
     if (style.brightness > 0.5f) {
-        result.oscillatorMix[0] = 0.6f;  // saw
-        result.oscillatorMix[2] = 0.2f;  // less triangle
+        result.oscillatorMix[0] = 0.6f; // saw
+        result.oscillatorMix[2] = 0.2f; // less triangle
     } else {
-        result.oscillatorMix[0] = 0.2f;  // less saw
-        result.oscillatorMix[2] = 0.6f;  // more triangle
+        result.oscillatorMix[0] = 0.2f; // less saw
+        result.oscillatorMix[2] = 0.6f; // more triangle
     }
 
     return result;
 }
 
-PatchStruct StyleTransfer::transfer(const PatchStruct& reference,
-                                     const PatchStruct& target,
-                                     float blend) {
+PatchStruct StyleTransfer::transfer(const PatchStruct& reference, const PatchStruct& target, float blend) {
     auto profile = extract(reference);
     return apply(target, profile, blend);
 }

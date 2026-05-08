@@ -8,13 +8,9 @@ namespace agentic_synth::engine {
 
 PresetDatabase::PresetDatabase() = default;
 
-PresetDatabase::PresetDatabase(const std::string& dbPath) {
-    open(dbPath);
-}
+PresetDatabase::PresetDatabase(const std::string& dbPath) { open(dbPath); }
 
-PresetDatabase::~PresetDatabase() {
-    close();
-}
+PresetDatabase::~PresetDatabase() { close(); }
 
 bool PresetDatabase::open(const std::string& dbPath) {
     // TODO: implement with SQLite3 C API
@@ -47,9 +43,7 @@ bool PresetDatabase::loadPreset(const std::string& name, PatchStruct& patch) {
     return false;
 }
 
-std::vector<std::string> PresetDatabase::listPresets() {
-    return {};
-}
+std::vector<std::string> PresetDatabase::listPresets() { return {}; }
 
 bool PresetDatabase::deletePreset(int id) {
     (void)id;

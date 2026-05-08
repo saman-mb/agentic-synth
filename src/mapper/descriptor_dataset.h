@@ -16,22 +16,22 @@ namespace agentic_synth::mapper {
 struct PatchDelta {
     // Oscillator 0
     std::optional<OscType> osc0_type;
-    std::optional<float>   osc0_semitone;   // semitones, -48..+48
-    std::optional<float>   osc0_detune;     // cents
-    std::optional<float>   osc0_volume;     // 0..1
-    std::optional<float>   osc0_fm_ratio;
-    std::optional<float>   osc0_fm_depth;
-    std::optional<float>   osc0_pulse_width;
+    std::optional<float> osc0_semitone; // semitones, -48..+48
+    std::optional<float> osc0_detune;   // cents
+    std::optional<float> osc0_volume;   // 0..1
+    std::optional<float> osc0_fm_ratio;
+    std::optional<float> osc0_fm_depth;
+    std::optional<float> osc0_pulse_width;
     // Oscillator 1 (supersaw/unison layer)
-    std::optional<bool>    osc1_enabled;
-    std::optional<float>   osc1_detune;
-    std::optional<float>   osc1_volume;
+    std::optional<bool> osc1_enabled;
+    std::optional<float> osc1_detune;
+    std::optional<float> osc1_volume;
     // Filter
     std::optional<FilterType> filter_type;
-    std::optional<float>      filter_cutoff;    // Hz
-    std::optional<float>      filter_resonance; // 0..1
-    std::optional<float>      filter_drive;     // 0..1
-    std::optional<float>      filter_env_mod;   // -1..+1
+    std::optional<float> filter_cutoff;    // Hz
+    std::optional<float> filter_resonance; // 0..1
+    std::optional<float> filter_drive;     // 0..1
+    std::optional<float> filter_env_mod;   // -1..+1
     // Amp envelope
     std::optional<float> amp_attack;
     std::optional<float> amp_decay;
@@ -44,9 +44,9 @@ struct PatchDelta {
     std::optional<float> flt_release;
     // LFO 0
     std::optional<LfoWaveform> lfo0_waveform;
-    std::optional<LfoTarget>   lfo0_target;
-    std::optional<float>       lfo0_rate;
-    std::optional<float>       lfo0_depth;
+    std::optional<LfoTarget> lfo0_target;
+    std::optional<float> lfo0_rate;
+    std::optional<float> lfo0_depth;
     // Reverb
     std::optional<float> reverb_size;
     std::optional<float> reverb_damping;
@@ -57,50 +57,87 @@ struct PatchDelta {
     std::optional<float> delay_feedback;
     std::optional<float> delay_mix;
     // Global
-    std::optional<float>    master_gain;
-    std::optional<float>    portamento;
-    std::optional<uint8_t>  voice_count;
+    std::optional<float> master_gain;
+    std::optional<float> portamento;
+    std::optional<uint8_t> voice_count;
 };
 
 // Apply delta to patch in-place. Only set fields are written.
 inline void apply_delta(PatchStruct& p, const PatchDelta& d) noexcept {
-    if (d.osc0_type)        p.osc[0].type          = *d.osc0_type;
-    if (d.osc0_semitone)    p.osc[0].semitone_offset = *d.osc0_semitone;
-    if (d.osc0_detune)      p.osc[0].detune_cents   = *d.osc0_detune;
-    if (d.osc0_volume)      p.osc[0].volume         = *d.osc0_volume;
-    if (d.osc0_fm_ratio)    p.osc[0].fm_ratio       = *d.osc0_fm_ratio;
-    if (d.osc0_fm_depth)    p.osc[0].fm_depth       = *d.osc0_fm_depth;
-    if (d.osc0_pulse_width) p.osc[0].pulse_width    = *d.osc0_pulse_width;
-    if (d.osc1_enabled)     p.osc[1].enabled        = *d.osc1_enabled ? 1u : 0u;
-    if (d.osc1_detune)      p.osc[1].detune_cents   = *d.osc1_detune;
-    if (d.osc1_volume)      p.osc[1].volume         = *d.osc1_volume;
-    if (d.filter_type)      p.filter.type           = *d.filter_type;
-    if (d.filter_cutoff)    p.filter.cutoff_hz      = *d.filter_cutoff;
-    if (d.filter_resonance) p.filter.resonance      = *d.filter_resonance;
-    if (d.filter_drive)     p.filter.drive          = *d.filter_drive;
-    if (d.filter_env_mod)   p.filter.env_mod        = *d.filter_env_mod;
-    if (d.amp_attack)       p.amp_env.attack_s      = *d.amp_attack;
-    if (d.amp_decay)        p.amp_env.decay_s       = *d.amp_decay;
-    if (d.amp_sustain)      p.amp_env.sustain       = *d.amp_sustain;
-    if (d.amp_release)      p.amp_env.release_s     = *d.amp_release;
-    if (d.flt_attack)       p.filter_env.attack_s   = *d.flt_attack;
-    if (d.flt_decay)        p.filter_env.decay_s    = *d.flt_decay;
-    if (d.flt_sustain)      p.filter_env.sustain    = *d.flt_sustain;
-    if (d.flt_release)      p.filter_env.release_s  = *d.flt_release;
-    if (d.lfo0_waveform)    p.lfo[0].waveform       = *d.lfo0_waveform;
-    if (d.lfo0_target)      p.lfo[0].target         = *d.lfo0_target;
-    if (d.lfo0_rate)        p.lfo[0].rate_hz        = *d.lfo0_rate;
-    if (d.lfo0_depth)       p.lfo[0].depth          = *d.lfo0_depth;
-    if (d.reverb_size)      p.reverb.size           = *d.reverb_size;
-    if (d.reverb_damping)   p.reverb.damping        = *d.reverb_damping;
-    if (d.reverb_width)     p.reverb.width          = *d.reverb_width;
-    if (d.reverb_mix)       p.reverb.mix            = *d.reverb_mix;
-    if (d.delay_time)       p.delay.time_s          = *d.delay_time;
-    if (d.delay_feedback)   p.delay.feedback        = *d.delay_feedback;
-    if (d.delay_mix)        p.delay.mix             = *d.delay_mix;
-    if (d.master_gain)      p.master_gain           = *d.master_gain;
-    if (d.portamento)       p.portamento_s          = *d.portamento;
-    if (d.voice_count)      p.voice_count           = *d.voice_count;
+    if (d.osc0_type)
+        p.osc[0].type = *d.osc0_type;
+    if (d.osc0_semitone)
+        p.osc[0].semitone_offset = *d.osc0_semitone;
+    if (d.osc0_detune)
+        p.osc[0].detune_cents = *d.osc0_detune;
+    if (d.osc0_volume)
+        p.osc[0].volume = *d.osc0_volume;
+    if (d.osc0_fm_ratio)
+        p.osc[0].fm_ratio = *d.osc0_fm_ratio;
+    if (d.osc0_fm_depth)
+        p.osc[0].fm_depth = *d.osc0_fm_depth;
+    if (d.osc0_pulse_width)
+        p.osc[0].pulse_width = *d.osc0_pulse_width;
+    if (d.osc1_enabled)
+        p.osc[1].enabled = *d.osc1_enabled ? 1u : 0u;
+    if (d.osc1_detune)
+        p.osc[1].detune_cents = *d.osc1_detune;
+    if (d.osc1_volume)
+        p.osc[1].volume = *d.osc1_volume;
+    if (d.filter_type)
+        p.filter.type = *d.filter_type;
+    if (d.filter_cutoff)
+        p.filter.cutoff_hz = *d.filter_cutoff;
+    if (d.filter_resonance)
+        p.filter.resonance = *d.filter_resonance;
+    if (d.filter_drive)
+        p.filter.drive = *d.filter_drive;
+    if (d.filter_env_mod)
+        p.filter.env_mod = *d.filter_env_mod;
+    if (d.amp_attack)
+        p.amp_env.attack_s = *d.amp_attack;
+    if (d.amp_decay)
+        p.amp_env.decay_s = *d.amp_decay;
+    if (d.amp_sustain)
+        p.amp_env.sustain = *d.amp_sustain;
+    if (d.amp_release)
+        p.amp_env.release_s = *d.amp_release;
+    if (d.flt_attack)
+        p.filter_env.attack_s = *d.flt_attack;
+    if (d.flt_decay)
+        p.filter_env.decay_s = *d.flt_decay;
+    if (d.flt_sustain)
+        p.filter_env.sustain = *d.flt_sustain;
+    if (d.flt_release)
+        p.filter_env.release_s = *d.flt_release;
+    if (d.lfo0_waveform)
+        p.lfo[0].waveform = *d.lfo0_waveform;
+    if (d.lfo0_target)
+        p.lfo[0].target = *d.lfo0_target;
+    if (d.lfo0_rate)
+        p.lfo[0].rate_hz = *d.lfo0_rate;
+    if (d.lfo0_depth)
+        p.lfo[0].depth = *d.lfo0_depth;
+    if (d.reverb_size)
+        p.reverb.size = *d.reverb_size;
+    if (d.reverb_damping)
+        p.reverb.damping = *d.reverb_damping;
+    if (d.reverb_width)
+        p.reverb.width = *d.reverb_width;
+    if (d.reverb_mix)
+        p.reverb.mix = *d.reverb_mix;
+    if (d.delay_time)
+        p.delay.time_s = *d.delay_time;
+    if (d.delay_feedback)
+        p.delay.feedback = *d.delay_feedback;
+    if (d.delay_mix)
+        p.delay.mix = *d.delay_mix;
+    if (d.master_gain)
+        p.master_gain = *d.master_gain;
+    if (d.portamento)
+        p.portamento_s = *d.portamento;
+    if (d.voice_count)
+        p.voice_count = *d.voice_count;
 }
 
 // ---------------------------------------------------------------------------
@@ -124,7 +161,7 @@ enum class SoundContext : uint8_t {
 
 struct DescriptorEntry {
     std::string_view keyword;
-    SoundContext context;  // Generic = applies to any context
+    SoundContext context; // Generic = applies to any context
     PatchDelta delta;
 };
 

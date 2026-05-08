@@ -1,15 +1,15 @@
-#include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
+#include <catch2/catch_test_macros.hpp>
 
-#include "mapper/SemanticMapper.h"
 #include "engine/PatchStruct.h"
+#include "mapper/SemanticMapper.h"
 
+using agentic_synth::LfoTarget;
+using agentic_synth::make_default_patch;
+using agentic_synth::OscType;
 using agentic_synth::mapper::SemanticMapper;
 using agentic_synth::mapper::SemanticMapperConfig;
 using agentic_synth::mapper::SoundContext;
-using agentic_synth::make_default_patch;
-using agentic_synth::OscType;
-using agentic_synth::LfoTarget;
 
 // Offline config — no embedding server, uses word-overlap fallback
 static SemanticMapperConfig offline_cfg() {
@@ -66,7 +66,7 @@ TEST_CASE("best_match: context-specific entry preferred over generic") {
     SemanticMapper mapper{offline_cfg()};
     // Dataset has both "dark" Generic and "dark" Bass entries
     auto m_generic = mapper.best_match("dark", SoundContext::Generic);
-    auto m_bass    = mapper.best_match("dark", SoundContext::Bass);
+    auto m_bass = mapper.best_match("dark", SoundContext::Bass);
     REQUIRE(m_generic.has_value());
     REQUIRE(m_bass.has_value());
     // Both find "dark" but the bass one should be context-specific
@@ -75,7 +75,7 @@ TEST_CASE("best_match: context-specific entry preferred over generic") {
 
 TEST_CASE("best_match: unknown word returns nullopt or very low-score generic") {
     SemanticMapperConfig strict_cfg = offline_cfg();
-    strict_cfg.similarity_threshold = 0.8f;  // very strict
+    strict_cfg.similarity_threshold = 0.8f; // very strict
     SemanticMapper mapper{strict_cfg};
     auto m = mapper.best_match("xyzqwerty", SoundContext::Generic);
     CHECK_FALSE(m.has_value());
@@ -158,23 +158,23 @@ TEST_CASE("apply: compound prompt applies multiple deltas") {
     auto patch = make_default_patch();
     int n = mapper.apply("dark warm bass pad", patch);
     CHECK(n >= 2);
-    CHECK(patch.osc[0].semitone_offset < 0.0f);  // from "bass"
-    CHECK(patch.amp_env.attack_s >= 0.4f);        // from "pad"
+    CHECK(patch.osc[0].semitone_offset < 0.0f); // from "bass"
+    CHECK(patch.amp_env.attack_s >= 0.4f);      // from "pad"
 }
 
 TEST_CASE("apply: context-aware — 'dark bass' vs 'dark pad'") {
     SemanticMapper mapper{offline_cfg()};
     auto patch_bass = make_default_patch();
-    auto patch_pad  = make_default_patch();
+    auto patch_pad = make_default_patch();
     mapper.apply("dark bass", patch_bass);
-    mapper.apply("dark pad",  patch_pad);
+    mapper.apply("dark pad", patch_pad);
     // Both should lower cutoff, but bass context may set it lower still
     CHECK(patch_bass.filter.cutoff_hz < patch_pad.filter.cutoff_hz);
 }
 
 TEST_CASE("apply: empty prompt returns 0 matched and leaves patch unchanged") {
     SemanticMapper mapper{offline_cfg()};
-    auto patch    = make_default_patch();
+    auto patch = make_default_patch();
     auto expected = make_default_patch();
     int n = mapper.apply("", patch);
     CHECK(n == 0);
@@ -189,10 +189,8 @@ TEST_CASE("apply: empty prompt returns 0 matched and leaves patch unchanged") {
 
 TEST_CASE("ablation: mapper produces non-default patch for every key descriptor") {
     SemanticMapper mapper{offline_cfg()};
-    const std::vector<std::string> descriptors = {
-        "dark", "bright", "warm", "cold", "plucky", "pad", "bass",
-        "lead", "ambient", "distorted", "vibrato", "tremolo", "mono"
-    };
+    const std::vector<std::string> descriptors = {"dark", "bright",  "warm",      "cold",    "plucky",  "pad", "bass",
+                                                  "lead", "ambient", "distorted", "vibrato", "tremolo", "mono"};
     const auto baseline = make_default_patch();
     for (const auto& d : descriptors) {
         auto patch = make_default_patch();

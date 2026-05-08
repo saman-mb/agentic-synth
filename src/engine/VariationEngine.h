@@ -35,8 +35,8 @@ public:
 
     // Same as generateVariations but uses a caller-supplied perturbation seed
     // for reproducible variation sets (useful for session replay and A/B testing).
-    [[nodiscard]] std::array<PatchStruct, kVariationCount>
-    generateVariationsWithSeed(const PatchStruct& base, uint32_t perturbSeed) const;
+    [[nodiscard]] std::array<PatchStruct, kVariationCount> generateVariationsWithSeed(const PatchStruct& base,
+                                                                                      uint32_t perturbSeed) const;
 };
 
 } // namespace agentic_synth::engine

@@ -12,8 +12,8 @@ namespace agentic_synth::agent {
 // Analyzes the current patch and suggests 3 variations.
 
 struct VariationSuggestion {
-    std::string label;       // e.g. "More aggressive"
-    std::string rationale;   // e.g. "Increase resonance and swap to saw wave"
+    std::string label;     // e.g. "More aggressive"
+    std::string rationale; // e.g. "Increase resonance and swap to saw wave"
     PatchStruct patch;
     VariationEngine::Strategy strategy;
 };

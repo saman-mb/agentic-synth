@@ -1,12 +1,12 @@
 #include "GenerationService.h"
 
-#include <thread>
-#include <cstring>
-#include <unistd.h>
-#include <sys/socket.h>
-#include <netinet/in.h>
 #include <arpa/inet.h>
+#include <cstring>
+#include <netinet/in.h>
 #include <poll.h>
+#include <sys/socket.h>
+#include <thread>
+#include <unistd.h>
 
 namespace agentic_synth::agent {
 
@@ -45,14 +45,17 @@ bool GenerationService::start(int port) {
             pfd.fd = serverFd;
             pfd.events = POLLIN;
 
-            int ret = poll(&pfd, 1, 500);  // 500ms timeout
-            if (ret < 0 || !running_) break;
-            if (ret == 0) continue;
+            int ret = poll(&pfd, 1, 500); // 500ms timeout
+            if (ret < 0 || !running_)
+                break;
+            if (ret == 0)
+                continue;
 
             struct sockaddr_in clientAddr{};
             socklen_t clientLen = sizeof(clientAddr);
             int clientFd = accept(serverFd, (struct sockaddr*)&clientAddr, &clientLen);
-            if (clientFd < 0) continue;
+            if (clientFd < 0)
+                continue;
 
             // Read request
             char buf[4096]{};
@@ -72,9 +75,7 @@ bool GenerationService::start(int port) {
     return true;
 }
 
-void GenerationService::stop() {
-    running_ = false;
-}
+void GenerationService::stop() { running_ = false; }
 
 GenerationService::Response GenerationService::generate(const GenerateRequest& req) {
     // TODO: delegate to HeuristicParser or LLM

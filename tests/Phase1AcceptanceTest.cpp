@@ -1,14 +1,14 @@
-#include <catch2/catch_test_macros.hpp>
-#include "engine/RealtimeSafety.h"
-#include "engine/PatchStruct.h"
-#include "engine/PatchValidator.h"
-#include "engine/VoiceManager.h"
 #include "engine/ADSREnvelope.h"
 #include "engine/Filter.h"
 #include "engine/LFO.h"
-#include "engine/VAOscillator.h"
-#include "engine/WavetableOscillator.h"
+#include "engine/PatchStruct.h"
+#include "engine/PatchValidator.h"
+#include "engine/RealtimeSafety.h"
 #include "engine/SPSCQueue.h"
+#include "engine/VAOscillator.h"
+#include "engine/VoiceManager.h"
+#include "engine/WavetableOscillator.h"
+#include <catch2/catch_test_macros.hpp>
 
 using namespace agentic_synth::engine;
 
@@ -21,31 +21,15 @@ struct TestDescriptor {
 };
 
 static const TestDescriptor kDescriptors[] = {
-    {"warm pad",        100.0f, 800.0f},
-    {"bright lead",     1000.0f, 5000.0f},
-    {"dark ambient",    50.0f,  400.0f},
-    {"sub bass",        30.0f,  150.0f},
-    {"aggressive",      2000.0f, 8000.0f},
-    {"mellow",          100.0f, 800.0f},
-    {"harsh",           3000.0f, 10000.0f},
-    {"soft",            100.0f, 600.0f},
-    {"brass",           500.0f, 2500.0f},
-    {"string-like",     400.0f, 2000.0f},
-    {"plucked",         600.0f, 3000.0f},
-    {"buzzy",           1500.0f, 6000.0f},
-    {"hollow",          200.0f, 1000.0f},
-    {"tinny",           3000.0f, 10000.0f},
-    {"boomy",           50.0f,  300.0f},
-    {"nasal",           500.0f, 2000.0f},
-    {"smooth",          200.0f, 1000.0f},
-    {"crisp",           2000.0f, 6000.0f},
-    {"round",           150.0f, 800.0f},
-    {"punchy",          300.0f, 1500.0f},
-    {"glassy",          2000.0f, 8000.0f},
-    {"airy",            3000.0f, 12000.0f},
-    {"thick",           100.0f, 600.0f},
-    {"growling",        100.0f, 500.0f},
-    {"shimmering",      3000.0f, 10000.0f},
+    {"warm pad", 100.0f, 800.0f},      {"bright lead", 1000.0f, 5000.0f}, {"dark ambient", 50.0f, 400.0f},
+    {"sub bass", 30.0f, 150.0f},       {"aggressive", 2000.0f, 8000.0f},  {"mellow", 100.0f, 800.0f},
+    {"harsh", 3000.0f, 10000.0f},      {"soft", 100.0f, 600.0f},          {"brass", 500.0f, 2500.0f},
+    {"string-like", 400.0f, 2000.0f},  {"plucked", 600.0f, 3000.0f},      {"buzzy", 1500.0f, 6000.0f},
+    {"hollow", 200.0f, 1000.0f},       {"tinny", 3000.0f, 10000.0f},      {"boomy", 50.0f, 300.0f},
+    {"nasal", 500.0f, 2000.0f},        {"smooth", 200.0f, 1000.0f},       {"crisp", 2000.0f, 6000.0f},
+    {"round", 150.0f, 800.0f},         {"punchy", 300.0f, 1500.0f},       {"glassy", 2000.0f, 8000.0f},
+    {"airy", 3000.0f, 12000.0f},       {"thick", 100.0f, 600.0f},         {"growling", 100.0f, 500.0f},
+    {"shimmering", 3000.0f, 10000.0f},
 };
 
 TEST_CASE("Phase 1: 25 natural-language descriptors produce valid patches", "[phase1][acceptance]") {
@@ -57,13 +41,11 @@ TEST_CASE("Phase 1: 25 natural-language descriptors produce valid patches", "[ph
         // (HeuristicParser should handle these via keyword matching)
         PatchStruct patch{};
         // Simulate heuristic parse: map descriptor to plausible parameters
-        if (strstr(d.input, "bass") || strstr(d.input, "boomy") ||
-            strstr(d.input, "sub") || strstr(d.input, "thick") ||
+        if (strstr(d.input, "bass") || strstr(d.input, "boomy") || strstr(d.input, "sub") || strstr(d.input, "thick") ||
             strstr(d.input, "growling")) {
             patch.filterCutoffHz = d.expectedMinCutoff + 50.0f;
-        } else if (strstr(d.input, "bright") || strstr(d.input, "harsh") ||
-                   strstr(d.input, "aggressive") || strstr(d.input, "crisp") ||
-                   strstr(d.input, "glassy") || strstr(d.input, "tinny") ||
+        } else if (strstr(d.input, "bright") || strstr(d.input, "harsh") || strstr(d.input, "aggressive") ||
+                   strstr(d.input, "crisp") || strstr(d.input, "glassy") || strstr(d.input, "tinny") ||
                    strstr(d.input, "airy") || strstr(d.input, "shimmering")) {
             patch.filterCutoffHz = d.expectedMinCutoff + 500.0f;
         } else {
@@ -78,7 +60,7 @@ TEST_CASE("Phase 1: 25 natural-language descriptors produce valid patches", "[ph
         ++validCount;
     }
 
-    REQUIRE(validCount >= 20);  // At least 20 of 25 must produce valid patches
+    REQUIRE(validCount >= 20); // At least 20 of 25 must produce valid patches
 }
 
 TEST_CASE("Phase 1: VoiceManager produces audio for basic patches", "[phase1][acceptance]") {
@@ -104,7 +86,7 @@ TEST_CASE("Phase 1: VoiceManager produces audio for basic patches", "[phase1][ac
         peak = std::max(peak, std::abs(output[i]));
     }
     REQUIRE(peak > 0.0f);
-    REQUIRE(peak < 2.0f);  // No clipping
+    REQUIRE(peak < 2.0f); // No clipping
 }
 
 TEST_CASE("Phase 1: Filter processes input without NaN", "[phase1][acceptance]") {

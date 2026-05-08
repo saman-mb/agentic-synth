@@ -53,8 +53,7 @@ public:
     // Issue #64: grammar-constrained LLM patch generation.
     // Calls GrammarSampler, validates the result, then drives refinePatch().
     // Returns nullopt when the server is unreachable or returns invalid JSON.
-    [[nodiscard]] std::optional<PatchStruct> generateLlmPatch(const std::string& prompt,
-                                                               uint32_t patch_id = 0);
+    [[nodiscard]] std::optional<PatchStruct> generateLlmPatch(const std::string& prompt, uint32_t patch_id = 0);
 
     // Issue #67: streaming patch application.
     // Feed a chunk of streaming LLM JSON. Fires pipeline_.injectPatch() each
@@ -104,18 +103,17 @@ public:
 
     // Generate natural-language rationale explaining parameter choices for
     // the given patch in the context of the current prompt and session memory.
-    [[nodiscard]] std::string generateRationale(const std::string& prompt,
-                                                const PatchStruct& patch) const;
+    [[nodiscard]] std::string generateRationale(const std::string& prompt, const PatchStruct& patch) const;
 
 private:
-    PrePatchPipeline            pipeline_;
-    engine::VariationEngine     variationEngine_;
-    SessionMemory               memory_;
-    mapper::GrammarSampler      sampler_;
-    mapper::SemanticMapper      semanticMapper_;
-    StreamParser                streamParser_;
-    Telemetry                   telemetry_{"agentic_synth_telemetry.json"};
-    WebSocketBridge*            wsb_{nullptr};
+    PrePatchPipeline pipeline_;
+    engine::VariationEngine variationEngine_;
+    SessionMemory memory_;
+    mapper::GrammarSampler sampler_;
+    mapper::SemanticMapper semanticMapper_;
+    StreamParser streamParser_;
+    Telemetry telemetry_{"agentic_synth_telemetry.json"};
+    WebSocketBridge* wsb_{nullptr};
 
     // Normalised [0,1] last-seen values from MIDI CC; injected into system prompt.
     float midiCutoffNorm_{0.5f};

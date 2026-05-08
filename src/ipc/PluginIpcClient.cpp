@@ -29,7 +29,8 @@ PluginIpcClient::~PluginIpcClient() {
 // ── Public API ────────────────────────────────────────────────────────────────
 
 bool PluginIpcClient::connectToCompanion(int timeoutMs) {
-    if (isConnected()) return true;
+    if (isConnected())
+        return true;
 
     if (!connectToSocket("127.0.0.1", kCompanionPort, timeoutMs)) {
         tryLaunchCompanion();
@@ -39,57 +40,49 @@ bool PluginIpcClient::connectToCompanion(int timeoutMs) {
     return true;
 }
 
-void PluginIpcClient::requestPatch(const std::string& prompt) {
-    sendMsg(IpcMsgType::PatchRequest, prompt);
-}
+void PluginIpcClient::requestPatch(const std::string& prompt) { sendMsg(IpcMsgType::PatchRequest, prompt); }
 
-bool PluginIpcClient::isActive() const noexcept {
-    return isConnected();
-}
+bool PluginIpcClient::isActive() const noexcept { return isConnected(); }
 
 // ── InterprocessConnection callbacks ─────────────────────────────────────────
 
-void PluginIpcClient::connectionMade() {
-    sendMsg(IpcMsgType::Hello);
-}
+void PluginIpcClient::connectionMade() { sendMsg(IpcMsgType::Hello); }
 
 void PluginIpcClient::connectionLost() {
     // Retry once after a short pause; the companion may be restarting.
-    juce::Timer::callAfterDelay(1000, [this] {
-        connectToCompanion();
-    });
+    juce::Timer::callAfterDelay(1000, [this] { connectToCompanion(); });
 }
 
 void PluginIpcClient::messageReceived(const juce::MemoryBlock& data) {
     IpcMsgHeader hdr;
     std::string payload;
-    if (!parseMessage(data, hdr, payload)) return;
+    if (!parseMessage(data, hdr, payload))
+        return;
 
     switch (hdr.type) {
-        case IpcMsgType::PatchUpdate:
-            if (onPatch_ && !payload.empty())
-                onPatch_(payload);
-            break;
-        case IpcMsgType::Shutdown:
-            disconnect();
-            break;
-        default:
-            break;
+    case IpcMsgType::PatchUpdate:
+        if (onPatch_ && !payload.empty())
+            onPatch_(payload);
+        break;
+    case IpcMsgType::Shutdown:
+        disconnect();
+        break;
+    default:
+        break;
     }
 }
 
 // ── Private helpers ───────────────────────────────────────────────────────────
 
 void PluginIpcClient::sendMsg(IpcMsgType type, const std::string& payload) {
-    if (!isConnected()) return;
+    if (!isConnected())
+        return;
     sendMessage(makeMessage(type, instanceId_, payload));
 }
 
 void PluginIpcClient::tryLaunchCompanion() {
     // Look for the companion binary next to the plugin bundle.
-    const juce::File execDir =
-        juce::File::getSpecialLocation(juce::File::currentExecutableFile)
-            .getParentDirectory();
+    const juce::File execDir = juce::File::getSpecialLocation(juce::File::currentExecutableFile).getParentDirectory();
     const juce::File companion = execDir.getChildFile("AgenticSynthCompanion");
     if (companion.existsAsFile())
         companion.startAsProcess();
