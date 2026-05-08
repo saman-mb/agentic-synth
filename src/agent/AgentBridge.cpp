@@ -5,6 +5,14 @@
 
 namespace agentic_synth::agent {
 
+AgentBridge::AgentBridge() {
+    // Wire stream parser: each completed field injects a partial patch
+    // directly onto the audio SPSC queue for < 500 ms first-audible-change.
+    streamParser_.setCallback([this](const PatchStruct& p) {
+        pipeline_.injectPatch(p);
+    });
+}
+
 namespace {
 // Load text file; returns empty string on failure.
 std::string load_text_file(const std::string& path) {
@@ -62,6 +70,10 @@ std::optional<PatchStruct> AgentBridge::generateLlmPatch(const std::string& prom
     auto result = sampler_.generate(prompt, patch_id);
     if (result) refinePatch(*result);
     return result;
+}
+
+void AgentBridge::feedChunk(std::string_view chunk) {
+    streamParser_.feedChunk(chunk);
 }
 
 } // namespace agentic_synth::agent
