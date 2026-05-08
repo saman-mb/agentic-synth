@@ -88,7 +88,8 @@ void ADSREnvelope::recalcCoefficients() {
             attackCoeff_ = 0.0F;
             attackBase_ = static_cast<float>(1.0 + tco);
         } else {
-            const double c = std::exp(-std::log((1.0 + tco) / tco) / N);
+            const double ratio = std::max(1e-10, (1.0 + tco) / tco);
+            const double c = std::exp(-std::log(ratio) / N);
             attackCoeff_ = static_cast<float>(c);
             attackBase_ = static_cast<float>((1.0 + tco) * (1.0 - c));
         }
@@ -101,7 +102,8 @@ void ADSREnvelope::recalcCoefficients() {
             decayCoeff_ = 0.0F;
             decayBase_ = static_cast<float>(sustain);
         } else {
-            const double c = std::exp(-std::log((1.0 - sustain + tco) / tco) / N);
+            const double ratio = std::max(1e-10, (1.0 - sustain + tco) / tco);
+            const double c = std::exp(-std::log(ratio) / N);
             decayCoeff_ = static_cast<float>(c);
             decayBase_ = static_cast<float>((sustain - tco) * (1.0 - c));
         }
@@ -114,7 +116,8 @@ void ADSREnvelope::recalcCoefficients() {
             releaseCoeff_ = 0.0F;
             releaseBase_ = 0.0F;
         } else {
-            const double c = std::exp(-std::log((1.0 + tco) / tco) / N);
+            const double ratio = std::max(1e-10, (1.0 + tco) / tco);
+            const double c = std::exp(-std::log(ratio) / N);
             releaseCoeff_ = static_cast<float>(c);
             releaseBase_ = static_cast<float>(-tco * (1.0 - c));
         }
