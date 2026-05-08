@@ -31,8 +31,7 @@ TEST_CASE("VariationRecommender: at least one suggestion differs from current pa
     auto suggestions = recommender.suggest(current);
     int differing = 0;
     for (const auto& s : suggestions) {
-        if (s.patch.filter.cutoff_hz != current.filter.cutoff_hz ||
-            s.patch.osc[0].volume != current.osc[0].volume ||
+        if (s.patch.filter.cutoff_hz != current.filter.cutoff_hz || s.patch.osc[0].volume != current.osc[0].volume ||
             s.patch.amp_env.attack_s != current.amp_env.attack_s) {
             ++differing;
         }

@@ -559,7 +559,7 @@ std::string GrammarSampler::http_post(const std::string& json_body) const {
     WSAStartup(MAKEWORD(2, 2), &wd);
 #endif
 
-    struct addrinfo hints{};
+    struct addrinfo hints {};
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     struct addrinfo* res = nullptr;
@@ -584,7 +584,7 @@ std::string GrammarSampler::http_post(const std::string& json_body) const {
     freeaddrinfo(res);
 
     // Set socket timeout
-    struct timeval tv{};
+    struct timeval tv {};
     tv.tv_sec = cfg_.timeout_ms / 1000;
     tv.tv_usec = (cfg_.timeout_ms % 1000) * 1000;
     setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&tv), sizeof(tv));
@@ -703,20 +703,14 @@ std::string GrammarSampler::build_request(const std::string& user_prompt, uint32
                               ") for: " + user_prompt;
 
     std::ostringstream body;
-    body << "{"
-         << "\"prompt\":\"" << json_escape(prompt_text) << "\","
-         << "\"grammar\":\"" << json_escape(grammar_text_) << "\","
-         << "\"max_tokens\":" << cfg_.max_tokens << ","
-         << "\"temperature\":" << cfg_.temperature << ","
-         << "\"stop\":[\"}\"]"
-         << "}";
+    body << "{" << "\"prompt\":\"" << json_escape(prompt_text) << "\"," << "\"grammar\":\""
+         << json_escape(grammar_text_) << "\"," << "\"max_tokens\":" << cfg_.max_tokens << ","
+         << "\"temperature\":" << cfg_.temperature << "," << "\"stop\":[\"}\"]" << "}";
     // Note: the stop token is not used because grammar already terminates the object
     // Re-build without incomplete stop token
     std::ostringstream body2;
-    body2 << "{"
-          << "\"prompt\":\"" << json_escape(prompt_text) << "\","
-          << "\"grammar\":\"" << json_escape(grammar_text_) << "\","
-          << "\"max_tokens\":" << cfg_.max_tokens << ","
+    body2 << "{" << "\"prompt\":\"" << json_escape(prompt_text) << "\"," << "\"grammar\":\""
+          << json_escape(grammar_text_) << "\"," << "\"max_tokens\":" << cfg_.max_tokens << ","
           << "\"temperature\":" << cfg_.temperature << "}";
     return body2.str();
 }
