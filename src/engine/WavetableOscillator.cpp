@@ -44,7 +44,7 @@ WavetableOscillator::WavetableOscillator() {
 }
 
 void WavetableOscillator::setSampleRate(double sampleRate) noexcept {
-    sampleRate_ = sampleRate;
+    sampleRate_ = sampleRate < 1.0 ? 1.0 : sampleRate; // guard against zero / negative
     phaseIncrement_ = frequency_ / sampleRate_;
 }
 
