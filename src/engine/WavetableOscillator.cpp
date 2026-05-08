@@ -138,6 +138,11 @@ bool parseWav(const std::string& path, std::vector<float>& out) {
     if (!f)
         return false;
 
+    // Determine file size once for chunk-bounds validation.
+    f.seekg(0, std::ios::end);
+    const auto fileSize = f.tellg();
+    f.seekg(0);
+
     auto read4 = [&]() -> uint32_t {
         uint8_t b[4]{};
         f.read(reinterpret_cast<char*>(b), 4);
@@ -157,7 +162,7 @@ bool parseWav(const std::string& path, std::vector<float>& out) {
 
     if (tag() != "RIFF")
         return false;
-    read4(); // file size
+    read4(); // file size field (ignored — we use actual file size)
     if (tag() != "WAVE")
         return false;
 
@@ -167,7 +172,17 @@ bool parseWav(const std::string& path, std::vector<float>& out) {
     while (f && !foundData) {
         const std::string chunkId = tag();
         const uint32_t chunkSize = read4();
-        const auto chunkEnd = static_cast<std::streampos>(f.tellg()) + static_cast<std::streamoff>(chunkSize);
+
+        if (!f)
+            break;
+
+        const auto chunkStart = f.tellg();
+        // Reject hostile chunk sizes that would seek past the end of the file.
+        if (chunkStart < 0 || chunkStart > fileSize ||
+            static_cast<uint64_t>(chunkSize) > static_cast<uint64_t>(fileSize - chunkStart)) {
+            return false;
+        }
+        const auto chunkEnd = chunkStart + static_cast<std::streamoff>(chunkSize);
 
         if (chunkId == "fmt " && !foundFmt) {
             audioFmt = read2();
