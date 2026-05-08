@@ -3,6 +3,7 @@
 #include <atomic>
 #include <cassert>
 #include <cstdlib>
+#include <new>
 
 namespace agentic_synth::engine {
 
@@ -46,13 +47,21 @@ public:
 #define CHECK_REALTIME()                                                                                               \
     REALTIME_ASSERT(isRealtimeContext().load(), "Audio-thread function called outside realtime context")
 
-// Override operator new on the audio thread to trip on allocation.
-// NOTE: Must live in a .cpp file (RealtimeSafety.cpp), NOT in a header,
-// to avoid ODR violations across translation units.
+// Override operator new/delete to assert when called from the audio thread.
+// Defined inline (C++17) so multiple TUs can include this header without ODR violation.
 // Enable by defining REALTIME_STRICT before including this header.
 #if defined(REALTIME_STRICT)
-void* operator new(std::size_t sz);
-void operator delete(void* ptr) noexcept;
+inline void* operator new(std::size_t sz) {
+    REALTIME_ASSERT(!isRealtimeContext().load(), "operator new on audio thread");
+    void* p = std::malloc(sz);
+    if (!p)
+        throw std::bad_alloc{};
+    return p;
+}
+inline void operator delete(void* ptr) noexcept {
+    REALTIME_ASSERT(!isRealtimeContext().load(), "operator delete on audio thread");
+    std::free(ptr);
+}
 #endif
 
 // ── Pre-allocated ring buffer for realtime-safe parameter updates ─────
