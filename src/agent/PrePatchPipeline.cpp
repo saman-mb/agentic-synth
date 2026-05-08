@@ -78,4 +78,9 @@ std::optional<PatchStruct> PrePatchPipeline::poll() noexcept { return queue_.pop
 
 double PrePatchPipeline::lastDispatchLatencyMs() const noexcept { return dispatchLatencyMs_; }
 
+void PrePatchPipeline::injectPatch(const PatchStruct& patch) {
+    lastHeuristicPatch_ = validate_patch(patch);
+    queue_.push(lastHeuristicPatch_);
+}
+
 } // namespace agentic_synth::agent

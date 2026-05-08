@@ -19,7 +19,11 @@ std::string load_text_file(const std::string& path) {
 std::string AgentBridge::status() const { return "agent-bridge-v2"; }
 
 PatchStruct AgentBridge::submitPrompt(const std::string& prompt) {
-    return pipeline_.submit(prompt);
+    // Issue #65: heuristic first for < 200 ms, then semantic layer refines in place.
+    PatchStruct patch = pipeline_.submit(prompt);
+    if (semanticMapper_.apply(prompt, patch) > 0)
+        pipeline_.injectPatch(patch);
+    return patch;
 }
 
 void AgentBridge::refinePatch(const PatchStruct& llmPatch) {

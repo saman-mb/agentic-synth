@@ -9,6 +9,7 @@
 #include "engine/PatchStruct.h"
 #include "engine/VariationEngine.h"
 #include "mapper/GrammarSampler.h"
+#include "mapper/SemanticMapper.h"
 
 namespace agentic_synth::agent {
 
@@ -48,6 +49,7 @@ private:
     engine::VariationEngine variationEngine_;
     SessionMemory memory_;
     mapper::GrammarSampler sampler_;
+    mapper::SemanticMapper semanticMapper_;
 };
 
 } // namespace agentic_synth::agent
