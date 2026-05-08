@@ -3,6 +3,7 @@
 
 #include <fstream>
 #include <iomanip>
+#include <juce_core/juce_core.h>
 #include <sstream>
 
 namespace agentic_synth::agent {
@@ -14,62 +15,6 @@ AgentBridge::AgentBridge() {
 }
 
 namespace {
-
-// ---------------------------------------------------------------------------
-// Minimal JSON field extractors for flat WebSocket message objects.
-// These handle the specific formats sent by the React UI — no external library.
-// ---------------------------------------------------------------------------
-
-std::string jsStr(const std::string& json, const std::string& key) {
-    const std::string needle = "\"" + key + "\"";
-    auto pos = json.find(needle);
-    if (pos == std::string::npos)
-        return {};
-    pos = json.find(':', pos + needle.size());
-    if (pos == std::string::npos)
-        return {};
-    pos = json.find('"', pos + 1);
-    if (pos == std::string::npos)
-        return {};
-    const auto end = json.find('"', pos + 1);
-    if (end == std::string::npos)
-        return {};
-    return json.substr(pos + 1, end - pos - 1);
-}
-
-float jsFloat(const std::string& json, const std::string& key) {
-    const std::string needle = "\"" + key + "\"";
-    auto pos = json.find(needle);
-    if (pos == std::string::npos)
-        return 0.0f;
-    pos = json.find(':', pos + needle.size());
-    if (pos == std::string::npos)
-        return 0.0f;
-    ++pos;
-    while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t'))
-        ++pos;
-    if (pos >= json.size())
-        return 0.0f;
-    try {
-        return std::stof(json.substr(pos));
-    } catch (...) {
-        return 0.0f;
-    }
-}
-
-bool jsBool(const std::string& json, const std::string& key) {
-    const std::string needle = "\"" + key + "\"";
-    auto pos = json.find(needle);
-    if (pos == std::string::npos)
-        return false;
-    pos = json.find(':', pos + needle.size());
-    if (pos == std::string::npos)
-        return false;
-    ++pos;
-    while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t'))
-        ++pos;
-    return json.size() > pos + 3 && json.substr(pos, 4) == "true";
-}
 
 // ---------------------------------------------------------------------------
 // Map a UI param path (e.g. "filter.cutoff_hz") to a PatchDelta with that
@@ -333,10 +278,17 @@ void AgentBridge::handleKnobTweak(const std::string& param, float value) {
 }
 
 void AgentBridge::handleTextMessage(const std::string& json, int clientId) {
-    const std::string type = jsStr(json, "type");
+    const auto parsed = juce::JSON::parse(juce::String(json));
+    const auto* obj = parsed.getDynamicObject();
+    if (!obj)
+        return;
+
+    const std::string type = obj->getProperty("type").toString().toStdString();
 
     if (type == "knob_tweak") {
-        handleKnobTweak(jsStr(json, "param"), jsFloat(json, "value"));
+        const std::string param = obj->getProperty("param").toString().toStdString();
+        const float value       = static_cast<float>(static_cast<double>(obj->getProperty("value")));
+        handleKnobTweak(param, value);
 
     } else if (type == "get_dictionary") {
         if (wsb_)
@@ -350,14 +302,14 @@ void AgentBridge::handleTextMessage(const std::string& json, int clientId) {
             wsb_->sendToClient(clientId, getTelemetryJson());
 
     } else if (type == "set_telemetry_enabled") {
-        setTelemetryEnabled(jsBool(json, "enabled"));
+        setTelemetryEnabled(static_cast<bool>(obj->getProperty("enabled")));
         if (wsb_)
             wsb_->sendToClient(clientId, getTelemetryJson());
 
     } else if (type == "generate") {
         // Issue #85: submit prompt, then send back narrative rationale.
-        const std::string userPrompt = jsStr(json, "prompt");
-        const PatchStruct patch = submitPrompt(userPrompt);
+        const std::string userPrompt = obj->getProperty("prompt").toString().toStdString();
+        const PatchStruct patch      = submitPrompt(userPrompt);
         if (wsb_) {
             const std::string rationale = generateRationale(userPrompt, patch);
             // Escape for JSON
