@@ -113,7 +113,25 @@ void WebSocketBridge::start(int port) {
 void WebSocketBridge::stop() {
     signalThreadShouldExit();
     serverSock_.close(); // unblocks waitForNextConnection()
-    stopThread(2000);
+
+    // Close all client sockets so per-client threads unblock from readFrame().
+    {
+        juce::ScopedLock lock(clientsMutex_);
+        for (auto& e : clients_)
+            e.sock->close();
+    }
+
+    stopThread(2000); // wait for the accept loop to exit
+
+    // Join all client threads — guarantees no thread accesses 'this' after stop() returns.
+    std::vector<std::thread> toJoin;
+    {
+        std::lock_guard<std::mutex> lock(clientThreadsMutex_);
+        toJoin = std::move(clientThreads_);
+    }
+    for (auto& t : toJoin)
+        if (t.joinable())
+            t.join();
 }
 
 // ---------------------------------------------------------------------------
@@ -125,17 +143,19 @@ void WebSocketBridge::run() {
         return;
 
     while (!threadShouldExit()) {
-        juce::StreamingSocket* client = serverSock_.waitForNextConnection();
-        if (!client)
+        juce::StreamingSocket* rawClient = serverSock_.waitForNextConnection();
+        if (!rawClient)
             break;
 
+        auto sharedSock = std::shared_ptr<juce::StreamingSocket>(rawClient);
         int id = nextClientId_.fetch_add(1);
         {
             juce::ScopedLock lock(clientsMutex_);
-            clients_.push_back({id, client});
+            clients_.push_back({id, sharedSock});
         }
 
-        juce::Thread::launch([this, client, id]() { handleClient(client, id); });
+        std::lock_guard<std::mutex> tlock(clientThreadsMutex_);
+        clientThreads_.emplace_back([this, sharedSock, id]() { handleClient(sharedSock, id); });
     }
 }
 
@@ -143,9 +163,7 @@ void WebSocketBridge::run() {
 // Per-client handler
 // ---------------------------------------------------------------------------
 
-void WebSocketBridge::handleClient(juce::StreamingSocket* sockRaw, int id) {
-    std::unique_ptr<juce::StreamingSocket> sock(sockRaw);
-
+void WebSocketBridge::handleClient(std::shared_ptr<juce::StreamingSocket> sock, int id) {
     if (!performHandshake(sock.get())) {
         juce::ScopedLock lock(clientsMutex_);
         clients_.erase(
@@ -268,6 +286,10 @@ bool WebSocketBridge::readFrame(juce::StreamingSocket* sock, uint8_t& opcode, st
             paylen = (paylen << 8) | ext[i];
     }
 
+    // Reject oversized payloads to prevent remote OOM (issue #177).
+    if (paylen > kMaxPayloadBytes)
+        return false;
+
     uint8_t mask[4] = {};
     if (masked && sock->read(mask, 4, true) != 4)
         return false;
@@ -324,14 +346,14 @@ bool WebSocketBridge::writeTextFrame(juce::StreamingSocket* sock, const std::str
 void WebSocketBridge::broadcast(const std::string& json) {
     juce::ScopedLock lock(clientsMutex_);
     for (auto& entry : clients_)
-        writeTextFrame(entry.sock, json);
+        writeTextFrame(entry.sock.get(), json);
 }
 
 void WebSocketBridge::sendToClient(int clientId, const std::string& json) {
     juce::ScopedLock lock(clientsMutex_);
     for (auto& entry : clients_) {
         if (entry.id == clientId) {
-            writeTextFrame(entry.sock, json);
+            writeTextFrame(entry.sock.get(), json);
             break;
         }
     }
