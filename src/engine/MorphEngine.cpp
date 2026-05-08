@@ -55,8 +55,9 @@ std::optional<PatchStruct> MorphEngine::target(int index) const noexcept {
 
 void MorphEngine::setPosition(float pos) noexcept {
     position_ = std::clamp(pos, 0.0f, 1.0f);
-    if (callback_)
-        positionDirty_.store(true, std::memory_order_release);
+    // Always mark dirty without touching callback_ — std::function is not RT-safe.
+    // pollCallback() checks callback_ on the UI thread.
+    positionDirty_.store(true, std::memory_order_release);
 }
 
 bool MorphEngine::pollCallback() noexcept {
