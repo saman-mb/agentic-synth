@@ -4,28 +4,29 @@
 
 #include <atomic>
 #include <functional>
+#include <mutex>
 #include <string>
 
 #include <juce_core/juce_core.h>
 
 namespace agentic_synth::ipc {
 
-// Called on the JUCE message thread when the companion sends a patch JSON.
+// Callback fired on the reader thread when the companion sends a patch JSON.
 using PatchJsonCallback = std::function<void(const std::string& patchJson)>;
 
-// One per plugin instance. Connects to the companion app via a named pipe.
-// The first instance in the DAW process also tries to launch the companion
-// if the pipe server is not yet available.
+// One per plugin instance. Connects to the companion via a Unix domain socket.
+// On first failed connect, schedules tryLaunchCompanion() on the JUCE message
+// thread so fork/exec never happens inside a plugin or audio callback.
 //
 // Thread safety: connectToCompanion() and requestPatch() may be called from
-// any non-audio thread. Callbacks are delivered on the JUCE message thread.
-class PluginIpcClient final : private juce::InterprocessConnection {
+// any non-audio thread. Callbacks are delivered on the reader thread.
+class PluginIpcClient final : private juce::Thread {
 public:
     PluginIpcClient(uint32_t instanceId, PatchJsonCallback onPatch);
     ~PluginIpcClient() override;
 
-    // Try to connect; launches companion when unavailable (async fire-and-forget).
-    // Returns true immediately if the pipe is open after timeoutMs.
+    // Connect to the companion socket; schedules a launch+retry if unavailable.
+    // Returns true immediately if the socket is open after the attempt.
     bool connectToCompanion(int timeoutMs = kConnectTimeoutMs);
 
     // Send an NL prompt to the companion's AgentBridge.
@@ -34,23 +35,25 @@ public:
     [[nodiscard]] bool isActive() const noexcept;
 
 private:
-    // juce::InterprocessConnection overrides
-    void connectionMade() override;
-    void connectionLost() override;
-    void messageReceived(const juce::MemoryBlock& data) override;
+    // Reader thread entry point.
+    void run() override;
 
     void sendMsg(IpcMsgType type, const std::string& payload = {});
 
-    // Returns a process-wide reference count (shared across all instances).
+    // Process-wide instance counter.
     static std::atomic<int>& instanceCount() noexcept;
 
-    // Try to find and launch the companion app binary.
+    // Guards against spawning multiple companion processes in a race.
+    static std::atomic<bool>& launchScheduled() noexcept;
+
+    // Locate and start the companion binary (call only on the message thread).
     static void tryLaunchCompanion();
 
     uint32_t instanceId_;
     PatchJsonCallback onPatch_;
-
-    JUCE_DECLARE_WEAK_REFERENCEABLE(PluginIpcClient)
+    int fd_{-1};
+    std::atomic<bool> connected_{false};
+    std::mutex writeMutex_;
 };
 
 } // namespace agentic_synth::ipc

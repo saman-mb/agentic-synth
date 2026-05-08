@@ -4,7 +4,9 @@
 
 #include <atomic>
 #include <functional>
+#include <memory>
 #include <mutex>
+#include <string>
 #include <vector>
 
 #include <juce_core/juce_core.h>
@@ -13,73 +15,72 @@ namespace agentic_synth::ipc {
 
 using PatchRequestCallback = std::function<void(uint32_t instanceId, const std::string& prompt)>;
 
+class CompanionIpcServer;
+
 // ── CompanionConnection ───────────────────────────────────────────────────────
-// Represents one connected plugin instance from the companion's perspective.
+// One accepted Unix domain socket connection from the companion's perspective.
+// Owns its own reader thread; sends are protected by a mutex for thread safety.
 
-class CompanionIpcServer; // forward
-
-class CompanionConnection final : public juce::InterprocessConnection {
+class CompanionConnection final : private juce::Thread {
 public:
-    CompanionConnection(uint32_t connId, PatchRequestCallback onRequest, CompanionIpcServer& owner);
+    CompanionConnection(int fd, uint32_t connId, PatchRequestCallback onRequest, CompanionIpcServer& owner);
+    ~CompanionConnection() override;
 
-    // Send a PatchUpdate message to this plugin instance.
     void sendPatchUpdate(const std::string& patchJson);
-
-    // Send a Shutdown notice to this plugin instance.
     void sendShutdown();
 
     [[nodiscard]] uint32_t connId() const noexcept { return connId_; }
+    [[nodiscard]] bool isAlive() const noexcept { return connected_.load(std::memory_order_acquire); }
 
 private:
-    void connectionMade() override;
-    void connectionLost() override;
-    void messageReceived(const juce::MemoryBlock&) override;
+    void run() override;
+    bool sendRaw(const void* buf, std::size_t len) noexcept;
+    bool recvAll(void* buf, std::size_t len) noexcept;
 
+    int fd_;
     uint32_t connId_;
     PatchRequestCallback onRequest_;
     CompanionIpcServer& owner_;
+    std::atomic<bool> connected_{true};
+    std::mutex writeMutex_;
 };
 
 // ── CompanionIpcServer ────────────────────────────────────────────────────────
-// Runs inside the companion app process.
-// Listens on localhost:kCompanionPort and accepts any number of plugin instances.
-// Shuts down when requestShutdown() is called or the last client disconnects.
+// Companion-side Unix domain socket server.
+// Binds to ipcSocketPath() and accepts any number of plugin instances.
+// Shuts down when shutdown() is called or the last client disconnects.
 
-class CompanionIpcServer final : public juce::InterprocessConnectionServer {
+class CompanionIpcServer final : private juce::Thread {
 public:
-    // onRequest : called on the JUCE message thread for each PatchRequest.
-    // onEmpty   : called when the last plugin instance disconnects.
     explicit CompanionIpcServer(PatchRequestCallback onRequest, std::function<void()> onEmpty = {});
     ~CompanionIpcServer() override;
 
-    // Bind and begin accepting on kCompanionPort. Returns false on failure.
+    // Create the socket, bind, and listen. Returns false on failure.
     bool start();
 
     // Broadcast a patch JSON payload to every connected plugin instance.
     void broadcastPatchUpdate(const std::string& patchJson);
 
-    // Target one specific plugin instance by instanceId (received via Hello).
+    // Target one specific plugin instance by instanceId.
     void sendPatchUpdate(uint32_t instanceId, const std::string& patchJson);
 
-    // Graceful shutdown: broadcast Shutdown to all clients, then stop.
+    // Graceful shutdown: send Shutdown to all clients, then stop.
     void shutdown();
 
     [[nodiscard]] int connectionCount() const noexcept;
 
-    // Called by CompanionConnection when a client disconnects.
+    // Called by CompanionConnection when its socket closes.
     void onClientDisconnected(uint32_t connId);
 
 private:
-    juce::InterprocessConnection* createConnectionObject() override;
+    void run() override; // accept loop
 
     PatchRequestCallback onRequest_;
     std::function<void()> onEmpty_;
     std::atomic<uint32_t> nextConnId_{1};
     mutable std::mutex connsMutex_;
-    // Raw pointers only — JUCE's InterprocessConnectionServer owns and deletes
-    // these objects via its internal OwnedArray.  Using shared_ptr here would
-    // cause a double-free when JUCE deletes the connection (issue #176).
-    std::vector<CompanionConnection*> conns_;
+    std::vector<std::shared_ptr<CompanionConnection>> conns_;
+    int serverFd_{-1};
 };
 
 } // namespace agentic_synth::ipc
