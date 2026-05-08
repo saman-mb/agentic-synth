@@ -24,11 +24,16 @@ add_library(agentic_synth_engine STATIC
     engine/MorphEngine.cpp
     engine/StyleTransfer.cpp
     engine/PresetExporter.cpp
+    engine/PresetDatabase.cpp
+    engine/PatchStateManager.cpp
+    engine/MultiModalInput.cpp
     agent/AgentBridge.cpp
     agent/SessionMemory.cpp
     agent/PrePatchPipeline.cpp
     agent/StreamParser.cpp
     agent/Telemetry.cpp
+    agent/VariationRecommender.cpp
+    agent/WhisperClient.cpp
 )
 
 target_include_directories(agentic_synth_engine PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
