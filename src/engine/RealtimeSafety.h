@@ -46,16 +46,13 @@ public:
 #define CHECK_REALTIME()                                                                                               \
     REALTIME_ASSERT(isRealtimeContext().load(), "Audio-thread function called outside realtime context")
 
-// Override operator new on the audio thread to trip on allocation
+// Override operator new on the audio thread to trip on allocation.
+// NOTE: Must live in a .cpp file (RealtimeSafety.cpp), NOT in a header,
+// to avoid ODR violations across translation units.
+// Enable by defining REALTIME_STRICT before including this header.
 #if defined(REALTIME_STRICT)
-void* operator new(std::size_t sz) {
-    REALTIME_ASSERT(!isRealtimeContext().load(), "Heap allocation on audio thread!");
-    return std::malloc(sz);
-}
-void operator delete(void* ptr) noexcept {
-    REALTIME_ASSERT(!isRealtimeContext().load(), "Heap deallocation on audio thread!");
-    std::free(ptr);
-}
+void* operator new(std::size_t sz);
+void operator delete(void* ptr) noexcept;
 #endif
 
 // ── Pre-allocated ring buffer for realtime-safe parameter updates ─────
@@ -85,8 +82,8 @@ public:
 
 private:
     T buffer_[Capacity];
-    std::atomic<size_t> readPos_{0};
-    std::atomic<size_t> writePos_{0};
+    alignas(64) std::atomic<size_t> readPos_{0};
+    alignas(64) std::atomic<size_t> writePos_{0};
 };
 
 } // namespace agentic_synth::engine
