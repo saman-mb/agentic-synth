@@ -49,6 +49,8 @@ private:
 
     uint32_t instanceId_;
     PatchJsonCallback onPatch_;
+
+    JUCE_DECLARE_WEAK_REFERENCEABLE(PluginIpcClient)
 };
 
 } // namespace agentic_synth::ipc

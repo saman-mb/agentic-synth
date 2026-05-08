@@ -49,8 +49,13 @@ bool PluginIpcClient::isActive() const noexcept { return isConnected(); }
 void PluginIpcClient::connectionMade() { sendMsg(IpcMsgType::Hello); }
 
 void PluginIpcClient::connectionLost() {
-    // Retry once after a short pause; the companion may be restarting.
-    juce::Timer::callAfterDelay(1000, [this] { connectToCompanion(); });
+    // Retry once after a short pause. Use WeakReference so the callback is
+    // a no-op if PluginIpcClient is destroyed before the timer fires (issue #179).
+    juce::WeakReference<PluginIpcClient> weakThis(this);
+    juce::Timer::callAfterDelay(1000, [weakThis]() mutable {
+        if (auto* self = weakThis.get())
+            self->connectToCompanion();
+    });
 }
 
 void PluginIpcClient::messageReceived(const juce::MemoryBlock& data) {
