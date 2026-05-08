@@ -11,6 +11,7 @@ import {
 import { useSynthBridge } from '../hooks/useSynthBridge';
 import type { ChatMessage, FeedbackKind, PatchVariation, WireIncoming } from '../types/chat';
 import { PatchPreview } from './PatchPreview';
+import { PushToTalk } from './PushToTalk';
 import './ChatInterface.css';
 
 // ---------------------------------------------------------------------------
@@ -137,7 +138,12 @@ function StatusDot({ status }: { status: string }) {
 
 const SESSION_ID = nanoid();
 
-export function ChatInterface() {
+interface ChatInterfaceProps {
+  externalTranscript?: string;
+  onAudio?: (buf: ArrayBuffer) => void;
+}
+
+export function ChatInterface({ externalTranscript, onAudio }: ChatInterfaceProps = {}) {
   const inputId = useId();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -146,6 +152,11 @@ export function ChatInterface() {
   const streamingIdRef = useRef<string | null>(null);
 
   const { status, send, lastMessage } = useSynthBridge();
+
+  // Populate input from external transcript (Whisper STT result)
+  useEffect(() => {
+    if (externalTranscript) setInputValue(externalTranscript);
+  }, [externalTranscript]);
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -325,6 +336,12 @@ export function ChatInterface() {
           disabled={isGenerating}
           rows={2}
         />
+        {onAudio && (
+          <PushToTalk
+            onData={onAudio}
+            wsReady={status === 'open'}
+          />
+        )}
         <button
           type="submit"
           className="send-btn"

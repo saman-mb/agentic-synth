@@ -12,8 +12,8 @@ using namespace agentic_synth::engine;
 // returns the peak output amplitude measured over the final cycle.
 static float measureGain(Filter& filter, float freq, float sampleRate, int cycles = 200) {
     const float omega = 2.0f * static_cast<float>(M_PI) * freq / sampleRate;
-    const int   totalSamples  = static_cast<int>(sampleRate / freq * cycles);
-    const int   measureStart  = static_cast<int>(sampleRate / freq * (cycles - 1));
+    const int totalSamples = static_cast<int>(sampleRate / freq * cycles);
+    const int measureStart = static_cast<int>(sampleRate / freq * (cycles - 1));
     float peak = 0.0f;
     for (int i = 0; i < totalSamples; ++i) {
         float out = filter.process(std::sin(omega * static_cast<float>(i)));
@@ -51,7 +51,7 @@ TEST_CASE("MoogLadder — resonance clamp prevents runaway gain", "[filter][moog
     MoogLadder f;
     f.prepare(44100.0);
     f.setCutoff(1000.0f);
-    f.setResonance(1.0f);  // maximum resonance, should not self-oscillate
+    f.setResonance(1.0f); // maximum resonance, should not self-oscillate
     const float sampleRate = 44100.0f;
     const float omega = 2.0f * static_cast<float>(M_PI) * 1000.0f / sampleRate;
     float maxOut = 0.0f;
@@ -121,9 +121,9 @@ TEST_CASE("SVFilter BP — peak near cutoff, attenuates far bands", "[filter][sv
     SVFilter f(FilterMode::BP);
     f.prepare(44100.0);
     f.setCutoff(1000.0f);
-    f.setResonance(0.5f);  // Q ≈ 1.0 → selective enough for ratio tests
+    f.setResonance(0.5f); // Q ≈ 1.0 → selective enough for ratio tests
     float gainAtCutoff = measureGain(f, 1000.0f, 44100.0f);
-    float gainFarBelow = measureGain(f,   50.0f, 44100.0f);
+    float gainFarBelow = measureGain(f, 50.0f, 44100.0f);
     float gainFarAbove = measureGain(f, 8000.0f, 44100.0f);
     REQUIRE(gainAtCutoff > gainFarBelow * 3.0f);
     REQUIRE(gainAtCutoff > gainFarAbove * 3.0f);
@@ -135,7 +135,7 @@ TEST_CASE("SVFilter Notch — null near cutoff, passes far bands", "[filter][svf
     f.setCutoff(1000.0f);
     f.setResonance(0.5f);
     float gainAtCutoff = measureGain(f, 1000.0f, 44100.0f);
-    float gainFarBelow = measureGain(f,   50.0f, 44100.0f);
+    float gainFarBelow = measureGain(f, 50.0f, 44100.0f);
     REQUIRE(gainAtCutoff < gainFarBelow * 0.5f);
 }
 
@@ -143,7 +143,7 @@ TEST_CASE("SVFilter — resonance clamp prevents self-oscillation", "[filter][sv
     SVFilter f(FilterMode::LP);
     f.prepare(44100.0);
     f.setCutoff(1000.0f);
-    f.setResonance(1.0f);  // maximum resonance
+    f.setResonance(1.0f); // maximum resonance
     const float sampleRate = 44100.0f;
     const float omega = 2.0f * static_cast<float>(M_PI) * 1000.0f / sampleRate;
     float maxOut = 0.0f;

@@ -8,7 +8,7 @@ agentic_synth_configure_target(agentic_synth_mapper)
 
 # ── Engine Library ───────────────────────────────────────────────────────────
 # Core synth engine and agent bridge (shared by app and plugin)
-add_library(agentic_synth_engine
+add_library(agentic_synth_engine STATIC
     engine/SynthEngine.cpp
     engine/ADSREnvelope.cpp
     engine/WavetableOscillator.cpp
@@ -16,8 +16,11 @@ add_library(agentic_synth_engine
     engine/Filter.cpp
     engine/LFO.cpp
     engine/VoiceManager.cpp
+    engine/PatchValidator.cpp
+    engine/VariationEngine.cpp
     agent/AgentBridge.cpp
     agent/SessionMemory.cpp
+    agent/PrePatchPipeline.cpp
 )
 
 target_include_directories(agentic_synth_engine PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -89,10 +92,10 @@ juce_generate_juce_header(AgenticSynth_Plugin)
 
 target_sources(AgenticSynth_Plugin
     PRIVATE
-        PluginProcessor.cpp
-        PluginProcessor.h
-        PluginEditor.cpp
-        PluginEditor.h
+        plugin/AgenticSynthPlugin.cpp
+        plugin/AgenticSynthPlugin.h
+        plugin/PluginEditor.cpp
+        plugin/PluginEditor.h
 )
 
 target_compile_definitions(AgenticSynth_Plugin

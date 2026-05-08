@@ -26,6 +26,12 @@ add_executable(agentic_synth_tests
     SessionMemoryTest.cpp
     ../src/agent/SessionMemory.cpp
     ../src/agent/AgentBridge.cpp
+    PatchValidatorTest.cpp
+    ../src/engine/PatchValidator.cpp
+    PrePatchTest.cpp
+    ../src/agent/PrePatchPipeline.cpp
+    VariationEngineTest.cpp
+    ../src/engine/VariationEngine.cpp
 )
 target_include_directories(agentic_synth_tests PRIVATE ../src)
 target_link_libraries(agentic_synth_tests PRIVATE Catch2::Catch2WithMain)

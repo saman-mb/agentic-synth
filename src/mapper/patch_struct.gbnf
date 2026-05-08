@@ -1,0 +1,86 @@
+# GBNF grammar for agentic-synth PatchStruct JSON.
+# Constrains llama.cpp grammar-sampled output to structurally valid patch JSON.
+# Field order is fixed to simplify deterministic parsing in GrammarSampler.cpp.
+
+root ::= patch-object
+
+ws ::= ([ \t\n\r])*
+
+number ::= "-"? ([0-9]+ ("." [0-9]*)? | "." [0-9]+) ([eE] [-+]? [0-9]+)?
+uint   ::= [0-9]+
+bool   ::= "true" | "false"
+
+osc-type     ::= "\"Sine\"" | "\"Triangle\"" | "\"Sawtooth\"" | "\"Square\"" | "\"Pulse\"" | "\"Wavetable\"" | "\"FM\"" | "\"Noise\""
+filter-type  ::= "\"LowPass\"" | "\"HighPass\"" | "\"BandPass\"" | "\"Notch\"" | "\"Peak\""
+lfo-waveform ::= "\"Sine\"" | "\"Triangle\"" | "\"Sawtooth\"" | "\"Square\"" | "\"SampleAndHold\""
+lfo-target   ::= "\"None\"" | "\"Pitch\"" | "\"FilterCutoff\"" | "\"Amplitude\"" | "\"Pan\"" | "\"WavetablePos\"" | "\"FmRatio\""
+
+osc-params ::= "{"
+  ws "\"type\""           ws ":" ws osc-type ws ","
+  ws "\"semitone_offset\"" ws ":" ws number  ws ","
+  ws "\"detune_cents\""   ws ":" ws number   ws ","
+  ws "\"wavetable_pos\""  ws ":" ws number   ws ","
+  ws "\"fm_ratio\""       ws ":" ws number   ws ","
+  ws "\"fm_depth\""       ws ":" ws number   ws ","
+  ws "\"volume\""         ws ":" ws number   ws ","
+  ws "\"pan\""            ws ":" ws number   ws ","
+  ws "\"pulse_width\""    ws ":" ws number   ws ","
+  ws "\"enabled\""        ws ":" ws bool
+  ws "}"
+
+filter-params ::= "{"
+  ws "\"type\""      ws ":" ws filter-type ws ","
+  ws "\"cutoff_hz\"" ws ":" ws number      ws ","
+  ws "\"resonance\"" ws ":" ws number      ws ","
+  ws "\"env_mod\""   ws ":" ws number      ws ","
+  ws "\"key_track\"" ws ":" ws number      ws ","
+  ws "\"drive\""     ws ":" ws number
+  ws "}"
+
+env-params ::= "{"
+  ws "\"attack_s\""  ws ":" ws number ws ","
+  ws "\"decay_s\""   ws ":" ws number ws ","
+  ws "\"sustain\""   ws ":" ws number ws ","
+  ws "\"release_s\"" ws ":" ws number
+  ws "}"
+
+lfo-params ::= "{"
+  ws "\"waveform\""     ws ":" ws lfo-waveform ws ","
+  ws "\"target\""       ws ":" ws lfo-target   ws ","
+  ws "\"rate_hz\""      ws ":" ws number       ws ","
+  ws "\"depth\""        ws ":" ws number       ws ","
+  ws "\"phase_offset\"" ws ":" ws number       ws ","
+  ws "\"bpm_sync\""     ws ":" ws bool
+  ws "}"
+
+reverb-params ::= "{"
+  ws "\"size\""    ws ":" ws number ws ","
+  ws "\"damping\"" ws ":" ws number ws ","
+  ws "\"width\""   ws ":" ws number ws ","
+  ws "\"mix\""     ws ":" ws number
+  ws "}"
+
+delay-params ::= "{"
+  ws "\"time_s\""   ws ":" ws number ws ","
+  ws "\"feedback\"" ws ":" ws number ws ","
+  ws "\"mix\""      ws ":" ws number ws ","
+  ws "\"bpm_sync\"" ws ":" ws bool
+  ws "}"
+
+osc-array ::= "[" ws osc-params ws "," ws osc-params ws "," ws osc-params ws "]"
+lfo-array ::= "[" ws lfo-params ws "," ws lfo-params ws "]"
+
+patch-object ::= "{"
+  ws "\"version\""      ws ":" ws uint          ws ","
+  ws "\"patch_id\""     ws ":" ws uint          ws ","
+  ws "\"osc\""          ws ":" ws osc-array     ws ","
+  ws "\"filter\""       ws ":" ws filter-params ws ","
+  ws "\"filter_env\""   ws ":" ws env-params    ws ","
+  ws "\"amp_env\""      ws ":" ws env-params    ws ","
+  ws "\"lfo\""          ws ":" ws lfo-array     ws ","
+  ws "\"reverb\""       ws ":" ws reverb-params ws ","
+  ws "\"delay\""        ws ":" ws delay-params  ws ","
+  ws "\"master_gain\""  ws ":" ws number        ws ","
+  ws "\"portamento_s\"" ws ":" ws number        ws ","
+  ws "\"voice_count\""  ws ":" ws uint
+  ws "}"
