@@ -1,5 +1,6 @@
 #pragma once
 
+#include <cstdlib>
 #include <cstdint>
 #include <string>
 
@@ -14,9 +15,21 @@ constexpr const char* kPipeName = "AgenticSynthIPC";
 // Connection timeout used by both sides.
 constexpr int kConnectTimeoutMs = 2000;
 
-// Localhost TCP port shared by all plugin instances and the companion.
-// Chosen in the IANA dynamic/private range.
+// Retained for Windows fallback only. On Linux/macOS the Unix socket path is
+// preferred (see ipcSocketPath() below).
 constexpr int kCompanionPort = 49123;
+
+#if !defined(_WIN32)
+// Unix domain socket path scoped to the current user.
+// On Linux uses $XDG_RUNTIME_DIR (systemd-managed, auto-cleaned on logout).
+// Falls back to /tmp on macOS and other POSIX systems.
+#include <unistd.h>
+inline std::string ipcSocketPath() noexcept {
+    const char* r = std::getenv("XDG_RUNTIME_DIR");
+    std::string base = (r && *r) ? r : "/tmp";
+    return base + "/" + kPipeName + "-" + std::to_string(static_cast<unsigned>(::getuid())) + ".sock";
+}
+#endif
 
 // ── Message types ─────────────────────────────────────────────────────────────
 
