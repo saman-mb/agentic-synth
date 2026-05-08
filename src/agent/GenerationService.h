@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <functional>
 #include <string>
 
@@ -20,7 +21,7 @@ public:
     void stop();
 
     // Check if running
-    bool isRunning() const { return running_; }
+    bool isRunning() const { return running_.load(std::memory_order_relaxed); }
 
     // Request types
     struct GenerateRequest {
@@ -48,7 +49,7 @@ public:
     Response refine(const RefineRequest& req);
 
 private:
-    bool running_ = false;
+    std::atomic<bool> running_{false};
     int port_ = 50051;
     void* serverThread_ = nullptr; // pthread handle
 
