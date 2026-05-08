@@ -10,12 +10,12 @@ juce::String PatchStateManager::saveToXml(const PatchStruct& patch) {
     return xml->toString();
 }
 
-PatchStruct PatchStateManager::loadFromXml(const juce::String& xml) {
-    auto xml = juce::XmlDocument::parse(xml);
-    if (xml == nullptr)
+PatchStruct PatchStateManager::loadFromXml(const juce::String& xmlStr) {
+    auto xmlDoc = juce::XmlDocument::parse(xmlStr);
+    if (xmlDoc == nullptr)
         return PatchStruct{};
 
-    auto tree = juce::ValueTree::fromXml(*xml);
+    auto tree = juce::ValueTree::fromXml(*xmlDoc);
     return fromValueTree(tree);
 }
 
@@ -25,11 +25,11 @@ bool PatchStateManager::saveToFile(const juce::File& file, const PatchStruct& pa
 }
 
 PatchStruct PatchStateManager::loadFromFile(const juce::File& file) {
-    auto xml = juce::XmlDocument::parse(file);
-    if (xml == nullptr)
+    auto xmlDoc = juce::XmlDocument::parse(file);
+    if (xmlDoc == nullptr)
         return PatchStruct{};
 
-    auto tree = juce::ValueTree::fromXml(*xml);
+    auto tree = juce::ValueTree::fromXml(*xmlDoc);
     return fromValueTree(tree);
 }
 
@@ -37,22 +37,20 @@ juce::ValueTree PatchStateManager::toValueTree(const PatchStruct& patch) {
     juce::ValueTree tree(kTreeType);
     tree.setProperty("version", kCurrentVersion, nullptr);
 
-    // Store each field as a named property
-    tree.setProperty("filterCutoffHz", patch.filterCutoffHz, nullptr);
-    tree.setProperty("filterResonance", patch.filterResonance, nullptr);
-    tree.setProperty("ampAttackMs", patch.ampAttackMs, nullptr);
-    tree.setProperty("ampDecayMs", patch.ampDecayMs, nullptr);
-    tree.setProperty("ampSustainLevel", patch.ampSustainLevel, nullptr);
-    tree.setProperty("ampReleaseMs", patch.ampReleaseMs, nullptr);
-    tree.setProperty("lfoRateHz", patch.lfoRateHz, nullptr);
-    tree.setProperty("lfoDepth", patch.lfoDepth, nullptr);
-    tree.setProperty("lfoShape", static_cast<int>(patch.lfoShape), nullptr);
+    tree.setProperty("filter_cutoff_hz", patch.filter.cutoff_hz, nullptr);
+    tree.setProperty("filter_resonance", patch.filter.resonance, nullptr);
+    tree.setProperty("amp_attack_s", patch.amp_env.attack_s, nullptr);
+    tree.setProperty("amp_decay_s", patch.amp_env.decay_s, nullptr);
+    tree.setProperty("amp_sustain", patch.amp_env.sustain, nullptr);
+    tree.setProperty("amp_release_s", patch.amp_env.release_s, nullptr);
+    tree.setProperty("lfo0_rate_hz", patch.lfo[0].rate_hz, nullptr);
+    tree.setProperty("lfo0_depth", patch.lfo[0].depth, nullptr);
+    tree.setProperty("lfo0_waveform", static_cast<int>(patch.lfo[0].waveform), nullptr);
 
-    // Oscillator mix as array
-    juce::Array<juce::var> oscMix;
-    for (int i = 0; i < 5; ++i)
-        oscMix.add(patch.oscillatorMix[i]);
-    tree.setProperty("oscillatorMix", oscMix, nullptr);
+    juce::Array<juce::var> oscVolumes;
+    for (int i = 0; i < kMaxOscillators; ++i)
+        oscVolumes.add(patch.osc[i].volume);
+    tree.setProperty("osc_volumes", oscVolumes, nullptr);
 
     return tree;
 }
@@ -62,21 +60,20 @@ PatchStruct PatchStateManager::fromValueTree(const juce::ValueTree& tree) {
         return PatchStruct{};
 
     PatchStruct patch{};
-    patch.filterCutoffHz = tree.getProperty("filterCutoffHz", 500.0f);
-    patch.filterResonance = tree.getProperty("filterResonance", 0.0f);
-    patch.ampAttackMs = tree.getProperty("ampAttackMs", 10.0f);
-    patch.ampDecayMs = tree.getProperty("ampDecayMs", 100.0f);
-    patch.ampSustainLevel = tree.getProperty("ampSustainLevel", 1.0f);
-    patch.ampReleaseMs = tree.getProperty("ampReleaseMs", 500.0f);
-    patch.lfoRateHz = tree.getProperty("lfoRateHz", 5.0f);
-    patch.lfoDepth = tree.getProperty("lfoDepth", 0.0f);
-    patch.lfoShape = static_cast<decltype(patch.lfoShape)>(static_cast<int>(tree.getProperty("lfoShape", 0)));
+    patch.filter.cutoff_hz  = tree.getProperty("filter_cutoff_hz", 500.0f);
+    patch.filter.resonance  = tree.getProperty("filter_resonance", 0.0f);
+    patch.amp_env.attack_s  = tree.getProperty("amp_attack_s", 0.005f);
+    patch.amp_env.decay_s   = tree.getProperty("amp_decay_s", 0.1f);
+    patch.amp_env.sustain   = tree.getProperty("amp_sustain", 1.0f);
+    patch.amp_env.release_s = tree.getProperty("amp_release_s", 0.1f);
+    patch.lfo[0].rate_hz    = tree.getProperty("lfo0_rate_hz", 1.0f);
+    patch.lfo[0].depth      = tree.getProperty("lfo0_depth", 0.0f);
+    patch.lfo[0].waveform   = static_cast<LfoWaveform>(static_cast<int>(tree.getProperty("lfo0_waveform", 0)));
 
-    auto oscMix = tree.getProperty("oscillatorMix", juce::Array<juce::var>());
-    if (auto* arr = oscMix.getArray()) {
-        for (int i = 0; i < std::min(arr->size(), 5); ++i) {
-            patch.oscillatorMix[i] = static_cast<float>((*arr)[i]);
-        }
+    auto oscVolumes = tree.getProperty("osc_volumes", juce::Array<juce::var>());
+    if (auto* arr = oscVolumes.getArray()) {
+        for (int i = 0; i < std::min(arr->size(), kMaxOscillators); ++i)
+            patch.osc[i].volume = static_cast<float>((*arr)[i]);
     }
 
     return patch;
