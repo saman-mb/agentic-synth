@@ -32,6 +32,11 @@ public:
     // Generate 5 variations concurrently using all three strategies.
     // Draws 2 from temperature, 2 from perturbation, 1 from morph.
     [[nodiscard]] std::array<PatchStruct, kVariationCount> generateVariations(const PatchStruct& base) const;
+
+    // Same as generateVariations but uses a caller-supplied perturbation seed
+    // for reproducible variation sets (useful for session replay and A/B testing).
+    [[nodiscard]] std::array<PatchStruct, kVariationCount>
+    generateVariationsWithSeed(const PatchStruct& base, uint32_t perturbSeed) const;
 };
 
 } // namespace agentic_synth::engine

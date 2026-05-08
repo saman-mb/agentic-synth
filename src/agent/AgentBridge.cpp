@@ -50,6 +50,11 @@ AgentBridge::generateVariations(const PatchStruct& base) const {
     return variationEngine_.generateVariations(base);
 }
 
+std::array<PatchStruct, engine::VariationEngine::kVariationCount>
+AgentBridge::generateVariationsWithSeed(const PatchStruct& base, uint32_t perturbSeed) const {
+    return variationEngine_.generateVariationsWithSeed(base, perturbSeed);
+}
+
 void AgentBridge::recordFeedback(FeedbackKind kind, const std::string& prompt, const PatchStruct& patch) {
     memory_.recordFeedback(kind, prompt, patch);
 }

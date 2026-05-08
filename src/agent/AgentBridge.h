@@ -36,6 +36,10 @@ public:
     [[nodiscard]] std::array<PatchStruct, engine::VariationEngine::kVariationCount>
     generateVariations(const PatchStruct& base) const;
 
+    // Reproducible variation set via explicit perturbation seed.
+    [[nodiscard]] std::array<PatchStruct, engine::VariationEngine::kVariationCount>
+    generateVariationsWithSeed(const PatchStruct& base, uint32_t perturbSeed) const;
+
     // Session memory: record user feedback and build LLM context.
     void recordFeedback(FeedbackKind kind, const std::string& prompt, const PatchStruct& patch);
     [[nodiscard]] std::string buildSystemPrompt(const std::string& userPrompt) const;

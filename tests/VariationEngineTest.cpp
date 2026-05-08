@@ -137,3 +137,39 @@ TEST_CASE("generateVariations: all patches have valid (finite) parameters") {
         CHECK(v.filter.cutoff_hz <= 18000.0f);
     }
 }
+
+TEST_CASE("generateVariationsWithSeed: same seed yields identical results") {
+    VariationEngine eng;
+    const auto base = make_default_patch();
+    const auto v1 = eng.generateVariationsWithSeed(base, 123);
+    const auto v2 = eng.generateVariationsWithSeed(base, 123);
+    for (int i = 0; i < VariationEngine::kVariationCount; ++i) {
+        CHECK(v1[i].filter.cutoff_hz == Catch::Approx(v2[i].filter.cutoff_hz));
+        CHECK(v1[i].reverb.mix       == Catch::Approx(v2[i].reverb.mix));
+        CHECK(v1[i].amp_env.attack_s == Catch::Approx(v2[i].amp_env.attack_s));
+        CHECK(v1[i].master_gain      == Catch::Approx(v2[i].master_gain));
+    }
+}
+
+TEST_CASE("generateVariationsWithSeed: different seeds produce different perturbations") {
+    VariationEngine eng;
+    const auto base = make_default_patch();
+    const auto v1 = eng.generateVariationsWithSeed(base, 42);
+    const auto v2 = eng.generateVariationsWithSeed(base, 9999);
+    // Perturbation slots are indices 2 and 3; at least one must differ.
+    bool anyDiff = (v1[2].filter.cutoff_hz != v2[2].filter.cutoff_hz) ||
+                   (v1[3].reverb.mix       != v2[3].reverb.mix);
+    CHECK(anyDiff);
+}
+
+TEST_CASE("generateVariationsWithSeed: all 5 variations are valid") {
+    VariationEngine eng;
+    const auto base = make_default_patch();
+    const auto vars = eng.generateVariationsWithSeed(base, 777);
+    for (const auto& v : vars) {
+        CHECK(std::isfinite(v.filter.cutoff_hz));
+        CHECK(std::isfinite(v.master_gain));
+        CHECK(v.filter.cutoff_hz >= 20.0f);
+        CHECK(v.filter.cutoff_hz <= 18000.0f);
+    }
+}
