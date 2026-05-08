@@ -16,8 +16,7 @@ struct Rule {
 
 std::string to_lower(const std::string& s) {
     std::string out = s;
-    std::transform(out.begin(), out.end(), out.begin(),
-                   [](unsigned char c) { return std::tolower(c); });
+    std::transform(out.begin(), out.end(), out.begin(), [](unsigned char c) { return std::tolower(c); });
     return out;
 }
 
@@ -26,10 +25,11 @@ bool has_word(const std::string& text, const char* word) {
     const std::string w(word);
     std::size_t pos = text.find(w);
     while (pos != std::string::npos) {
-        bool left_ok  = (pos == 0) || !std::isalpha(static_cast<unsigned char>(text[pos - 1]));
-        bool right_ok = (pos + w.size() == text.size()) ||
-                        !std::isalpha(static_cast<unsigned char>(text[pos + w.size()]));
-        if (left_ok && right_ok) return true;
+        bool left_ok = (pos == 0) || !std::isalpha(static_cast<unsigned char>(text[pos - 1]));
+        bool right_ok =
+            (pos + w.size() == text.size()) || !std::isalpha(static_cast<unsigned char>(text[pos + w.size()]));
+        if (left_ok && right_ok)
+            return true;
         pos = text.find(w, pos + 1);
     }
     return false;
@@ -335,10 +335,10 @@ const std::vector<Rule>& get_rules() {
 }
 // clang-format on
 
-}  // namespace
+} // namespace
 
 PatchStruct HeuristicParser::parse(const std::string& prompt) const {
-    PatchStruct patch  = make_default_patch();
+    PatchStruct patch = make_default_patch();
     const std::string lower = to_lower(prompt);
     for (const auto& rule : get_rules()) {
         if (has_word(lower, rule.keyword)) {
@@ -348,4 +348,4 @@ PatchStruct HeuristicParser::parse(const std::string& prompt) const {
     return patch;
 }
 
-}  // namespace agentsynth
+} // namespace agentsynth

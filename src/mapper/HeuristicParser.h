@@ -16,4 +16,4 @@ public:
     [[nodiscard]] PatchStruct parse(const std::string& prompt) const;
 };
 
-}  // namespace agentsynth
+} // namespace agentsynth
