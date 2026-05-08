@@ -1,7 +1,6 @@
 #include "engine/VariationEngine.h"
 
 #include <algorithm>
-#include <future>
 
 namespace agentic_synth::engine {
 
@@ -152,14 +151,11 @@ std::array<PatchStruct, VariationEngine::kVariationCount>
 VariationEngine::generateVariations(const PatchStruct& base) const {
     const PatchStruct morphTarget = makeHotPatch(make_default_patch());
 
-    // Launch all three strategies concurrently.
-    auto futTemp = std::async(std::launch::async, [&] { return temperatureSweep(base); });
-    auto futPert = std::async(std::launch::async, [&] { return perturbation(base); });
-    auto futMorph = std::async(std::launch::async, [&] { return morph(base, morphTarget); });
-
-    const auto temps = futTemp.get();
-    const auto perts = futPert.get();
-    const auto morphs = futMorph.get();
+    // Run synchronously — std::async would spawn threads from any calling context
+    // (including the audio thread) and involves heap allocation.
+    const auto temps = temperatureSweep(base);
+    const auto perts = perturbation(base);
+    const auto morphs = morph(base, morphTarget);
 
     // 2 from temperature (moderate + strong), 2 from perturbation (different seeds),
     // 1 from morph (midpoint).
@@ -176,13 +172,9 @@ std::array<PatchStruct, VariationEngine::kVariationCount>
 VariationEngine::generateVariationsWithSeed(const PatchStruct& base, uint32_t perturbSeed) const {
     const PatchStruct morphTarget = makeHotPatch(make_default_patch());
 
-    auto futTemp = std::async(std::launch::async, [&] { return temperatureSweep(base); });
-    auto futPert = std::async(std::launch::async, [&] { return perturbation(base, perturbSeed); });
-    auto futMorph = std::async(std::launch::async, [&] { return morph(base, morphTarget); });
-
-    const auto temps = futTemp.get();
-    const auto perts = futPert.get();
-    const auto morphs = futMorph.get();
+    const auto temps = temperatureSweep(base);
+    const auto perts = perturbation(base, perturbSeed);
+    const auto morphs = morph(base, morphTarget);
 
     std::array<PatchStruct, kVariationCount> result;
     result[0] = temps[1];
