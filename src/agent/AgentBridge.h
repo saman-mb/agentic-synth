@@ -8,6 +8,7 @@
 #include "agent/SessionMemory.h"
 #include "engine/PatchStruct.h"
 #include "engine/VariationEngine.h"
+#include "mapper/GrammarSampler.h"
 
 namespace agentic_synth::agent {
 
@@ -36,10 +37,17 @@ public:
     [[nodiscard]] PatchVector getParameterBias(const std::string& userPrompt) const;
     [[nodiscard]] const SessionMemory& sessionMemory() const noexcept { return memory_; }
 
+    // Issue #64: grammar-constrained LLM patch generation.
+    // Calls GrammarSampler, validates the result, then drives refinePatch().
+    // Returns nullopt when the server is unreachable or returns invalid JSON.
+    [[nodiscard]] std::optional<PatchStruct> generateLlmPatch(const std::string& prompt,
+                                                               uint32_t patch_id = 0);
+
 private:
     PrePatchPipeline pipeline_;
     engine::VariationEngine variationEngine_;
     SessionMemory memory_;
+    mapper::GrammarSampler sampler_;
 };
 
 } // namespace agentic_synth::agent

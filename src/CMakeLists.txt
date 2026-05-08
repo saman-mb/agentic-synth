@@ -2,6 +2,7 @@
 # Pure C++ keyword → PatchStruct mapping; no JUCE dependency
 add_library(agentic_synth_mapper STATIC
     mapper/HeuristicParser.cpp
+    mapper/GrammarSampler.cpp
 )
 target_include_directories(agentic_synth_mapper PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 agentic_synth_configure_target(agentic_synth_mapper)

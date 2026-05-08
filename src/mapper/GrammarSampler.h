@@ -34,6 +34,9 @@ public:
     // Pure function — no network calls. Used for unit tests and offline validation.
     [[nodiscard]] static std::optional<PatchStruct> parse_patch_json(const std::string& json_text);
 
+    // The synth-domain system prompt text loaded at construction.
+    [[nodiscard]] const std::string& systemPrompt() const noexcept { return cfg_.system_prompt; }
+
 private:
     GrammarSamplerConfig cfg_;
     std::string grammar_text_;   // content of the .gbnf file
