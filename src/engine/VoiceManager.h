@@ -3,6 +3,7 @@
 #include "engine/ADSREnvelope.h"
 #include "engine/Filter.h"
 #include "engine/LFO.h"
+#include "engine/PatchValidator.h"
 #include "engine/VAOscillator.h"
 #include "engine/WavetableOscillator.h"
 
@@ -27,6 +28,7 @@ struct Voice {
     std::unique_ptr<Filter> filter; // MoogLadder by default
     ADSREnvelope ampEnv;
     std::array<LFO, 2> lfos;
+    DcBlocker dcBlocker;
 
     [[nodiscard]] bool isActive() const noexcept { return ampEnv.isActive(); }
     void prepare(double sampleRate);

@@ -16,6 +16,7 @@ void Voice::prepare(double sampleRate) {
     ampEnv.setSampleRate(sampleRate);
     for (auto& lfo : lfos)
         lfo.setSampleRate(sampleRate);
+    dcBlocker.prepare(static_cast<float>(sampleRate));
 }
 
 float Voice::render(float portamentoAlpha) noexcept {
@@ -29,7 +30,7 @@ float Voice::render(float portamentoAlpha) noexcept {
     float sample = wavetableOsc.processSample() + vaOsc.processSample();
     if (filter)
         sample = filter->process(sample);
-    return sample * ampEnv.process();
+    return dcBlocker.process(sample * ampEnv.process());
 }
 
 // ── VoiceManager ──────────────────────────────────────────────────────────────

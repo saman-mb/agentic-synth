@@ -217,3 +217,46 @@ TEST_CASE("validate_patch: version field always set to kPatchStructVersion") {
         REQUIRE(v.version == kPatchStructVersion);
     }
 }
+
+// ── DcBlocker ─────────────────────────────────────────────────────────────────
+
+TEST_CASE("DcBlocker: DC input attenuates to near zero at steady state") {
+    DcBlocker blocker;
+    blocker.prepare(44100.0f);
+    float out = 1.0f;
+    for (int i = 0; i < 20000; ++i)
+        out = blocker.process(1.0f);
+    REQUIRE(std::abs(out) < 0.01f);
+}
+
+TEST_CASE("DcBlocker: high-frequency signal passes with minimal attenuation") {
+    DcBlocker blocker;
+    blocker.prepare(44100.0f);
+    float sumSq = 0.0f;
+    for (int i = 0; i < 1000; ++i) {
+        const float s = std::sin(2.0f * 3.14159265f * 1000.0f * static_cast<float>(i) / 44100.0f);
+        const float o = blocker.process(s);
+        sumSq += o * o;
+    }
+    const float rms = std::sqrt(sumSq / 1000.0f);
+    REQUIRE(rms > 0.4f);
+}
+
+TEST_CASE("DcBlocker: reset clears filter state") {
+    DcBlocker blocker;
+    blocker.prepare(44100.0f);
+    for (int i = 0; i < 100; ++i)
+        blocker.process(0.5f);
+    blocker.reset();
+    REQUIRE(blocker.process(0.0f) == Catch::Approx(0.0f));
+}
+
+TEST_CASE("DcBlocker: prepare resets history") {
+    DcBlocker blocker;
+    blocker.prepare(44100.0f);
+    for (int i = 0; i < 100; ++i)
+        blocker.process(1.0f);
+    blocker.prepare(44100.0f);
+    // First output after prepare must equal 1 - 0 + R*0 = 1
+    REQUIRE(blocker.process(1.0f) == Catch::Approx(1.0f));
+}
