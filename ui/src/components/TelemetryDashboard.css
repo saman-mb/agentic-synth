@@ -1,0 +1,210 @@
+.tel-dash {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  padding: 0.75rem;
+  height: 100%;
+  overflow-y: auto;
+}
+
+.tel-header {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.tel-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #91e8ff;
+}
+
+.tel-toggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  user-select: none;
+}
+
+.tel-toggle input { display: none; }
+
+.tel-toggle-track {
+  width: 2rem;
+  height: 1rem;
+  border-radius: 0.5rem;
+  background: rgb(255 255 255 / 12%);
+  position: relative;
+  transition: background 0.2s;
+}
+
+.tel-toggle input:checked + .tel-toggle-track {
+  background: rgb(123 92 255 / 60%);
+}
+
+.tel-toggle-thumb {
+  position: absolute;
+  top: 0.1rem;
+  left: 0.1rem;
+  width: 0.8rem;
+  height: 0.8rem;
+  border-radius: 50%;
+  background: #f4f0ff;
+  transition: transform 0.2s;
+}
+
+.tel-toggle input:checked ~ .tel-toggle-track .tel-toggle-thumb {
+  transform: translateX(1rem);
+}
+
+.tel-toggle-label {
+  font-size: 0.68rem;
+  color: #9080bb;
+}
+
+.tel-btn {
+  padding: 0.25rem 0.5rem;
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 0.4rem;
+  background: transparent;
+  color: #b8a8ff;
+  font-size: 0.72rem;
+  cursor: pointer;
+  font-family: inherit;
+  margin-left: auto;
+}
+
+.tel-btn:hover {
+  background: rgb(255 255 255 / 6%);
+}
+
+.tel-disabled-notice {
+  font-size: 0.7rem;
+  color: #6a5fa0;
+  line-height: 1.5;
+  padding: 0.75rem;
+  border: 1px solid rgb(255 255 255 / 6%);
+  border-radius: 0.5rem;
+  background: rgb(255 255 255 / 2%);
+}
+
+.tel-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 0.4rem;
+}
+
+.tel-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0.5rem;
+  border: 1px solid rgb(255 255 255 / 7%);
+  border-radius: 0.5rem;
+  background: rgb(255 255 255 / 2%);
+}
+
+.tel-stat-val {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #c8b8ff;
+  font-variant-numeric: tabular-nums;
+}
+
+.tel-stat-label {
+  font-size: 0.58rem;
+  color: #6a5fa0;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  margin-top: 0.15rem;
+}
+
+.tel-section-title {
+  font-size: 0.6rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #6a5fa0;
+}
+
+.tel-bars {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.tel-bar-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.tel-bar-label {
+  font-size: 0.62rem;
+  color: #9080bb;
+  width: 2rem;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.tel-bar-track {
+  flex: 1;
+  height: 0.4rem;
+  background: rgb(255 255 255 / 8%);
+  border-radius: 0.2rem;
+  overflow: hidden;
+}
+
+.tel-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #7b5cff, #91e8ff);
+  border-radius: 0.2rem;
+  transition: width 0.4s ease-out;
+}
+
+.tel-bar-val {
+  font-size: 0.62rem;
+  color: #c8b8ff;
+  font-variant-numeric: tabular-nums;
+  min-width: 3.5rem;
+  text-align: right;
+}
+
+.tel-records {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.tel-record {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.2rem 0.4rem;
+  border-radius: 0.3rem;
+  background: rgb(255 255 255 / 2%);
+  font-size: 0.65rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.tel-record-err {
+  background: rgb(255 80 80 / 8%);
+}
+
+.tel-record-status { color: #7be0b8; }
+.tel-record-err .tel-record-status { color: #ff8080; }
+
+.tel-record-lat   { color: #c8b8ff; min-width: 3.5rem; }
+.tel-record-tok   { color: #91e8ff; min-width: 3rem; }
+.tel-record-tps   { color: #9080bb; flex: 1; }
+.tel-record-errmsg { color: #ff8080; font-size: 0.6rem; }
+
+.tel-empty {
+  font-size: 0.68rem;
+  color: #6a5fa0;
+  text-align: center;
+  padding: 1rem;
+}

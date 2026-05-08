@@ -3,6 +3,7 @@
 
 #include <fstream>
 #include <sstream>
+#include <iomanip>
 
 namespace agentic_synth::agent {
 
@@ -238,6 +239,25 @@ void AgentBridge::handleTextMessage(const std::string& json, int clientId) {
     } else if (type == "set_telemetry_enabled") {
         setTelemetryEnabled(jsBool(json, "enabled"));
         if (wsb_) wsb_->sendToClient(clientId, getTelemetryJson());
+
+    } else if (type == "generate") {
+        // Issue #85: submit prompt, then send back narrative rationale.
+        const std::string userPrompt = jsStr(json, "prompt");
+        const PatchStruct patch = submitPrompt(userPrompt);
+        if (wsb_) {
+            const std::string rationale = generateRationale(userPrompt, patch);
+            // Escape for JSON
+            std::string escaped;
+            escaped.reserve(rationale.size());
+            for (char c : rationale) {
+                if (c == '"')       escaped += "\\\"";
+                else if (c == '\\') escaped += "\\\\";
+                else if (c == '\n') escaped += "\\n";
+                else                escaped += c;
+            }
+            const std::string msg = "{\"type\":\"rationale\",\"text\":\"" + escaped + "\"}";
+            wsb_->sendToClient(clientId, msg);
+        }
     }
 }
 
@@ -264,6 +284,79 @@ std::string AgentBridge::getTelemetryJson() const {
 void AgentBridge::setTelemetryEnabled(bool on) {
     telemetry_.setEnabled(on);
     if (!on) telemetry_.flush(); // flush remaining records when disabling
+}
+
+// ── Issue #85: Session-aware narrative generation ────────────────────────────
+
+std::string AgentBridge::generateRationale(const std::string& prompt,
+                                            const PatchStruct& patch) const {
+    std::ostringstream oss;
+
+    // Describe oscillator character.
+    static const char* kOscNames[] = {
+        "sine", "triangle", "sawtooth", "square", "pulse", "wavetable", "FM", "noise"
+    };
+    const int oscIdx = static_cast<int>(patch.osc[0].type);
+    const char* oscName = (oscIdx >= 0 && oscIdx < 8) ? kOscNames[oscIdx] : "sawtooth";
+
+    oss << "I chose a " << oscName << " oscillator";
+
+    // Filter character.
+    if (patch.filter.cutoff_hz < 500.0f)
+        oss << " with a closed filter for a dark, sub-heavy character";
+    else if (patch.filter.cutoff_hz < 4000.0f)
+        oss << " with a mid-range filter for warmth and presence";
+    else
+        oss << " with an open filter for brightness and clarity";
+
+    if (patch.filter.resonance > 0.6f)
+        oss << ", pushing the resonance for an acidic edge";
+    else if (patch.filter.resonance > 0.3f)
+        oss << " with moderate resonance for character";
+
+    // Amplitude envelope.
+    if (patch.amp_env.attack_s > 0.5f)
+        oss << ". The slow attack lets the sound bloom gradually";
+    else if (patch.amp_env.attack_s < 0.01f)
+        oss << ". The instant attack gives it punch and immediacy";
+
+    if (patch.amp_env.release_s > 1.5f)
+        oss << " with a long release tail";
+
+    // Modulation / movement.
+    if (patch.lfo[0].depth > 0.3f) {
+        const char* lfoTarget =
+            (patch.lfo[0].target == LfoTarget::Pitch)       ? "pitch modulation" :
+            (patch.lfo[0].target == LfoTarget::FilterCutoff)? "filter movement"  :
+            (patch.lfo[0].target == LfoTarget::Amplitude)   ? "tremolo"          :
+                                                               "modulation";
+        oss << ", adding " << lfoTarget << " for animation";
+    }
+
+    // Space.
+    if (patch.reverb.mix > 0.4f)
+        oss << ". Heavy reverb places it in a wide, ambient space";
+    else if (patch.reverb.mix > 0.15f)
+        oss << ". Light reverb adds depth without washing it out";
+
+    if (patch.delay.mix > 0.2f)
+        oss << " with delay for rhythmic echo";
+
+    // Session context influence.
+    const std::string recap = memory_.buildRecap(prompt, 3);
+    if (!recap.empty()) {
+        oss << ". Your session feedback steered me toward this timbral direction"
+            << " — I've adjusted based on what you've liked and passed on previously";
+    }
+
+    // MIDI context.
+    if (midiCutoffNorm_ < 0.25f)
+        oss << ". I respected your MIDI filter position (currently closed/dark)";
+    else if (midiCutoffNorm_ > 0.75f)
+        oss << ". I matched your MIDI filter position (currently open/bright)";
+
+    oss << ".";
+    return oss.str();
 }
 
 } // namespace agentic_synth::agent

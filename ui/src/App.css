@@ -107,6 +107,44 @@ body,
   100% { filter: none; }
 }
 
+/* Active user drag — cyan glow so the user knows the knob is live */
+.knob-editing svg {
+  filter: drop-shadow(0 0 5px #91e8ff88);
+}
+
+/* ── Left panel tabs ──────────────────────────────────────────────────── */
+
+.panel-tabs {
+  display: flex;
+  border-bottom: 1px solid rgb(255 255 255 / 8%);
+  margin-bottom: 0.5rem;
+}
+
+.panel-tab {
+  flex: 1;
+  padding: 0.45rem 0;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #6a5fa0;
+  font-family: inherit;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.panel-tab:hover {
+  color: #c8b8ff;
+}
+
+.panel-tab-active {
+  color: #91e8ff;
+  border-bottom-color: #91e8ff;
+}
+
 /* ── Push-to-talk ─────────────────────────────────────────────────── */
 
 .ptt-btn {

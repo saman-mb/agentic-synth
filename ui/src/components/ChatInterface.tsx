@@ -9,7 +9,7 @@ import {
 } from 'react';
 
 import { useSynthBridge } from '../hooks/useSynthBridge';
-import type { ChatMessage, FeedbackKind, PatchVariation, WireIncoming } from '../types/chat';
+import type { ChatMessage, FeedbackKind, PatchVariation, ProactiveSuggestion, WireIncoming } from '../types/chat';
 import { PatchPreview } from './PatchPreview';
 import { PushToTalk } from './PushToTalk';
 import './ChatInterface.css';
@@ -97,6 +97,13 @@ function MessageBubble({ message, onFeedback }: BubbleProps) {
         {message.streaming && <span className="cursor" aria-hidden="true" />}
       </p>
 
+      {message.rationale && !message.streaming && (
+        <details className="rationale-details">
+          <summary className="rationale-summary">Why this patch?</summary>
+          <p className="rationale-text">{message.rationale}</p>
+        </details>
+      )}
+
       {message.variations && message.variations.length > 0 && (
         <ABVariationGrid variations={message.variations} />
       )}
@@ -113,6 +120,34 @@ function MessageBubble({ message, onFeedback }: BubbleProps) {
         />
       )}
     </article>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Proactive variation suggestion strip
+// ---------------------------------------------------------------------------
+
+interface ProactiveSuggestionsProps {
+  suggestions: ProactiveSuggestion[];
+  onDismiss: () => void;
+}
+
+function ProactiveSuggestionStrip({ suggestions, onDismiss }: ProactiveSuggestionsProps) {
+  return (
+    <div className="proactive-suggestions" role="region" aria-label="Suggested variations">
+      <div className="proactive-header">
+        <span className="proactive-title">Suggested variations</span>
+        <button className="proactive-dismiss" onClick={onDismiss} aria-label="Dismiss suggestions">✕</button>
+      </div>
+      <div className="proactive-list">
+        {suggestions.map((s) => (
+          <div key={s.label} className="proactive-item">
+            <strong className="proactive-label">{s.label}</strong>
+            <span className="proactive-desc">{s.description}</span>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -148,6 +183,7 @@ export function ChatInterface({ externalTranscript, onAudio }: ChatInterfaceProp
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [proactiveSuggestions, setProactiveSuggestions] = useState<ProactiveSuggestion[]>([]);
   const listEndRef = useRef<HTMLDivElement>(null);
   const streamingIdRef = useRef<string | null>(null);
 
@@ -222,6 +258,18 @@ export function ChatInterface({ externalTranscript, onAudio }: ChatInterfaceProp
           }
           streamingIdRef.current = null;
           setIsGenerating(false);
+          break;
+        }
+        case 'rationale': {
+          const sid = streamingIdRef.current;
+          if (!sid) return;
+          setMessages((prev) =>
+            prev.map((m) => (m.id === sid ? { ...m, rationale: msg.text } : m)),
+          );
+          break;
+        }
+        case 'suggest_variations': {
+          setProactiveSuggestions(msg.variations);
           break;
         }
       }
@@ -319,6 +367,12 @@ export function ChatInterface({ externalTranscript, onAudio }: ChatInterfaceProp
         {messages.map((msg) => (
           <MessageBubble key={msg.id} message={msg} onFeedback={handleFeedback} />
         ))}
+        {proactiveSuggestions.length > 0 && (
+          <ProactiveSuggestionStrip
+            suggestions={proactiveSuggestions}
+            onDismiss={() => setProactiveSuggestions([])}
+          />
+        )}
         <div ref={listEndRef} />
       </section>
 

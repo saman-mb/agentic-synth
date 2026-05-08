@@ -22,6 +22,7 @@ export interface ChatMessage {
   patch?: PatchPreviewData;
   variations?: PatchVariation[];
   feedback?: FeedbackKind;
+  rationale?: string;
 }
 
 // WebSocket wire protocol
@@ -29,7 +30,15 @@ export type WireIncoming =
   | { type: 'token'; content: string }
   | { type: 'patch'; variation: 'A' | 'B'; data: PatchPreviewData }
   | { type: 'done' }
-  | { type: 'error'; message: string };
+  | { type: 'error'; message: string }
+  | { type: 'rationale'; text: string }
+  | { type: 'suggest_variations'; variations: ProactiveSuggestion[] };
+
+export interface ProactiveSuggestion {
+  label: string;
+  description: string;
+  patch: PatchPreviewData;
+}
 
 export type WireOutgoing =
   | { type: 'generate'; prompt: string; sessionId: string }
