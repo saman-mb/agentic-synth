@@ -2,7 +2,11 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import './App.css';
 import { ChatInterface } from './components/ChatInterface';
 import { KnobGrid, makeDefaultPatch, PatchParams } from './components/KnobGrid';
+import { SemanticDictionary } from './components/SemanticDictionary';
+import { TelemetryDashboard } from './components/TelemetryDashboard';
 import { useWebSocket } from './hooks/useWebSocket';
+
+type LeftPanel = 'knobs' | 'dictionary' | 'telemetry';
 
 const KNOB_BRIDGE_URL = 'ws://localhost:9002';
 
@@ -37,6 +41,7 @@ export function App() {
   const [patch, setPatch] = useState<PatchParams>(makeDefaultPatch);
   const [agentKeys, setAgentKeys] = useState<Set<string>>(new Set());
   const [transcript, setTranscript] = useState('');
+  const [leftPanel, setLeftPanel] = useState<LeftPanel>('knobs');
   const agentKeyTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { lastMessage, sendMessage, sendBinary } = useWebSocket(KNOB_BRIDGE_URL);
@@ -82,7 +87,29 @@ export function App() {
   return (
     <div className="app-layout">
       <aside className="panel-knobs">
-        <KnobGrid patch={patch} agentKeys={agentKeys} onKnobChange={handleKnobChange} />
+        <nav className="panel-tabs">
+          <button
+            className={`panel-tab${leftPanel === 'knobs' ? ' panel-tab-active' : ''}`}
+            onClick={() => setLeftPanel('knobs')}
+          >Knobs</button>
+          <button
+            className={`panel-tab${leftPanel === 'dictionary' ? ' panel-tab-active' : ''}`}
+            onClick={() => setLeftPanel('dictionary')}
+          >Dictionary</button>
+          <button
+            className={`panel-tab${leftPanel === 'telemetry' ? ' panel-tab-active' : ''}`}
+            onClick={() => setLeftPanel('telemetry')}
+          >Telemetry</button>
+        </nav>
+        {leftPanel === 'knobs' && (
+          <KnobGrid patch={patch} agentKeys={agentKeys} onKnobChange={handleKnobChange} />
+        )}
+        {leftPanel === 'dictionary' && (
+          <SemanticDictionary sendMessage={sendMessage} lastMessage={lastMessage} />
+        )}
+        {leftPanel === 'telemetry' && (
+          <TelemetryDashboard sendMessage={sendMessage} lastMessage={lastMessage} />
+        )}
       </aside>
       <main className="panel-chat">
         <ChatInterface externalTranscript={transcript} onAudio={handleAudio} />

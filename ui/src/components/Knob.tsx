@@ -47,6 +47,7 @@ export function Knob({ value, min, max, label, unit, decimals = 2, onChange, age
 
   const dragRef = useRef<{ startY: number; startNorm: number } | null>(null);
   const [flashing, setFlashing] = useState(false);
+  const [isDragging, setIsDragging] = useState(false);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -60,6 +61,7 @@ export function Knob({ value, min, max, label, unit, decimals = 2, onChange, age
     e.preventDefault();
     (e.target as Element).setPointerCapture(e.pointerId);
     dragRef.current = { startY: e.clientY, startNorm: norm };
+    setIsDragging(true);
   }, [norm]);
 
   const onPointerMove = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
@@ -71,10 +73,11 @@ export function Knob({ value, min, max, label, unit, decimals = 2, onChange, age
 
   const onPointerUp = useCallback(() => {
     dragRef.current = null;
+    setIsDragging(false);
   }, []);
 
   return (
-    <div className={`knob-wrap${flashing ? ' knob-agent' : ''}`}>
+    <div className={`knob-wrap${flashing ? ' knob-agent' : ''}${isDragging ? ' knob-editing' : ''}`}>
       <svg
         width="64"
         height="64"

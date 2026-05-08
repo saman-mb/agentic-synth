@@ -100,6 +100,13 @@ public:
 
     [[nodiscard]] Telemetry& telemetry() noexcept { return telemetry_; }
 
+    // ── Issue #85: Session-aware narrative generation ─────────────────────────
+
+    // Generate natural-language rationale explaining parameter choices for
+    // the given patch in the context of the current prompt and session memory.
+    [[nodiscard]] std::string generateRationale(const std::string& prompt,
+                                                const PatchStruct& patch) const;
+
 private:
     PrePatchPipeline            pipeline_;
     engine::VariationEngine     variationEngine_;

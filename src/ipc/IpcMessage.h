@@ -14,6 +14,10 @@ constexpr const char* kPipeName = "AgenticSynthIPC";
 // Connection timeout used by both sides.
 constexpr int kConnectTimeoutMs = 2000;
 
+// Localhost TCP port shared by all plugin instances and the companion.
+// Chosen in the IANA dynamic/private range.
+constexpr int kCompanionPort = 49123;
+
 // ── Message types ─────────────────────────────────────────────────────────────
 
 enum class IpcMsgType : uint8_t {
