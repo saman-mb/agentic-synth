@@ -11,8 +11,19 @@ add_executable(agentic_synth_tests
     placeholder_test.cpp
     ADSREnvelopeTest.cpp
     ../src/engine/ADSREnvelope.cpp
+    WavetableOscillatorTest.cpp
+    ../src/engine/WavetableOscillator.cpp
+    VAOscillatorTest.cpp
+    ../src/engine/VAOscillator.cpp
+    FilterTest.cpp
+    ../src/engine/Filter.cpp
+    LFOTest.cpp
+    ../src/engine/LFO.cpp
+    VoiceManagerTest.cpp
+    ../src/engine/VoiceManager.cpp
+    HeuristicParserTest.cpp
+    ../src/mapper/HeuristicParser.cpp
 )
-
 target_include_directories(agentic_synth_tests PRIVATE ../src)
 target_link_libraries(agentic_synth_tests PRIVATE Catch2::Catch2WithMain)
 
