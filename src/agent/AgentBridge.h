@@ -3,9 +3,11 @@
 #include <array>
 #include <optional>
 #include <string>
+#include <string_view>
 
 #include "agent/PrePatchPipeline.h"
 #include "agent/SessionMemory.h"
+#include "agent/StreamParser.h"
 #include "engine/PatchStruct.h"
 #include "engine/VariationEngine.h"
 #include "mapper/GrammarSampler.h"
@@ -15,6 +17,8 @@ namespace agentic_synth::agent {
 
 class AgentBridge {
 public:
+    AgentBridge();
+
     [[nodiscard]] std::string status() const;
 
     // Issue #68: pre-patch pipeline.
@@ -44,12 +48,19 @@ public:
     [[nodiscard]] std::optional<PatchStruct> generateLlmPatch(const std::string& prompt,
                                                                uint32_t patch_id = 0);
 
+    // Issue #67: streaming patch application.
+    // Feed a chunk of streaming LLM JSON. Fires pipeline_.injectPatch() each
+    // time a top-level field is complete, delivering first audible change
+    // well within 500 ms of stream start.
+    void feedChunk(std::string_view chunk);
+
 private:
     PrePatchPipeline pipeline_;
     engine::VariationEngine variationEngine_;
     SessionMemory memory_;
     mapper::GrammarSampler sampler_;
     mapper::SemanticMapper semanticMapper_;
+    StreamParser streamParser_;
 };
 
 } // namespace agentic_synth::agent
