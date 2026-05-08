@@ -61,7 +61,8 @@ TEST_CASE("VoiceManager chord spam never drops below N-1 active voices") {
     VoiceManager vm(kVoices);
     vm.prepare(44100.0);
 
-    for (int i = 0; i < kVoices; ++i) vm.noteOn(48 + i, 0.8f);
+    for (int i = 0; i < kVoices; ++i)
+        vm.noteOn(48 + i, 0.8f);
     REQUIRE(vm.activeVoiceCount() == kVoices);
 
     // Drive beyond the voice limit; each steal must keep count at N.
@@ -81,7 +82,8 @@ TEST_CASE("VoiceManager voice stealing steals oldest note") {
     vm.prepare(44100.0);
 
     // Fill: oldest → 60, then 61, 62, 63.
-    for (int i = 0; i < kVoices; ++i) vm.noteOn(60 + i, 0.8f);
+    for (int i = 0; i < kVoices; ++i)
+        vm.noteOn(60 + i, 0.8f);
     REQUIRE(vm.activeVoiceCount() == kVoices);
 
     // One more note: 60 (oldest) must be evicted.
@@ -100,7 +102,8 @@ TEST_CASE("VoiceManager voice stealing consistently oldest-first across multiple
     VoiceManager vm(kVoices);
     vm.prepare(44100.0);
 
-    for (int i = 0; i < kVoices; ++i) vm.noteOn(60 + i, 0.8f);
+    for (int i = 0; i < kVoices; ++i)
+        vm.noteOn(60 + i, 0.8f);
 
     vm.noteOn(70, 0.8f); // steals 60
     vm.noteOn(71, 0.8f); // steals 61
@@ -121,15 +124,16 @@ TEST_CASE("VoiceManager stealing prefers releasing voices over held voices") {
     VoiceManager vm(kVoices);
     vm.prepare(44100.0);
 
-    for (int i = 0; i < kVoices; ++i) vm.noteOn(60 + i, 0.8f);
+    for (int i = 0; i < kVoices; ++i)
+        vm.noteOn(60 + i, 0.8f);
 
     // Release note 63 (most recent). It should be stolen before 60 (older but held).
     vm.noteOff(63);
 
     vm.noteOn(70, 0.8f);
     auto notes = vm.activeNotes();
-    CHECK(hasNote(notes, 70));   // new note active
-    CHECK(hasNote(notes, 60));   // held — not stolen
+    CHECK(hasNote(notes, 70));       // new note active
+    CHECK(hasNote(notes, 60));       // held — not stolen
     CHECK_FALSE(hasNote(notes, 63)); // releasing — stolen first
 }
 
@@ -187,7 +191,8 @@ TEST_CASE("VoiceManager renderBlock produces finite output with active note") {
     vm.renderBlock(buf.data(), static_cast<int>(buf.size()));
 
     bool hasNaN = false;
-    for (float s : buf) hasNaN = hasNaN || std::isnan(s);
+    for (float s : buf)
+        hasNaN = hasNaN || std::isnan(s);
     CHECK_FALSE(hasNaN);
 }
 
