@@ -32,6 +32,12 @@ TEST_CASE("VoiceManager single note on/off") {
     CHECK(hasNote(vm.activeNotes(), 60));
 
     vm.noteOff(60);
+    // Voice enters release phase immediately after noteOff — still active.
+    CHECK(vm.activeVoiceCount() == 1);
+
+    // Render enough samples (> default release of 0.3 s at 44100 Hz) for release to complete.
+    std::vector<float> buf(16384, 0.0f);
+    vm.renderBlock(buf.data(), static_cast<int>(buf.size()));
     CHECK(vm.activeVoiceCount() == 0);
 }
 
