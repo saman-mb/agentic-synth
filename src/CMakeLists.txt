@@ -3,6 +3,11 @@
 add_library(agentic_synth_engine
     engine/SynthEngine.cpp
     engine/ADSREnvelope.cpp
+    engine/WavetableOscillator.cpp
+    engine/VAOscillator.cpp
+    engine/Filter.cpp
+    engine/LFO.cpp
+    engine/VoiceManager.cpp
     agent/AgentBridge.cpp
 )
 
@@ -14,7 +19,6 @@ target_link_libraries(agentic_synth_engine
         juce::juce_audio_basics
         juce::juce_audio_processors
 )
-
 # ── Standalone App ───────────────────────────────────────────────────────────
 juce_add_gui_app(AgenticSynth
     PRODUCT_NAME "Agentic Synth"
