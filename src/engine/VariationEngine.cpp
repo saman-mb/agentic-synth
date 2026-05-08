@@ -172,4 +172,25 @@ VariationEngine::generateVariations(const PatchStruct& base) const {
     return result;
 }
 
+std::array<PatchStruct, VariationEngine::kVariationCount>
+VariationEngine::generateVariationsWithSeed(const PatchStruct& base, uint32_t perturbSeed) const {
+    const PatchStruct morphTarget = makeHotPatch(make_default_patch());
+
+    auto futTemp  = std::async(std::launch::async, [&] { return temperatureSweep(base); });
+    auto futPert  = std::async(std::launch::async, [&] { return perturbation(base, perturbSeed); });
+    auto futMorph = std::async(std::launch::async, [&] { return morph(base, morphTarget); });
+
+    const auto temps  = futTemp.get();
+    const auto perts  = futPert.get();
+    const auto morphs = futMorph.get();
+
+    std::array<PatchStruct, kVariationCount> result;
+    result[0] = temps[1];
+    result[1] = temps[3];
+    result[2] = perts[0];
+    result[3] = perts[2];
+    result[4] = morphs[2];
+    return result;
+}
+
 } // namespace agentic_synth::engine
