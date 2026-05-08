@@ -38,6 +38,7 @@ private:
 
     // Triangle integration state; initialised to waveform value at phase=0
     double triAccum_ = -1.0;
+    int triRecenterCounter_ = 0;
 
     // Analog drift modulator
     double driftCents_ = 0.0;

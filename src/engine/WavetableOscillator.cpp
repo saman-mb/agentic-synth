@@ -117,9 +117,7 @@ float WavetableOscillator::readMorphedSample(int mipLevel, double phase) const n
 
 float WavetableOscillator::processSample() noexcept {
     const float out = readMorphedSample(selectMipLevel(), phase_);
-    phase_ += phaseIncrement_;
-    if (phase_ >= 1.0)
-        phase_ -= 1.0;
+    phase_ = std::fmod(phase_ + phaseIncrement_, 1.0);
     return out;
 }
 
@@ -127,9 +125,7 @@ void WavetableOscillator::processBlock(float* output, int numSamples) noexcept {
     const int mipLevel = selectMipLevel();
     for (int i = 0; i < numSamples; ++i) {
         output[i] = readMorphedSample(mipLevel, phase_);
-        phase_ += phaseIncrement_;
-        if (phase_ >= 1.0)
-            phase_ -= 1.0;
+        phase_ = std::fmod(phase_ + phaseIncrement_, 1.0);
     }
 }
 

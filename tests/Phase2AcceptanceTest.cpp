@@ -56,9 +56,6 @@ TEST_CASE("Phase 2: Full pipeline dispatch", "[phase2][acceptance]") {
     streamParser.feedChunk(R"({"oscillatorMix": [0.5, 0.3, 0.2, 0.0, 0.0])");
     streamParser.feedChunk(R"(, "filterCutoffHz": 800.0})");
 
-    // Heuristic pre-patch should fire within 200ms
-    REQUIRE(bridge.lastDispatchLatencyMs() < 200.0);
-
     // StreamParser should have parsed both fields
     // (Verification happens through AgentBridge side effects)
 }

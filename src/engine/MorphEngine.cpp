@@ -55,10 +55,17 @@ std::optional<PatchStruct> MorphEngine::target(int index) const noexcept {
 
 void MorphEngine::setPosition(float pos) noexcept {
     position_ = std::clamp(pos, 0.0f, 1.0f);
-    if (callback_) {
-        const PatchStruct morphed = morphedPatch();
-        callback_(morphed);
-    }
+    if (callback_)
+        positionDirty_.store(true, std::memory_order_release);
+}
+
+bool MorphEngine::pollCallback() noexcept {
+    if (!positionDirty_.load(std::memory_order_acquire))
+        return false;
+    positionDirty_.store(false, std::memory_order_relaxed);
+    if (callback_)
+        callback_(morphedPatch());
+    return true;
 }
 
 // ---------------------------------------------------------------------------

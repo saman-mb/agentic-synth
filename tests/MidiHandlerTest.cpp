@@ -121,10 +121,17 @@ TEST_CASE("MidiHandler: setHostTempo propagates to VoiceManager", "[midi]") {
     auto vm = makeVM();
     MidiHandler handler(vm);
 
-    // Should not throw or crash.
+    // Verify no-crash with tempo changes
     handler.setHostTempo(120.0);
     handler.setHostTempo(90.0);
     handler.setHostTempo(180.0);
+
+    // Verify handler still processes MIDI correctly after tempo changes
+    handler.process(RawMidiMsg::noteOn(60, 100));
+    REQUIRE(vm.activeVoiceCount() == 1);
+    REQUIRE(vm.activeNotes().front() == 60);
+
+    handler.process(RawMidiMsg::noteOff(60));
     SUCCEED("setHostTempo accepted without error");
 }
 

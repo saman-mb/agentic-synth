@@ -1,5 +1,6 @@
 #include "VAOscillator.h"
 
+#include <algorithm>
 #include <cmath>
 
 namespace agentic_synth::engine {
@@ -32,6 +33,7 @@ void VAOscillator::setDetuneCents(double cents) noexcept {
 void VAOscillator::reset() noexcept {
     phase_ = 0.0;
     triAccum_ = -1.0;
+    triRecenterCounter_ = 0;
     driftCents_ = 0.0;
     driftTarget_ = 0.0;
     driftPeriod_ = driftPeriodDist_(rng_);
@@ -91,6 +93,11 @@ double VAOscillator::triangle() noexcept {
     // triAccum_ initialises to -1 at phase=0 so the first half-cycle rises to +1.
     double sq = square();
     triAccum_ += 4.0 * phaseInc_ * sq;
+    // Clamp every 1024 samples to prevent unbounded numerical drift.
+    if (++triRecenterCounter_ >= 1024) {
+        triAccum_ = std::clamp(triAccum_, -1.0, 1.0);
+        triRecenterCounter_ = 0;
+    }
     return triAccum_;
 }
 

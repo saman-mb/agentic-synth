@@ -60,5 +60,14 @@ private:
     std::atomic<float>* ampReleaseParam_ = nullptr;
     std::atomic<float>* portamentoParam_ = nullptr;
 
+    // Shadow values for dirty-flag skipping in applyParameters().
+    float lastCutoff_{-1.0f};
+    float lastRes_{-1.0f};
+    float lastAttack_{-1.0f};
+    float lastDecay_{-1.0f};
+    float lastSustain_{-1.0f};
+    float lastRelease_{-1.0f};
+    float lastPortamento_{-1.0f};
+
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(AgenticSynthPlugin)
 };

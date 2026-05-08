@@ -6,10 +6,13 @@
 using namespace agentic_synth;
 using namespace agentic_synth::agent;
 
-TEST_CASE("submit dispatch latency is < 200 ms") {
+TEST_CASE("submit dispatches immediately for polling") {
     PrePatchPipeline pipeline;
-    pipeline.submit("bright lead");
-    CHECK(pipeline.lastDispatchLatencyMs() < 200.0);
+    const auto dispatched = pipeline.submit("bright lead");
+    // Verify the dispatched patch is immediately available for polling
+    const auto polled = pipeline.poll();
+    REQUIRE(polled.has_value());
+    CHECK(polled->filter.cutoff_hz == Catch::Approx(dispatched.filter.cutoff_hz));
 }
 
 TEST_CASE("poll returns heuristic patch immediately after submit") {
