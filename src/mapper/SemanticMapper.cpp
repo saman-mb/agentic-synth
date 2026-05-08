@@ -152,7 +152,7 @@ std::string SemanticMapper::http_post_embedding(const std::string& text) const {
     }
     const std::string path = "/embedding";
 
-    struct addrinfo hints{};
+    struct addrinfo hints {};
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     struct addrinfo* res = nullptr;
@@ -175,7 +175,7 @@ std::string SemanticMapper::http_post_embedding(const std::string& text) const {
     }
     freeaddrinfo(res);
 
-    struct timeval tv{};
+    struct timeval tv {};
     tv.tv_sec = cfg_.timeout_ms / 1000;
     tv.tv_usec = (cfg_.timeout_ms % 1000) * 1000;
     setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&tv), sizeof(tv));
@@ -803,8 +803,7 @@ void SemanticMapper::parseAndSaveCustomEntries(const std::string& json, const st
             const auto& ce = customEntries_[n];
             if (n > 0)
                 f << ',';
-            f << "{\"keyword\":\"" << ce.keyword << "\""
-              << ",\"context\":\"" << contextToStr(ce.context) << "\""
+            f << "{\"keyword\":\"" << ce.keyword << "\"" << ",\"context\":\"" << contextToStr(ce.context) << "\""
               << ",\"delta\":" << deltaToJson(ce.delta) << "}";
         }
         f << ']';
@@ -823,10 +822,8 @@ std::string SemanticMapper::dumpAllToJson() const {
         if (!first)
             ss << ',';
         first = false;
-        ss << "{\"keyword\":\"" << e.keyword << "\""
-           << ",\"context\":\"" << contextToStr(e.context) << "\""
-           << ",\"readonly\":true"
-           << ",\"delta\":" << deltaToJson(e.delta) << "}";
+        ss << "{\"keyword\":\"" << e.keyword << "\"" << ",\"context\":\"" << contextToStr(e.context) << "\""
+           << ",\"readonly\":true" << ",\"delta\":" << deltaToJson(e.delta) << "}";
     }
 
     // User-defined custom entries (editable).
@@ -834,10 +831,8 @@ std::string SemanticMapper::dumpAllToJson() const {
         if (!first)
             ss << ',';
         first = false;
-        ss << "{\"keyword\":\"" << e.keyword << "\""
-           << ",\"context\":\"" << contextToStr(e.context) << "\""
-           << ",\"readonly\":false"
-           << ",\"delta\":" << deltaToJson(e.delta) << "}";
+        ss << "{\"keyword\":\"" << e.keyword << "\"" << ",\"context\":\"" << contextToStr(e.context) << "\""
+           << ",\"readonly\":false" << ",\"delta\":" << deltaToJson(e.delta) << "}";
     }
 
     ss << ']';

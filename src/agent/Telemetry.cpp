@@ -113,9 +113,9 @@ std::string Telemetry::toJson() const {
 
     std::ostringstream ss;
     ss << std::fixed;
-    ss << "{\"enabled\":" << (enabled_ ? "true" : "false") << ",\"summary\":{"
-       << "\"total_generations\":" << total << ",\"error_count\":" << errors << ",\"error_rate\":" << err_rate
-       << ",\"avg_latency_ms\":" << avg_lat << ",\"p50_latency_ms\":" << pct(0.5) << ",\"p95_latency_ms\":" << pct(0.95)
+    ss << "{\"enabled\":" << (enabled_ ? "true" : "false") << ",\"summary\":{" << "\"total_generations\":" << total
+       << ",\"error_count\":" << errors << ",\"error_rate\":" << err_rate << ",\"avg_latency_ms\":" << avg_lat
+       << ",\"p50_latency_ms\":" << pct(0.5) << ",\"p95_latency_ms\":" << pct(0.95)
        << ",\"avg_tokens_per_second\":" << avg_tps << "},\"records\":[";
 
     for (size_t i = 0; i < records_.size(); ++i) {

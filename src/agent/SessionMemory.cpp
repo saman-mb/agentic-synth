@@ -167,10 +167,8 @@ std::string SessionMemory::buildRecap(const std::string& currentPrompt, int maxE
         float attack = ev.patch.amp_env.attack_s;
         float reverb = ev.patch.reverb.mix;
 
-        oss << "- " << label << ": \"" << ev.prompt << "\""
-            << " → cutoff=" << static_cast<int>(cutoff) << "Hz"
-            << " attack=" << attack << "s"
-            << " reverb=" << reverb << " (similarity=" << s.score << ")\n";
+        oss << "- " << label << ": \"" << ev.prompt << "\"" << " → cutoff=" << static_cast<int>(cutoff) << "Hz"
+            << " attack=" << attack << "s" << " reverb=" << reverb << " (similarity=" << s.score << ")\n";
         ++count;
     }
 

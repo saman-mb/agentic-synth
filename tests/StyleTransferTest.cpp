@@ -66,8 +66,8 @@ TEST_CASE("StyleTransfer: apply with blend=1 shifts result toward reference styl
     PatchStruct result = StyleTransfer::apply(target, style, 1.0f);
 
     // Full blend: result should differ from unblended target
-    bool changed = (result.filter.cutoff_hz != target.filter.cutoff_hz) ||
-                   (result.amp_env.attack_s != target.amp_env.attack_s);
+    bool changed =
+        (result.filter.cutoff_hz != target.filter.cutoff_hz) || (result.amp_env.attack_s != target.amp_env.attack_s);
     CHECK(changed);
 }
 
