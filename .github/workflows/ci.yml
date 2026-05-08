@@ -48,16 +48,22 @@ jobs:
         run: npm run lint
 
   build:
-    name: Build
+    name: Build (${{ matrix.os }})
     needs: lint
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+
     steps:
       - uses: actions/checkout@v4
 
       - name: Initialize submodules
         run: git submodule update --init --recursive
 
-      - name: Install system dependencies
+      - name: Install system dependencies (Linux)
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y -qq \
@@ -73,7 +79,13 @@ jobs:
             libcurl4-openssl-dev \
             libfontconfig-dev \
             libgl-dev \
-            libgtk-3-dev
+            libgtk-3-dev \
+            lcov
+
+      - name: Install system dependencies (macOS)
+        if: runner.os == 'macOS'
+        run: |
+          brew install lcov
 
       - name: Setup CMake
         uses: jwlawson/actions-setup-cmake@v2
@@ -90,11 +102,57 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cmake-juce-
 
-      - name: Configure CMake
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DAGENTIC_SYNTH_BUILD_TESTS=ON
+      - name: Configure CMake (Linux — with gcov coverage)
+        if: runner.os == 'Linux'
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DAGENTIC_SYNTH_BUILD_TESTS=ON \
+            -DCMAKE_CXX_FLAGS="--coverage" \
+            -DCMAKE_EXE_LINKER_FLAGS="--coverage"
+
+      - name: Configure CMake (macOS / Windows — without coverage)
+        if: runner.os != 'Linux'
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DAGENTIC_SYNTH_BUILD_TESTS=ON
 
       - name: Build project
         run: cmake --build build --config Debug --parallel
 
       - name: Run unit tests
         run: ctest --test-dir build --build-config Debug --output-on-failure
+
+      - name: Generate lcov coverage report (Linux only)
+        if: runner.os == 'Linux'
+        run: |
+          lcov --capture --directory build \
+               --output-file build/coverage.info \
+               --ignore-errors mismatch
+          lcov --remove build/coverage.info \
+               '/usr/*' '*/Catch2/*' '*/third_party/*' '*/tests/*' \
+               --output-file build/coverage_filtered.info \
+               --ignore-errors unused
+          lcov --list build/coverage_filtered.info
+
+      - name: Upload coverage to Codecov (Linux only)
+        if: runner.os == 'Linux'
+        uses: codecov/codecov-action@v4
+        with:
+          files: build/coverage_filtered.info
+          fail_ci_if_error: false
+          token: ${{ secrets.CODECOV_TOKEN }}
+
+      - name: Generate HTML coverage report (Linux only)
+        if: runner.os == 'Linux'
+        run: |
+          genhtml build/coverage_filtered.info \
+                  --output-directory build/coverage_html
+
+      - name: Archive HTML coverage report
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: build/coverage_html
