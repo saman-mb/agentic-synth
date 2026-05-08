@@ -15,8 +15,8 @@ namespace agentic_synth::engine {
 
 // Per-voice DSP state. VoiceManager owns and allocates all voices.
 struct Voice {
-    int midiNote{-1};       // -1 = free slot
-    bool noteIsOn{false};   // false = envelope releasing, true = held
+    int midiNote{-1};     // -1 = free slot
+    bool noteIsOn{false}; // false = envelope releasing, true = held
     uint64_t noteOnOrder{0};
 
     float targetFrequency{440.0f};

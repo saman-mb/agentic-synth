@@ -11,21 +11,24 @@ namespace agentic_synth::engine {
 void Voice::prepare(double sampleRate) {
     wavetableOsc.setSampleRate(sampleRate);
     vaOsc.prepare(sampleRate);
-    if (filter) filter->prepare(sampleRate);
+    if (filter)
+        filter->prepare(sampleRate);
     ampEnv.setSampleRate(sampleRate);
-    for (auto& lfo : lfos) lfo.setSampleRate(sampleRate);
+    for (auto& lfo : lfos)
+        lfo.setSampleRate(sampleRate);
 }
 
 float Voice::render(float portamentoAlpha) noexcept {
-    if (!isActive()) return 0.0f;
+    if (!isActive())
+        return 0.0f;
     // One-pole smoother: currentFrequency glides toward targetFrequency.
     // alpha=0 → instant snap; alpha→1 → very slow glide.
-    currentFrequency = portamentoAlpha * currentFrequency
-                     + (1.0f - portamentoAlpha) * targetFrequency;
+    currentFrequency = portamentoAlpha * currentFrequency + (1.0f - portamentoAlpha) * targetFrequency;
     wavetableOsc.setFrequency(static_cast<double>(currentFrequency));
     vaOsc.setFrequency(static_cast<double>(currentFrequency));
     float sample = wavetableOsc.processSample() + vaOsc.processSample();
-    if (filter) sample = filter->process(sample);
+    if (filter)
+        sample = filter->process(sample);
     return sample * ampEnv.process();
 }
 
@@ -41,15 +44,19 @@ VoiceManager::VoiceManager(int voiceCount) {
 
 void VoiceManager::prepare(double sampleRate) {
     sampleRate_ = sampleRate;
-    for (auto& v : voices_) v.prepare(sampleRate);
+    for (auto& v : voices_)
+        v.prepare(sampleRate);
 }
 
 void VoiceManager::noteOn(int midiNote, float /*velocity*/) {
     // Reuse existing voice for same note, otherwise steal or allocate.
     Voice* v = findVoiceForNote(midiNote);
-    if (v == nullptr) v = findFreeVoice();
-    if (v == nullptr) v = stealVoice();
-    if (v == nullptr) return; // shouldn't happen with a valid voice pool
+    if (v == nullptr)
+        v = findFreeVoice();
+    if (v == nullptr)
+        v = stealVoice();
+    if (v == nullptr)
+        return; // shouldn't happen with a valid voice pool
 
     const bool wasActive = v->isActive();
     const bool portando = (portamentoSeconds_ > 0.0f) && wasActive;
@@ -66,13 +73,15 @@ void VoiceManager::noteOn(int midiNote, float /*velocity*/) {
 
     if (!wasActive || retrigger_) {
         v->ampEnv.noteOn();
-        for (auto& lfo : v->lfos) lfo.trigger();
+        for (auto& lfo : v->lfos)
+            lfo.trigger();
     }
 }
 
 void VoiceManager::noteOff(int midiNote) {
     Voice* v = findVoiceForNote(midiNote);
-    if (v == nullptr) return;
+    if (v == nullptr)
+        return;
     v->noteIsOn = false;
     v->ampEnv.noteOff();
 }
@@ -83,7 +92,8 @@ void VoiceManager::setRetrigger(bool retrigger) noexcept { retrigger_ = retrigge
 float VoiceManager::renderNextSample() noexcept {
     float sum = 0.0f;
     const float alpha = portamentoAlpha();
-    for (auto& v : voices_) sum += v.render(alpha);
+    for (auto& v : voices_)
+        sum += v.render(alpha);
     return sum;
 }
 
@@ -91,33 +101,35 @@ void VoiceManager::renderBlock(float* output, int numSamples) noexcept {
     const float alpha = portamentoAlpha();
     for (int i = 0; i < numSamples; ++i) {
         float sum = 0.0f;
-        for (auto& v : voices_) sum += v.render(alpha);
+        for (auto& v : voices_)
+            sum += v.render(alpha);
         output[i] = sum;
     }
 }
 
 int VoiceManager::activeVoiceCount() const noexcept {
     int count = 0;
-    for (const auto& v : voices_) count += v.isActive() ? 1 : 0;
+    for (const auto& v : voices_)
+        count += v.isActive() ? 1 : 0;
     return count;
 }
 
-int VoiceManager::voiceCount() const noexcept {
-    return static_cast<int>(voices_.size());
-}
+int VoiceManager::voiceCount() const noexcept { return static_cast<int>(voices_.size()); }
 
 std::vector<int> VoiceManager::activeNotes() const {
     std::vector<int> notes;
     notes.reserve(voices_.size());
     for (const auto& v : voices_) {
-        if (v.isActive()) notes.push_back(v.midiNote);
+        if (v.isActive())
+            notes.push_back(v.midiNote);
     }
     return notes;
 }
 
 Voice* VoiceManager::findFreeVoice() noexcept {
     for (auto& v : voices_) {
-        if (!v.isActive()) return &v;
+        if (!v.isActive())
+            return &v;
     }
     return nullptr;
 }
@@ -133,7 +145,8 @@ Voice* VoiceManager::stealVoice() noexcept {
                 oldest = &v;
         }
     }
-    if (oldest != nullptr) return oldest;
+    if (oldest != nullptr)
+        return oldest;
 
     for (auto& v : voices_) {
         if (v.isActive()) {
@@ -146,13 +159,15 @@ Voice* VoiceManager::stealVoice() noexcept {
 
 Voice* VoiceManager::findVoiceForNote(int midiNote) noexcept {
     for (auto& v : voices_) {
-        if (v.isActive() && v.midiNote == midiNote) return &v;
+        if (v.isActive() && v.midiNote == midiNote)
+            return &v;
     }
     return nullptr;
 }
 
 float VoiceManager::portamentoAlpha() const noexcept {
-    if (portamentoSeconds_ <= 0.0f) return 0.0f;
+    if (portamentoSeconds_ <= 0.0f)
+        return 0.0f;
     return static_cast<float>(std::exp(-1.0 / (portamentoSeconds_ * sampleRate_)));
 }
 
