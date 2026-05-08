@@ -56,6 +56,15 @@ TEST_CASE("LFO tempo-sync rate matches host BPM within 0.1%", "[LFO][tempo-sync]
         double expected = (200.0 / 60.0) / 1.0;
         REQUIRE_THAT(lfo.currentRateHz(), Catch::Matchers::WithinRel(expected, 0.001));
     }
+
+    SECTION("disabling tempo sync reverts to free rate") {
+        lfo.setHostTempo(120.0);
+        lfo.setTempoSync(true, LfoSyncDivision::Quarter);
+        lfo.setFreeRate(5.0f);
+        // After disabling tempo sync, rate should be 5 Hz (free rate)
+        lfo.setTempoSync(false);
+        REQUIRE_THAT(lfo.currentRateHz(), Catch::Matchers::WithinRel(5.0, 0.001));
+    }
 }
 
 TEST_CASE("LFO phase reset on key trigger", "[LFO][trigger]") {

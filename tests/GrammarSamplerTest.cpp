@@ -59,7 +59,7 @@ TEST_CASE("parse_patch_json: all OscType enum values accepted") {
         std::string json = make_valid_json();
         // Replace first "Sawtooth"
         auto pos = json.find("\"Sawtooth\"");
-        json.replace(pos, 10, std::string("\"") + t + "\"");
+        json.replace(pos, std::string("\"Sawtooth\"").length(), std::string("\"") + t + "\"");
         auto r = GrammarSampler::parse_patch_json(json);
         INFO("OscType: " << t);
         REQUIRE(r.has_value());
@@ -70,7 +70,7 @@ TEST_CASE("parse_patch_json: all FilterType enum values accepted") {
     for (const char* t : {"LowPass", "HighPass", "BandPass", "Notch", "Peak"}) {
         std::string json = make_valid_json();
         auto pos = json.find("\"LowPass\"");
-        json.replace(pos, 9, std::string("\"") + t + "\"");
+        json.replace(pos, std::string("\"LowPass\"").length(), std::string("\"") + t + "\"");
         auto r = GrammarSampler::parse_patch_json(json);
         INFO("FilterType: " << t);
         REQUIRE(r.has_value());
