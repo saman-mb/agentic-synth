@@ -2,6 +2,7 @@
 # Core synth engine and agent bridge (shared by app and plugin)
 add_library(agentic_synth_engine
     engine/SynthEngine.cpp
+    engine/ADSREnvelope.cpp
     agent/AgentBridge.cpp
 )
 
