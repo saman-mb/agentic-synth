@@ -38,6 +38,11 @@ public:
 
     [[nodiscard]] const std::vector<GenerationRecord>& records() const noexcept { return records_; }
 
+    // Platform-appropriate log directory (created on first call).
+    // Used as the default log_path so the file never lands in the DAW's CWD.
+    // Multiple plugin instances get unique filenames via process ID.
+    [[nodiscard]] static std::string defaultLogPath();
+
 private:
     bool enabled_{false};
     std::string log_path_;

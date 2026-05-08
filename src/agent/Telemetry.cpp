@@ -2,10 +2,45 @@
 
 #include <algorithm>
 #include <chrono>
+#include <filesystem>
 #include <fstream>
 #include <sstream>
 
+#if defined(_WIN32)
+#include <process.h>
+static int current_pid() noexcept { return static_cast<int>(::_getpid()); }
+#else
+#include <unistd.h>
+static int current_pid() noexcept { return static_cast<int>(::getpid()); }
+#endif
+
 namespace agentic_synth::agent {
+
+std::string Telemetry::defaultLogPath() {
+    std::string dir;
+#if defined(_WIN32)
+    const char* appdata = std::getenv("APPDATA");
+    dir = appdata ? (std::string(appdata) + "\\agentic-synth\\telemetry")
+                  : "agentic-synth-telemetry";
+#elif defined(__APPLE__)
+    const char* home = std::getenv("HOME");
+    dir = home ? (std::string(home) + "/Library/Application Support/agentic-synth/telemetry")
+               : "/tmp/agentic-synth-telemetry";
+#else
+    // Linux: prefer XDG_DATA_HOME, fall back to ~/.local/share
+    const char* xdg = std::getenv("XDG_DATA_HOME");
+    if (xdg && *xdg) {
+        dir = std::string(xdg) + "/agentic-synth/telemetry";
+    } else {
+        const char* home = std::getenv("HOME");
+        dir = home ? (std::string(home) + "/.local/share/agentic-synth/telemetry")
+                   : "/tmp/agentic-synth-telemetry";
+    }
+#endif
+    std::error_code ec;
+    std::filesystem::create_directories(dir, ec);
+    return dir + "/telemetry_" + std::to_string(current_pid()) + ".json";
+}
 
 Telemetry::Telemetry(std::string log_path) : log_path_(std::move(log_path)) {}
 
