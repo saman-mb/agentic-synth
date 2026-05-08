@@ -40,6 +40,7 @@ add_executable(agentic_synth_tests
     ../src/mapper/SemanticMapper.cpp
     StreamParserTest.cpp
     ../src/agent/StreamParser.cpp
+    ../src/agent/Telemetry.cpp
 )
 target_include_directories(agentic_synth_tests PRIVATE ../src)
 target_link_libraries(agentic_synth_tests PRIVATE Catch2::Catch2WithMain)

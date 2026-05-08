@@ -25,6 +25,7 @@ add_library(agentic_synth_engine STATIC
     agent/SessionMemory.cpp
     agent/PrePatchPipeline.cpp
     agent/StreamParser.cpp
+    agent/Telemetry.cpp
 )
 
 target_include_directories(agentic_synth_engine PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
