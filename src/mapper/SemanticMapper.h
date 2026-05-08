@@ -9,6 +9,14 @@
 
 namespace agentic_synth::mapper {
 
+// Issue #90: a user-defined (keyword, context, delta) triple with an owned keyword string.
+// Stored in SemanticMapper::customEntries_; takes priority over the static dataset.
+struct CustomEntry {
+    std::string  keyword;
+    SoundContext context{SoundContext::Generic};
+    PatchDelta   delta;
+};
+
 // Configuration for SemanticMapper.
 // Embedding queries go to the llama.cpp /embedding endpoint.
 // When server_url is empty the mapper falls back to tokenised word-overlap
@@ -42,8 +50,26 @@ public:
     [[nodiscard]] std::optional<const DescriptorEntry*>
     best_match(const std::string& descriptor, SoundContext ctx) const;
 
+    // ── Issue #90: runtime dictionary editing ─────────────────────────────────
+
+    // Load custom entries from a JSON file (call once at startup).
+    void loadCustomEntries(const std::string& json_path);
+
+    // Parse the "entries" array from a save_dictionary JSON frame,
+    // update customEntries_, and persist them to json_path.
+    void parseAndSaveCustomEntries(const std::string& json, const std::string& json_path);
+
+    // Programmatically add / replace a custom entry.
+    void addCustomEntry(CustomEntry e);
+
+    // Dump all static + custom entries to a JSON array string.
+    [[nodiscard]] std::string dumpAllToJson() const;
+
+    [[nodiscard]] const std::vector<CustomEntry>& customEntries() const noexcept { return customEntries_; }
+
 private:
-    SemanticMapperConfig cfg_;
+    SemanticMapperConfig     cfg_;
+    std::vector<CustomEntry> customEntries_;
 
     // Tokenise prompt into lowercase words
     [[nodiscard]] static std::vector<std::string> tokenise(const std::string& prompt);

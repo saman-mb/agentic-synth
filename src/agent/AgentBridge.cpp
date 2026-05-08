@@ -1,4 +1,5 @@
 #include "agent/AgentBridge.h"
+#include "agent/WebSocketBridge.h"
 
 #include <fstream>
 #include <sstream>
@@ -14,6 +15,109 @@ AgentBridge::AgentBridge() {
 }
 
 namespace {
+
+// ---------------------------------------------------------------------------
+// Minimal JSON field extractors for flat WebSocket message objects.
+// These handle the specific formats sent by the React UI — no external library.
+// ---------------------------------------------------------------------------
+
+std::string jsStr(const std::string& json, const std::string& key) {
+    const std::string needle = "\"" + key + "\"";
+    auto pos = json.find(needle);
+    if (pos == std::string::npos) return {};
+    pos = json.find(':', pos + needle.size());
+    if (pos == std::string::npos) return {};
+    pos = json.find('"', pos + 1);
+    if (pos == std::string::npos) return {};
+    const auto end = json.find('"', pos + 1);
+    if (end == std::string::npos) return {};
+    return json.substr(pos + 1, end - pos - 1);
+}
+
+float jsFloat(const std::string& json, const std::string& key) {
+    const std::string needle = "\"" + key + "\"";
+    auto pos = json.find(needle);
+    if (pos == std::string::npos) return 0.0f;
+    pos = json.find(':', pos + needle.size());
+    if (pos == std::string::npos) return 0.0f;
+    ++pos;
+    while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t')) ++pos;
+    if (pos >= json.size()) return 0.0f;
+    try { return std::stof(json.substr(pos)); } catch (...) { return 0.0f; }
+}
+
+bool jsBool(const std::string& json, const std::string& key) {
+    const std::string needle = "\"" + key + "\"";
+    auto pos = json.find(needle);
+    if (pos == std::string::npos) return false;
+    pos = json.find(':', pos + needle.size());
+    if (pos == std::string::npos) return false;
+    ++pos;
+    while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t')) ++pos;
+    return json.size() > pos + 3 && json.substr(pos, 4) == "true";
+}
+
+// ---------------------------------------------------------------------------
+// Map a UI param path (e.g. "filter.cutoff_hz") to a PatchDelta with that
+// one field set, leaving all other fields as nullopt.
+// ---------------------------------------------------------------------------
+
+mapper::PatchDelta paramToDelta(const std::string& param, float value) {
+    mapper::PatchDelta d;
+    // Filter
+    if (param == "filter.cutoff_hz")     { d.filter_cutoff    = value; return d; }
+    if (param == "filter.resonance")     { d.filter_resonance = value; return d; }
+    if (param == "filter.env_mod")       { d.filter_env_mod   = value; return d; }
+    if (param == "filter.drive")         { d.filter_drive     = value; return d; }
+    // Amp envelope
+    if (param == "amp_env.attack_s")     { d.amp_attack       = value; return d; }
+    if (param == "amp_env.decay_s")      { d.amp_decay        = value; return d; }
+    if (param == "amp_env.sustain")      { d.amp_sustain      = value; return d; }
+    if (param == "amp_env.release_s")    { d.amp_release      = value; return d; }
+    // Filter envelope
+    if (param == "filter_env.attack_s")  { d.flt_attack       = value; return d; }
+    if (param == "filter_env.decay_s")   { d.flt_decay        = value; return d; }
+    if (param == "filter_env.sustain")   { d.flt_sustain      = value; return d; }
+    if (param == "filter_env.release_s") { d.flt_release      = value; return d; }
+    // LFO 0
+    if (param == "lfo.0.rate_hz")        { d.lfo0_rate        = value; return d; }
+    if (param == "lfo.0.depth")          { d.lfo0_depth       = value; return d; }
+    // Reverb
+    if (param == "reverb.size")          { d.reverb_size      = value; return d; }
+    if (param == "reverb.damping")       { d.reverb_damping   = value; return d; }
+    if (param == "reverb.width")         { d.reverb_width     = value; return d; }
+    if (param == "reverb.mix")           { d.reverb_mix       = value; return d; }
+    // Delay
+    if (param == "delay.time_s")         { d.delay_time       = value; return d; }
+    if (param == "delay.feedback")       { d.delay_feedback   = value; return d; }
+    if (param == "delay.mix")            { d.delay_mix        = value; return d; }
+    // Global
+    if (param == "master_gain")          { d.master_gain      = value; return d; }
+    if (param == "portamento_s")         { d.portamento       = value; return d; }
+    // Oscillators (osc.N.field)
+    if (param.size() > 4 && param.compare(0, 4, "osc.") == 0) {
+        const auto p2  = param.substr(4);
+        const auto dot = p2.find('.');
+        if (dot != std::string::npos) {
+            int idx = 0;
+            try { idx = std::stoi(p2.substr(0, dot)); } catch (...) {}
+            const std::string field = p2.substr(dot + 1);
+            if (idx == 0) {
+                if (field == "volume")          { d.osc0_volume      = value; return d; }
+                if (field == "detune_cents")    { d.osc0_detune      = value; return d; }
+                if (field == "semitone_offset") { d.osc0_semitone    = value; return d; }
+                if (field == "fm_ratio")        { d.osc0_fm_ratio    = value; return d; }
+                if (field == "fm_depth")        { d.osc0_fm_depth    = value; return d; }
+                if (field == "pulse_width")     { d.osc0_pulse_width = value; return d; }
+            } else if (idx == 1) {
+                if (field == "volume")       { d.osc1_volume = value; return d; }
+                if (field == "detune_cents") { d.osc1_detune = value; return d; }
+            }
+        }
+    }
+    return d; // unknown param → empty delta (no-op)
+}
+
 // Load text file; returns empty string on failure.
 std::string load_text_file(const std::string& path) {
     std::ifstream f(path);
@@ -22,6 +126,7 @@ std::string load_text_file(const std::string& path) {
     ss << f.rdbuf();
     return ss.str();
 }
+
 } // namespace
 
 std::string AgentBridge::status() const { return "agent-bridge-v2"; }
@@ -102,6 +207,63 @@ void AgentBridge::onMidiCC(int controller, int value) noexcept {
         case 74: midiCutoffNorm_    = static_cast<float>(value) / 127.0f; break;
         default: break;
     }
+}
+
+// ── Issue #72: Bidirectional knob bridge ─────────────────────────────────────
+
+void AgentBridge::handleKnobTweak(const std::string& param, float value) {
+    // Copy current patch, apply the single-parameter delta, inject immediately.
+    PatchStruct patch = pipeline_.currentPatch();
+    mapper::apply_delta(patch, paramToDelta(param, value));
+    pipeline_.injectPatch(patch);
+    // Record so the session memory can bias future generations towards user tweaks.
+    memory_.recordFeedback(FeedbackKind::Tweak, param, patch);
+}
+
+void AgentBridge::handleTextMessage(const std::string& json, int clientId) {
+    const std::string type = jsStr(json, "type");
+
+    if (type == "knob_tweak") {
+        handleKnobTweak(jsStr(json, "param"), jsFloat(json, "value"));
+
+    } else if (type == "get_dictionary") {
+        if (wsb_) wsb_->sendToClient(clientId, getDictionaryJson());
+
+    } else if (type == "save_dictionary") {
+        saveDictionary(json);
+
+    } else if (type == "get_telemetry") {
+        if (wsb_) wsb_->sendToClient(clientId, getTelemetryJson());
+
+    } else if (type == "set_telemetry_enabled") {
+        setTelemetryEnabled(jsBool(json, "enabled"));
+        if (wsb_) wsb_->sendToClient(clientId, getTelemetryJson());
+    }
+}
+
+// ── Issue #90: Semantic dictionary ───────────────────────────────────────────
+
+std::string AgentBridge::getDictionaryJson() const {
+    return "{\"type\":\"dictionary_data\",\"entries\":" + semanticMapper_.dumpAllToJson() + "}";
+}
+
+void AgentBridge::saveDictionary(const std::string& json) {
+    semanticMapper_.parseAndSaveCustomEntries(json, "descriptor_dataset_custom.json");
+}
+
+void AgentBridge::loadDictionary(const std::string& path) {
+    semanticMapper_.loadCustomEntries(path);
+}
+
+// ── Issue #91: Telemetry ──────────────────────────────────────────────────────
+
+std::string AgentBridge::getTelemetryJson() const {
+    return "{\"type\":\"telemetry_data\"," + telemetry_.toJson().substr(1); // splice type field in
+}
+
+void AgentBridge::setTelemetryEnabled(bool on) {
+    telemetry_.setEnabled(on);
+    if (!on) telemetry_.flush(); // flush remaining records when disabling
 }
 
 } // namespace agentic_synth::agent
