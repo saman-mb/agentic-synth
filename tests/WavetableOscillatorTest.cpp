@@ -19,12 +19,14 @@ static double measureFrequency(float* buf, int numSamples, double sampleRate, do
     int first = -1, last = -1;
     for (int i = skip + 1; i < numSamples; ++i) {
         if (buf[i - 1] <= 0.0f && buf[i] > 0.0f) {
-            if (first < 0) first = i;
+            if (first < 0)
+                first = i;
             last = i;
             ++crossings;
         }
     }
-    if (crossings < 2 || last == first) return 0.0;
+    if (crossings < 2 || last == first)
+        return 0.0;
     return static_cast<double>(crossings - 1) * sampleRate / static_cast<double>(last - first);
 }
 
@@ -48,8 +50,8 @@ TEST_CASE("WavetableOscillator pitch accuracy ±1 cent, MIDI 24..108", "[wavetab
         REQUIRE(measured > 0.0);
 
         const double cents = std::abs(1200.0 * std::log2(measured / expected));
-        INFO("MIDI " << midi << "  expected=" << expected << " Hz  measured=" << measured
-                     << " Hz  error=" << cents << " cents");
+        INFO("MIDI " << midi << "  expected=" << expected << " Hz  measured=" << measured << " Hz  error=" << cents
+                     << " cents");
         REQUIRE(cents < 1.0);
     }
 }
@@ -57,8 +59,10 @@ TEST_CASE("WavetableOscillator pitch accuracy ±1 cent, MIDI 24..108", "[wavetab
 TEST_CASE("WavetableOscillator morphs linearly between frames", "[wavetable][morph]") {
     // Frame 0 = DC +1, frame 1 = DC -1; morph 0.5 must give DC 0.
     std::vector<float> frames(2 * kWavetableSize);
-    for (int i = 0; i < kWavetableSize; ++i) frames[i] = 1.0f;
-    for (int i = 0; i < kWavetableSize; ++i) frames[kWavetableSize + i] = -1.0f;
+    for (int i = 0; i < kWavetableSize; ++i)
+        frames[i] = 1.0f;
+    for (int i = 0; i < kWavetableSize; ++i)
+        frames[kWavetableSize + i] = -1.0f;
 
     WavetableOscillator osc;
     osc.setSampleRate(44100.0);
@@ -94,7 +98,8 @@ TEST_CASE("WavetableOscillator reset restarts phase", "[wavetable][reset]") {
     osc.setFrequency(440.0);
 
     const float first = osc.processSample();
-    for (int i = 0; i < 100; ++i) osc.processSample();
+    for (int i = 0; i < 100; ++i)
+        osc.processSample();
 
     osc.reset();
     const float afterReset = osc.processSample();
