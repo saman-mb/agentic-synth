@@ -43,17 +43,17 @@ TEST_CASE("Phase 1: 25 natural-language descriptors produce valid patches", "[ph
         // Simulate heuristic parse: map descriptor to plausible parameters
         if (strstr(d.input, "bass") || strstr(d.input, "boomy") || strstr(d.input, "sub") || strstr(d.input, "thick") ||
             strstr(d.input, "growling")) {
-            patch.filterCutoffHz = d.expectedMinCutoff + 50.0f;
+            patch.filter.cutoff_hz = d.expectedMinCutoff + 50.0f;
         } else if (strstr(d.input, "bright") || strstr(d.input, "harsh") || strstr(d.input, "aggressive") ||
                    strstr(d.input, "crisp") || strstr(d.input, "glassy") || strstr(d.input, "tinny") ||
                    strstr(d.input, "airy") || strstr(d.input, "shimmering")) {
-            patch.filterCutoffHz = d.expectedMinCutoff + 500.0f;
+            patch.filter.cutoff_hz = d.expectedMinCutoff + 500.0f;
         } else {
-            patch.filterCutoffHz = d.expectedMinCutoff + 200.0f;
+            patch.filter.cutoff_hz = d.expectedMinCutoff + 200.0f;
         }
-        patch.filterResonance = 0.3f;
-        patch.ampAttackMs = 50.0f;
-        patch.oscillatorMix[0] = 1.0f;
+        patch.filter.resonance = 0.3f;
+        patch.amp_env.attack_s = 0.05f;
+        patch.osc[0].volume = 1.0f;
 
         auto result = validator.validate(patch);
         REQUIRE(result.valid());
@@ -68,9 +68,9 @@ TEST_CASE("Phase 1: VoiceManager produces audio for basic patches", "[phase1][ac
     voices.prepare(44100.0);
 
     PatchStruct patch{};
-    patch.filterCutoffHz = 500.0f;
-    patch.filterResonance = 0.2f;
-    patch.oscillatorMix[0] = 1.0f;
+    patch.filter.cutoff_hz = 500.0f;
+    patch.filter.resonance = 0.2f;
+    patch.osc[0].volume = 1.0f;
 
     voices.applyPatch(patch);
     voices.noteOn(60, 100.0f);
@@ -107,15 +107,15 @@ TEST_CASE("Phase 1: SPSC queue delivers patches without loss", "[phase1][accepta
     SPSCQueue<PatchStruct, 64> queue;
 
     PatchStruct sent{};
-    sent.filterCutoffHz = 1000.0f;
-    sent.filterResonance = 0.5f;
+    sent.filter.cutoff_hz = 1000.0f;
+    sent.filter.resonance = 0.5f;
 
     REQUIRE(queue.push(sent));
 
     PatchStruct received{};
     REQUIRE(queue.pop(received));
-    REQUIRE(received.filterCutoffHz == 1000.0f);
-    REQUIRE(received.filterResonance == 0.5f);
+    REQUIRE(received.filter.cutoff_hz == 1000.0f);
+    REQUIRE(received.filter.resonance == 0.5f);
 }
 
 TEST_CASE("Phase 1: LFO produces cyclic output", "[phase1][acceptance]") {

@@ -58,17 +58,38 @@ void AgenticSynthPlugin::prepareToPlay(double sampleRate, int /*samplesPerBlock*
 void AgenticSynthPlugin::releaseResources() {}
 
 void AgenticSynthPlugin::applyParameters() noexcept {
-    voiceManager_.setFilterCutoff(filterCutoffParam_->load());
-    voiceManager_.setFilterResonance(filterResParam_->load());
+    const float cutoff     = filterCutoffParam_->load();
+    const float res        = filterResParam_->load();
+    const float attack     = ampAttackParam_->load();
+    const float decay      = ampDecayParam_->load();
+    const float sustain    = ampSustainParam_->load();
+    const float release    = ampReleaseParam_->load();
+    const float portamento = portamentoParam_->load();
+
+    if (cutoff == lastCutoff_ && res == lastRes_ && attack == lastAttack_ &&
+        decay == lastDecay_ && sustain == lastSustain_ && release == lastRelease_ &&
+        portamento == lastPortamento_)
+        return;
+
+    lastCutoff_     = cutoff;
+    lastRes_        = res;
+    lastAttack_     = attack;
+    lastDecay_      = decay;
+    lastSustain_    = sustain;
+    lastRelease_    = release;
+    lastPortamento_ = portamento;
+
+    voiceManager_.setFilterCutoff(cutoff);
+    voiceManager_.setFilterResonance(res);
 
     agentic_synth::engine::ADSREnvelope::Params env;
-    env.attackSeconds = ampAttackParam_->load();
-    env.decaySeconds = ampDecayParam_->load();
-    env.sustainLevel = ampSustainParam_->load();
-    env.releaseSeconds = ampReleaseParam_->load();
+    env.attackSeconds  = attack;
+    env.decaySeconds   = decay;
+    env.sustainLevel   = sustain;
+    env.releaseSeconds = release;
     voiceManager_.setAmpEnvelope(env);
 
-    voiceManager_.setPortamento(portamentoParam_->load());
+    voiceManager_.setPortamento(portamento);
 }
 
 void AgenticSynthPlugin::applyPatch(const PatchStruct& patch) noexcept {
@@ -120,13 +141,16 @@ void AgenticSynthPlugin::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
     const int numSamples = buffer.getNumSamples();
     buffer.clear();
 
-    voiceManager_.renderBlock(buffer.getWritePointer(0), numSamples);
+    const int numChannels = buffer.getNumChannels();
+    if (numChannels >= 2) {
+        voiceManager_.renderBlock(buffer.getWritePointer(0), buffer.getWritePointer(1), numSamples);
+    } else {
+        voiceManager_.renderBlock(buffer.getWritePointer(0), numSamples);
+    }
 
     const float gain = masterGainParam_->load();
-    buffer.applyGain(0, 0, numSamples, gain);
-
-    if (buffer.getNumChannels() > 1)
-        buffer.copyFrom(1, 0, buffer, 0, 0, numSamples);
+    for (int ch = 0; ch < numChannels; ++ch)
+        buffer.applyGain(ch, 0, numSamples, gain);
 }
 
 //==============================================================================

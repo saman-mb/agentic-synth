@@ -30,8 +30,8 @@ TEST_CASE("Phase 2: NL descriptor produces valid PatchStruct", "[phase2][accepta
     REQUIRE(validator.validate(patch).valid());
 
     // Key parameters should be set non-zero
-    REQUIRE(patch.filterCutoffHz < 1000.0f); // "warm" = lower cutoff
-    REQUIRE(patch.ampAttackMs > 200.0f);     // "slow attack"
+    REQUIRE(patch.filter.cutoff_hz < 1000.0f); // "warm" = lower cutoff
+    REQUIRE(patch.amp_env.attack_s > 0.2f);     // "slow attack"
 }
 
 TEST_CASE("Phase 2: NL refinement updates existing patch", "[phase2][acceptance]") {
@@ -43,8 +43,8 @@ TEST_CASE("Phase 2: NL refinement updates existing patch", "[phase2][acceptance]
     // The refined patch should have lower cutoff
     // (Integration-style: refine mutates internal state)
 
-    REQUIRE(patch.filterCutoffHz > 0.0f);
-    REQUIRE(refined.filterCutoffHz > 0.0f);
+    REQUIRE(patch.filter.cutoff_hz > 0.0f);
+    REQUIRE(refined.filter.cutoff_hz > 0.0f);
 }
 
 TEST_CASE("Phase 2: Full pipeline dispatch", "[phase2][acceptance]") {
@@ -78,9 +78,9 @@ TEST_CASE("Phase 2: Session memory influences next generation", "[phase2][accept
 
 TEST_CASE("Phase 2: Variation generation from base patch", "[phase2][acceptance]") {
     PatchStruct base{};
-    base.oscillatorMix[0] = 1.0f;
-    base.filterCutoffHz = 1000.0f;
-    base.ampAttackMs = 100.0f;
+    base.osc[0].volume = 1.0f;
+    base.filter.cutoff_hz = 1000.0f;
+    base.amp_env.attack_s = 0.1f;
 
     VariationEngine varEngine;
     auto variations = varEngine.generate(base, 5);
@@ -90,7 +90,7 @@ TEST_CASE("Phase 2: Variation generation from base patch", "[phase2][acceptance]
     // Each variation should differ from the base
     int differing = 0;
     for (const auto& v : variations) {
-        if (v.filterCutoffHz != base.filterCutoffHz || v.oscillatorMix[0] != base.oscillatorMix[0]) {
+        if (v.filter.cutoff_hz != base.filter.cutoff_hz || v.osc[0].volume != base.osc[0].volume) {
             ++differing;
         }
     }
@@ -113,10 +113,10 @@ TEST_CASE("Phase 2: Telemetry collects metrics", "[phase2][acceptance]") {
 
 TEST_CASE("Phase 2: Morph engine creates interpolated patches", "[phase2][acceptance]") {
     PatchStruct a{}, b{};
-    a.filterCutoffHz = 200.0f;
-    b.filterCutoffHz = 2000.0f;
-    a.oscillatorMix[0] = 1.0f;
-    b.oscillatorMix[1] = 1.0f;
+    a.filter.cutoff_hz = 200.0f;
+    b.filter.cutoff_hz = 2000.0f;
+    a.osc[0].volume = 1.0f;
+    b.osc[1].volume = 1.0f;
 
     MorphEngine morph;
     morph.setTarget(0, a);
