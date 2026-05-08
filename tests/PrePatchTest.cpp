@@ -97,3 +97,35 @@ TEST_CASE("lerpPatch at t=0.5 produces midpoint float values") {
     CHECK(result.filter.cutoff_hz == Catch::Approx(2000.0f).epsilon(0.001f));
     CHECK(result.reverb.mix == Catch::Approx(0.5f).epsilon(0.001f));
 }
+
+TEST_CASE("injectPatch multiple times queues in order for streaming pre-patch") {
+    PrePatchPipeline pipeline;
+    pipeline.submit("warm pad");
+    pipeline.poll(); // drain initial heuristic
+
+    PatchStruct p1 = make_default_patch();
+    p1.master_gain = 0.3f;
+    pipeline.injectPatch(p1);
+
+    PatchStruct p2 = make_default_patch();
+    p2.master_gain = 0.6f;
+    pipeline.injectPatch(p2);
+
+    const auto r1 = pipeline.poll();
+    const auto r2 = pipeline.poll();
+    REQUIRE(r1.has_value());
+    REQUIRE(r2.has_value());
+    CHECK(r1->master_gain == Catch::Approx(0.3f).epsilon(0.01f));
+    CHECK(r2->master_gain == Catch::Approx(0.6f).epsilon(0.01f));
+}
+
+TEST_CASE("currentPatch reflects last injectPatch call") {
+    PrePatchPipeline pipeline;
+    pipeline.submit("plucky");
+
+    PatchStruct p = make_default_patch();
+    p.filter.cutoff_hz = 3000.0f;
+    pipeline.injectPatch(p);
+
+    CHECK(pipeline.currentPatch().filter.cutoff_hz == Catch::Approx(3000.0f).epsilon(0.1f));
+}
