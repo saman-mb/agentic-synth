@@ -58,22 +58,22 @@ PatchStruct MultiModalInput::spectralToPatch(const SpectralProfile& profile) {
 
     // Bright hum → more saw, higher cutoff
     if (profile.brightness > 0.6f) {
-        patch.oscillatorMix[0] = 0.7f; // saw
-        patch.oscillatorMix[1] = 0.3f; // square
-        patch.filterCutoffHz = 3000.0f;
+        patch.osc[0].volume = 0.7f; // saw
+        patch.osc[1].volume = 0.3f; // square
+        patch.filter.cutoff_hz = 3000.0f;
     } else if (profile.brightness > 0.3f) {
-        patch.oscillatorMix[0] = 0.4f;
-        patch.oscillatorMix[2] = 0.6f; // triangle
-        patch.filterCutoffHz = 1200.0f;
+        patch.osc[0].volume = 0.4f;
+        patch.osc[2].volume = 0.6f; // triangle
+        patch.filter.cutoff_hz = 1200.0f;
     } else {
-        patch.oscillatorMix[2] = 0.8f; // triangle
-        patch.oscillatorMix[3] = 0.2f; // sine
-        patch.filterCutoffHz = 400.0f;
+        patch.osc[0].volume = 0.2f; // sine (no 4th oscillator; osc[0] used)
+        patch.osc[2].volume = 0.8f; // triangle
+        patch.filter.cutoff_hz = 400.0f;
     }
 
-    patch.filterResonance = profile.roughness * 0.5f;
-    patch.ampAttackMs = 50.0f;
-    patch.ampReleaseMs = 200.0f;
+    patch.filter.resonance = profile.roughness * 0.5f;
+    patch.amp_env.attack_s = 0.05f;  // 50 ms
+    patch.amp_env.release_s = 0.2f;  // 200 ms
 
     return patch;
 }
@@ -85,9 +85,9 @@ void MultiModalInput::applyTempoToPatch(float bpm, PatchStruct& patch) {
 
     // Map BPM to LFO rate (1/4, 1/8, 1/16 note sync)
     float beatHz = bpm / 60.0f;
-    patch.lfoRateHz = beatHz; // 1/4 note
-    patch.lfoDepth = 0.3f;
-    patch.ampAttackMs = std::clamp(60000.0f / bpm * 0.1f, 5.0f, 1000.0f);
+    patch.lfo[0].rate_hz = beatHz; // 1/4 note
+    patch.lfo[0].depth = 0.3f;
+    patch.amp_env.attack_s = std::clamp(6.0f / bpm, 0.005f, 1.0f); // 10% of beat period, clamped 5ms–1s
 }
 
 std::vector<float> MultiModalInput::computeMagnitudeSpectrum(const float* samples, int numSamples) {
