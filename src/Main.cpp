@@ -1,54 +1,14 @@
-#include "MainComponent.h"
+#include "agent/AgentBridge.h"
+#include "engine/SynthEngine.h"
 
-//==============================================================================
-class AgenticSynthApplication final : public juce::JUCEApplication {
-public:
-    AgenticSynthApplication() = default;
+#include <iostream>
 
-    const juce::String getApplicationName() override { return JUCE_APPLICATION_NAME_STRING; }
-    const juce::String getApplicationVersion() override { return JUCE_APPLICATION_VERSION_STRING; }
-    bool moreThanOneInstanceAllowed() override { return true; }
+int main() {
+    const agentic_synth::engine::SynthEngine engine;
+    const agentic_synth::agent::AgentBridge bridge;
 
-    void initialise(const juce::String& commandLine) override {
-        juce::ignoreUnused(commandLine);
-        mainWindow.reset(new MainWindow(getApplicationName()));
-    }
+    std::cout << engine.name() << "\n";
+    std::cout << bridge.status() << "\n";
 
-    void shutdown() override { mainWindow = nullptr; }
-
-    void systemRequestedQuit() override { quit(); }
-
-    void anotherInstanceStarted(const juce::String& commandLine) override { juce::ignoreUnused(commandLine); }
-
-    class MainWindow final : public juce::DocumentWindow {
-    public:
-        explicit MainWindow(juce::String name)
-            : DocumentWindow(name,
-                             juce::Desktop::getInstance().getDefaultLookAndFeel().findColour(
-                                 juce::ResizableWindow::backgroundColourId),
-                             DocumentWindow::allButtons) {
-            setUsingNativeTitleBar(true);
-            setContentOwned(new MainComponent(), true);
-
-#if JUCE_IOS || JUCE_ANDROID
-            setFullScreen(true);
-#else
-            setResizable(true, true);
-            centreWithSize(getWidth(), getHeight());
-#endif
-
-            setVisible(true);
-        }
-
-        void closeButtonPressed() override { JUCEApplication::getInstance()->systemRequestedQuit(); }
-
-    private:
-        JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(MainWindow)
-    };
-
-private:
-    std::unique_ptr<MainWindow> mainWindow;
-};
-
-//==============================================================================
-START_JUCE_APPLICATION(AgenticSynthApplication)
+    return 0;
+}

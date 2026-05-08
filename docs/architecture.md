@@ -1,269 +1,257 @@
-# Agentic Synth — High-Level Architecture
+# Agentic Synth Architecture
 
-## 1. Overview
+## Purpose
 
-Agentic Synth is a VST3/AU plugin and companion desktop application that lets music producers describe sounds in natural language and receive synthesizer patches in real time. A producer speaks or types a description — "a dark, ominous bass with rhythmic earthquake-like vibrations building to a crescendo" — and an on-device AI agent translates that intent into oscillator configurations, filter settings, envelopes, and LFO routing, then renders the patch immediately for playback.
+This document is the canonical architecture reference for Agentic Synth. It describes the target production architecture, the major source directories, the intended data flow, and the architectural decisions that guide future implementation.
 
-**Core value proposition:** Close the gap between sonic imagination and patch creation. No manual parameter hunting. The agent understands musical semantics, remembers what sounds the producer liked, generates variations on demand, and adjusts coherently when the producer says "make it wider" or "more aggressive in the mids."
+Agentic Synth is a VST3/AU plugin and standalone application that uses LLM agents to generate synthesizer patches from natural-language requests. A producer describes a sound, the agent converts that intent into safe patch parameters, and the audio engine renders the result in real time.
 
----
+## System Overview
 
-## 2. System Architecture Diagram
+Agentic Synth has four primary runtime layers:
+
+| Layer | Primary technology | Responsibility |
+| --- | --- | --- |
+| Plugin host integration | C++20, JUCE 7 | Expose Agentic Synth as VST3, AU, and standalone targets; own DAW-facing audio and MIDI callbacks. |
+| Audio engine | C++20 | Render synth voices, apply patch parameters, and maintain real-time audio safety. |
+| Agent bridge | C++ with Python/LLM integration boundary | Translate user requests into structured patch-generation work and move generated patches back into C++. |
+| User interface | React, TypeScript, Vite | Provide the companion interface for prompt input, patch review, parameter editing, and future agent interaction. |
+
+The production system keeps LLM inference and all blocking work outside the real-time audio callback. The audio thread consumes already-validated patch state and must never call Python, allocate unbounded memory, perform network I/O, or wait on agent responses.
 
 ```mermaid
-graph TB
-    subgraph DAW["DAW Host"]
-        HOST[VST3/AU Shell<br/>JUCE / iPlug2]
-    end
-
-    subgraph Audio["Audio Engine"]
-        SYNTH[Synthesizer Core<br/>Wavetable · FM · VA]
-        RENDER[Real-Time Audio Pipeline<br/>Low-latency thread]
-        SYNTH --> RENDER
-    end
-
-    subgraph AgentLayer["Agent Layer"]
-        LLM[Agent Runtime<br/>llama.cpp · Phi-4 / Llama 3.2 8B]
-        MAPPER[NL-to-Parameter Mapper<br/>Semantic Embeddings + Mapping Tables]
-        PRESET[Generative Variation Engine<br/>Branch · Morph · Explore]
-        LLM --> MAPPER
-        LLM --> PRESET
-    end
-
-    subgraph UI["UI Layer"]
-        CHAT[Chat Interface<br/>NL input · History]
-        VIZ[Waveform & Spectrum Preview]
-        PATCHUI[Patch Explorer<br/>Knob view · Parameter override]
-        CHAT --> VIZ
-        CHAT --> PATCHUI
-    end
-
-    subgraph Storage["Persistence"]
-        SESSION[Session Memory<br/>Liked · Discarded · Context]
-        DB[Preset Database<br/>SQLite]
-        SESSION --- DB
-    end
-
-    HOST <-->|Plugin API<br/>MIDI + Audio| RENDER
-    HOST <-->|IPC: gRPC/HTTP| LLM
-    UI <-->|WebSocket / gRPC| LLM
-    UI <-->|WebSocket / gRPC| SYNTH
-    MAPPER -->|Patch struct| SYNTH
-    PRESET -->|Patch variants| DB
-    SESSION -->|Context feed| LLM
-    DB -->|Preset recall| SYNTH
+flowchart LR
+    User[User request] --> UI[React UI]
+    UI --> Bridge[AgentBridge]
+    Bridge --> LLM[LLM agent]
+    LLM --> Bridge
+    Bridge --> Params[Validated patch parameters]
+    Params --> Processor[Plugin Processor]
+    Processor --> Engine[SynthEngine]
+    Engine --> Audio[Audio output]
 ```
 
----
+## Core Components
 
-## 3. Component Descriptions
+### SynthEngine
 
-### VST3/AU Shell
-- **Framework:** JUCE 7 (preferred) or iPlug2
-- Exposes the plugin to any DAW via VST3 and AU APIs
-- Owns the audio callback — the only component allowed to touch the real-time thread
-- Bridges DAW MIDI/automation events into the audio engine
-- Launches the companion app process and communicates via local gRPC or named pipe
+`SynthEngine` is the C++ synthesis core under `src/engine/`. It is responsible for turning validated patch parameters into audio samples.
 
-### Synthesizer Engine
-- **Architecture:** Hybrid wavetable + FM + virtual-analog (VA) core, written in C++
-- Wavetable layer: supports up to 256-sample wavetables, morphable across dimensions
-- FM layer: 4–6 operator FM with arbitrary algorithm routing
-- VA layer: Moog-ladder and SVF filter models, analog-drift oscillators
-- All DSP runs lock-free on the audio thread; parameter changes are applied via atomic double-buffered structs
+Target responsibilities:
 
-### Agent Runtime
-- **Inference:** llama.cpp (GGUF quantized models, CPU + Metal/CUDA offload)
-- **Models:** Phi-4 (14B, Q4_K_M ~8GB VRAM) or Llama 3.2 8B (Q4_K_M ~5GB) depending on available hardware
-- Runs in a separate process or thread pool, never on the audio thread
-- Exposes a local gRPC service with two primary endpoints: `GeneratePatch(description)` and `RefinePatch(existing_patch, delta_description)`
-- Context window used to carry session history and curated synth-domain system prompt
+- Maintain the DSP graph for oscillators, filters, envelopes, modulation, effects, and voice management.
+- Render audio deterministically for the sample rate and block size provided by the plugin processor.
+- Apply parameter updates through real-time-safe mechanisms such as atomics, lock-free queues, or double-buffered patch state.
+- Enforce DSP-level parameter limits as a final safety boundary.
 
-### NL-to-Synth-Parameter Mapper
-- The core glue layer — converts agent output into concrete synth parameters
-- Agent produces a structured JSON patch spec (oscillator config, filter cutoff/resonance, ADSR values, LFO rate/depth/target, effects chain)
-- Mapper resolves high-level semantic tags (`"warm"`, `"dark"`, `"evolving"`) via a curated embedding lookup table: each tag maps to a delta vector in parameter space
-- Semantic embedding space trained on a dataset of labeled preset descriptions + parameter values
-- Handles ambiguity resolution: "dark" in a bass context lowers filter cutoff; "dark" in a pad context also reduces high-frequency wavetable content
-- Produces a `PatchStruct` sent to the synthesizer engine over a lock-free queue
+Current repository status:
 
-### Audio Rendering Pipeline
-- Runs entirely on the real-time audio thread inside the VST3/AU shell
-- Reads `PatchStruct` from a wait-free single-producer / single-consumer queue (no agent writes here)
-- Renders N-voice polyphony with voice stealing, pitch, velocity, and mod wheel routing
-- Latency target: < 2ms parameter-to-audio from queue commit to rendered output
-- Waveform preview is rendered off-thread at reduced sample rate for UI display
+- `src/engine/SynthEngine.h` and `src/engine/SynthEngine.cpp` contain the placeholder engine surface.
+- The placeholder implementation returns silence and establishes the namespace and source location for future DSP work.
 
-### UI Layer
-- **Option A (recommended):** React + TypeScript frontend served from a local Vite dev server; communicates with the agent and synth via WebSocket
-- **Option B:** Native JUCE UI — faster to ship, less flexible for chat/rich interaction
-- Chat panel: text and speech input (Web Speech API or whisper.cpp for offline STT)
-- Patch explorer: draggable knob grid mirroring the synthesizer's parameter space
-- Waveform / spectrum visualization: canvas-rendered, updated via WebSocket push
-- Preset browser: grid of generated and saved patches with audio preview thumbnails
+### AgentBridge
 
-### Session History & Preset Database
-- SQLite database at `~/.agentic-synth/session.db`
-- Tables: `patches` (JSON blob + metadata), `session_events` (liked/discarded/tweaked), `embeddings` (semantic vectors for similarity search)
-- Session context fed back into the agent prompt so it knows what the producer has already tried
-- Liked patches raise their semantic neighborhood in future generation; discarded patches suppress it
+`AgentBridge` is the boundary between the C++ plugin/application and the agent runtime under `src/agent/`.
 
-### Generative Variation Engine
-- Given a base patch, generates N variations (default: 5) by:
-  1. Sampling the agent with temperature-varied prompts ("a slightly brighter version", "more movement", etc.)
-  2. Perturbing parameter vectors within semantic-preserving bounds (±15% on correlated parameter groups)
-  3. Interpolating between two saved patches along a morph axis
-- Variations rendered immediately for instant A/B comparison
+Target responsibilities:
 
----
+- Accept natural-language patch requests and refinement requests from the UI or plugin layer.
+- Invoke the selected LLM agent runtime through a C++/Python bridge or local process boundary.
+- Require structured agent output, preferably a versioned patch schema rather than free-form text.
+- Validate, clamp, and normalize patch parameters before they can reach the audio engine.
+- Return agent status, progress, errors, and generated patch metadata to the UI.
 
-## 4. Data Flow
+Current repository status:
 
-**End-to-end: "a dark evolving pad"**
+- `src/agent/AgentBridge.h` and `src/agent/AgentBridge.cpp` contain the placeholder bridge surface.
+- `third_party/README.md` reserves `third_party/llama.cpp/` for local model inference dependencies.
 
-```
-1. INPUT
-   User types or speaks: "a dark evolving pad"
-   ↓
-2. STT (if speech)
-   whisper.cpp transcribes audio → text string
-   ↓
-3. AGENT RUNTIME
-   llama.cpp receives: [system prompt: synth domain context]
-                       [session history: last 5 patches + feedback]
-                       [user: "a dark evolving pad"]
-   → Produces JSON patch spec:
-     { osc1: {type: wavetable, table: "dark_pad_01", detune: 8},
-       osc2: {type: VA, waveform: saw, octave: -1},
-       filter: {type: SVF_LP, cutoff: 800, resonance: 0.3, env_mod: 0.6},
-       env: {attack: 1200ms, decay: 400ms, sustain: 0.7, release: 2800ms},
-       lfo1: {target: filter_cutoff, rate: 0.25Hz, depth: 0.4, shape: sine},
-       lfo2: {target: osc1_wavetable_pos, rate: 0.08Hz, depth: 0.6},
-       reverb: {size: 0.85, damp: 0.4} }
-   ↓
-4. NL-TO-PARAMETER MAPPER
-   Semantic tags resolved: "dark" → filter cutoff bias −30%, wavetable → dark tables
-   "evolving" → LFO depth +20%, slow rate, wavetable pos modulation
-   Final PatchStruct assembled
-   ↓
-5. PATCH DELIVERY
-   PatchStruct pushed to wait-free queue → audio thread reads next buffer cycle
-   ↓
-6. AUDIO RENDERING
-   Synthesizer engine applies patch, renders audio
-   Waveform preview rendered off-thread → pushed to UI via WebSocket
-   ↓
-7. USER HEARS PATCH (~50–200ms total latency for NL→audio)
-   ↓
-8. USER TWEAKS
-   "Make the filter more open and add rhythmic gating"
-   ↓
-9. AGENT REFINEMENT
-   Agent receives: [previous patch spec] + [delta description]
-   → Updates only filter.cutoff (+40%), adds trem LFO on amplitude at 1/8 note sync
-   ↓
-10. SESSION MEMORY
-    Event logged: patch_id, description, user_feedback="kept"
-    Embedding stored for future similarity retrieval
+### React UI
+
+The React UI lives under `ui/` and is built with Vite-oriented project structure.
+
+Target responsibilities:
+
+- Capture typed and, eventually, spoken sound-design requests.
+- Display agent responses, generated patches, and refinement history.
+- Provide direct controls for patch parameters so users can override or fine-tune agent output.
+- Visualize audio and patch state through waveform, spectrum, envelope, modulation, and preset views.
+- Communicate with the C++ application/plugin boundary through a defined local API or embedded web-view bridge.
+
+Current repository status:
+
+- `ui/src/App.tsx` contains a placeholder UI shell.
+- `ui/package.json` currently exposes linting through `npm run lint`.
+
+### Plugin Processor
+
+The plugin processor is the DAW-facing C++ component under `src/PluginProcessor.*`.
+
+Target responsibilities:
+
+- Implement JUCE `AudioProcessor` lifecycle hooks for preparation, state restoration, MIDI handling, audio rendering, and editor creation.
+- Own the real-time `processBlock` callback and delegate synthesis to `SynthEngine`.
+- Receive validated parameter updates from the agent/UI side without blocking the audio callback.
+- Serialize plugin state for DAW sessions, including generated patch parameters and user edits.
+
+Current repository status:
+
+- `src/PluginProcessor.cpp` currently clears the output buffer as a placeholder.
+- `src/PluginEditor.*` contains the JUCE editor surface for the plugin target.
+
+## Data Flow
+
+The main product loop is natural language to audio:
+
+1. The user enters a request such as `make a dark evolving pad with slow motion` in the React UI or plugin editor.
+2. The UI sends the request to `AgentBridge` using the local integration channel.
+3. `AgentBridge` prepares a constrained prompt or structured request for the LLM agent.
+4. The LLM returns a structured patch proposal with oscillator, filter, envelope, modulation, and effects parameters.
+5. `AgentBridge` validates the patch schema, clamps unsafe values, fills defaults, and converts the result into the internal patch representation.
+6. The plugin processor receives the validated patch update through a real-time-safe handoff.
+7. `SynthEngine` applies the patch at a safe synchronization point and renders audio in `processBlock`.
+8. The user hears the result and can refine it with another prompt or direct UI edits.
+
+```text
+user request
+  -> AgentBridge
+  -> LLM agent
+  -> patch parameters
+  -> validation and normalization
+  -> Plugin Processor
+  -> SynthEngine
+  -> audio output
 ```
 
----
+Key boundaries:
 
-## 5. Technology Choices
+- The LLM path is asynchronous and non-real-time.
+- Patch validation happens before parameters reach `SynthEngine`.
+- The audio callback only reads prepared state and renders audio.
+- UI updates and audio rendering use separate timing models.
 
-| Component | Choice | Rationale |
-|---|---|---|
-| Audio framework | **JUCE 7** (C++) | Battle-tested VST3/AU/standalone, excellent DSP utilities, large community, commercial license available |
-| Agent inference | **llama.cpp** | Runs on CPU + Metal/CUDA, GGUF quantization, active development, proven real-world performance |
-| LLM model | **Phi-4 (14B Q4)** or **Llama 3.2 8B Q4** | Phi-4 best-in-class at instruction following for its size; Llama 3.2 8B for lower-RAM systems. Both run at acceptable tokens/sec on 2022+ hardware |
-| Parameter mapping | **Semantic embeddings + curated tables** | Pure LLM output is noisy for precise parameter values; curated tables provide guardrails while embeddings handle open-ended vocabulary |
-| UI | **React + TypeScript + Vite + WebSocket** | Richer chat UX than native JUCE, easier to iterate on, ships to companion app and web preview simultaneously |
-| IPC | **gRPC (local)** | Type-safe, low overhead, bidirectional streaming for real-time parameter updates; HTTP/JSON fallback for simpler integrations |
-| Persistence | **SQLite** | Zero-dependency, embedded, sufficient for preset + session data at this scale |
-| Speech input | **whisper.cpp** (offline) | Privacy-first, no API cost, runs on-device alongside llama.cpp |
+## Build System
 
----
+Agentic Synth uses a split build system appropriate for a native audio plugin with a web-based companion UI.
 
-## 6. Key Risks & Mitigations
+### C++ Plugin and App
 
-### Real-Time Audio Safety
-**Risk:** Agent inference (100ms–2s) blocks or starves the audio thread, causing dropouts.
-**Mitigation:** Agent runs in a completely separate process/thread. Audio thread only reads from a wait-free queue. Parameter changes are double-buffered and applied atomically. Agent is never on the audio call stack.
+- CMake is the top-level build system.
+- The project targets C++20.
+- JUCE 7 is the selected framework for plugin and standalone application integration.
+- `src/CMakeLists.txt` defines the intended JUCE targets for the shared engine library, standalone app, and plugin target.
+- `CMakePresets.json` defines local presets for Linux, macOS, and Windows-oriented builds.
+- CI configures CMake, builds the project, and runs CTest on Linux, macOS, and Windows.
 
-### Harmful Frequency Generation
-**Risk:** Agent generates extreme parameter values (e.g. 0Hz filter, full resonance self-oscillation, DC offset).
-**Mitigation:** All parameter values are clamped server-side in the Mapper before reaching the synthesizer. Hard limits enforced in the `PatchStruct` validator. Resonance capped below self-oscillation threshold unless explicitly unlocked in settings.
+Important targets and concepts:
 
-### NL Inference Latency
-**Risk:** 2–5 second lag before producer hears a patch change breaks creative flow.
-**Mitigation:**
-- Phi-4 Q4 produces ~15–30 tokens/sec on M2 Mac; patch JSON is ~150 tokens → ~5–10s cold. Optimized with:
-  - Persistent KV cache (model stays loaded)
-  - Speculative decoding where supported
-  - Streaming: audio engine applies partial patch as tokens arrive, updates incrementally
-  - "Instant preview" mode: mapper applies a heuristic pre-patch from keywords in < 200ms while full inference completes in background
+- `agentic_synth_engine`: shared C++ engine and agent bridge library.
+- `AgenticSynth`: standalone JUCE GUI application target.
+- `AgenticSynth_Plugin`: JUCE plugin target configured for VST3, AU, and standalone formats.
 
-### Semantic Ambiguity
-**Risk:** "Dark" means different things across synthesis contexts, genres, and users.
-**Mitigation:**
-- System prompt includes synthesis-domain context grounding the model's vocabulary
-- Session history disambiguates: if producer consistently pushes filter cutoff up after "dark" patches, the mapper biases future "dark" predictions
-- Explicit disambiguation: agent asks a single clarifying question if confidence is low
-- User-editable semantic dictionary: producers can define what "dark" means for their workflow
+### React UI
 
----
+- The UI lives in `ui/`.
+- Vite project files are present in `ui/vite.config.ts`, `ui/tsconfig.json`, and `ui/index.html`.
+- React source lives under `ui/src/`.
+- Node.js 20 or newer is expected for local development and CI.
+- UI linting runs with `npm run lint` from the `ui/` directory.
 
-## 7. Implementation Phases
+## Directory Structure
 
-### Phase 1 — Standalone Desktop App (Foundation)
-**Goal:** Prove the core loop works end-to-end without DAW complexity.
+```text
+agentic-synth/
+  .github/workflows/       CI definitions
+  cmake/                   Shared CMake project options and helpers
+  docs/                    Architecture documents, diagrams, generated artifacts, and ADRs
+  docs/adr/                Architecture Decision Records
+  src/                     C++ application, plugin, engine, and bridge code
+  src/agent/               AgentBridge C++ boundary
+  src/engine/              SynthEngine DSP boundary
+  tests/                   C++ test targets
+  third_party/             Reserved vendored dependencies and submodules
+  third_party/JUCE/        Expected JUCE framework dependency
+  third_party/llama.cpp/   Expected local inference dependency
+  ui/                      React, TypeScript, and Vite UI project
+  CMakeLists.txt           Root CMake entry point
+  CMakePresets.json        Local configure and build presets
+  CONTRIBUTING.md          Contributor workflow and standards
+  README.md                Project overview
+```
 
-- JUCE standalone app with wavetable + VA synthesizer core
-- Hardcoded patch mapping: fixed vocabulary of ~50 semantic descriptors → parameter presets
-- Basic React UI with text input and patch knob display
-- SQLite preset storage
-- No LLM — heuristic rule-based NL parsing (keyword matching)
+## Key Design Decisions
 
-**Deliverable:** Producer can type 20–30 common descriptors and hear a reasonable patch.
+Architecture decisions are recorded as ADRs in `docs/adr/`.
 
----
+| ADR | Status | Decision |
+| --- | --- | --- |
+| [ADR-0001](adr/ADR-0001-initial-architecture.md) | Accepted | Use JUCE 7 as the audio plugin framework. |
 
-### Phase 2 — Local LLM Integration + Chat Interface
-**Goal:** Replace hardcoded rules with a real generative agent.
+Current guiding decisions:
 
-- Integrate llama.cpp with Phi-4 or Llama 3.2 8B
-- Build NL-to-Parameter Mapper with semantic embedding lookup
-- gRPC bridge between agent process and synth engine
-- Chat interface with history, streaming responses
-- Generative variation engine (5 variations from base patch)
-- Session memory: liked/discarded patch tracking
+- Use JUCE 7 for cross-platform VST3/AU plugin and standalone app delivery.
+- Keep the audio thread isolated from agent inference, Python execution, file I/O, and network I/O.
+- Treat agent output as untrusted until it passes schema validation and parameter clamping.
+- Keep the synthesis engine in C++ for deterministic low-latency rendering.
+- Use React and Vite for the companion UI to support a richer chat and patch-editing experience than a purely native control panel.
+- Prefer local/offline inference where possible so patch generation can work without cloud availability and avoid sending creative session data to external services by default.
 
-**Deliverable:** Full NL patch generation loop with session awareness and variations.
+## Development Workflow
 
----
+### Local Setup
 
-### Phase 3 — VST3/AU Plugin + DAW Hosting
-**Goal:** Run inside real DAWs (Ableton, Logic, FL Studio, Reaper).
+Install the expected toolchain:
 
-- JUCE VST3/AU wrapper around the synthesizer core
-- Plugin ↔ companion app IPC (named pipe or local gRPC)
-- MIDI input handling (pitch, velocity, mod wheel, automation)
-- State save/restore (DAW project serialization)
-- Audio preview streaming from plugin to companion app UI
-- Hardened real-time safety audit
+- CMake 3.24 or newer.
+- A C++20-capable compiler.
+- JUCE 7 available through the expected third-party location or future dependency bootstrap flow.
+- Node.js 20 or newer and npm for UI work.
+- Python 3 and `pre-commit` for repository hooks.
 
-**Deliverable:** Plugin passes basic DAW validation; runs stably in Ableton Live and Logic Pro.
+Set up hooks:
 
----
+```sh
+python -m pip install pre-commit
+pre-commit install --install-hooks
+pre-commit install --hook-type commit-msg
+```
 
-### Phase 4 — Advanced Agentic Features
-**Goal:** Make the agent a genuine creative collaborator, not just a patch generator.
+Build and test C++ code:
 
-- **Style transfer:** "Make this patch sound like [reference patch]" — analyzes parameter deltas and applies them
-- **Session-aware generation:** Agent understands the full session narrative ("we've been building a dark set, this should be the peak moment")
-- **Smart morphing:** Real-time interpolation between two patches, driven by MIDI CC or automation
-- **Multi-modal input:** Hum a melody or tap a rhythm — agent infers timbre intent from audio character
-- **Collaborative iteration:** Agent proactively suggests variations when producer loops a section multiple times without changing the patch
-- **Export and sharing:** Export patches as standard preset formats (Serum, Vital compatible where possible)
+```sh
+cmake -S . -B build -DAGENTIC_SYNTH_BUILD_TESTS=ON
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
+```
 
-**Deliverable:** A creative tool that feels like having a sound designer in the session.
+Lint UI code:
+
+```sh
+cd ui
+npm ci
+npm run lint
+```
+
+Run all pre-commit checks before review:
+
+```sh
+pre-commit run --all-files
+```
+
+### Change Guidelines
+
+- Keep real-time audio code small, deterministic, and allocation-free in `processBlock`.
+- Add tests around patch validation, parameter mapping, and any deterministic DSP behavior.
+- Update or add ADRs when a change introduces a durable architectural decision.
+- Update this document when component ownership, build targets, data flow, or repository structure changes.
+- Keep generated documentation artifacts separate from canonical markdown sources.
+
+## Open Architecture Work
+
+The repository currently contains placeholder implementations for the engine, bridge, plugin rendering path, and UI shell. The next architecture milestones are:
+
+- Define the versioned patch parameter schema shared by the agent bridge, UI, plugin state, and `SynthEngine`.
+- Decide the concrete C++/Python or local process integration model for agent execution.
+- Implement a real-time-safe patch handoff between `AgentBridge`, `PluginProcessor`, and `SynthEngine`.
+- Wire the CMake root project to the intended JUCE plugin/app targets as the plugin build matures.
+- Expand tests beyond the placeholder target to cover engine behavior and agent-output validation.
