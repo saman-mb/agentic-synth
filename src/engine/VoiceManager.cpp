@@ -37,6 +37,9 @@ float Voice::render(float portamentoAlpha) noexcept {
 
 VoiceManager::VoiceManager(int voiceCount) {
     assert(voiceCount > 0);
+    // Reserve first so resize() never triggers a reallocation — Voice contains
+    // unique_ptr which makes it non-trivially-relocatable.
+    voices_.reserve(static_cast<std::size_t>(voiceCount));
     voices_.resize(static_cast<std::size_t>(voiceCount));
     for (auto& v : voices_) {
         v.filter = std::make_unique<MoogLadder>();
