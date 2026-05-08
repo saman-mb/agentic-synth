@@ -171,8 +171,8 @@ struct DescriptorEntry {
 // ---------------------------------------------------------------------------
 
 // clang-format off
-inline const std::array<DescriptorEntry, 72>& get_descriptor_dataset() {
-    static const std::array<DescriptorEntry, 72> data{{
+inline const std::array<DescriptorEntry, 74>& get_descriptor_dataset() {
+    static const std::array<DescriptorEntry, 74> data{{
 
         // ── Brightness / Tone ─────────────────────────────────────────────────
         {"dark",    SoundContext::Generic,    {.filter_cutoff=400.0f,   .filter_resonance=0.05f}},
