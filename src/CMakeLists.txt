@@ -35,9 +35,8 @@ target_link_libraries(agentic_synth_engine
     PUBLIC
         agentic_synth_mapper
         juce::juce_audio_basics
-        juce::juce_audio_processors
+        juce::juce_data_structures
 )
-
 # ── Agent Library ────────────────────────────────────────────────────────────
 # AI agent layer: depends on engine_lib, never the other way around.
 add_library(agentic_synth_agent STATIC
