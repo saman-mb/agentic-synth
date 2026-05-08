@@ -23,6 +23,9 @@ add_executable(agentic_synth_tests
     ../src/engine/VoiceManager.cpp
     HeuristicParserTest.cpp
     ../src/mapper/HeuristicParser.cpp
+    SessionMemoryTest.cpp
+    ../src/agent/SessionMemory.cpp
+    ../src/agent/AgentBridge.cpp
 )
 target_include_directories(agentic_synth_tests PRIVATE ../src)
 target_link_libraries(agentic_synth_tests PRIVATE Catch2::Catch2WithMain)
