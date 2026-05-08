@@ -10,7 +10,7 @@ TEST_CASE("bright lead: high cutoff, saw wave") {
     HeuristicParser parser;
     auto patch = parser.parse("bright lead");
     CHECK(patch.filter.cutoff_hz > 4000.0f);
-    CHECK(patch.osc[0].type == OscType::Saw);
+    CHECK(patch.osc[0].type == OscType::Sawtooth);
 }
 
 TEST_CASE("dark pad: low cutoff, slow attack, reverb") {
@@ -33,7 +33,7 @@ TEST_CASE("evolving ambient: active LFO, high reverb mix") {
     auto patch = parser.parse("evolving ambient");
     CHECK(patch.lfo[0].depth > 0.5f);
     CHECK(patch.reverb.mix > 0.4f);
-    CHECK(patch.lfo[0].target == LfoTarget::Filter);
+    CHECK(patch.lfo[0].target == LfoTarget::FilterCutoff);
 }
 
 TEST_CASE("warm mono legato: monophonic with portamento") {
