@@ -21,6 +21,8 @@ add_executable(agentic_synth_tests
     ../src/engine/LFO.cpp
     VoiceManagerTest.cpp
     ../src/engine/VoiceManager.cpp
+    MidiHandlerTest.cpp
+    ../src/engine/MidiHandler.cpp
     HeuristicParserTest.cpp
     ../src/mapper/HeuristicParser.cpp
     SessionMemoryTest.cpp

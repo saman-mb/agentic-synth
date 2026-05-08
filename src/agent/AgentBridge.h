@@ -8,12 +8,16 @@
 #include "agent/PrePatchPipeline.h"
 #include "agent/SessionMemory.h"
 #include "agent/StreamParser.h"
+#include "agent/Telemetry.h"
 #include "engine/PatchStruct.h"
 #include "engine/VariationEngine.h"
 #include "mapper/GrammarSampler.h"
 #include "mapper/SemanticMapper.h"
 
 namespace agentic_synth::agent {
+
+// Forward declaration — keeps JUCE out of this header.
+class WebSocketBridge;
 
 class AgentBridge {
 public:
@@ -58,13 +62,57 @@ public:
     // well within 500 ms of stream start.
     void feedChunk(std::string_view chunk);
 
+    // Issue #76: called by MidiHandler for every CC message.
+    // Tracks CC movements and biases future AI patch generation accordingly.
+    void onMidiCC(int controller, int value) noexcept;
+
+    // ── Issue #72: Bidirectional knob bridge ──────────────────────────────────
+
+    // Set the bridge so this class can send replies (dictionary, telemetry data).
+    void setWebSocketBridge(WebSocketBridge* bridge) noexcept { wsb_ = bridge; }
+
+    // Route all incoming WebSocket text frames here.
+    // Dispatches: knob_tweak, get_dictionary, save_dictionary,
+    //             get_telemetry, set_telemetry_enabled.
+    void handleTextMessage(const std::string& json, int clientId);
+
+    // Apply one real-time knob change to the audio pipeline (target ≤16 ms).
+    // Records the change as FeedbackKind::Tweak in session memory.
+    void handleKnobTweak(const std::string& param, float value);
+
+    // ── Issue #90: Semantic dictionary ────────────────────────────────────────
+
+    // All static + custom entries serialised as a dictionary_data JSON frame.
+    [[nodiscard]] std::string getDictionaryJson() const;
+
+    // Parse custom entries from a save_dictionary JSON frame and persist to disk.
+    void saveDictionary(const std::string& json);
+
+    // Load custom entries from disk (call once at startup).
+    void loadDictionary(const std::string& path = "descriptor_dataset_custom.json");
+
+    // ── Issue #91: Telemetry ──────────────────────────────────────────────────
+
+    // Current telemetry serialised as a telemetry_data JSON frame.
+    [[nodiscard]] std::string getTelemetryJson() const;
+
+    void setTelemetryEnabled(bool on);
+
+    [[nodiscard]] Telemetry& telemetry() noexcept { return telemetry_; }
+
 private:
-    PrePatchPipeline pipeline_;
-    engine::VariationEngine variationEngine_;
-    SessionMemory memory_;
-    mapper::GrammarSampler sampler_;
-    mapper::SemanticMapper semanticMapper_;
-    StreamParser streamParser_;
+    PrePatchPipeline            pipeline_;
+    engine::VariationEngine     variationEngine_;
+    SessionMemory               memory_;
+    mapper::GrammarSampler      sampler_;
+    mapper::SemanticMapper      semanticMapper_;
+    StreamParser                streamParser_;
+    Telemetry                   telemetry_{"agentic_synth_telemetry.json"};
+    WebSocketBridge*            wsb_{nullptr};
+
+    // Normalised [0,1] last-seen values from MIDI CC; injected into system prompt.
+    float midiCutoffNorm_{0.5f};
+    float midiResonanceNorm_{0.0f};
 };
 
 } // namespace agentic_synth::agent

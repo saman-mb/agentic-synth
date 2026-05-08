@@ -38,6 +38,7 @@ APVTS::ParameterLayout AgenticSynthPlugin::createParameterLayout() {
 //==============================================================================
 AgenticSynthPlugin::AgenticSynthPlugin()
     : AudioProcessor(BusesProperties().withOutput("Output", juce::AudioChannelSet::stereo(), true)),
+      midiHandler_(voiceManager_),
       apvts_(*this, nullptr, "Parameters", createParameterLayout()) {
     masterGainParam_ = apvts_.getRawParameterValue("masterGain");
     filterCutoffParam_ = apvts_.getRawParameterValue("filterCutoff");
@@ -101,12 +102,20 @@ void AgenticSynthPlugin::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
     if (const auto patch = agentBridge_.pollPatch())
         applyPatch(*patch);
 
+    // Route all MIDI through MidiHandler (note on/off + CC mapping).
     for (const auto metadata : midiMessages) {
-        const auto msg = metadata.getMessage();
-        if (msg.isNoteOn())
-            voiceManager_.noteOn(msg.getNoteNumber(), msg.getFloatVelocity());
-        else if (msg.isNoteOff())
-            voiceManager_.noteOff(msg.getNoteNumber());
+        const auto& msg = metadata.getMessage();
+        const auto* raw = msg.getRawData();
+        const int sz = msg.getRawDataSize();
+        agentic_synth::engine::RawMidiMsg rmsg;
+        rmsg.status = raw[0];
+        rmsg.data1  = sz > 1 ? raw[1] : 0;
+        rmsg.data2  = sz > 2 ? raw[2] : 0;
+        midiHandler_.process(rmsg);
+
+        // Notify AgentBridge of CC movements for AI context.
+        if (msg.isController())
+            agentBridge_.onMidiCC(msg.getControllerNumber(), msg.getControllerValue());
     }
 
     const int numSamples = buffer.getNumSamples();
