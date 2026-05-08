@@ -89,6 +89,23 @@ void VoiceManager::noteOff(int midiNote) {
 void VoiceManager::setPortamento(float seconds) noexcept { portamentoSeconds_ = seconds; }
 void VoiceManager::setRetrigger(bool retrigger) noexcept { retrigger_ = retrigger; }
 
+void VoiceManager::setFilterCutoff(float hz) noexcept {
+    for (auto& v : voices_)
+        if (v.filter)
+            v.filter->setCutoff(hz);
+}
+
+void VoiceManager::setFilterResonance(float resonance) noexcept {
+    for (auto& v : voices_)
+        if (v.filter)
+            v.filter->setResonance(resonance);
+}
+
+void VoiceManager::setAmpEnvelope(ADSREnvelope::Params params) noexcept {
+    for (auto& v : voices_)
+        v.ampEnv.setParams(params);
+}
+
 float VoiceManager::renderNextSample() noexcept {
     float sum = 0.0f;
     const float alpha = portamentoAlpha();

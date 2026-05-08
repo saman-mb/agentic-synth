@@ -52,6 +52,11 @@ public:
     // true = retrigger envelope on each noteOn; false = legato (keep envelope running).
     void setRetrigger(bool retrigger) noexcept;
 
+    // Parameter setters applied to all voices (safe to call from audio thread).
+    void setFilterCutoff(float hz) noexcept;
+    void setFilterResonance(float resonance) noexcept;
+    void setAmpEnvelope(ADSREnvelope::Params params) noexcept;
+
     float renderNextSample() noexcept;
     void renderBlock(float* output, int numSamples) noexcept;
 

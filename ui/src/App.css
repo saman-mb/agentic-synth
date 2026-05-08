@@ -11,3 +11,129 @@ body,
   height: 100%;
   margin: 0;
 }
+
+/* ── Root layout: knob grid left, chat right ──────────────────────── */
+
+.app-layout {
+  display: grid;
+  grid-template-columns: minmax(340px, 420px) 1fr;
+  height: 100vh;
+  overflow: hidden;
+}
+
+@media (max-width: 900px) {
+  .app-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
+}
+
+/* ── Knob panel ───────────────────────────────────────────────────── */
+
+.panel-knobs {
+  overflow-y: auto;
+  border-right: 1px solid rgb(255 255 255 / 8%);
+  background: rgb(255 255 255 / 2%);
+  padding: 0.75rem;
+}
+
+/* ── Chat panel ───────────────────────────────────────────────────── */
+
+.panel-chat {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Knob grid ────────────────────────────────────────────────────── */
+
+.knob-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.knob-section {
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: 0.6rem;
+  padding: 0.6rem 0.75rem 0.75rem;
+}
+
+.knob-section h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.65rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #91e8ff;
+}
+
+.knob-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
+/* ── Individual knob ──────────────────────────────────────────────── */
+
+.knob-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: ns-resize;
+  user-select: none;
+  gap: 2px;
+}
+
+.knob-label {
+  font-size: 0.58rem;
+  color: #9080bb;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.knob-value {
+  font-size: 0.62rem;
+  color: #d4cce8;
+  font-variant-numeric: tabular-nums;
+}
+
+.knob-agent svg {
+  animation: knob-flash 0.4s ease-out;
+}
+
+@keyframes knob-flash {
+  0%   { filter: drop-shadow(0 0 6px #7b5cff); }
+  100% { filter: none; }
+}
+
+/* ── Push-to-talk ─────────────────────────────────────────────────── */
+
+.ptt-btn {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgb(123 92 255 / 40%);
+  border-radius: 0.5rem;
+  background: transparent;
+  color: #b8a8ff;
+  font-family: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  touch-action: none;
+}
+
+.ptt-btn:hover:not(:disabled) {
+  background: rgb(123 92 255 / 12%);
+}
+
+.ptt-btn.ptt-active {
+  background: rgb(123 92 255 / 25%);
+  border-color: #7b5cff;
+  color: #f4f0ff;
+}
+
+.ptt-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}

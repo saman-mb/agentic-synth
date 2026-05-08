@@ -119,5 +119,6 @@ TEST_CASE("SessionMemory: clear removes all events") {
     mem.clear();
     CHECK(mem.events().empty());
     PatchVector bias = mem.computeParameterBias("dark pad");
-    for (float b : bias) CHECK(b == 0.0f);
+    for (float b : bias)
+        CHECK(b == 0.0f);
 }
