@@ -41,6 +41,13 @@ add_executable(agentic_synth_tests
     StreamParserTest.cpp
     ../src/agent/StreamParser.cpp
     ../src/agent/Telemetry.cpp
+    Phase1AcceptanceTest.cpp
+    Phase2AcceptanceTest.cpp
+    Phase3AcceptanceTest.cpp
+    RealtimeSafetyTest.cpp
+    ../src/engine/StyleTransfer.cpp
+    ../src/engine/PresetExporter.cpp
+    ../src/engine/MorphEngine.cpp
 )
 target_include_directories(agentic_synth_tests PRIVATE ../src)
 target_link_libraries(agentic_synth_tests PRIVATE Catch2::Catch2WithMain)

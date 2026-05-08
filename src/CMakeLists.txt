@@ -21,6 +21,9 @@ add_library(agentic_synth_engine STATIC
     engine/PatchValidator.cpp
     engine/VariationEngine.cpp
     engine/MidiHandler.cpp
+    engine/MorphEngine.cpp
+    engine/StyleTransfer.cpp
+    engine/PresetExporter.cpp
     agent/AgentBridge.cpp
     agent/SessionMemory.cpp
     agent/PrePatchPipeline.cpp
