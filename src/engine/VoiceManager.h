@@ -66,6 +66,7 @@ public:
 
     float renderNextSample() noexcept;
     void renderBlock(float* output, int numSamples) noexcept;
+    void renderBlock(float* left, float* right, int numSamples) noexcept;
 
     [[nodiscard]] int activeVoiceCount() const noexcept;
     [[nodiscard]] int voiceCount() const noexcept;

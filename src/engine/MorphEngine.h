@@ -1,7 +1,9 @@
 #pragma once
 
 #include <array>
+#include <atomic>
 #include <cstdint>
+#include <functional>
 #include <optional>
 
 #include "engine/PatchStruct.h"
@@ -67,11 +69,17 @@ public:
     // Returns true if the CC was consumed (matches morphCc_).
     bool onMidiCC(int controller, int value) noexcept;
 
+    // Poll from the UI/message thread: if position changed since last poll,
+    // fires the callback with the morphed patch and returns true.
+    // Safe to call from any thread; the callback is never fired on the audio thread.
+    bool pollCallback() noexcept;
+
 private:
     std::array<std::optional<PatchStruct>, kMaxTargets> targets_{};
     float position_{0.0f};
     int morphCc_{2}; // CC#2 = Breath Controller
     MorphCallback callback_;
+    std::atomic<bool> positionDirty_{false};
 
     static PatchStruct lerp(const PatchStruct& a, const PatchStruct& b, float t) noexcept;
 };
