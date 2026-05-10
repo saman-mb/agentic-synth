@@ -6,13 +6,12 @@
 - [Troubleshooting](getting-started.md#troubleshooting) — Common issues and fixes
 
 ## Development
-- [Architecture Overview](ARCHITECTURE.md) — System design and component relationships
+- [Architecture Overview](architecture.md) — System design and component relationships
 - [Build & Release](build-release.md) — Compiling from source, packaging, and signing
+- [Local Inference](local-inference.md) — Running LLM inference on a dedicated machine
+
+## Testing
+- [DAW Smoke Tests](daw-smoke-test.md) — Manual testing in major DAWs
 
 ## Compliance
 - [Privacy Statement](privacy-statement.md) — Data handling, telemetry, and user control
-
-## Release
-- [Build & Release](build-release.md) — CI/CD pipeline, code signing, installer creation
-- [DAW Smoke Tests](daw-smoke-test.md) — Manual testing in major DAWs
-- [Plugin Validation](plugin-validation.md) — Automated plugin validation scripts

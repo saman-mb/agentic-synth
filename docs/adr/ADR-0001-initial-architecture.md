@@ -63,5 +63,5 @@ JUCE 7 is selected for its mature plugin API, cross-platform support, standalone
 
 ## Links
 
-- [Agentic Synth Architecture](../ARCHITECTURE.md)
+- [Agentic Synth Architecture](../architecture.md)
 - [JUCE](https://juce.com/)
