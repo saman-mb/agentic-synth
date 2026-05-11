@@ -96,15 +96,28 @@ jobs:
         with:
           cmake-version: "3.28.x"
 
+      # ccache cuts the JUCE rebuild cost from ~50 min to ~5 min across runs
+      # on the free tier. Without it the ubuntu-latest runner OOMs / loses
+      # comms because every commit recompiles all of JUCE.
+      - name: Setup ccache
+        uses: hendrikmuhs/ccache-action@v1.2
+        with:
+          key: ${{ runner.os }}-cmake-debug
+          max-size: 500M
+
       - name: Configure CMake
         run: |
           cmake -S . -B build \
             -DCMAKE_BUILD_TYPE=Debug \
             -DAGENTIC_SYNTH_BUILD_TESTS=ON \
-            -DAGENTIC_SYNTH_BUILD_PLUGIN=ON
+            -DAGENTIC_SYNTH_BUILD_PLUGIN=ON \
+            -DCMAKE_C_COMPILER_LAUNCHER=ccache \
+            -DCMAKE_CXX_COMPILER_LAUNCHER=ccache
 
+      # --parallel without a limit can OOM under JUCE's heavy TUs on the
+      # 16 GB ubuntu-latest free tier. Cap at 2 concurrent jobs.
       - name: Build everything
-        run: cmake --build build --config Debug --parallel
+        run: cmake --build build --config Debug --parallel 2
 
       - name: Run unit tests
         run: ctest --test-dir build --build-config Debug --output-on-failure
