@@ -134,8 +134,7 @@ float Voice::render(float portamentoAlpha, float baseCutoffHz, float resonance) 
 
     // Voice-steal fade-out ramp (linear).
     if (fadeOutSamplesRemaining > 0) {
-        const float rampGain =
-            static_cast<float>(fadeOutSamplesRemaining) / static_cast<float>(fadeOutSamplesTotal);
+        const float rampGain = static_cast<float>(fadeOutSamplesRemaining) / static_cast<float>(fadeOutSamplesTotal);
         gain *= rampGain;
         --fadeOutSamplesRemaining;
         if (fadeOutSamplesRemaining == 0) {
@@ -144,7 +143,8 @@ float Voice::render(float portamentoAlpha, float baseCutoffHz, float resonance) 
             filterEnv.reset();
             // Reset filter integrators too: resonant patches click on reuse
             // otherwise (Moog ladder s_[0..3] state carries over).
-            if (filter) filter->reset();
+            if (filter)
+                filter->reset();
             dcBlocker.reset();
             noteIsOn = false;
             midiNote = -1;
@@ -177,8 +177,7 @@ void VoiceManager::prepare(double sampleRate) {
     sampleRate_ = sampleRate;
     for (auto& v : voices_)
         v.prepare(sampleRate);
-    voiceStealFadeSamples_ =
-        std::max(1, static_cast<int>(std::lround(kVoiceStealFadeSeconds * sampleRate)));
+    voiceStealFadeSamples_ = std::max(1, static_cast<int>(std::lround(kVoiceStealFadeSeconds * sampleRate)));
     cutoffSmoother_.setSampleRate(sampleRate);
     resonanceSmoother_.setSampleRate(sampleRate);
     gainSmoother_.setSampleRate(sampleRate);
@@ -226,8 +225,7 @@ void VoiceManager::noteOn(int midiNote, float velocity) {
     // in the pool. Round-robin pattern spreads polyphonic chords across the
     // stereo field; precompute constant-power L/R gains here so the audio
     // thread never calls cos/sin per sample.
-    const std::size_t voiceIndex =
-        static_cast<std::size_t>(v - voices_.data());
+    const std::size_t voiceIndex = static_cast<std::size_t>(v - voices_.data());
     v->pan = panForVoiceIndex(voiceIndex);
     computePanGains(v->pan, v->panGainL, v->panGainR);
 
@@ -255,13 +253,9 @@ void VoiceManager::noteOff(int midiNote) {
 void VoiceManager::setPortamento(float seconds) noexcept { portamentoSeconds_ = seconds; }
 void VoiceManager::setRetrigger(bool retrigger) noexcept { retrigger_ = retrigger; }
 
-void VoiceManager::setFilterCutoff(float hz) noexcept {
-    cutoffSmoother_.setTarget(hz);
-}
+void VoiceManager::setFilterCutoff(float hz) noexcept { cutoffSmoother_.setTarget(hz); }
 
-void VoiceManager::setFilterResonance(float resonance) noexcept {
-    resonanceSmoother_.setTarget(resonance);
-}
+void VoiceManager::setFilterResonance(float resonance) noexcept { resonanceSmoother_.setTarget(resonance); }
 
 void VoiceManager::setAmpEnvelope(ADSREnvelope::Params params) noexcept {
     for (auto& v : voices_)
@@ -273,24 +267,20 @@ void VoiceManager::setFilterEnvelope(ADSREnvelope::Params params) noexcept {
         v.filterEnv.setParams(params);
 }
 
-void VoiceManager::setMasterGain(float gain) noexcept {
-    gainSmoother_.setTarget(gain);
-}
+void VoiceManager::setMasterGain(float gain) noexcept { gainSmoother_.setTarget(gain); }
 
 void VoiceManager::applyPatch(const PatchStruct& patch) noexcept {
     // NaN/inf guard: a malformed PatchStruct would propagate non-finite
     // values forever through the one-pole smoothers (state += k*(NaN-state)).
     // Clamp at the boundary.
-    const auto safe = [](float v, float fallback) noexcept {
-        return std::isfinite(v) ? v : fallback;
-    };
+    const auto safe = [](float v, float fallback) noexcept { return std::isfinite(v) ? v : fallback; };
 
     // Filter cutoff/resonance & master gain → smoothed targets (block-rate writers,
     // sample-rate readers). First call after prepare() snaps to avoid an
     // audible glide from the default value on patch load.
-    const float cutoffHz   = safe(patch.filter.cutoff_hz,  1000.0f);
-    const float resonance  = safe(patch.filter.resonance,  0.0f);
-    const float masterGain = safe(patch.master_gain,       1.0f);
+    const float cutoffHz = safe(patch.filter.cutoff_hz, 1000.0f);
+    const float resonance = safe(patch.filter.resonance, 0.0f);
+    const float masterGain = safe(patch.master_gain, 1.0f);
     if (!primed_) {
         cutoffSmoother_.reset(cutoffHz);
         resonanceSmoother_.reset(resonance);
@@ -307,19 +297,20 @@ void VoiceManager::applyPatch(const PatchStruct& patch) noexcept {
     // through a ParamSmoother like cutoff/resonance.
     const float drive = std::clamp(safe(patch.filter.drive, 0.0f), 0.0f, 1.0f);
     for (auto& v : voices_) {
-        if (v.filter) v.filter->setDrive(drive);
+        if (v.filter)
+            v.filter->setDrive(drive);
     }
 
     // FX bus parameters (stereo path only). Reverb width and delay bpm_sync
     // are not yet wired — width is folded into Freeverb's fixed stereo spread
     // and tempo-sync delay times need MorphEngine work first.
-    reverb_.setSize(std::clamp(safe(patch.reverb.size,    0.5f), 0.0f, 1.0f));
+    reverb_.setSize(std::clamp(safe(patch.reverb.size, 0.5f), 0.0f, 1.0f));
     reverb_.setDamp(std::clamp(safe(patch.reverb.damping, 0.5f), 0.0f, 1.0f));
-    reverb_.setMix (std::clamp(safe(patch.reverb.mix,     0.0f), 0.0f, 1.0f));
-    delay_.setTimeSeconds(std::clamp(safe(patch.delay.time_s,   0.25f), 0.001f, 2.0f));
-    delay_.setFeedback   (std::clamp(safe(patch.delay.feedback, 0.3f),  0.0f,   0.99f));
-    delay_.setMix        (std::clamp(safe(patch.delay.mix,      0.0f),  0.0f,   1.0f));
-    delay_.setStereo     (std::clamp(safe(patch.delay.stereo,   0.5f),  0.0f,   1.0f));
+    reverb_.setMix(std::clamp(safe(patch.reverb.mix, 0.0f), 0.0f, 1.0f));
+    delay_.setTimeSeconds(std::clamp(safe(patch.delay.time_s, 0.25f), 0.001f, 2.0f));
+    delay_.setFeedback(std::clamp(safe(patch.delay.feedback, 0.3f), 0.0f, 0.99f));
+    delay_.setMix(std::clamp(safe(patch.delay.mix, 0.0f), 0.0f, 1.0f));
+    delay_.setStereo(std::clamp(safe(patch.delay.stereo, 0.5f), 0.0f, 1.0f));
 
     // Amp + filter envelopes.
     ADSREnvelope::Params ampParams{};

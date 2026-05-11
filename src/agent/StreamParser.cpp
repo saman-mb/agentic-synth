@@ -163,8 +163,7 @@ void StreamParser::onFieldComplete() {
     // thread), so the per-field allocation is fine — and it eliminates the
     // entire class of substring-scan bugs the old extractFloat/Int helpers
     // suffered from.
-    const juce::String fragment =
-        "{\"" + juce::String(currentKey_) + "\":" + juce::String(trimmed) + "}";
+    const juce::String fragment = "{\"" + juce::String(currentKey_) + "\":" + juce::String(trimmed) + "}";
 
     juce::var parsed;
     const auto result = juce::JSON::parse(fragment, parsed);
@@ -194,8 +193,7 @@ void StreamParser::applyField(const std::string& key, const juce::var& wrapper) 
         if (val.isInt() || val.isInt64() || val.isDouble())
             partial_.patch_id = static_cast<uint32_t>(static_cast<int64_t>(val));
     } else if (key == "filter") {
-        partial_.filter.cutoff_hz =
-            std::clamp(varF(val, "cutoff_hz", partial_.filter.cutoff_hz), 20.0f, 20000.0f);
+        partial_.filter.cutoff_hz = std::clamp(varF(val, "cutoff_hz", partial_.filter.cutoff_hz), 20.0f, 20000.0f);
         partial_.filter.resonance = std::clamp(varF(val, "resonance", partial_.filter.resonance), 0.0f, 1.0f);
         partial_.filter.env_mod = std::clamp(varF(val, "env_mod", partial_.filter.env_mod), -1.0f, 1.0f);
         partial_.filter.key_track = std::clamp(varF(val, "key_track", partial_.filter.key_track), 0.0f, 1.0f);
@@ -203,19 +201,15 @@ void StreamParser::applyField(const std::string& key, const juce::var& wrapper) 
         const int t = varI(val, "type", static_cast<int>(partial_.filter.type));
         partial_.filter.type = static_cast<FilterType>(std::clamp(t, 0, 4));
     } else if (key == "filter_env") {
-        partial_.filter_env.attack_s =
-            std::clamp(varF(val, "attack_s", partial_.filter_env.attack_s), 0.0f, 10.0f);
-        partial_.filter_env.decay_s =
-            std::clamp(varF(val, "decay_s", partial_.filter_env.decay_s), 0.0f, 10.0f);
+        partial_.filter_env.attack_s = std::clamp(varF(val, "attack_s", partial_.filter_env.attack_s), 0.0f, 10.0f);
+        partial_.filter_env.decay_s = std::clamp(varF(val, "decay_s", partial_.filter_env.decay_s), 0.0f, 10.0f);
         partial_.filter_env.sustain = std::clamp(varF(val, "sustain", partial_.filter_env.sustain), 0.0f, 1.0f);
-        partial_.filter_env.release_s =
-            std::clamp(varF(val, "release_s", partial_.filter_env.release_s), 0.0f, 20.0f);
+        partial_.filter_env.release_s = std::clamp(varF(val, "release_s", partial_.filter_env.release_s), 0.0f, 20.0f);
     } else if (key == "amp_env") {
         partial_.amp_env.attack_s = std::clamp(varF(val, "attack_s", partial_.amp_env.attack_s), 0.0f, 10.0f);
         partial_.amp_env.decay_s = std::clamp(varF(val, "decay_s", partial_.amp_env.decay_s), 0.0f, 10.0f);
         partial_.amp_env.sustain = std::clamp(varF(val, "sustain", partial_.amp_env.sustain), 0.0f, 1.0f);
-        partial_.amp_env.release_s =
-            std::clamp(varF(val, "release_s", partial_.amp_env.release_s), 0.0f, 20.0f);
+        partial_.amp_env.release_s = std::clamp(varF(val, "release_s", partial_.amp_env.release_s), 0.0f, 20.0f);
     } else if (key == "reverb") {
         partial_.reverb.size = std::clamp(varF(val, "size", partial_.reverb.size), 0.0f, 1.0f);
         partial_.reverb.damping = std::clamp(varF(val, "damping", partial_.reverb.damping), 0.0f, 1.0f);

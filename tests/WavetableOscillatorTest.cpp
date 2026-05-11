@@ -232,8 +232,8 @@ TEST_CASE("Mip-level crossfade eliminates octave-boundary clicks", "[wavetable][
 
     const double diffXfade = rmsDiff(belowX, aboveX);
     const double diffStep = rmsDiff(belowS, aboveS);
-    INFO("RMS(below vs above boundary): crossfade=" << diffXfade << " step=" << diffStep
-                                                    << "  boundary=" << boundaryHz << " Hz");
+    INFO("RMS(below vs above boundary): crossfade=" << diffXfade << " step=" << diffStep << "  boundary=" << boundaryHz
+                                                    << " Hz");
     REQUIRE(diffXfade * 2.0 < diffStep);
 }
 

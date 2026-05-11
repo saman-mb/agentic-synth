@@ -23,9 +23,7 @@ void ParamSmoother::reset(float value) noexcept {
     target_ = value;
 }
 
-void ParamSmoother::setTarget(float target) noexcept {
-    target_ = target;
-}
+void ParamSmoother::setTarget(float target) noexcept { target_ = target; }
 
 float ParamSmoother::process() noexcept {
     state_ += coeff_ * (target_ - state_);

@@ -28,8 +28,7 @@ struct JuceFixture {
 };
 
 // Drains the JUCE message queue until pred() is satisfied or timeoutMs elapses.
-template <typename Pred>
-bool drainUntil(Pred pred, int timeoutMs = 500) {
+template <typename Pred> bool drainUntil(Pred pred, int timeoutMs = 500) {
     auto* mm = juce::MessageManager::getInstance();
     const auto deadline = juce::Time::getMillisecondCounter() + (juce::uint32)timeoutMs;
     while (juce::Time::getMillisecondCounter() < deadline) {
@@ -65,10 +64,12 @@ TEST_CASE("AgentBridge: postMidiNote routes note-on then note-off to sink") {
     // Note-on should land on the next message-pump tick; note-off is
     // scheduled via Timer::callAfterDelay so we need to wait past the
     // 100 ms duration.
-    REQUIRE(drainUntil([&] {
-        std::lock_guard<std::mutex> lock(eventsMutex);
-        return events.size() == 2;
-    }, /*timeoutMs=*/500));
+    REQUIRE(drainUntil(
+        [&] {
+            std::lock_guard<std::mutex> lock(eventsMutex);
+            return events.size() == 2;
+        },
+        /*timeoutMs=*/500));
 
     std::lock_guard<std::mutex> lock(eventsMutex);
     REQUIRE(events.size() == 2);
@@ -92,9 +93,7 @@ TEST_CASE("AgentBridge: postMidiNote with no sink registered is a safe no-op") {
 
     // Now register a sink and confirm the bridge is still usable afterwards.
     std::atomic<int> calls{0};
-    bridge.setMidiNoteSink([&](int, float, bool) {
-        calls.fetch_add(1, std::memory_order_relaxed);
-    });
+    bridge.setMidiNoteSink([&](int, float, bool) { calls.fetch_add(1, std::memory_order_relaxed); });
     bridge.postMidiNote(48, 0.5f, /*durationMs=*/30);
     REQUIRE(drainUntil([&] { return calls.load() >= 2; }, /*timeoutMs=*/300));
     CHECK(calls.load() == 2);

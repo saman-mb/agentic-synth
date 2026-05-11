@@ -27,7 +27,7 @@ bool GenerationService::start(int port) {
         int opt = 1;
         setsockopt(serverFd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
 
-        struct sockaddr_in addr {};
+        struct sockaddr_in addr{};
         addr.sin_family = AF_INET;
         addr.sin_addr.s_addr = INADDR_ANY;
         addr.sin_port = htons(port_);
@@ -41,7 +41,7 @@ bool GenerationService::start(int port) {
         listen(serverFd, 5);
 
         while (running_.load(std::memory_order_relaxed)) {
-            struct pollfd pfd {};
+            struct pollfd pfd{};
             pfd.fd = serverFd;
             pfd.events = POLLIN;
 
@@ -51,7 +51,7 @@ bool GenerationService::start(int port) {
             if (ret == 0)
                 continue;
 
-            struct sockaddr_in clientAddr {};
+            struct sockaddr_in clientAddr{};
             socklen_t clientLen = sizeof(clientAddr);
             int clientFd = accept(serverFd, (struct sockaddr*)&clientAddr, &clientLen);
             if (clientFd < 0)

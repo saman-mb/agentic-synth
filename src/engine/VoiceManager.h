@@ -56,9 +56,7 @@ struct Voice {
     float panGainL{0.7071068f}; // cos(π/4) — center default
     float panGainR{0.7071068f}; // sin(π/4)
 
-    [[nodiscard]] bool isActive() const noexcept {
-        return ampEnv.isActive() || fadeOutSamplesRemaining > 0;
-    }
+    [[nodiscard]] bool isActive() const noexcept { return ampEnv.isActive() || fadeOutSamplesRemaining > 0; }
     void prepare(double sampleRate);
     // baseCutoffHz/resonance come from VoiceManager per-sample smoothers; this
     // lets us apply LFO + filter-env modulation on top of the smoothed value.

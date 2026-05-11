@@ -160,7 +160,7 @@ std::string SemanticMapper::http_post_embedding(const std::string& text) const {
     }
     const std::string path = "/embedding";
 
-    struct addrinfo hints {};
+    struct addrinfo hints{};
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     struct addrinfo* res = nullptr;
@@ -183,7 +183,7 @@ std::string SemanticMapper::http_post_embedding(const std::string& text) const {
     }
     freeaddrinfo(res);
 
-    struct timeval tv {};
+    struct timeval tv{};
     tv.tv_sec = cfg_.timeout_ms / 1000;
     tv.tv_usec = (cfg_.timeout_ms % 1000) * 1000;
     setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&tv), sizeof(tv));
@@ -587,8 +587,7 @@ juce::var deltaToVar(const PatchDelta& d) {
     if (d.filter_type)
         obj->setProperty("filter_type", juce::String("LowPass")); // conservative: only LowPass confirmed in dataset
     if (d.lfo0_waveform)
-        obj->setProperty("lfo0_waveform",
-                         juce::String((*d.lfo0_waveform == LfoWaveform::Square) ? "Square" : "Sine"));
+        obj->setProperty("lfo0_waveform", juce::String((*d.lfo0_waveform == LfoWaveform::Square) ? "Square" : "Sine"));
     if (d.lfo0_target)
         obj->setProperty("lfo0_target", juce::String(lfoTargetToStr(*d.lfo0_target)));
     if (d.osc1_enabled)

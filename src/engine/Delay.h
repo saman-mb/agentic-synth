@@ -28,9 +28,9 @@ public:
     void prepare(double sampleRate, double maxDelaySeconds = 2.5);
 
     void setTimeSeconds(float seconds) noexcept;
-    void setFeedback(float fb01) noexcept;       // clamped to [0, 0.99]
-    void setMix(float mix01) noexcept;           // 0 = dry, 1 = wet
-    void setStereo(float stereo01) noexcept;     // 0 = parallel, 1 = ping-pong
+    void setFeedback(float fb01) noexcept;   // clamped to [0, 0.99]
+    void setMix(float mix01) noexcept;       // 0 = dry, 1 = wet
+    void setStereo(float stereo01) noexcept; // 0 = parallel, 1 = ping-pong
 
     void process(float inL, float inR, float& outL, float& outR) noexcept;
 

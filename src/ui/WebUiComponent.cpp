@@ -27,8 +27,7 @@ juce::String mangleResourceName(const juce::String& filename) {
     for (auto c : filename) {
         if (c == ' ' || c == '.') {
             out += '_';
-        } else if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z')
-                   || (c >= '0' && c <= '9') || c == '_') {
+        } else if ((c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_') {
             out += c;
         }
         // else: drop (matches retainCharacters in JUCE).
@@ -37,17 +36,28 @@ juce::String mangleResourceName(const juce::String& filename) {
 }
 
 juce::String mimeForPath(const juce::String& path) {
-    if (path.endsWithIgnoreCase(".html")) return "text/html";
-    if (path.endsWithIgnoreCase(".js"))   return "text/javascript";
-    if (path.endsWithIgnoreCase(".mjs"))  return "text/javascript";
-    if (path.endsWithIgnoreCase(".css"))  return "text/css";
-    if (path.endsWithIgnoreCase(".svg"))  return "image/svg+xml";
-    if (path.endsWithIgnoreCase(".woff2"))return "font/woff2";
-    if (path.endsWithIgnoreCase(".woff")) return "font/woff";
-    if (path.endsWithIgnoreCase(".json")) return "application/json";
-    if (path.endsWithIgnoreCase(".png"))  return "image/png";
-    if (path.endsWithIgnoreCase(".jpg") || path.endsWithIgnoreCase(".jpeg")) return "image/jpeg";
-    if (path.endsWithIgnoreCase(".ico"))  return "image/x-icon";
+    if (path.endsWithIgnoreCase(".html"))
+        return "text/html";
+    if (path.endsWithIgnoreCase(".js"))
+        return "text/javascript";
+    if (path.endsWithIgnoreCase(".mjs"))
+        return "text/javascript";
+    if (path.endsWithIgnoreCase(".css"))
+        return "text/css";
+    if (path.endsWithIgnoreCase(".svg"))
+        return "image/svg+xml";
+    if (path.endsWithIgnoreCase(".woff2"))
+        return "font/woff2";
+    if (path.endsWithIgnoreCase(".woff"))
+        return "font/woff";
+    if (path.endsWithIgnoreCase(".json"))
+        return "application/json";
+    if (path.endsWithIgnoreCase(".png"))
+        return "image/png";
+    if (path.endsWithIgnoreCase(".jpg") || path.endsWithIgnoreCase(".jpeg"))
+        return "image/jpeg";
+    if (path.endsWithIgnoreCase(".ico"))
+        return "image/x-icon";
     return "application/octet-stream";
 }
 
@@ -61,8 +71,7 @@ juce::var argOr(const juce::Array<juce::var>& args, int index, const juce::var& 
 // (Windows %TEMP%, macOS /var/folders, systemd-tmpfiles) does not nuke
 // WebView2 localStorage / cookies / IndexedDB between DAW sessions.
 juce::File agenticSynthAppDataDir() {
-    auto dir = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
-                   .getChildFile("AgenticSynth");
+    auto dir = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory).getChildFile("AgenticSynth");
     if (!dir.isDirectory()) {
         dir.createDirectory();
     }
@@ -136,11 +145,9 @@ juce::File webView2UserDataFolderForThisInstance() {
 
 } // namespace
 
-std::optional<juce::WebBrowserComponent::Resource>
-WebUiComponent::serveResource(const juce::String& path) {
+std::optional<juce::WebBrowserComponent::Resource> WebUiComponent::serveResource(const juce::String& path) {
     // Normalise: strip any query/fragment, default "/" → "/index.html".
-    juce::String trimmed = path.upToFirstOccurrenceOf("?", false, false)
-                               .upToFirstOccurrenceOf("#", false, false);
+    juce::String trimmed = path.upToFirstOccurrenceOf("?", false, false).upToFirstOccurrenceOf("#", false, false);
     if (trimmed.isEmpty() || trimmed == "/") {
         trimmed = "/index.html";
     }
@@ -151,7 +158,7 @@ WebUiComponent::serveResource(const juce::String& path) {
 
     juce::String relative = trimmed.startsWith("/") ? trimmed.substring(1) : trimmed;
     juce::String basename = relative.fromLastOccurrenceOf("/", false, false);
-    juce::String mangled  = mangleResourceName(basename);
+    juce::String mangled = mangleResourceName(basename);
 
     int numBytes = 0;
     const char* data = UiBinaryData::getNamedResource(mangled.toRawUTF8(), numBytes);
@@ -160,8 +167,7 @@ WebUiComponent::serveResource(const juce::String& path) {
     }
 
     juce::WebBrowserComponent::Resource resource;
-    resource.data.assign(reinterpret_cast<const std::byte*>(data),
-                         reinterpret_cast<const std::byte*>(data) + numBytes);
+    resource.data.assign(reinterpret_cast<const std::byte*>(data), reinterpret_cast<const std::byte*>(data) + numBytes);
     resource.mimeType = mimeForPath(trimmed);
     return resource;
 }
@@ -206,7 +212,7 @@ juce::String WebUiComponent::buildFallbackMessage(const juce::String& errorInfo)
 #define AGENTIC_SYNTH_VERSION_STRING "0.0.0"
 #endif
     constexpr const char* kProjectName = AGENTIC_SYNTH_PROJECT_NAME;
-    constexpr const char* kVersion     = AGENTIC_SYNTH_VERSION_STRING;
+    constexpr const char* kVersion = AGENTIC_SYNTH_VERSION_STRING;
 
     const juce::String bullet = juce::String::fromUTF8("\xe2\x80\xa2");
 
@@ -214,8 +220,9 @@ juce::String WebUiComponent::buildFallbackMessage(const juce::String& errorInfo)
     msg << "Failed to load " << kProjectName << " UI.\n"
         << "This usually means the system WebView is missing or broken.\n\n"
         << bullet << " macOS: requires WKWebView (system)\n"
-        << bullet << " Windows: requires WebView2 Runtime "
-                     "(https://developer.microsoft.com/microsoft-edge/webview2/)\n"
+        << bullet
+        << " Windows: requires WebView2 Runtime "
+           "(https://developer.microsoft.com/microsoft-edge/webview2/)\n"
         << bullet << " Linux: requires libwebkit2gtk-4.1-0\n\n"
         << "Version: " << kVersion << "\n"
         << "Details: " << (errorInfo.isEmpty() ? juce::String("(no error info)") : errorInfo);
@@ -230,11 +237,8 @@ WebUiComponent::FallbackComponent::FallbackComponent() {
     message_.setText(WebUiComponent::buildFallbackMessage({}), juce::dontSendNotification);
     addAndMakeVisible(message_);
 
-    copyButton_.onClick = [this]() {
-        juce::SystemClipboard::copyTextToClipboard(errorInfo_);
-    };
-    copyButton_.setColour(juce::TextButton::buttonColourId,
-                          juce::Colour::fromRGB(0x33, 0x33, 0x3a));
+    copyButton_.onClick = [this]() { juce::SystemClipboard::copyTextToClipboard(errorInfo_); };
+    copyButton_.setColour(juce::TextButton::buttonColourId, juce::Colour::fromRGB(0x33, 0x33, 0x3a));
     copyButton_.setColour(juce::TextButton::textColourOffId, juce::Colours::white);
     addAndMakeVisible(copyButton_);
 }
@@ -253,7 +257,7 @@ void WebUiComponent::FallbackComponent::paint(juce::Graphics& g) {
 void WebUiComponent::FallbackComponent::resized() {
     auto bounds = getLocalBounds().reduced(40);
     constexpr int kButtonHeight = 36;
-    constexpr int kButtonWidth  = 200;
+    constexpr int kButtonWidth = 200;
     auto buttonRow = bounds.removeFromBottom(kButtonHeight + 12).withTrimmedBottom(0);
     auto buttonBounds = buttonRow.withSizeKeepingCentre(kButtonWidth, kButtonHeight);
     copyButton_.setBounds(buttonBounds);
@@ -275,7 +279,8 @@ void WebUiComponent::handleLoadFailure(const juce::String& errorInfo) {
     juce::MessageManager::callAsync([this, errorInfo]() {
         lastLoadError_ = errorInfo;
         fallback_.setError(errorInfo);
-        if (browser_) browser_->setVisible(false);
+        if (browser_)
+            browser_->setVisible(false);
         addAndMakeVisible(fallback_);
         fallback_.setBounds(getLocalBounds());
         fallback_.toFront(false);
@@ -288,69 +293,66 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge) : bridge_(bridge) {
     using Options = juce::WebBrowserComponent::Options;
     using NativeFnCompletion = juce::WebBrowserComponent::NativeFunctionCompletion;
 
-    Options options = Options{}
-        .withNativeIntegrationEnabled(true)
-        .withKeepPageLoadedWhenBrowserIsHidden()
-        .withResourceProvider([](const juce::String& p) { return WebUiComponent::serveResource(p); })
-        // Persistent, per-slot WebView2 user-data folder under
-        // userApplicationDataDirectory (NOT temp). This survives DAW project
-        // reopen, OS temp cleaners, and machine reboots, so localStorage,
-        // cookies and IndexedDB written by the React UI persist. The
-        // <stableId> segment is a UUID written once on first run; the
-        // slot-<N> child disambiguates concurrent controllers when a DAW
-        // hosts multiple plugin instances in the same process (WebView2
-        // requires distinct user-data folders for concurrent controllers).
-        // Apple/Linux backends ignore this option but the directory is
-        // still safe to materialise on those platforms.
-        .withWinWebView2Options(Options::WinWebView2{}
-            .withUserDataFolder(webView2UserDataFolderForThisInstance()));
+    Options options =
+        Options{}
+            .withNativeIntegrationEnabled(true)
+            .withKeepPageLoadedWhenBrowserIsHidden()
+            .withResourceProvider([](const juce::String& p) { return WebUiComponent::serveResource(p); })
+            // Persistent, per-slot WebView2 user-data folder under
+            // userApplicationDataDirectory (NOT temp). This survives DAW project
+            // reopen, OS temp cleaners, and machine reboots, so localStorage,
+            // cookies and IndexedDB written by the React UI persist. The
+            // <stableId> segment is a UUID written once on first run; the
+            // slot-<N> child disambiguates concurrent controllers when a DAW
+            // hosts multiple plugin instances in the same process (WebView2
+            // requires distinct user-data folders for concurrent controllers).
+            // Apple/Linux backends ignore this option but the directory is
+            // still safe to materialise on those platforms.
+            .withWinWebView2Options(Options::WinWebView2{}.withUserDataFolder(webView2UserDataFolderForThisInstance()));
 
     // ── 8 native functions (UI → C++) ────────────────────────────────────────
 
     options = options.withNativeFunction(
-        juce::Identifier{"knob_tweak"},
-        [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
+        juce::Identifier{"knob_tweak"}, [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
             const auto param = argOr(args, 0, juce::var{""}).toString().toStdString();
             const auto value = static_cast<float>(static_cast<double>(argOr(args, 1, juce::var{0.0})));
             bridge_.handleKnobTweak(param, value);
             completion(juce::var{});
         });
 
-    options = options.withNativeFunction(
-        juce::Identifier{"generate"},
-        [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
-            const auto prompt = argOr(args, 0, juce::var{""}).toString().toStdString();
-            // Resolve the JS promise immediately so the UI stays responsive.
-            // The actual heuristic + rationale work runs on a worker; results
-            // arrive at the UI via the onPatch / onRationale / onDone events.
-            completion(juce::var{});
-            juce::Thread::launch([this, prompt]() {
-                const PatchStruct patch = bridge_.submitPrompt(prompt);
-                const std::string rationale = bridge_.generateRationale(prompt, patch);
-                auto* pobj = new juce::DynamicObject{};
-                pobj->setProperty("variation", juce::String("A"));
-                pobj->setProperty("data", [&patch]() {
-                    auto* d = new juce::DynamicObject{};
-                    d->setProperty("cutoffHz", patch.filter.cutoff_hz);
-                    d->setProperty("resonance", patch.filter.resonance);
-                    d->setProperty("attackS", patch.amp_env.attack_s);
-                    d->setProperty("sustainLevel", patch.amp_env.sustain);
-                    d->setProperty("lfoDepth", patch.lfo[0].depth);
-                    d->setProperty("reverbMix", patch.reverb.mix);
-                    return juce::var{d};
-                }());
-                bridge_.notifyPatch(juce::var{pobj});
+    options = options.withNativeFunction(juce::Identifier{"generate"},
+                                         [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
+                                             const auto prompt = argOr(args, 0, juce::var{""}).toString().toStdString();
+                                             // Resolve the JS promise immediately so the UI stays responsive.
+                                             // The actual heuristic + rationale work runs on a worker; results
+                                             // arrive at the UI via the onPatch / onRationale / onDone events.
+                                             completion(juce::var{});
+                                             juce::Thread::launch([this, prompt]() {
+                                                 const PatchStruct patch = bridge_.submitPrompt(prompt);
+                                                 const std::string rationale = bridge_.generateRationale(prompt, patch);
+                                                 auto* pobj = new juce::DynamicObject{};
+                                                 pobj->setProperty("variation", juce::String("A"));
+                                                 pobj->setProperty("data", [&patch]() {
+                                                     auto* d = new juce::DynamicObject{};
+                                                     d->setProperty("cutoffHz", patch.filter.cutoff_hz);
+                                                     d->setProperty("resonance", patch.filter.resonance);
+                                                     d->setProperty("attackS", patch.amp_env.attack_s);
+                                                     d->setProperty("sustainLevel", patch.amp_env.sustain);
+                                                     d->setProperty("lfoDepth", patch.lfo[0].depth);
+                                                     d->setProperty("reverbMix", patch.reverb.mix);
+                                                     return juce::var{d};
+                                                 }());
+                                                 bridge_.notifyPatch(juce::var{pobj});
 
-                auto* robj = new juce::DynamicObject{};
-                robj->setProperty("text", juce::String(rationale));
-                bridge_.notifyRationale(juce::var{robj});
-                bridge_.notifyDone(juce::var{});
-            });
-        });
+                                                 auto* robj = new juce::DynamicObject{};
+                                                 robj->setProperty("text", juce::String(rationale));
+                                                 bridge_.notifyRationale(juce::var{robj});
+                                                 bridge_.notifyDone(juce::var{});
+                                             });
+                                         });
 
     options = options.withNativeFunction(
-        juce::Identifier{"feedback"},
-        [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
+        juce::Identifier{"feedback"}, [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
             // args: [messageId, kind, patch?]. We only need kind + patch
             // shape for recordFeedback; messageId is opaque/UI-only.
             const auto kindStr = argOr(args, 1, juce::var{""}).toString();
@@ -372,54 +374,49 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge) : bridge_(bridge) {
                 patch.filter.cutoff_hz = static_cast<float>(static_cast<double>(obj->getProperty("cutoffHz")));
                 patch.filter.resonance = static_cast<float>(static_cast<double>(obj->getProperty("resonance")));
                 patch.amp_env.attack_s = static_cast<float>(static_cast<double>(obj->getProperty("attackS")));
-                patch.amp_env.sustain  = static_cast<float>(static_cast<double>(obj->getProperty("sustainLevel")));
-                patch.lfo[0].depth     = static_cast<float>(static_cast<double>(obj->getProperty("lfoDepth")));
-                patch.reverb.mix       = static_cast<float>(static_cast<double>(obj->getProperty("reverbMix")));
+                patch.amp_env.sustain = static_cast<float>(static_cast<double>(obj->getProperty("sustainLevel")));
+                patch.lfo[0].depth = static_cast<float>(static_cast<double>(obj->getProperty("lfoDepth")));
+                patch.reverb.mix = static_cast<float>(static_cast<double>(obj->getProperty("reverbMix")));
             }
             bridge_.recordFeedback(kind, /*prompt*/ "", patch);
             completion(juce::var{});
         });
 
-    options = options.withNativeFunction(
-        juce::Identifier{"get_dictionary"},
-        [this](const juce::Array<juce::var>& /*args*/, NativeFnCompletion completion) {
-            // Resolve the JS Promise with the parsed JSON payload.
-            const std::string json = bridge_.getDictionaryJson();
-            completion(juce::JSON::parse(juce::String(json)));
-        });
+    options = options.withNativeFunction(juce::Identifier{"get_dictionary"},
+                                         [this](const juce::Array<juce::var>& /*args*/, NativeFnCompletion completion) {
+                                             // Resolve the JS Promise with the parsed JSON payload.
+                                             const std::string json = bridge_.getDictionaryJson();
+                                             completion(juce::JSON::parse(juce::String(json)));
+                                         });
+
+    options = options.withNativeFunction(juce::Identifier{"save_dictionary"},
+                                         [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
+                                             // Frontend sends an entries array; we wrap it back into the
+                                             // save_dictionary frame shape that SemanticMapper expects.
+                                             const auto entries = argOr(args, 0, juce::var{});
+                                             auto* wrapper = new juce::DynamicObject{};
+                                             wrapper->setProperty("type", juce::String("save_dictionary"));
+                                             wrapper->setProperty("entries", entries);
+                                             const auto json = juce::JSON::toString(juce::var{wrapper});
+                                             bridge_.saveDictionary(json.toStdString());
+                                             completion(juce::var{});
+                                         });
+
+    options = options.withNativeFunction(juce::Identifier{"get_telemetry"},
+                                         [this](const juce::Array<juce::var>& /*args*/, NativeFnCompletion completion) {
+                                             const std::string json = bridge_.getTelemetryJson();
+                                             completion(juce::JSON::parse(juce::String(json)));
+                                         });
+
+    options = options.withNativeFunction(juce::Identifier{"set_telemetry_enabled"},
+                                         [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
+                                             const bool enabled = static_cast<bool>(argOr(args, 0, juce::var{false}));
+                                             bridge_.setTelemetryEnabled(enabled);
+                                             completion(juce::var{});
+                                         });
 
     options = options.withNativeFunction(
-        juce::Identifier{"save_dictionary"},
-        [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
-            // Frontend sends an entries array; we wrap it back into the
-            // save_dictionary frame shape that SemanticMapper expects.
-            const auto entries = argOr(args, 0, juce::var{});
-            auto* wrapper = new juce::DynamicObject{};
-            wrapper->setProperty("type", juce::String("save_dictionary"));
-            wrapper->setProperty("entries", entries);
-            const auto json = juce::JSON::toString(juce::var{wrapper});
-            bridge_.saveDictionary(json.toStdString());
-            completion(juce::var{});
-        });
-
-    options = options.withNativeFunction(
-        juce::Identifier{"get_telemetry"},
-        [this](const juce::Array<juce::var>& /*args*/, NativeFnCompletion completion) {
-            const std::string json = bridge_.getTelemetryJson();
-            completion(juce::JSON::parse(juce::String(json)));
-        });
-
-    options = options.withNativeFunction(
-        juce::Identifier{"set_telemetry_enabled"},
-        [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
-            const bool enabled = static_cast<bool>(argOr(args, 0, juce::var{false}));
-            bridge_.setTelemetryEnabled(enabled);
-            completion(juce::var{});
-        });
-
-    options = options.withNativeFunction(
-        juce::Identifier{"play_midi_note"},
-        [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
+        juce::Identifier{"play_midi_note"}, [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
             // Phase 6C: in-browser audition keyboard. Args:
             //   [0] note (int, 0..127)
             //   [1] velocity (double, 0..1)
@@ -428,16 +425,15 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge) : bridge_(bridge) {
             // and the matched note-off via the message thread. Resolve the
             // JS promise immediately so the keyboard stays responsive even
             // if the engine is mid-block.
-            const int note         = static_cast<int>(argOr(args, 0, juce::var{60}));
-            const float velocity   = static_cast<float>(static_cast<double>(argOr(args, 1, juce::var{0.8})));
-            const int durationMs   = static_cast<int>(argOr(args, 2, juce::var{350}));
+            const int note = static_cast<int>(argOr(args, 0, juce::var{60}));
+            const float velocity = static_cast<float>(static_cast<double>(argOr(args, 1, juce::var{0.8})));
+            const int durationMs = static_cast<int>(argOr(args, 2, juce::var{350}));
             bridge_.postMidiNote(note, velocity, durationMs);
             completion(juce::var{});
         });
 
     options = options.withNativeFunction(
-        juce::Identifier{"push_audio_pcm"},
-        [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
+        juce::Identifier{"push_audio_pcm"}, [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
             // Perf hotspot fix: JS now sends a single base64-encoded Int16
             // PCM string instead of a juce::Array<juce::var> of doubles.
             // Old path was ~24 B/sample × 1600 samples = ~38 KB of boxed
@@ -473,10 +469,8 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge) : bridge_(bridge) {
                     DBG("push_audio_pcm: bad payload size " << static_cast<int>(byteCount));
                     return;
                 }
-                const auto* samples =
-                    reinterpret_cast<const std::int16_t*>(raw.getData());
-                const int numSamples =
-                    static_cast<int>(byteCount / sizeof(std::int16_t));
+                const auto* samples = reinterpret_cast<const std::int16_t*>(raw.getData());
+                const int numSamples = static_cast<int>(byteCount / sizeof(std::int16_t));
                 client->feedAudio(samples, numSamples);
             });
         });
@@ -494,28 +488,36 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge) : bridge_(bridge) {
     // subscriber without further dispatch.
 
     subs_.push_back(bridge_.onToken([this](const juce::var& v) {
-        if (browser_) browser_->emitEventIfBrowserIsVisible(juce::Identifier{"token"}, v);
+        if (browser_)
+            browser_->emitEventIfBrowserIsVisible(juce::Identifier{"token"}, v);
     }));
     subs_.push_back(bridge_.onPatch([this](const juce::var& v) {
-        if (browser_) browser_->emitEventIfBrowserIsVisible(juce::Identifier{"patch"}, v);
+        if (browser_)
+            browser_->emitEventIfBrowserIsVisible(juce::Identifier{"patch"}, v);
     }));
     subs_.push_back(bridge_.onDone([this](const juce::var& v) {
-        if (browser_) browser_->emitEventIfBrowserIsVisible(juce::Identifier{"done"}, v);
+        if (browser_)
+            browser_->emitEventIfBrowserIsVisible(juce::Identifier{"done"}, v);
     }));
     subs_.push_back(bridge_.onError([this](const juce::var& v) {
-        if (browser_) browser_->emitEventIfBrowserIsVisible(juce::Identifier{"error"}, v);
+        if (browser_)
+            browser_->emitEventIfBrowserIsVisible(juce::Identifier{"error"}, v);
     }));
     subs_.push_back(bridge_.onRationale([this](const juce::var& v) {
-        if (browser_) browser_->emitEventIfBrowserIsVisible(juce::Identifier{"rationale"}, v);
+        if (browser_)
+            browser_->emitEventIfBrowserIsVisible(juce::Identifier{"rationale"}, v);
     }));
     subs_.push_back(bridge_.onSuggestVariations([this](const juce::var& v) {
-        if (browser_) browser_->emitEventIfBrowserIsVisible(juce::Identifier{"suggest_variations"}, v);
+        if (browser_)
+            browser_->emitEventIfBrowserIsVisible(juce::Identifier{"suggest_variations"}, v);
     }));
     subs_.push_back(bridge_.onPatchUpdate([this](const juce::var& v) {
-        if (browser_) browser_->emitEventIfBrowserIsVisible(juce::Identifier{"patch_update"}, v);
+        if (browser_)
+            browser_->emitEventIfBrowserIsVisible(juce::Identifier{"patch_update"}, v);
     }));
     subs_.push_back(bridge_.onTranscript([this](const juce::var& v) {
-        if (browser_) browser_->emitEventIfBrowserIsVisible(juce::Identifier{"transcript"}, v);
+        if (browser_)
+            browser_->emitEventIfBrowserIsVisible(juce::Identifier{"transcript"}, v);
     }));
 
 #if AGENTIC_SYNTH_UI_DEV

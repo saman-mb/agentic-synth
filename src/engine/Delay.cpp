@@ -44,17 +44,11 @@ void Delay::setTimeSeconds(float seconds) noexcept {
     delaySamples_ = samples;
 }
 
-void Delay::setFeedback(float fb01) noexcept {
-    feedback_ = std::clamp(fb01, 0.0f, kMaxFeedback);
-}
+void Delay::setFeedback(float fb01) noexcept { feedback_ = std::clamp(fb01, 0.0f, kMaxFeedback); }
 
-void Delay::setMix(float mix01) noexcept {
-    mix_ = std::clamp(mix01, 0.0f, 1.0f);
-}
+void Delay::setMix(float mix01) noexcept { mix_ = std::clamp(mix01, 0.0f, 1.0f); }
 
-void Delay::setStereo(float stereo01) noexcept {
-    stereo_ = std::clamp(stereo01, 0.0f, 1.0f);
-}
+void Delay::setStereo(float stereo01) noexcept { stereo_ = std::clamp(stereo01, 0.0f, 1.0f); }
 
 void Delay::process(float inL, float inR, float& outL, float& outR) noexcept {
     if (bufferSize_ <= 1) {

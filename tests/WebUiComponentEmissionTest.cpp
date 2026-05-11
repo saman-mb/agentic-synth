@@ -7,8 +7,8 @@
 // notify*() emission on the bridge must reach a live SubscriberHandle that
 // the component holds.
 
-#include "ui/WebUiComponent.h"
 #include "agent/AgentBridge.h"
+#include "ui/WebUiComponent.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -29,8 +29,7 @@ struct GuiFixture {
 };
 } // namespace
 
-TEST_CASE("WebUiComponent registers all 8 AgentBridge subscribers on construction",
-          "[WebUiComponent][Emission]") {
+TEST_CASE("WebUiComponent registers all 8 AgentBridge subscribers on construction", "[WebUiComponent][Emission]") {
     GuiFixture fix;
     AgentBridge bridge;
 

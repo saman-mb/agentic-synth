@@ -15,9 +15,9 @@
 //      WebUiComponent uses, asserted independently of the WebView so the
 //      wiring contract holds even where no real browser is available.
 
-#include "ui/WebUiComponent.h"
 #include "agent/AgentBridge.h"
 #include "agent/Telemetry.h"
+#include "ui/WebUiComponent.h"
 
 #include <catch2/catch_test_macros.hpp>
 
@@ -36,8 +36,7 @@ struct GuiFixture {
 };
 } // namespace
 
-TEST_CASE("buildFallbackMessage covers every platform's WebView dependency",
-          "[WebUiComponent][Fallback]") {
+TEST_CASE("buildFallbackMessage covers every platform's WebView dependency", "[WebUiComponent][Fallback]") {
     const auto msg = WebUiComponent::buildFallbackMessage("net::ERR_FAILED");
 
     // Brand + opening line.
@@ -65,8 +64,7 @@ TEST_CASE("buildFallbackMessage covers every platform's WebView dependency",
     REQUIRE(msg.contains("Version:"));
 }
 
-TEST_CASE("buildFallbackMessage handles empty error info gracefully",
-          "[WebUiComponent][Fallback]") {
+TEST_CASE("buildFallbackMessage handles empty error info gracefully", "[WebUiComponent][Fallback]") {
     const auto msg = WebUiComponent::buildFallbackMessage({});
     // Empty error must not produce a "Details: " line with nothing after it —
     // that would look broken to the user.
@@ -74,8 +72,7 @@ TEST_CASE("buildFallbackMessage handles empty error info gracefully",
     REQUIRE(msg.contains("(no error info)"));
 }
 
-TEST_CASE("WebUiComponent reports successful load until an error fires",
-          "[WebUiComponent][Fallback]") {
+TEST_CASE("WebUiComponent reports successful load until an error fires", "[WebUiComponent][Fallback]") {
     GuiFixture fix;
     AgentBridge bridge;
 

@@ -61,9 +61,7 @@ AgenticSynthPlugin::AgenticSynthPlugin()
     // members destruct so an in-flight Timer note-off cannot push into a
     // half-destroyed collector.
     agentBridge_.setMidiNoteSink([this](int note, float velocity, bool isNoteOn) {
-        const auto msg = isNoteOn
-            ? juce::MidiMessage::noteOn(1, note, velocity)
-            : juce::MidiMessage::noteOff(1, note);
+        const auto msg = isNoteOn ? juce::MidiMessage::noteOn(1, note, velocity) : juce::MidiMessage::noteOff(1, note);
         const juce::ScopedLock sl(auditionMutex_);
         auditionPending_.addEvent(msg, 0);
     });
