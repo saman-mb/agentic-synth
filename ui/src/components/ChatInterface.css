@@ -4,8 +4,8 @@
   height: 100vh;
   max-width: 860px;
   margin: 0 auto;
-  background: #111018;
-  color: #f4f0ff;
+  background: var(--color-bg-app);
+  color: var(--color-fg-primary);
 }
 
 /* ── Header ──────────────────────────────────────────────────────── */
@@ -15,8 +15,8 @@
   align-items: center;
   gap: 0.6rem;
   padding: 0.9rem 1.25rem;
-  border-bottom: 1px solid rgb(255 255 255 / 8%);
-  background: rgb(255 255 255 / 2%);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--fill-soft);
 }
 
 .chat-title {
@@ -33,10 +33,10 @@
   flex-shrink: 0;
 }
 
-.status-dot.open { background: #4afa8a; }
-.status-dot.connecting { background: #f4c842; animation: blink 1s step-start infinite; }
+.status-dot.open { background: var(--color-success); }
+.status-dot.connecting { background: var(--color-warning); animation: blink 1s step-start infinite; }
 .status-dot.closed,
-.status-dot.error { background: #ff5c5c; }
+.status-dot.error { background: var(--color-error-dot); }
 
 @keyframes blink {
   50% { opacity: 0.2; }
@@ -87,12 +87,12 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: #91e8ff;
+  color: var(--color-accent-hot);
   opacity: 0.7;
 }
 
 .message-bubble.user .bubble-role {
-  color: #b8a8ff;
+  color: var(--color-accent-soft);
 }
 
 .bubble-text {
@@ -106,14 +106,14 @@
 }
 
 .message-bubble.user .bubble-text {
-  background: rgb(123 92 255 / 25%);
-  border: 1px solid rgb(123 92 255 / 35%);
+  background: var(--accent-tint-25);
+  border: 1px solid var(--accent-tint-35);
   border-bottom-right-radius: 0.25rem;
 }
 
 .message-bubble.assistant .bubble-text {
-  background: rgb(255 255 255 / 5%);
-  border: 1px solid rgb(255 255 255 / 10%);
+  background: var(--fill-medium);
+  border: 1px solid var(--fill-stronger);
   border-bottom-left-radius: 0.25rem;
 }
 
@@ -121,7 +121,7 @@
   display: inline-block;
   width: 2px;
   height: 1em;
-  background: #91e8ff;
+  background: var(--color-accent-hot);
   margin-left: 2px;
   vertical-align: text-bottom;
   animation: blink 0.8s step-start infinite;
@@ -144,7 +144,7 @@
 }
 
 .ab-commit-btn {
-  background: linear-gradient(135deg, #7b5cff, #0cb7f2);
+  background: linear-gradient(135deg, var(--grad-accent-a), var(--grad-accent-b));
   border: none;
   border-radius: 0.5rem;
   color: #fff;
@@ -163,7 +163,7 @@
 
 .ab-commit-btn:focus { outline: none; }
 .ab-commit-btn:focus-visible {
-  outline: 2px solid #7b5cff;
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
@@ -191,23 +191,23 @@
 }
 
 .feedback-btn.like {
-  color: #4afa8a;
-  border-color: rgb(74 250 138 / 40%);
+  color: var(--color-success);
+  border-color: var(--success-tint-40);
 }
 
 .feedback-btn.like.active,
 .feedback-btn.like:hover:not(:disabled) {
-  background: rgb(74 250 138 / 15%);
+  background: var(--success-tint-15);
 }
 
 .feedback-btn.dislike {
-  color: #ff6b6b;
-  border-color: rgb(255 107 107 / 40%);
+  color: var(--color-error);
+  border-color: var(--error-tint-40);
 }
 
 .feedback-btn.dislike.active,
 .feedback-btn.dislike:hover:not(:disabled) {
-  background: rgb(255 107 107 / 15%);
+  background: var(--error-tint-15);
 }
 
 /* ── Input bar ────────────────────────────────────────────────────── */
@@ -216,17 +216,17 @@
   display: flex;
   gap: 0.5rem;
   padding: 0.75rem 1rem;
-  border-top: 1px solid rgb(255 255 255 / 8%);
-  background: rgb(255 255 255 / 2%);
+  border-top: 1px solid var(--color-border);
+  background: var(--fill-soft);
   align-items: flex-end;
 }
 
 .prompt-input {
   flex: 1;
-  background: rgb(255 255 255 / 6%);
-  border: 1px solid rgb(255 255 255 / 14%);
+  background: var(--fill-strong);
+  border: 1px solid var(--color-border-strong);
   border-radius: 0.75rem;
-  color: #f4f0ff;
+  color: var(--color-fg-primary);
   font-family: inherit;
   font-size: 0.95rem;
   padding: 0.65rem 0.9rem;
@@ -235,15 +235,15 @@
   transition: border-color 0.15s;
 }
 
-.prompt-input::placeholder { color: rgb(255 255 255 / 30%); }
+.prompt-input::placeholder { color: var(--color-fg-muted); }
 
 .prompt-input:focus {
   outline: none;
-  border-color: rgb(123 92 255 / 60%);
+  border-color: var(--accent-tint-60);
 }
 
 .prompt-input:focus-visible {
-  outline: 2px solid #7b5cff;
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
@@ -252,7 +252,7 @@
 }
 
 .send-btn {
-  background: linear-gradient(135deg, #7b5cff, #0cb7f2);
+  background: linear-gradient(135deg, var(--grad-accent-a), var(--grad-accent-b));
   border: none;
   border-radius: 0.75rem;
   color: #fff;

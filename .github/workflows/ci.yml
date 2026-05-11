@@ -19,16 +19,20 @@ jobs:
         with:
           submodules: recursive
 
-      - name: Install clang-format
+      # Pin clang-format-18 to match .pre-commit-config.yaml (which uses
+      # clang-format 19 mirror but 18 is API-compatible with our style).
+      # Plain `apt install clang-format` pulls whatever Ubuntu defaults to
+      # (currently 22 on noble) and disagrees with local devs running 18/19.
+      - name: Install clang-format-18
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq clang-format
+          sudo apt-get install -y -qq clang-format-18
 
       - name: Check clang-format
         run: |
           mapfile -t files < <(git ls-files '*.cpp' '*.h' '*.hpp' '*.cxx' '*.cc')
           if [ "${#files[@]}" -gt 0 ]; then
-            clang-format --dry-run --Werror "${files[@]}"
+            clang-format-18 --dry-run --Werror "${files[@]}"
           fi
 
       - name: Setup Node.js

@@ -19,7 +19,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: #91e8ff;
+  color: var(--color-accent-hot);
 }
 
 .tel-toggle {
@@ -36,13 +36,13 @@
   width: 2rem;
   height: 1rem;
   border-radius: 0.5rem;
-  background: rgb(255 255 255 / 12%);
+  background: var(--fill-stronger);
   position: relative;
   transition: background 0.2s;
 }
 
 .tel-toggle input:checked + .tel-toggle-track {
-  background: rgb(123 92 255 / 60%);
+  background: var(--accent-tint-60);
 }
 
 .tel-toggle-thumb {
@@ -52,7 +52,7 @@
   width: 0.8rem;
   height: 0.8rem;
   border-radius: 50%;
-  background: #f4f0ff;
+  background: var(--color-fg-primary);
   transition: transform 0.2s;
 }
 
@@ -62,15 +62,15 @@
 
 .tel-toggle-label {
   font-size: 0.68rem;
-  color: #9080bb;
+  color: var(--color-fg-secondary);
 }
 
 .tel-btn {
   padding: 0.25rem 0.5rem;
-  border: 1px solid rgb(255 255 255 / 12%);
+  border: 1px solid var(--fill-stronger);
   border-radius: 0.4rem;
   background: transparent;
-  color: #b8a8ff;
+  color: var(--color-accent-soft);
   font-size: 0.72rem;
   cursor: pointer;
   font-family: inherit;
@@ -78,17 +78,17 @@
 }
 
 .tel-btn:hover {
-  background: rgb(255 255 255 / 6%);
+  background: var(--fill-medium);
 }
 
 .tel-disabled-notice {
   font-size: 0.7rem;
-  color: #6a5fa0;
+  color: var(--color-fg-muted);
   line-height: 1.5;
   padding: 0.75rem;
-  border: 1px solid rgb(255 255 255 / 6%);
+  border: 1px solid var(--color-border);
   border-radius: 0.5rem;
-  background: rgb(255 255 255 / 2%);
+  background: var(--fill-soft);
 }
 
 .tel-stats-grid {
@@ -102,21 +102,21 @@
   flex-direction: column;
   align-items: center;
   padding: 0.5rem;
-  border: 1px solid rgb(255 255 255 / 7%);
+  border: 1px solid var(--color-border);
   border-radius: 0.5rem;
-  background: rgb(255 255 255 / 2%);
+  background: var(--fill-soft);
 }
 
 .tel-stat-val {
   font-size: 1.1rem;
   font-weight: 700;
-  color: #c8b8ff;
+  color: var(--color-accent-strong);
   font-variant-numeric: tabular-nums;
 }
 
 .tel-stat-label {
   font-size: 0.58rem;
-  color: #6a5fa0;
+  color: var(--color-fg-muted);
   text-transform: uppercase;
   letter-spacing: 0.08em;
   margin-top: 0.15rem;
@@ -127,7 +127,7 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: #6a5fa0;
+  color: var(--color-fg-muted);
 }
 
 .tel-bars {
@@ -144,7 +144,7 @@
 
 .tel-bar-label {
   font-size: 0.62rem;
-  color: #9080bb;
+  color: var(--color-fg-secondary);
   width: 2rem;
   text-align: right;
   font-variant-numeric: tabular-nums;
@@ -153,21 +153,21 @@
 .tel-bar-track {
   flex: 1;
   height: 0.4rem;
-  background: rgb(255 255 255 / 8%);
+  background: var(--fill-strong);
   border-radius: 0.2rem;
   overflow: hidden;
 }
 
 .tel-bar-fill {
   height: 100%;
-  background: linear-gradient(90deg, #7b5cff, #91e8ff);
+  background: linear-gradient(90deg, var(--color-accent), var(--color-accent-hot));
   border-radius: 0.2rem;
   transition: width 0.4s ease-out;
 }
 
 .tel-bar-val {
   font-size: 0.62rem;
-  color: #c8b8ff;
+  color: var(--color-accent-strong);
   font-variant-numeric: tabular-nums;
   min-width: 3.5rem;
   text-align: right;
@@ -185,26 +185,26 @@
   gap: 0.5rem;
   padding: 0.2rem 0.4rem;
   border-radius: 0.3rem;
-  background: rgb(255 255 255 / 2%);
+  background: var(--fill-soft);
   font-size: 0.65rem;
   font-variant-numeric: tabular-nums;
 }
 
 .tel-record-err {
-  background: rgb(255 80 80 / 8%);
+  background: var(--error-tint-08);
 }
 
-.tel-record-status { color: #7be0b8; }
-.tel-record-err .tel-record-status { color: #ff8080; }
+.tel-record-status { color: var(--color-success-soft); }
+.tel-record-err .tel-record-status { color: var(--color-error-soft); }
 
-.tel-record-lat   { color: #c8b8ff; min-width: 3.5rem; }
-.tel-record-tok   { color: #91e8ff; min-width: 3rem; }
-.tel-record-tps   { color: #9080bb; flex: 1; }
-.tel-record-errmsg { color: #ff8080; font-size: 0.6rem; }
+.tel-record-lat   { color: var(--color-accent-strong); min-width: 3.5rem; }
+.tel-record-tok   { color: var(--color-accent-hot); min-width: 3rem; }
+.tel-record-tps   { color: var(--color-fg-secondary); flex: 1; }
+.tel-record-errmsg { color: var(--color-error-soft); font-size: 0.6rem; }
 
 .tel-empty {
   font-size: 0.68rem;
-  color: #6a5fa0;
+  color: var(--color-fg-muted);
   text-align: center;
   padding: 1rem;
 }
