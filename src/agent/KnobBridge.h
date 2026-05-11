@@ -30,8 +30,7 @@ namespace agentic_synth::agent {
 // + injectPatch contract is unchanged from the AgentBridge inline version.
 class KnobBridge {
 public:
-    KnobBridge(PrePatchPipeline& pipeline, SessionMemory& memory) noexcept
-        : pipeline_(pipeline), memory_(memory) {}
+    KnobBridge(PrePatchPipeline& pipeline, SessionMemory& memory) noexcept : pipeline_(pipeline), memory_(memory) {}
 
     // Apply one real-time knob change to the audio pipeline (target ≤ 16 ms).
     // Records the change as FeedbackKind::Tweak in session memory.
@@ -44,9 +43,7 @@ public:
     // Read-only views of the latched MIDI CC state. Used by PromptHandler
     // to bias the system prompt + rationale toward the user's current
     // performance state.
-    [[nodiscard]] float midiCutoffNorm() const noexcept {
-        return midiCutoffNorm_.load(std::memory_order_relaxed);
-    }
+    [[nodiscard]] float midiCutoffNorm() const noexcept { return midiCutoffNorm_.load(std::memory_order_relaxed); }
     [[nodiscard]] float midiResonanceNorm() const noexcept {
         return midiResonanceNorm_.load(std::memory_order_relaxed);
     }
