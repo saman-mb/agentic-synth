@@ -10,18 +10,22 @@ namespace agentic_synth::engine {
 
 inline constexpr int kWavetableSize = 256;
 inline constexpr int kMaxWavetableFrames = 256;
-inline constexpr int kNumMipLevels = 8; // sizes: 256, 128, 64, 32, 16, 8, 4, 2
+inline constexpr int kNumMipLevels = 8;
 
+// Band-limited mip pyramid: all mips are kWavetableSize samples.
+// Mip level k zeroes DFT bins above kWavetableSize / 2^(k+1), so its harmonic
+// content stays below Nyquist when played at frequencies up to sampleRate / 2^(k+1).
 struct WavetableData {
-    // mips[level][frame] holds (kWavetableSize >> level) samples
+    // mips[level][frame] holds kWavetableSize band-limited samples for that level.
     std::array<std::array<std::vector<float>, kMaxWavetableFrames>, kNumMipLevels> mips{};
     int frameCount{0};
 
     // Populate from a flat buffer of numFrames * kWavetableSize samples (row-major).
-    // Builds all mip levels via boxcar averaging.
+    // Builds all mip levels via FFT bin-zeroing (offline; allocates).
     void buildFromFrames(const float* samples, int numFrames);
 
 private:
+    // Bandlimit the source-frame (mip 0) in-place into level k.
     void buildMipLevel(int level);
 };
 
@@ -50,8 +54,12 @@ public:
     [[nodiscard]] float processSample() noexcept;
     void processBlock(float* output, int numSamples) noexcept;
 
+    // Test accessors / knobs (no DSP cost in release path).
+    void setMipCrossfadeEnabled(bool enabled) noexcept { mipCrossfadeEnabled_ = enabled; }
+    [[nodiscard]] float currentMipLevelF() const noexcept;
+
 private:
-    [[nodiscard]] int selectMipLevel() const noexcept;
+    [[nodiscard]] float mipLevelFloat() const noexcept;
     [[nodiscard]] float readMorphedSample(int mipLevel, double phase) const noexcept;
 
     std::shared_ptr<const WavetableData> table_;
@@ -60,6 +68,7 @@ private:
     double phaseIncrement_{440.0 / 44100.0};
     double phase_{0.0}; // 0..1
     float morphPos_{0.0f};
+    bool mipCrossfadeEnabled_{true};
 };
 
 } // namespace agentic_synth::engine

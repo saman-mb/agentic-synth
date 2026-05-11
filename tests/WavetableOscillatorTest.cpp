@@ -2,7 +2,9 @@
 
 #include "engine/WavetableOscillator.h"
 
+#include <algorithm>
 #include <cmath>
+#include <complex>
 #include <numbers>
 #include <vector>
 
@@ -104,4 +106,182 @@ TEST_CASE("WavetableOscillator reset restarts phase", "[wavetable][reset]") {
     osc.reset();
     const float afterReset = osc.processSample();
     REQUIRE(std::abs(afterReset - first) < 1e-5f);
+}
+
+// ---------------------------------------------------------------------------
+// FFT-band-limited mip + per-sample mip crossfade
+// ---------------------------------------------------------------------------
+
+namespace {
+
+// Naive DFT — fine for kWavetableSize=256 in test code.
+std::vector<std::complex<double>> dft(const std::vector<float>& x) {
+    const int n = static_cast<int>(x.size());
+    std::vector<std::complex<double>> X(n);
+    for (int k = 0; k < n; ++k) {
+        std::complex<double> acc(0.0, 0.0);
+        for (int i = 0; i < n; ++i) {
+            const double ang = -2.0 * std::numbers::pi * static_cast<double>(k) * static_cast<double>(i) / n;
+            acc += std::complex<double>(std::cos(ang), std::sin(ang)) * static_cast<double>(x[i]);
+        }
+        X[k] = acc;
+    }
+    return X;
+}
+
+// Bandlimited saw with `harmonics` partials, written into kWavetableSize.
+std::vector<float> makeSaw(int harmonics) {
+    std::vector<float> out(kWavetableSize, 0.0f);
+    for (int i = 0; i < kWavetableSize; ++i) {
+        double y = 0.0;
+        for (int h = 1; h <= harmonics; ++h)
+            y += std::sin(2.0 * std::numbers::pi * h * i / kWavetableSize) / h;
+        out[i] = static_cast<float>(y * (2.0 / std::numbers::pi));
+    }
+    return out;
+}
+
+} // namespace
+
+TEST_CASE("Band-limited mip removes content above target Nyquist", "[wavetable][mip][fft]") {
+    // Saw with 120 harmonics — full spectrum is rich enough to detect leakage at every mip level.
+    auto saw = makeSaw(120);
+
+    WavetableData data;
+    data.buildFromFrames(saw.data(), 1);
+
+    for (int level = 1; level < kNumMipLevels; ++level) {
+        const auto& mip = data.mips[level][0];
+        REQUIRE(static_cast<int>(mip.size()) == kWavetableSize);
+
+        auto spec = dft(mip);
+
+        // Cutoff matches the implementation: mip k zeros bins >= N / 2^(k+1).
+        const int cutoff = kWavetableSize >> (level + 1);
+        if (cutoff < 2)
+            continue; // very-low-bandwidth mips: nothing meaningful to assert
+
+        double fund = std::abs(spec[1]); // saw fundamental
+        REQUIRE(fund > 1e-6);
+
+        double maxAbove = 0.0;
+        for (int b = cutoff; b < kWavetableSize / 2; ++b)
+            maxAbove = std::max(maxAbove, std::abs(spec[b]));
+
+        const double dbDown = 20.0 * std::log10(std::max(maxAbove, 1e-12) / fund);
+        INFO("mip " << level << " cutoff=" << cutoff << " worst-bin-above=" << dbDown << " dB");
+        REQUIRE(dbDown < -60.0);
+    }
+}
+
+TEST_CASE("Higher-octave notes use higher mip indices", "[wavetable][mip][selection]") {
+    WavetableOscillator osc;
+    osc.setSampleRate(44100.0);
+
+    osc.setFrequency(midiToHz(24)); // ~32.7 Hz
+    const float lowLevel = osc.currentMipLevelF();
+
+    osc.setFrequency(midiToHz(96)); // ~2093 Hz
+    const float highLevel = osc.currentMipLevelF();
+
+    INFO("low=" << lowLevel << " high=" << highLevel);
+    REQUIRE(highLevel > lowLevel + 1.0f); // at least one full octave of mip difference
+}
+
+TEST_CASE("Mip-level crossfade eliminates octave-boundary clicks", "[wavetable][mip][crossfade]") {
+    constexpr double kSampleRate = 44100.0;
+    constexpr int kBlock = 256;
+
+    auto saw = makeSaw(120); // bright source so mip transitions are audible
+
+    // Pick a frequency that sits exactly at a mip-level integer boundary, then
+    // render two neighbouring frequencies (one just below, one just above).
+    // Match the starting phase. With integer-mip selection the two renders
+    // come from *different* mips → large RMS difference. With crossfade the
+    // fractional level barely changes across the boundary → small difference.
+    // Integer mip boundaries are at freq = sampleRate / (2*kWavetableSize) * 2^k.
+    // Pick k=2 → ~344.5 Hz so we're well clear of the ratio<=1 floor clamp.
+    const double boundaryHz = kSampleRate / (2.0 * kWavetableSize) * 4.0;
+    REQUIRE(boundaryHz > 100.0);
+
+    constexpr int kShortBlock = 8; // keep phase drift negligible across freq probes
+    const double dHz = 0.05;       // ±0.05 Hz around the integer-mip boundary
+    auto renderAt = [&](double hz, bool crossfade) {
+        WavetableOscillator osc;
+        osc.setSampleRate(kSampleRate);
+        osc.loadFromFrames(saw.data(), 1);
+        osc.setMipCrossfadeEnabled(crossfade);
+        osc.setFrequency(hz);
+        osc.reset();
+        std::vector<float> b(kShortBlock);
+        osc.processBlock(b.data(), kShortBlock);
+        return b;
+    };
+
+    auto rmsDiff = [](const std::vector<float>& a, const std::vector<float>& b) {
+        double s = 0.0;
+        for (size_t i = 0; i < a.size(); ++i)
+            s += static_cast<double>(a[i] - b[i]) * (a[i] - b[i]);
+        return std::sqrt(s / a.size());
+    };
+
+    const auto belowX = renderAt(boundaryHz - dHz, true);
+    const auto aboveX = renderAt(boundaryHz + dHz, true);
+    const auto belowS = renderAt(boundaryHz - dHz, false);
+    const auto aboveS = renderAt(boundaryHz + dHz, false);
+
+    const double diffXfade = rmsDiff(belowX, aboveX);
+    const double diffStep = rmsDiff(belowS, aboveS);
+    INFO("RMS(below vs above boundary): crossfade=" << diffXfade << " step=" << diffStep
+                                                    << "  boundary=" << boundaryHz << " Hz");
+    REQUIRE(diffXfade * 2.0 < diffStep);
+}
+
+TEST_CASE("Aliasing at high notes is reduced", "[wavetable][mip][alias]") {
+    constexpr double kSampleRate = 44100.0;
+    constexpr int kBufSize = 4096;
+
+    auto saw = makeSaw(120);
+
+    WavetableOscillator osc;
+    osc.setSampleRate(kSampleRate);
+    osc.loadFromFrames(saw.data(), 1);
+    osc.setFrequency(midiToHz(96)); // ~2093 Hz fundamental
+    osc.reset();
+
+    std::vector<float> buf(kBufSize);
+    osc.processBlock(buf.data(), kBufSize);
+
+    // Hann window to clean the DFT (cheap; we only need rough bin energy).
+    std::vector<float> win(kBufSize);
+    for (int i = 0; i < kBufSize; ++i)
+        win[i] = buf[i] * static_cast<float>(0.5 - 0.5 * std::cos(2.0 * std::numbers::pi * i / (kBufSize - 1)));
+
+    // Locate fundamental bin and a "very high" band.
+    const double fundHz = midiToHz(96);
+    const int fundBin = static_cast<int>(std::round(fundHz * kBufSize / kSampleRate));
+
+    // Naive DFT only for the bins we need.
+    auto bin = [&](int k) {
+        std::complex<double> acc(0.0, 0.0);
+        for (int i = 0; i < kBufSize; ++i) {
+            const double ang = -2.0 * std::numbers::pi * k * i / kBufSize;
+            acc += std::complex<double>(std::cos(ang), std::sin(ang)) * static_cast<double>(win[i]);
+        }
+        return std::abs(acc);
+    };
+
+    const double fundMag = bin(fundBin);
+    REQUIRE(fundMag > 0.0);
+
+    // Very-high band: 18 kHz .. Nyquist. With band-limited mips, this should be empty.
+    const int aliasBinStart = static_cast<int>(18000.0 * kBufSize / kSampleRate);
+    const int aliasBinEnd = kBufSize / 2 - 1;
+    double maxAlias = 0.0;
+    for (int b = aliasBinStart; b <= aliasBinEnd; b += 4) // stride for speed
+        maxAlias = std::max(maxAlias, bin(b));
+
+    const double db = 20.0 * std::log10(std::max(maxAlias, 1e-12) / fundMag);
+    INFO("MIDI 96, worst bin in 18 kHz..Nyquist = " << db << " dB rel fundamental");
+    REQUIRE(db < -40.0);
 }
