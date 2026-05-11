@@ -1,0 +1,269 @@
+.sem-dict {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  overflow: hidden;
+}
+
+.sem-dict-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+}
+
+.sem-dict-title {
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  color: #91e8ff;
+}
+
+.sem-dict-count {
+  font-size: 0.6rem;
+  color: #6a5fa0;
+}
+
+.sem-dict-toolbar {
+  display: flex;
+  gap: 0.4rem;
+  align-items: center;
+}
+
+.sem-dict-search {
+  flex: 1;
+  background: rgb(255 255 255 / 5%);
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 0.4rem;
+  padding: 0.3rem 0.5rem;
+  font-size: 0.75rem;
+  color: #f4f0ff;
+  font-family: inherit;
+  outline: none;
+}
+
+.sem-dict-search:focus {
+  border-color: rgb(123 92 255 / 50%);
+}
+
+.sem-btn {
+  padding: 0.3rem 0.6rem;
+  border: 1px solid rgb(255 255 255 / 15%);
+  border-radius: 0.4rem;
+  background: transparent;
+  color: #b8a8ff;
+  font-family: inherit;
+  font-size: 0.72rem;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.sem-btn:hover:not(:disabled) {
+  background: rgb(255 255 255 / 8%);
+}
+
+.sem-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.sem-btn-primary {
+  border-color: rgb(123 92 255 / 40%);
+  color: #c8b8ff;
+}
+
+.sem-btn-primary:hover:not(:disabled) {
+  background: rgb(123 92 255 / 18%);
+  border-color: #7b5cff;
+}
+
+.sem-dict-status {
+  font-size: 0.68rem;
+  color: #7be0b8;
+  padding: 0.2rem 0;
+}
+
+.sem-dict-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.sem-entry {
+  border: 1px solid rgb(255 255 255 / 7%);
+  border-radius: 0.5rem;
+  overflow: hidden;
+}
+
+.sem-entry-custom {
+  border-color: rgb(123 92 255 / 25%);
+}
+
+.sem-entry-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  background: transparent;
+  border: none;
+  color: #f4f0ff;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  font-size: 0.72rem;
+  transition: background 0.1s;
+}
+
+.sem-entry-header:hover {
+  background: rgb(255 255 255 / 4%);
+}
+
+.sem-entry-keyword {
+  font-weight: 600;
+  min-width: 5rem;
+  color: #e0d8ff;
+}
+
+.sem-ctx-badge {
+  font-size: 0.58rem;
+  padding: 0.1rem 0.4rem;
+  border-radius: 0.3rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 600;
+  background: rgb(255 255 255 / 8%);
+  color: #91e8ff;
+}
+
+.sem-ctx-bass     { background: rgb(255 100 100 / 15%); color: #ff8888; }
+.sem-ctx-pad      { background: rgb(100 200 255 / 15%); color: #80d4ff; }
+.sem-ctx-lead     { background: rgb(255 200 100 / 15%); color: #ffc880; }
+.sem-ctx-keys     { background: rgb(150 255 150 / 15%); color: #88ee88; }
+.sem-ctx-percussion { background: rgb(255 150 50 / 15%);  color: #ffaa44; }
+.sem-ctx-arp      { background: rgb(200 100 255 / 15%); color: #cc88ff; }
+.sem-ctx-texture  { background: rgb(100 220 200 / 15%); color: #66ccbb; }
+.sem-ctx-generic  { background: rgb(255 255 255 / 8%);  color: #aaa0cc; }
+
+.sem-badge-custom {
+  font-size: 0.55rem;
+  padding: 0.1rem 0.35rem;
+  border-radius: 0.3rem;
+  background: rgb(123 92 255 / 25%);
+  color: #a088ff;
+  font-weight: 600;
+}
+
+.sem-entry-preview {
+  flex: 1;
+  font-size: 0.6rem;
+  color: #6a5fa0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sem-entry-chevron {
+  font-size: 0.55rem;
+  color: #6a5fa0;
+}
+
+.sem-entry-body {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.2rem 0.5rem;
+  padding: 0.5rem 0.6rem 0.6rem;
+  border-top: 1px solid rgb(255 255 255 / 6%);
+  background: rgb(0 0 0 / 15%);
+}
+
+.sem-field-row {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+.sem-field-label {
+  font-size: 0.58rem;
+  color: #6a5fa0;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sem-field-val {
+  font-size: 0.65rem;
+  color: #c8c0e8;
+  font-variant-numeric: tabular-nums;
+  min-width: 4rem;
+  text-align: right;
+}
+
+.sem-field-input {
+  width: 5rem;
+  background: rgb(255 255 255 / 6%);
+  border: 1px solid rgb(255 255 255 / 12%);
+  border-radius: 0.3rem;
+  padding: 0.15rem 0.3rem;
+  font-size: 0.65rem;
+  color: #f4f0ff;
+  font-family: inherit;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  outline: none;
+}
+
+.sem-field-input:focus {
+  border-color: rgb(123 92 255 / 50%);
+}
+
+.sem-add-panel {
+  border: 1px solid rgb(123 92 255 / 30%);
+  border-radius: 0.5rem;
+  padding: 0.6rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  background: rgb(123 92 255 / 5%);
+}
+
+.sem-add-row {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.sem-add-kw {
+  flex: 1;
+  width: auto;
+}
+
+.sem-add-deltas {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.2rem 0.5rem;
+}
+
+.sem-add-actions {
+  display: flex;
+  gap: 0.4rem;
+  justify-content: flex-end;
+}
+
+.sem-add-trigger {
+  align-self: flex-start;
+  font-size: 0.7rem;
+  color: #7b5cff;
+  border-color: rgb(123 92 255 / 30%);
+}
+
+.sem-add-trigger:hover {
+  background: rgb(123 92 255 / 10%);
+  color: #a088ff;
+}
