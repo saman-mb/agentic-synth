@@ -41,11 +41,16 @@
   font-size: 0.75rem;
   color: #f4f0ff;
   font-family: inherit;
-  outline: none;
 }
 
 .sem-dict-search:focus {
+  outline: none;
   border-color: rgb(123 92 255 / 50%);
+}
+
+.sem-dict-search:focus-visible {
+  outline: 2px solid #7b5cff;
+  outline-offset: 2px;
 }
 
 .sem-btn {
@@ -217,11 +222,16 @@
   font-family: inherit;
   font-variant-numeric: tabular-nums;
   text-align: right;
-  outline: none;
 }
 
 .sem-field-input:focus {
+  outline: none;
   border-color: rgb(123 92 255 / 50%);
+}
+
+.sem-field-input:focus-visible {
+  outline: 2px solid #7b5cff;
+  outline-offset: 2px;
 }
 
 .sem-add-panel {

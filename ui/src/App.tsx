@@ -192,6 +192,7 @@ export function App() {
             id="panel-tabpanel-knobs"
             role="tabpanel"
             aria-labelledby="panel-tab-knobs"
+            tabIndex={0}
           >
             <KnobGrid patch={patch} agentKeys={lastAgentEditBatch} onKnobChange={handleKnobChange} />
           </div>
@@ -201,6 +202,7 @@ export function App() {
             id="panel-tabpanel-dictionary"
             role="tabpanel"
             aria-labelledby="panel-tab-dictionary"
+            tabIndex={0}
           >
             <SemanticDictionary sendMessage={sendMessage} lastMessage={lastMessage} />
           </div>
@@ -210,6 +212,7 @@ export function App() {
             id="panel-tabpanel-telemetry"
             role="tabpanel"
             aria-labelledby="panel-tab-telemetry"
+            tabIndex={0}
           >
             <TelemetryDashboard sendMessage={sendMessage} lastMessage={lastMessage} />
           </div>

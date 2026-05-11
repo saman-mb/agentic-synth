@@ -12,7 +12,7 @@
 class AgenticSynthPlugin final : public juce::AudioProcessor {
 public:
     AgenticSynthPlugin();
-    ~AgenticSynthPlugin() override = default;
+    ~AgenticSynthPlugin() override;
 
     void prepareToPlay(double sampleRate, int samplesPerBlock) override;
     void releaseResources() override;
@@ -54,6 +54,14 @@ private:
     agentic_synth::agent::AgentBridge agentBridge_;
     agentic_synth::engine::MidiHandler midiHandler_;
     juce::AudioProcessorValueTreeState apvts_;
+
+    // Thread-safe FIFO for non-audio-thread MIDI producers (audition keyboard,
+    // future remote control). processBlock drains into the host's MidiBuffer
+    // under audio-thread exclusivity. CriticalSection-protected MidiBuffer
+    // chosen over juce::MidiMessageCollector to avoid linking
+    // juce_audio_devices for one tiny FIFO.
+    juce::MidiBuffer auditionPending_;
+    juce::CriticalSection auditionMutex_;
 
     std::atomic<float>* masterGainParam_ = nullptr;
     std::atomic<float>* filterCutoffParam_ = nullptr;

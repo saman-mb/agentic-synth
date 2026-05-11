@@ -64,10 +64,15 @@
   background: #0c0b14;
   border-radius: 6px;
   padding: 4px;
+}
+
+.audition-keyboard:focus {
   outline: none;
 }
 
 .audition-keyboard:focus-visible {
+  outline: 2px solid #7b5cff;
+  outline-offset: 2px;
   box-shadow: 0 0 0 2px rgb(106 92 255 / 65%);
 }
 

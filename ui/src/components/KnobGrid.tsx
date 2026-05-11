@@ -275,6 +275,12 @@ export function KnobGrid({ patch, agentKeys, onKnobChange }: KnobGridProps) {
         <button type="button" className="knob-grid-tool" onClick={collapseAll}>Collapse all</button>
       </div>
 
+      <div className="visually-hidden" aria-live="polite" aria-atomic="true">
+        {agentKeys.size > 0
+          ? `Agent updated ${agentKeys.size} parameter${agentKeys.size === 1 ? '' : 's'}`
+          : ''}
+      </div>
+
       {patch.osc.map((osc, i) => {
         const title = `Osc ${i + 1}`;
         return (
