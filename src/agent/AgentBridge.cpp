@@ -193,9 +193,7 @@ void AgentBridge::onMidiCC(int controller, int value) noexcept { knob_.onMidiCC(
 
 // ── Issue #72: Bidirectional knob bridge (Phase 12A: forwards to KnobBridge) ─
 
-void AgentBridge::handleKnobTweak(const std::string& param, float value) {
-    knob_.handleKnobTweak(param, value);
-}
+void AgentBridge::handleKnobTweak(const std::string& param, float value) { knob_.handleKnobTweak(param, value); }
 
 // ── Issue #90: Semantic dictionary (Phase 10C: forwards to DictionaryService) ─
 
