@@ -248,6 +248,7 @@ void StreamParser::applyField(const std::string& key, const std::string& val) {
         partial_.delay.time_s = std::clamp(extractFloat(val, "time_s", partial_.delay.time_s), 0.0f, 2.0f);
         partial_.delay.feedback = std::clamp(extractFloat(val, "feedback", partial_.delay.feedback), 0.0f, 0.99f);
         partial_.delay.mix = std::clamp(extractFloat(val, "mix", partial_.delay.mix), 0.0f, 1.0f);
+        partial_.delay.stereo = std::clamp(extractFloat(val, "stereo", partial_.delay.stereo), 0.0f, 1.0f);
     } else if (key == "osc") {
         for (int i = 0; i < kMaxOscillators; ++i) {
             const std::string obj = extractObjectAt(val, i);

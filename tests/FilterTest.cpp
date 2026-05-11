@@ -106,12 +106,13 @@ TEST_CASE("MoogLadder — stable at max resonance across cutoffs and sample rate
     }
 }
 
-TEST_CASE("MoogLadder — self-oscillates with zero input at max resonance",
+TEST_CASE("MoogLadder — self-oscillates AT the cutoff frequency at max resonance",
           "[filter][moog][self-oscillation]") {
-    const float sampleRate = 48000.0f;
+    const float sampleRate = 44100.0f;
+    const float cutoff = 500.0f;
     MoogLadder f;
     f.prepare(static_cast<double>(sampleRate));
-    f.setCutoff(500.0f);
+    f.setCutoff(cutoff);
     f.setResonance(1.0f);
 
     // Kick the system with a brief impulse so the soft-saturation fixed point
@@ -123,18 +124,143 @@ TEST_CASE("MoogLadder — self-oscillates with zero input at max resonance",
         REQUIRE(std::isfinite(out));
     }
 
-    // Run for ~1 s of zero input and measure the steady-state peak over the
-    // final 200 ms.
-    const int totalSamples = static_cast<int>(sampleRate);
-    const int measureStart = totalSamples - static_cast<int>(sampleRate * 0.2f);
-    float peak = 0.0f;
-    for (int i = 1; i < totalSamples; ++i) {
+    // Run for ~1 s of zero input, skip 200 ms ring-in, then count zero
+    // crossings on the tail. A pure 500 Hz oscillator produces 2 ZCs per
+    // period → ~1000 ZCs per second; tolerance ±10% for the cutoff-vs-actual
+    // pole-frequency offset (tan() prewarp leaves a small bias).
+    const int ringInSamples = static_cast<int>(sampleRate * 0.2f);
+    const int totalSamples = static_cast<int>(sampleRate); // 1 second total
+    for (int i = 0; i < ringInSamples; ++i) {
         out = f.process(0.0f);
         REQUIRE(std::isfinite(out));
-        if (i >= measureStart)
-            peak = std::max(peak, std::abs(out));
     }
+
+    float peak = 0.0f;
+    float prev = out;
+    int zeroCrossings = 0;
+    const int tailSamples = totalSamples - ringInSamples;
+    for (int i = 0; i < tailSamples; ++i) {
+        out = f.process(0.0f);
+        REQUIRE(std::isfinite(out));
+        peak = std::max(peak, std::abs(out));
+        // Rising-or-falling crossings, ignoring exact-zero plateau samples.
+        if ((prev < 0.0f && out >= 0.0f) || (prev >= 0.0f && out < 0.0f))
+            ++zeroCrossings;
+        prev = out;
+    }
+
+    // Amplitude check (legacy assertion preserved).
     REQUIRE(peak > 0.1f);
+
+    // Spectral check: actual oscillation frequency from zero-crossing count.
+    // tailSamples ≈ 0.8 s, so expected ZCs = 2 * cutoff * 0.8 = 800.
+    const float tailSeconds = static_cast<float>(tailSamples) / sampleRate;
+    const float measuredHz =
+        static_cast<float>(zeroCrossings) / (2.0f * tailSeconds);
+    const float lower = cutoff * 0.90f;
+    const float upper = cutoff * 1.10f;
+    INFO("cutoff=" << cutoff << " Hz, measured oscillation="
+                   << measuredHz << " Hz, zero-crossings=" << zeroCrossings
+                   << " over " << tailSeconds << " s");
+    REQUIRE(measuredHz > lower);
+    REQUIRE(measuredHz < upper);
+}
+
+TEST_CASE("MoogLadder — NaN input doesn't poison subsequent samples",
+          "[filter][moog][nan-guard]") {
+    MoogLadder f;
+    f.prepare(44100.0);
+    f.setCutoff(1000.0f);
+    f.setResonance(0.5f);
+
+    // Warm up with a few normal samples so the integrators hold state.
+    const float omega = 2.0f * static_cast<float>(M_PI) * 200.0f / 44100.0f;
+    for (int i = 0; i < 64; ++i) {
+        const float out = f.process(std::sin(omega * static_cast<float>(i)));
+        REQUIRE(std::isfinite(out));
+    }
+
+    // Inject one NaN — guard must clear state and return 0.
+    const float poisoned = f.process(std::numeric_limits<float>::quiet_NaN());
+    REQUIRE(std::isfinite(poisoned));
+    REQUIRE(poisoned == 0.0f);
+
+    // Also try +Inf — same recovery contract.
+    const float poisonedInf =
+        f.process(std::numeric_limits<float>::infinity());
+    REQUIRE(std::isfinite(poisonedInf));
+
+    // Post-recovery: all samples must be finite, and the filter must again
+    // produce non-zero output once driven with a normal signal.
+    float maxAbs = 0.0f;
+    for (int i = 0; i < 4096; ++i) {
+        const float out = f.process(std::sin(omega * static_cast<float>(i)));
+        REQUIRE(std::isfinite(out));
+        if (i > 256) // skip ring-in after reset
+            maxAbs = std::max(maxAbs, std::abs(out));
+    }
+    REQUIRE(maxAbs > 0.1f);
+}
+
+TEST_CASE("SVFilter — NaN input doesn't poison subsequent samples",
+          "[filter][svf][nan-guard]") {
+    SVFilter f(FilterMode::LP);
+    f.prepare(44100.0);
+    f.setCutoff(1000.0f);
+    f.setResonance(0.5f);
+
+    const float omega = 2.0f * static_cast<float>(M_PI) * 200.0f / 44100.0f;
+    for (int i = 0; i < 64; ++i) {
+        const float out = f.process(std::sin(omega * static_cast<float>(i)));
+        REQUIRE(std::isfinite(out));
+    }
+
+    const float poisoned = f.process(std::numeric_limits<float>::quiet_NaN());
+    REQUIRE(std::isfinite(poisoned));
+    REQUIRE(poisoned == 0.0f);
+
+    float maxAbs = 0.0f;
+    for (int i = 0; i < 4096; ++i) {
+        const float out = f.process(std::sin(omega * static_cast<float>(i)));
+        REQUIRE(std::isfinite(out));
+        if (i > 256)
+            maxAbs = std::max(maxAbs, std::abs(out));
+    }
+    REQUIRE(maxAbs > 0.1f);
+}
+
+TEST_CASE("MoogLadder — non-finite setter values are rejected",
+          "[filter][moog][nan-guard]") {
+    MoogLadder f;
+    f.prepare(44100.0);
+    f.setCutoff(1000.0f);
+    f.setResonance(0.5f);
+    f.setDrive(0.3f);
+
+    // Baseline output with valid params.
+    const float omega = 2.0f * static_cast<float>(M_PI) * 200.0f / 44100.0f;
+    float baseline = 0.0f;
+    for (int i = 0; i < 1024; ++i)
+        baseline = std::max(baseline,
+                            std::abs(f.process(std::sin(omega *
+                                                        static_cast<float>(i)))));
+    REQUIRE(baseline > 0.1f);
+
+    // Throw NaN/Inf at every setter — must be ignored, state unchanged.
+    f.setCutoff(std::numeric_limits<float>::quiet_NaN());
+    f.setCutoff(std::numeric_limits<float>::infinity());
+    f.setResonance(std::numeric_limits<float>::quiet_NaN());
+    f.setDrive(std::numeric_limits<float>::quiet_NaN());
+
+    f.reset();
+    float after = 0.0f;
+    for (int i = 0; i < 1024; ++i) {
+        const float out = f.process(std::sin(omega * static_cast<float>(i)));
+        REQUIRE(std::isfinite(out));
+        after = std::max(after, std::abs(out));
+    }
+    // Same params still active → output magnitude roughly matches baseline.
+    REQUIRE(after > 0.1f);
 }
 
 // Helper: harmonic-content metric. Fits the best amplitude+phase fundamental

@@ -319,8 +319,7 @@ void VoiceManager::applyPatch(const PatchStruct& patch) noexcept {
     delay_.setTimeSeconds(std::clamp(safe(patch.delay.time_s,   0.25f), 0.001f, 2.0f));
     delay_.setFeedback   (std::clamp(safe(patch.delay.feedback, 0.3f),  0.0f,   0.99f));
     delay_.setMix        (std::clamp(safe(patch.delay.mix,      0.0f),  0.0f,   1.0f));
-    // Stereo cross-feed isn't in PatchStruct yet — fixed at moderate ping-pong.
-    delay_.setStereo(0.5f);
+    delay_.setStereo     (std::clamp(safe(patch.delay.stereo,   0.5f),  0.0f,   1.0f));
 
     // Amp + filter envelopes.
     ADSREnvelope::Params ampParams{};

@@ -110,10 +110,11 @@ struct DelayParams {
     float time_s;     // 0 .. 2
     float feedback;   // 0 .. 0.99
     float mix;        // 0 .. 1
+    float stereo;     // 0 .. 1 (0 = parallel, 1 = ping-pong cross-feed)
     uint8_t bpm_sync; // bool
     uint8_t _pad[3];
 };
-static_assert(sizeof(DelayParams) == 16);
+static_assert(sizeof(DelayParams) == 20);
 
 // ---------------------------------------------------------------------------
 // Top-level PatchStruct
@@ -191,6 +192,9 @@ inline PatchStruct make_default_patch() noexcept {
         lfo.depth = 0.0f;
         lfo.target = LfoTarget::None;
     }
+
+    // Default delay stereo to moderate ping-pong (matches prior hardcoded VoiceManager value).
+    p.delay.stereo = 0.5f;
 
     p.master_gain = 1.0f;
     p.voice_count = 8;
