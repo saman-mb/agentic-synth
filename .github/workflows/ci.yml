@@ -20,6 +20,11 @@ jobs:
       - name: Initialize submodules
         run: git submodule update --init --recursive
 
+      - name: Install clang-format
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq clang-format
+
       - name: Check clang-format
         run: |
           mapfile -t files < <(git ls-files '*.cpp' '*.h' '*.hpp' '*.cxx' '*.cc')
@@ -42,39 +47,46 @@ jobs:
         working-directory: ui
         run: npm run lint
 
-  build:
-    name: Build (Linux)
-    needs: lint
+  tests:
+    name: Tests
     runs-on: [self-hosted, Linux, X64, unit-test]
-
+    needs: lint
     steps:
       - uses: actions/checkout@v4
 
       - name: Initialize submodules
         run: git submodule update --init --recursive
 
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            libgl1-mesa-dev \
+            libglu1-mesa-dev \
+            libx11-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libxcursor-dev \
+            libasound2-dev \
+            libjack-jackd2-dev \
+            libfreetype-dev \
+            libcurl4-openssl-dev \
+            libfontconfig-dev \
+            libgl-dev \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev
+
       - name: Setup CMake
         uses: jwlawson/actions-setup-cmake@v2
         with:
           cmake-version: "3.28.x"
 
-      - name: Cache CMake and JUCE artifacts
-        uses: actions/cache@v4
-        with:
-          path: |
-            build/_deps
-            ~/.cache
-          key: ${{ runner.os }}-cmake-juce-${{ hashFiles('CMakeLists.txt', 'cmake/**', 'src/**', 'tests/**') }}
-          restore-keys: |
-            ${{ runner.os }}-cmake-juce-
-
-      - name: Set up pkg-config path for self-hosted runner
-        run: |
-          export PKG_CONFIG_PATH=/home/saman/local-sysroot/usr/lib/x86_64-linux-gnu/pkgconfig:$PKG_CONFIG_PATH
-          echo "PKG_CONFIG_PATH=$PKG_CONFIG_PATH" >> $GITHUB_ENV
-
       - name: Configure CMake
-        run: cmake -S . -B build -DCMAKE_BUILD_TYPE=Debug -DAGENTIC_SYNTH_BUILD_TESTS=ON
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Debug \
+            -DAGENTIC_SYNTH_BUILD_TESTS=ON \
+            -DAGENTIC_SYNTH_BUILD_PLUGIN=OFF
 
       - name: Build project
         run: cmake --build build --config Debug --parallel

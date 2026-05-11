@@ -1,20 +1,68 @@
-# ── Engine Library ───────────────────────────────────────────────────────────
-# Core synth engine and agent bridge (shared by app and plugin)
-add_library(agentic_synth_engine
-    engine/SynthEngine.cpp
-    agent/AgentBridge.cpp
+# ── Mapper Library ───────────────────────────────────────────────────────────
+# Pure C++ keyword → PatchStruct mapping; no JUCE dependency
+add_library(agentic_synth_mapper STATIC
+    mapper/HeuristicParser.cpp
+    mapper/GrammarSampler.cpp
+    mapper/SemanticMapper.cpp
 )
+target_include_directories(agentic_synth_mapper PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+agentic_synth_configure_target(agentic_synth_mapper)
 
+# ── Engine Library ───────────────────────────────────────────────────────────
+# Core synth DSP only — no agent code.  Depends on mapper and JUCE audio types.
+add_library(agentic_synth_engine STATIC
+    engine/SynthEngine.cpp
+    engine/ADSREnvelope.cpp
+    engine/WavetableOscillator.cpp
+    engine/VAOscillator.cpp
+    engine/Filter.cpp
+    engine/LFO.cpp
+    engine/VoiceManager.cpp
+    engine/PatchValidator.cpp
+    engine/VariationEngine.cpp
+    engine/MidiHandler.cpp
+    engine/MorphEngine.cpp
+    engine/StyleTransfer.cpp
+    engine/PresetExporter.cpp
+    engine/PresetDatabase.cpp
+    engine/PatchStateManager.cpp
+    engine/MultiModalInput.cpp
+)
 target_include_directories(agentic_synth_engine PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 agentic_synth_configure_target(agentic_synth_engine)
 
 target_link_libraries(agentic_synth_engine
     PUBLIC
+        agentic_synth_mapper
+        juce::juce_core
         juce::juce_audio_basics
-        juce::juce_audio_processors
+        juce::juce_data_structures
+)
+# ── Agent Library ────────────────────────────────────────────────────────────
+# AI agent layer: depends on engine_lib, never the other way around.
+add_library(agentic_synth_agent STATIC
+    agent/AgentBridge.cpp
+    agent/SessionMemory.cpp
+    agent/PrePatchPipeline.cpp
+    agent/StreamParser.cpp
+    agent/Telemetry.cpp
+    agent/VariationRecommender.cpp
+    agent/WhisperClient.cpp
+    agent/GenerationService.cpp
+    agent/WebSocketBridge.cpp
+)
+target_include_directories(agentic_synth_agent PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+agentic_synth_configure_target(agentic_synth_agent)
+
+target_link_libraries(agentic_synth_agent
+    PUBLIC
+        agentic_synth_engine
+        juce::juce_core
 )
 
-# ── Standalone App ───────────────────────────────────────────────────────────
+# ── Standalone App and Plugin (gated on BUILD_PLUGIN) ───────────────────────
+if(AGENTIC_SYNTH_BUILD_PLUGIN)
+
 juce_add_gui_app(AgenticSynth
     PRODUCT_NAME "Agentic Synth"
     VERSION       ${PROJECT_VERSION}
@@ -43,7 +91,7 @@ target_compile_definitions(AgenticSynth
 
 target_link_libraries(AgenticSynth
     PRIVATE
-        agentic_synth_engine
+        agentic_synth_agent
         juce::juce_gui_extra
     PUBLIC
         juce::juce_recommended_config_flags
@@ -74,10 +122,10 @@ juce_generate_juce_header(AgenticSynth_Plugin)
 
 target_sources(AgenticSynth_Plugin
     PRIVATE
-        PluginProcessor.cpp
-        PluginProcessor.h
-        PluginEditor.cpp
-        PluginEditor.h
+        plugin/AgenticSynthPlugin.cpp
+        plugin/AgenticSynthPlugin.h
+        plugin/PluginEditor.cpp
+        plugin/PluginEditor.h
 )
 
 target_compile_definitions(AgenticSynth_Plugin
@@ -89,7 +137,7 @@ target_compile_definitions(AgenticSynth_Plugin
 
 target_link_libraries(AgenticSynth_Plugin
     PRIVATE
-        agentic_synth_engine
+        agentic_synth_agent
         juce::juce_audio_utils
         juce::juce_audio_plugin_client
     PUBLIC
@@ -97,3 +145,5 @@ target_link_libraries(AgenticSynth_Plugin
         juce::juce_recommended_lto_flags
         juce::juce_recommended_warning_flags
 )
+
+endif() # AGENTIC_SYNTH_BUILD_PLUGIN

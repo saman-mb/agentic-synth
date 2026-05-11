@@ -5,43 +5,173 @@
     Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
-body {
+html,
+body,
+#root {
+  height: 100%;
   margin: 0;
 }
 
-.app-shell {
+/* ── Root layout: knob grid left, chat right ──────────────────────── */
+
+.app-layout {
   display: grid;
-  min-height: 100vh;
-  place-items: center;
-  padding: 2rem;
+  grid-template-columns: minmax(340px, 420px) 1fr;
+  height: 100vh;
+  overflow: hidden;
 }
 
-.hero-card {
-  width: min(100%, 44rem);
-  border: 1px solid rgb(255 255 255 / 12%);
-  border-radius: 1.5rem;
-  background: linear-gradient(135deg, rgb(123 92 255 / 20%), rgb(12 183 242 / 12%));
-  box-shadow: 0 2rem 6rem rgb(0 0 0 / 35%);
-  padding: clamp(2rem, 6vw, 4rem);
+@media (max-width: 900px) {
+  .app-layout {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto 1fr;
+  }
 }
 
-.eyebrow {
-  color: #91e8ff;
-  font-size: 0.78rem;
+/* ── Knob panel ───────────────────────────────────────────────────── */
+
+.panel-knobs {
+  overflow-y: auto;
+  border-right: 1px solid rgb(255 255 255 / 8%);
+  background: rgb(255 255 255 / 2%);
+  padding: 0.75rem;
+}
+
+/* ── Chat panel ───────────────────────────────────────────────────── */
+
+.panel-chat {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Knob grid ────────────────────────────────────────────────────── */
+
+.knob-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+}
+
+.knob-section {
+  border: 1px solid rgb(255 255 255 / 8%);
+  border-radius: 0.6rem;
+  padding: 0.6rem 0.75rem 0.75rem;
+}
+
+.knob-section h3 {
+  margin: 0 0 0.5rem;
+  font-size: 0.65rem;
   font-weight: 700;
-  letter-spacing: 0.16em;
   text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: #91e8ff;
 }
 
-h1 {
-  margin: 0.75rem 0 1rem;
-  font-size: clamp(2.5rem, 8vw, 5rem);
-  line-height: 0.95;
+.knob-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
 }
 
-p {
-  color: #d7d0ea;
-  font-size: clamp(1rem, 2vw, 1.2rem);
-  line-height: 1.6;
-  margin: 0;
+/* ── Individual knob ──────────────────────────────────────────────── */
+
+.knob-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: ns-resize;
+  user-select: none;
+  gap: 2px;
+}
+
+.knob-label {
+  font-size: 0.58rem;
+  color: #9080bb;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.knob-value {
+  font-size: 0.62rem;
+  color: #d4cce8;
+  font-variant-numeric: tabular-nums;
+}
+
+.knob-agent svg {
+  animation: knob-flash 0.4s ease-out;
+}
+
+@keyframes knob-flash {
+  0%   { filter: drop-shadow(0 0 6px #7b5cff); }
+  100% { filter: none; }
+}
+
+/* Active user drag — cyan glow so the user knows the knob is live */
+.knob-editing svg {
+  filter: drop-shadow(0 0 5px #91e8ff88);
+}
+
+/* ── Left panel tabs ──────────────────────────────────────────────────── */
+
+.panel-tabs {
+  display: flex;
+  border-bottom: 1px solid rgb(255 255 255 / 8%);
+  margin-bottom: 0.5rem;
+}
+
+.panel-tab {
+  flex: 1;
+  padding: 0.45rem 0;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: #6a5fa0;
+  font-family: inherit;
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+
+.panel-tab:hover {
+  color: #c8b8ff;
+}
+
+.panel-tab-active {
+  color: #91e8ff;
+  border-bottom-color: #91e8ff;
+}
+
+/* ── Push-to-talk ─────────────────────────────────────────────────── */
+
+.ptt-btn {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border: 1px solid rgb(123 92 255 / 40%);
+  border-radius: 0.5rem;
+  background: transparent;
+  color: #b8a8ff;
+  font-family: inherit;
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+  touch-action: none;
+}
+
+.ptt-btn:hover:not(:disabled) {
+  background: rgb(123 92 255 / 12%);
+}
+
+.ptt-btn.ptt-active {
+  background: rgb(123 92 255 / 25%);
+  border-color: #7b5cff;
+  color: #f4f0ff;
+}
+
+.ptt-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
 }
