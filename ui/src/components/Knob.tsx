@@ -9,6 +9,7 @@ interface KnobProps {
   decimals?: number;
   onChange: (value: number) => void;
   agentDriven?: boolean;
+  step?: number;
 }
 
 function polarToXY(cx: number, cy: number, r: number, deg: number) {
@@ -33,7 +34,37 @@ function formatVal(v: number, unit: string | undefined, decimals: number) {
   return unit ? `${s}${unit}` : s;
 }
 
-export function Knob({ value, min, max, label, unit, decimals = 2, onChange, agentDriven }: KnobProps) {
+// Spoken form for aria-valuetext — screen readers say "820 hertz" not "820Hz"
+function spokenUnit(unit: string | undefined): string {
+  if (!unit) return '';
+  const u = unit.trim().toLowerCase();
+  switch (u) {
+    case 'hz': return ' hertz';
+    case 'khz': return ' kilohertz';
+    case 's': return ' seconds';
+    case 'ms': return ' milliseconds';
+    case 'db': return ' decibels';
+    case '%': return ' percent';
+    case 'st': return ' semitones';
+    default: return ` ${unit}`;
+  }
+}
+
+function clamp(v: number, min: number, max: number) {
+  return Math.max(min, Math.min(max, v));
+}
+
+export function Knob({
+  value,
+  min,
+  max,
+  label,
+  unit,
+  decimals = 2,
+  onChange,
+  agentDriven,
+  step,
+}: KnobProps) {
   const norm = Math.max(0, Math.min(1, (value - min) / (max - min)));
   const valueDeg = START_DEG + norm * SWEEP;
   const endDeg = START_DEG + SWEEP;
@@ -50,6 +81,9 @@ export function Knob({ value, min, max, label, unit, decimals = 2, onChange, age
   const [isDragging, setIsDragging] = useState(false);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const fineStep = step ?? (max - min) / 100;
+  const coarseStep = fineStep * 10;
+
   useEffect(() => {
     if (!agentDriven) return;
     setFlashing(true);
@@ -59,7 +93,11 @@ export function Knob({ value, min, max, label, unit, decimals = 2, onChange, age
 
   const onPointerDown = useCallback((e: React.PointerEvent<SVGSVGElement>) => {
     e.preventDefault();
-    (e.target as Element).setPointerCapture(e.pointerId);
+    // Capture on currentTarget (the SVG root) — capturing on e.target binds
+    // to whatever child node the pointer landed on (fill path, dot circle).
+    // If React re-renders and replaces that child mid-drag (e.g. agent edit
+    // batch arrives), the captured node detaches and pointermove stops.
+    (e.currentTarget as Element).setPointerCapture(e.pointerId);
     dragRef.current = { startY: e.clientY, startNorm: norm };
     setIsDragging(true);
   }, [norm]);
@@ -76,8 +114,54 @@ export function Knob({ value, min, max, label, unit, decimals = 2, onChange, age
     setIsDragging(false);
   }, []);
 
+  const onKeyDown = useCallback((e: React.KeyboardEvent<HTMLDivElement>) => {
+    let next: number | null = null;
+    const inc = e.shiftKey ? coarseStep : fineStep;
+    switch (e.key) {
+      case 'ArrowUp':
+      case 'ArrowRight':
+        next = clamp(value + inc, min, max);
+        break;
+      case 'ArrowDown':
+      case 'ArrowLeft':
+        next = clamp(value - inc, min, max);
+        break;
+      case 'PageUp':
+        next = clamp(value + coarseStep, min, max);
+        break;
+      case 'PageDown':
+        next = clamp(value - coarseStep, min, max);
+        break;
+      case 'Home':
+        next = min;
+        break;
+      case 'End':
+        next = max;
+        break;
+      default:
+        return;
+    }
+    if (next !== null) {
+      e.preventDefault();
+      onChange(next);
+    }
+  }, [value, min, max, fineStep, coarseStep, onChange]);
+
+  const valueText = `${formatVal(value, unit, decimals)}${unit ? '' : ''}`;
+  const ariaValueText = `${value.toFixed(decimals)}${spokenUnit(unit)}`;
+
   return (
-    <div className={`knob-wrap${flashing ? ' knob-agent' : ''}${isDragging ? ' knob-editing' : ''}`}>
+    <div
+      className={`knob-wrap${flashing ? ' knob-agent' : ''}${isDragging ? ' knob-editing' : ''}`}
+      role="slider"
+      tabIndex={0}
+      aria-label={label}
+      aria-valuemin={min}
+      aria-valuemax={max}
+      aria-valuenow={value}
+      aria-valuetext={ariaValueText}
+      onKeyDown={onKeyDown}
+    >
       <svg
         width="64"
         height="64"
@@ -86,6 +170,8 @@ export function Knob({ value, min, max, label, unit, decimals = 2, onChange, age
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
         onPointerCancel={onPointerUp}
+        aria-hidden="true"
+        focusable="false"
       >
         <path d={trackPath} fill="none" stroke="#2a2540" strokeWidth="5" strokeLinecap="round" />
         {fillPath && (
@@ -94,7 +180,7 @@ export function Knob({ value, min, max, label, unit, decimals = 2, onChange, age
         <circle cx={dot.x} cy={dot.y} r="4" fill="#f4f0ff" />
       </svg>
       <span className="knob-label">{label}</span>
-      <span className="knob-value">{formatVal(value, unit, decimals)}</span>
+      <span className="knob-value">{valueText}</span>
     </div>
   );
 }

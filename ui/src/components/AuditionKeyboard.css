@@ -1,0 +1,159 @@
+/* AuditionKeyboard — horizontal 13-key strip (C3..C4). */
+
+.audition-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 0.6rem 0.75rem;
+  background: rgb(255 255 255 / 3%);
+  border: 1px solid rgb(255 255 255 / 7%);
+  border-radius: 8px;
+  margin: 0.6rem 0;
+}
+
+.audition-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.audition-btn {
+  appearance: none;
+  border: 1px solid rgb(255 255 255 / 14%);
+  background: rgb(106 92 255 / 18%);
+  color: #f4f0ff;
+  font-size: 0.8rem;
+  padding: 0.4rem 0.75rem;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 120ms ease, transform 120ms ease;
+}
+
+.audition-btn:hover:not(:disabled) { background: rgb(106 92 255 / 32%); }
+.audition-btn:active:not(:disabled) { transform: translateY(1px); }
+.audition-btn:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.audition-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.78rem;
+  color: rgb(255 255 255 / 75%);
+  user-select: none;
+  cursor: pointer;
+}
+
+.audition-toggle input {
+  accent-color: #6a5cff;
+  cursor: pointer;
+}
+
+.audition-hint {
+  font-size: 0.72rem;
+  color: rgb(255 255 255 / 50%);
+  font-style: italic;
+}
+
+/* ── Keyboard ────────────────────────────────────────────────────── */
+
+.audition-keyboard {
+  position: relative;
+  display: flex;
+  height: 110px;
+  background: #0c0b14;
+  border-radius: 6px;
+  padding: 4px;
+  outline: none;
+}
+
+.audition-keyboard:focus-visible {
+  box-shadow: 0 0 0 2px rgb(106 92 255 / 65%);
+}
+
+.piano-key {
+  appearance: none;
+  border: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: center;
+  gap: 2px;
+  padding-bottom: 6px;
+  cursor: pointer;
+  font-family: inherit;
+  user-select: none;
+  transition: background 80ms ease, transform 60ms ease;
+}
+
+.piano-key:disabled { cursor: not-allowed; opacity: 0.5; }
+
+.piano-key-label {
+  font-size: 0.62rem;
+  letter-spacing: 0.04em;
+}
+
+.piano-key-binding {
+  font-size: 0.58rem;
+  opacity: 0.55;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+/* White keys flex evenly across the strip. */
+.piano-key-white {
+  flex: 1 1 0;
+  background: linear-gradient(180deg, #f5f1ff 0%, #d9d3ec 100%);
+  color: #1b1626;
+  border-right: 1px solid rgb(0 0 0 / 25%);
+  border-radius: 0 0 4px 4px;
+}
+
+.piano-key-white:last-child { border-right: none; }
+.piano-key-white:hover:not(:disabled) {
+  background: linear-gradient(180deg, #ffffff 0%, #e5dfff 100%);
+}
+
+/* Black keys overlay using negative margin so layout stays a single row.
+   Width is ~60% of a white key; height is 65% of the strip. The
+   surrounding white keys are full-width so the click target underneath
+   the black key edge stays usable. */
+.piano-key-black {
+  flex: 0 0 0;
+  width: 28px;
+  height: 65%;
+  margin-left: -14px;
+  margin-right: -14px;
+  background: linear-gradient(180deg, #1b1626 0%, #2c2440 100%);
+  color: #f4f0ff;
+  border-radius: 0 0 3px 3px;
+  z-index: 2;
+  box-shadow: 0 2px 6px rgb(0 0 0 / 55%);
+}
+
+.piano-key-black:hover:not(:disabled) {
+  background: linear-gradient(180deg, #2c2440 0%, #3d3358 100%);
+}
+
+.piano-key-active.piano-key-white {
+  background: linear-gradient(180deg, #c2b4ff 0%, #8a78ff 100%);
+  color: #1b1626;
+}
+
+.piano-key-active.piano-key-black {
+  background: linear-gradient(180deg, #6a5cff 0%, #4434c4 100%);
+}
+
+/* ── PushToTalk error surface ─────────────────────────────────────── */
+
+.ptt-error {
+  flex-basis: 100%;
+  font-size: 0.74rem;
+  color: #ff8c8c;
+  background: rgb(255 92 92 / 12%);
+  border: 1px solid rgb(255 92 92 / 30%);
+  padding: 0.4rem 0.6rem;
+  border-radius: 5px;
+  margin-top: 0.4rem;
+}

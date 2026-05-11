@@ -178,6 +178,12 @@ export function useSynthBridge(): UseSynthBridgeReturn {
           void callNative('feedback', [msg.messageId, msg.kind, msg.patch ?? null]);
           return;
         }
+        case 'play_midi_note': {
+          // Audition keyboard: fire-and-forget; UI doesn't await an ack
+          // because C++-side note-off is scheduled by duration_ms.
+          void callNative('play_midi_note', [msg.note, msg.velocity, msg.duration_ms]);
+          return;
+        }
         // Spread each known WireOutgoing variant onto positional `params`
         // matching the C++ native function arity in WebUiComponent.cpp.
         // Wrapping into a single object arg breaks args[0]/args[1] reads

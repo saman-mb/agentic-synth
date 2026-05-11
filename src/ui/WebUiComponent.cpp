@@ -418,6 +418,24 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge) : bridge_(bridge) {
         });
 
     options = options.withNativeFunction(
+        juce::Identifier{"play_midi_note"},
+        [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
+            // Phase 6C: in-browser audition keyboard. Args:
+            //   [0] note (int, 0..127)
+            //   [1] velocity (double, 0..1)
+            //   [2] duration_ms (int)
+            // AgentBridge::postMidiNote clamps and dispatches both note-on
+            // and the matched note-off via the message thread. Resolve the
+            // JS promise immediately so the keyboard stays responsive even
+            // if the engine is mid-block.
+            const int note         = static_cast<int>(argOr(args, 0, juce::var{60}));
+            const float velocity   = static_cast<float>(static_cast<double>(argOr(args, 1, juce::var{0.8})));
+            const int durationMs   = static_cast<int>(argOr(args, 2, juce::var{350}));
+            bridge_.postMidiNote(note, velocity, durationMs);
+            completion(juce::var{});
+        });
+
+    options = options.withNativeFunction(
         juce::Identifier{"push_audio_pcm"},
         [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
             // Perf hotspot fix: JS now sends a single base64-encoded Int16

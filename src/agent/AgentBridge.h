@@ -101,6 +101,22 @@ public:
     // the given patch in the context of the current prompt and session memory.
     [[nodiscard]] std::string generateRationale(const std::string& prompt, const PatchStruct& patch) const;
 
+    // ── Phase 6C: in-browser audition keyboard ────────────────────────────────
+    //
+    // Queue a one-shot MIDI note for the synth engine. note ∈ [0,127],
+    // velocity ∈ [0,1], durationMs is when the matched note-off should fire.
+    // Posts a noteOn immediately on the JUCE message thread and schedules
+    // the matching noteOff via Timer::callAfterDelay.
+    //
+    // The actual VoiceManager lives in the AudioProcessor, not on
+    // AgentBridge. Wiring is done by the AudioProcessor at construction via
+    // setMidiNoteSink — when no sink is registered (e.g. headless tests)
+    // postMidiNote logs and returns. This keeps AgentBridge free of any
+    // direct engine dependency.
+    using MidiNoteSink = std::function<void(int note, float velocity, bool isNoteOn)>;
+    void setMidiNoteSink(MidiNoteSink sink);
+    void postMidiNote(int note, float velocity, int durationMs);
+
     // ── Typed callback subscription API ──────────────────────────────────────
     //
     // RAII subscription: returned handle owns the slot; when it goes out of
@@ -164,6 +180,12 @@ private:
     // Written by the MIDI/audio thread; read by UI/control thread — must be atomic.
     std::atomic<float> midiCutoffNorm_{0.5f};
     std::atomic<float> midiResonanceNorm_{0.0f};
+
+    // Phase 6C: optional in-browser-audition note sink. Owned externally
+    // (typically by AgenticSynthPlugin). Mutex guards swap-during-callback;
+    // invocations always happen on the JUCE message thread.
+    mutable std::mutex midiSinkMutex_;
+    MidiNoteSink midiNoteSink_;
 
     // Tripwire: stamped by pollPatch() so dispatch() can assert it is never
     // reached from the audio thread (callAsync + var copies allocate).

@@ -42,4 +42,5 @@ export interface ProactiveSuggestion {
 
 export type WireOutgoing =
   | { type: 'generate'; prompt: string; sessionId: string }
-  | { type: 'feedback'; messageId: string; kind: FeedbackKind; patch?: PatchPreviewData };
+  | { type: 'feedback'; messageId: string; kind: FeedbackKind; patch?: PatchPreviewData }
+  | { type: 'play_midi_note'; note: number; velocity: number; duration_ms: number };

@@ -506,4 +506,58 @@ std::string AgentBridge::generateRationale(const std::string& prompt, const Patc
     return oss.str();
 }
 
+// ── Phase 6C: in-browser audition keyboard ──────────────────────────────────
+
+void AgentBridge::setMidiNoteSink(MidiNoteSink sink) {
+    std::lock_guard<std::mutex> lock(midiSinkMutex_);
+    midiNoteSink_ = std::move(sink);
+}
+
+void AgentBridge::postMidiNote(int note, float velocity, int durationMs) {
+    // Clamp inputs: bad UI input should never crash the engine.
+    if (note < 0) note = 0;
+    if (note > 127) note = 127;
+    if (velocity < 0.0f) velocity = 0.0f;
+    if (velocity > 1.0f) velocity = 1.0f;
+    if (durationMs < 10) durationMs = 10;
+    if (durationMs > 10000) durationMs = 10000;
+
+    // Snapshot the sink under the lock so a concurrent setMidiNoteSink
+    // cannot race the dispatch below.
+    MidiNoteSink sinkCopy;
+    {
+        std::lock_guard<std::mutex> lock(midiSinkMutex_);
+        sinkCopy = midiNoteSink_;
+    }
+    if (!sinkCopy) {
+        DBG("AgentBridge::postMidiNote: no sink registered, note dropped (note="
+            << note << ")");
+        return;
+    }
+
+    auto* mm = juce::MessageManager::getInstanceWithoutCreating();
+    if (mm == nullptr) {
+        // Headless: invoke synchronously and assume the caller knows what
+        // they are doing (tests can stub the sink).
+        sinkCopy(note, velocity, /*isNoteOn=*/true);
+        sinkCopy(note, velocity, /*isNoteOn=*/false);
+        return;
+    }
+
+    // Drive note-on now on the message thread; AudioProcessor's
+    // processBlock will pick up the queued event from the sink on the
+    // next audio block.
+    juce::MessageManager::callAsync([sinkCopy, note, velocity]() {
+        sinkCopy(note, velocity, /*isNoteOn=*/true);
+    });
+
+    // Schedule the matched note-off. Timer::callAfterDelay runs on the
+    // message thread, mirroring the note-on dispatch above so ordering
+    // is preserved end-to-end. Capturing by value keeps the sink alive
+    // even if setMidiNoteSink swaps it before the timer fires.
+    juce::Timer::callAfterDelay(durationMs, [sinkCopy, note, velocity]() {
+        sinkCopy(note, velocity, /*isNoteOn=*/false);
+    });
+}
+
 } // namespace agentic_synth::agent
