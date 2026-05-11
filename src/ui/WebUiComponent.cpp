@@ -3,6 +3,7 @@
 #include "UiBinaryData.h"
 #include "agent/WhisperClient.h"
 
+#include <atomic>
 #include <cstdint>
 #include <utility>
 #include <vector>
@@ -53,6 +54,84 @@ juce::String mimeForPath(const juce::String& path) {
 // Convenience: extract a juce::var argument by index with a default fallback.
 juce::var argOr(const juce::Array<juce::var>& args, int index, const juce::var& fallback) {
     return (index >= 0 && index < args.size()) ? args[index] : fallback;
+}
+
+// Root directory for all AgenticSynth persistent state. Sits under the
+// platform-appropriate per-user app-data dir (NOT temp), so OS housekeeping
+// (Windows %TEMP%, macOS /var/folders, systemd-tmpfiles) does not nuke
+// WebView2 localStorage / cookies / IndexedDB between DAW sessions.
+juce::File agenticSynthAppDataDir() {
+    auto dir = juce::File::getSpecialLocation(juce::File::userApplicationDataDirectory)
+                   .getChildFile("AgenticSynth");
+    if (!dir.isDirectory()) {
+        dir.createDirectory();
+    }
+    return dir;
+}
+
+// Resolve (or lazily create) the persistent install-stable identifier used
+// as the root segment of every WebView2 user-data folder.
+//
+// Stored in <appData>/AgenticSynth/instance-id.json as { "instanceId": "<uuid>" }.
+// On first run we generate a Uuid and persist it; on every subsequent run we
+// read the same string back, so WebView2 state survives:
+//   • plugin re-instantiation inside the same DAW session
+//   • DAW project close/reopen
+//   • DAW restart / machine reboot
+// (Anything that wipes <appData> itself is treated as "fresh install".)
+//
+// We deliberately do NOT mix in processId / device-id / editor-index here:
+// those change across runs and would defeat the persistence goal.
+juce::String persistentInstanceId() {
+    static const juce::String cached = []() -> juce::String {
+        const auto file = agenticSynthAppDataDir().getChildFile("instance-id.json");
+
+        if (file.existsAsFile()) {
+            const auto parsed = juce::JSON::parse(file);
+            if (auto* obj = parsed.getDynamicObject()) {
+                const auto id = obj->getProperty("instanceId").toString();
+                if (id.isNotEmpty()) {
+                    return id;
+                }
+            }
+            // Corrupt / unexpected shape: fall through and rewrite below.
+        }
+
+        const auto fresh = juce::Uuid().toString();
+        auto* obj = new juce::DynamicObject{};
+        obj->setProperty("instanceId", fresh);
+        file.replaceWithText(juce::JSON::toString(juce::var{obj}));
+        return fresh;
+    }();
+    return cached;
+}
+
+// Per-process slot counter for multi-instance disambiguation. WebView2
+// permits multiple concurrent controllers in one process ONLY if each uses
+// a distinct user-data folder. We hand out slot-0, slot-1, … to live
+// WebUiComponent ctors. The counter resets each process start, so the first
+// editor opened in a given DAW session always lands on slot-0 and therefore
+// reuses the same on-disk localStorage/IndexedDB across reopens. Concurrent
+// siblings (e.g. 4-instance DAW projects) get slot-1..slot-N, also
+// persisted (folders are reused on subsequent runs in arrival order).
+//
+// Reuse-on-destruct is intentionally not implemented: editor lifetimes
+// inside hosts are too noisy, and reusing a slot whose WebView2 is still
+// shutting down can race the file lock. Folders are cheap; leave them.
+int nextWebView2SlotIndex() {
+    static std::atomic<int> counter{0};
+    return counter.fetch_add(1, std::memory_order_relaxed);
+}
+
+// Compose the final user-data folder for THIS WebUiComponent instance.
+// Layout: <appData>/AgenticSynth/WebView2/<stableId>/slot-<N>
+juce::File webView2UserDataFolderForThisInstance() {
+    auto folder = agenticSynthAppDataDir()
+                      .getChildFile("WebView2")
+                      .getChildFile(persistentInstanceId())
+                      .getChildFile("slot-" + juce::String(nextWebView2SlotIndex()));
+    folder.createDirectory();
+    return folder;
 }
 
 } // namespace
@@ -213,11 +292,18 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge) : bridge_(bridge) {
         .withNativeIntegrationEnabled(true)
         .withKeepPageLoadedWhenBrowserIsHidden()
         .withResourceProvider([](const juce::String& p) { return WebUiComponent::serveResource(p); })
-        // Per-instance WebView2 user-data folder avoids multi-DAW-instance
-        // collisions on Windows. Apple/Linux backends ignore this option.
+        // Persistent, per-slot WebView2 user-data folder under
+        // userApplicationDataDirectory (NOT temp). This survives DAW project
+        // reopen, OS temp cleaners, and machine reboots, so localStorage,
+        // cookies and IndexedDB written by the React UI persist. The
+        // <stableId> segment is a UUID written once on first run; the
+        // slot-<N> child disambiguates concurrent controllers when a DAW
+        // hosts multiple plugin instances in the same process (WebView2
+        // requires distinct user-data folders for concurrent controllers).
+        // Apple/Linux backends ignore this option but the directory is
+        // still safe to materialise on those platforms.
         .withWinWebView2Options(Options::WinWebView2{}
-            .withUserDataFolder(juce::File::getSpecialLocation(juce::File::tempDirectory)
-                                .getChildFile("AgenticSynth-WV2-" + juce::Uuid().toString())));
+            .withUserDataFolder(webView2UserDataFolderForThisInstance()));
 
     // ── 8 native functions (UI → C++) ────────────────────────────────────────
 
@@ -334,25 +420,47 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge) : bridge_(bridge) {
     options = options.withNativeFunction(
         juce::Identifier{"push_audio_pcm"},
         [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
-            // First arg is expected to be a Float32 array marshalled as a
-            // juce::Array<juce::var> of numbers. Convert and forward.
+            // Perf hotspot fix: JS now sends a single base64-encoded Int16
+            // PCM string instead of a juce::Array<juce::var> of doubles.
+            // Old path was ~24 B/sample × 1600 samples = ~38 KB of boxed
+            // juce::var per 100 ms chunk plus JSON serialization on the
+            // message thread. New path: 1 string arg (~4.3 KB base64 for
+            // 1600 samples), decode + forward on a worker so the message
+            // thread returns immediately.
             if (whisperClient_ == nullptr) {
                 DBG("push_audio_pcm received but no WhisperClient wired");
                 completion(juce::var{});
                 return;
             }
-            const auto& pcm = argOr(args, 0, juce::var{});
-            if (const auto* arr = pcm.getArray()) {
-                std::vector<std::int16_t> samples;
-                samples.reserve(static_cast<size_t>(arr->size()));
-                for (const auto& v : *arr) {
-                    const float f = static_cast<float>(static_cast<double>(v));
-                    const float clamped = juce::jlimit(-1.0f, 1.0f, f);
-                    samples.push_back(static_cast<std::int16_t>(clamped * 32767.0f));
-                }
-                whisperClient_->feedAudio(samples.data(), static_cast<int>(samples.size()));
-            }
+            const auto b64 = argOr(args, 0, juce::var{""}).toString();
+            // Snapshot the WhisperClient pointer — never capture `this`.
+            // If WebUiComponent is destroyed mid-decode the worker still
+            // touches only `client` (whose lifetime is owned externally per
+            // setWhisperClient contract) and the b64 string (ref-counted COW).
+            auto* const client = whisperClient_;
+            // Resolve the JS promise before doing any work so the message
+            // thread is free to drain other events. Decoding + forwarding
+            // happens on a JUCE worker thread (Whisper STT tolerates
+            // ~100-200 ms latency, easily within budget for base64 +
+            // worker hop).
             completion(juce::var{});
+            juce::Thread::launch([client, b64]() {
+                juce::MemoryOutputStream raw;
+                if (!juce::Base64::convertFromBase64(raw, b64)) {
+                    DBG("push_audio_pcm: base64 decode failed");
+                    return;
+                }
+                const auto byteCount = raw.getDataSize();
+                if (byteCount == 0 || (byteCount % sizeof(std::int16_t)) != 0) {
+                    DBG("push_audio_pcm: bad payload size " << static_cast<int>(byteCount));
+                    return;
+                }
+                const auto* samples =
+                    reinterpret_cast<const std::int16_t*>(raw.getData());
+                const int numSamples =
+                    static_cast<int>(byteCount / sizeof(std::int16_t));
+                client->feedAudio(samples, numSamples);
+            });
         });
 
     // ── Construct the WebView with the fully-built options ───────────────────

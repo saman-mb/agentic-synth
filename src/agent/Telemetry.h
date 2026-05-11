@@ -1,5 +1,6 @@
 #pragma once
 
+#include <atomic>
 #include <cstdint>
 #include <mutex>
 #include <string>
@@ -57,13 +58,28 @@ public:
     // Snapshot of the current UI-event ring buffer (oldest first).
     [[nodiscard]] std::vector<UiEvent> uiEvents() const;
 
+    // Resolved on-disk log path for this Telemetry instance (may be empty if
+    // explicitly constructed with no path).
+    [[nodiscard]] const std::string& logPath() const noexcept { return log_path_; }
+
     // Ring-buffer capacity for UI events. Drops oldest when exceeded.
     static constexpr size_t kUiEventCap = 256;
 
     // Platform-appropriate log directory (created on first call).
     // Used as the default log_path so the file never lands in the DAW's CWD.
-    // Multiple plugin instances get unique filenames via process ID.
+    //
+    // Path format: `<dir>/telemetry_<pid>_<instance>.json`. The per-process
+    // <instance> counter prevents collisions when a DAW hosts multiple plugin
+    // instances (each with its own AgentBridge → Telemetry) in the same
+    // process: without it, two Telemetry::flush() calls would interleave
+    // writes to the same file and corrupt the JSON.
+    //
+    // The no-arg overload pulls a fresh instance number from a global atomic
+    // counter — every call returns a unique path. Callers wanting a stable
+    // path (e.g. for tests, or to pin a specific plugin slot) can pass an
+    // explicit instance index.
     [[nodiscard]] static std::string defaultLogPath();
+    [[nodiscard]] static std::string defaultLogPath(uint64_t instance_index);
 
 private:
     bool enabled_{false};
@@ -71,6 +87,11 @@ private:
     std::vector<GenerationRecord> records_;
     std::vector<UiEvent> ui_events_;
     mutable std::mutex ui_mutex_;
+
+    // Per-process monotonic counter — increments each time defaultLogPath()
+    // is called with no args. Atomic so concurrent AgentBridge ctors on
+    // different threads (rare but legal) get distinct values.
+    static std::atomic<uint64_t> next_instance_index_;
 
     [[nodiscard]] static int64_t nowMs() noexcept;
 };

@@ -208,11 +208,34 @@ export function useWebSocket(url: string): UseWebSocketReturn {
 
   const sendBinary = useCallback((data: ArrayBuffer) => {
     if (usingJuce) {
-      // 16 kHz mono Float32 PCM → forward to push_audio_pcm. Per SRE
-      // review this is a known perf hotspot for sustained capture;
-      // base64 / typed-array encoding is a tracked follow-up.
-      const pcm = Array.from(new Float32Array(data));
-      void callNative('push_audio_pcm', [pcm]);
+      // 16 kHz mono Float32 PCM → Int16 PCM → base64 string.
+      // Old path passed Array<number> of doubles (~24 B/sample boxed
+      // juce::var on the C++ side, ~38 KB per 100 ms chunk + JSON);
+      // new path is one ~4.3 KB string per 100 ms chunk and lets the
+      // C++ side decode on a worker thread. Int16 (16-bit signed PCM)
+      // is the canonical Whisper input format and is bit-exact for the
+      // dynamic range Whisper actually uses — no audible quality loss
+      // vs Float32 at 16 kHz mono.
+      const f32 = new Float32Array(data);
+      const i16 = new Int16Array(f32.length);
+      for (let i = 0; i < f32.length; i++) {
+        const s = Math.max(-1, Math.min(1, f32[i]));
+        i16[i] = s < 0 ? s * 0x8000 : s * 0x7fff;
+      }
+      // Base64-encode the underlying bytes. Chunked btoa avoids the
+      // "argument list too long" hazard fromCharCode hits on long
+      // typed arrays (~64k+ args on some engines).
+      const bytes = new Uint8Array(i16.buffer);
+      let binary = '';
+      const CHUNK = 0x8000;
+      for (let i = 0; i < bytes.length; i += CHUNK) {
+        binary += String.fromCharCode.apply(
+          null,
+          Array.from(bytes.subarray(i, i + CHUNK)),
+        );
+      }
+      const b64 = btoa(binary);
+      void callNative('push_audio_pcm', [b64]);
       return;
     }
     if (ws.current?.readyState === WebSocket.OPEN) {

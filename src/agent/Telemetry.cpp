@@ -16,7 +16,9 @@ static int current_pid() noexcept { return static_cast<int>(::getpid()); }
 
 namespace agentic_synth::agent {
 
-std::string Telemetry::defaultLogPath() {
+std::atomic<uint64_t> Telemetry::next_instance_index_{0};
+
+std::string Telemetry::defaultLogPath(uint64_t instance_index) {
     std::string dir;
 #if defined(_WIN32)
     const char* appdata = std::getenv("APPDATA");
@@ -37,7 +39,12 @@ std::string Telemetry::defaultLogPath() {
 #endif
     std::error_code ec;
     std::filesystem::create_directories(dir, ec);
-    return dir + "/telemetry_" + std::to_string(current_pid()) + ".json";
+    return dir + "/telemetry_" + std::to_string(current_pid()) + "_" + std::to_string(instance_index) + ".json";
+}
+
+std::string Telemetry::defaultLogPath() {
+    // fetch_add returns the pre-increment value — first caller gets 0, next 1, etc.
+    return defaultLogPath(next_instance_index_.fetch_add(1, std::memory_order_relaxed));
 }
 
 Telemetry::Telemetry(std::string log_path) : log_path_(std::move(log_path)) {}

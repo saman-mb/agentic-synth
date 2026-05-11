@@ -96,3 +96,46 @@ TEST_CASE("Telemetry toJson exposes ui_events array", "[Telemetry][UiEvents]") {
     REQUIRE(json.find("\"kind\":\"page_load_error\"") != std::string::npos);
     REQUIRE(json.find("\"detail\":\"net::ERR_FAILED\"") != std::string::npos);
 }
+
+// Regression: when a DAW hosts multiple plugin instances in one process,
+// each AgentBridge constructs its own Telemetry via defaultLogPath(). Without
+// a per-instance suffix both Telemetries would share `<dir>/telemetry_<pid>.json`,
+// and their flush() writes would interleave and corrupt the JSON.
+TEST_CASE("Telemetry::defaultLogPath returns unique paths per call", "[Telemetry][PathCollision]") {
+    const auto p1 = Telemetry::defaultLogPath();
+    const auto p2 = Telemetry::defaultLogPath();
+    const auto p3 = Telemetry::defaultLogPath();
+
+    REQUIRE_FALSE(p1.empty());
+    REQUIRE(p1 != p2);
+    REQUIRE(p2 != p3);
+    REQUIRE(p1 != p3);
+
+    // All three must still encode the current PID so on-disk grouping by
+    // process is preserved (existing operator expectation).
+    const auto pid_tag = "_" + std::to_string(test_pid()) + "_";
+    REQUIRE(p1.find(pid_tag) != std::string::npos);
+    REQUIRE(p2.find(pid_tag) != std::string::npos);
+    REQUIRE(p3.find(pid_tag) != std::string::npos);
+}
+
+TEST_CASE("Telemetry instances constructed back-to-back have distinct log paths",
+          "[Telemetry][PathCollision]") {
+    // Mirrors AgentBridge's `Telemetry telemetry_{Telemetry::defaultLogPath()}`
+    // default member init — two AgentBridges in the same process must not
+    // collide.
+    Telemetry a(Telemetry::defaultLogPath());
+    Telemetry b(Telemetry::defaultLogPath());
+
+    REQUIRE_FALSE(a.logPath().empty());
+    REQUIRE_FALSE(b.logPath().empty());
+    REQUIRE(a.logPath() != b.logPath());
+}
+
+TEST_CASE("Telemetry::defaultLogPath(index) is stable for a given index",
+          "[Telemetry][PathCollision]") {
+    // The explicit-index overload is the deterministic escape hatch (tests,
+    // pinned slots). Same index → same path; different indices → different.
+    REQUIRE(Telemetry::defaultLogPath(42) == Telemetry::defaultLogPath(42));
+    REQUIRE(Telemetry::defaultLogPath(42) != Telemetry::defaultLogPath(43));
+}
