@@ -41,6 +41,8 @@ add_executable(agentic_synth_tests
     StyleTransferTest.cpp
     AgentBridgeCallbacksTest.cpp
     AgentBridgeMidiSinkTest.cpp
+    DictionaryServiceTest.cpp
+    TelemetryServiceTest.cpp
     TelemetryUiEventsTest.cpp
     # Phase 5: re-enabled tests that were orphaned at the start of the JUCE 8
     # WebView migration QA review.
