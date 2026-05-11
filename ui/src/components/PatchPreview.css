@@ -1,6 +1,6 @@
 .patch-preview {
-  background: rgb(255 255 255 / 4%);
-  border: 1px solid rgb(255 255 255 / 10%);
+  background: var(--fill-medium);
+  border: 1px solid var(--fill-stronger);
   border-radius: 0.75rem;
   padding: 0.75rem 1rem;
   display: flex;
@@ -14,7 +14,7 @@
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: #91e8ff;
+  color: var(--color-accent-hot);
   margin-bottom: 0.25rem;
 }
 
@@ -27,26 +27,27 @@
 
 .param-label {
   font-size: 0.7rem;
-  color: #a09ab8;
+  color: var(--color-fg-secondary);
   text-align: right;
 }
 
 .param-track {
   height: 4px;
-  background: rgb(255 255 255 / 10%);
+  background: var(--fill-stronger);
   border-radius: 2px;
   overflow: hidden;
 }
 
 .param-fill {
   height: 100%;
-  background: linear-gradient(90deg, #7b5cff, #0cb7f2);
+  background: linear-gradient(90deg, var(--grad-accent-a), var(--grad-accent-b));
   border-radius: 2px;
   transition: width 0.3s ease;
 }
 
 .param-value {
   font-size: 0.65rem;
-  color: #d7d0ea;
+  color: var(--color-fg-primary);
   font-variant-numeric: tabular-nums;
+  opacity: 0.85;
 }

@@ -1,0 +1,211 @@
+/* ── Patch Browser ───────────────────────────────────────────────────
+   Sidebar/panel listing recent assistant-generated patches.
+   Click a row to recall the patch onto the knobs (+ bridge).
+   Star a row to persist it across reloads.                           */
+
+.patch-browser {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  font-size: 0.7rem;
+}
+
+/* Toolbar: filter radios + clear button */
+.patch-browser-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.patch-browser-filter {
+  display: inline-flex;
+  background: rgb(255 255 255 / 4%);
+  border: 1px solid rgb(255 255 255 / 10%);
+  border-radius: 0.4rem;
+  overflow: hidden;
+}
+
+.pb-filter-btn {
+  background: transparent;
+  border: none;
+  color: #9080bb;
+  font-family: inherit;
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.3rem 0.6rem;
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+}
+
+.pb-filter-btn:hover {
+  color: #c8b8ff;
+}
+
+.pb-filter-active {
+  background: rgb(123 92 255 / 22%);
+  color: #f4f0ff;
+}
+
+.pb-filter-btn:focus { outline: none; }
+.pb-filter-btn:focus-visible {
+  outline: 2px solid #7b5cff;
+  outline-offset: -2px;
+}
+
+.pb-clear-btn {
+  margin-left: auto;
+  background: rgb(255 255 255 / 4%);
+  border: 1px solid rgb(255 255 255 / 10%);
+  color: #c8b8ff;
+  font-family: inherit;
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.3rem 0.55rem;
+  border-radius: 0.4rem;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, opacity 0.12s;
+}
+
+.pb-clear-btn:hover:not(:disabled) {
+  background: rgb(123 92 255 / 15%);
+  border-color: rgb(123 92 255 / 40%);
+}
+
+.pb-clear-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+.pb-clear-btn:focus { outline: none; }
+.pb-clear-btn:focus-visible {
+  outline: 2px solid #7b5cff;
+  outline-offset: 1px;
+}
+
+/* Empty state */
+.patch-browser-empty {
+  padding: 1rem 0.6rem;
+  text-align: center;
+  font-size: 0.7rem;
+  color: #6a5fa0;
+  border: 1px dashed rgb(255 255 255 / 8%);
+  border-radius: 0.5rem;
+  line-height: 1.45;
+}
+
+/* List */
+.patch-browser-list {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.patch-browser-row {
+  display: flex;
+  align-items: stretch;
+  gap: 0.25rem;
+  border: 1px solid rgb(255 255 255 / 6%);
+  border-radius: 0.45rem;
+  background: rgb(255 255 255 / 2%);
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.patch-browser-row:hover {
+  background: rgb(123 92 255 / 10%);
+  border-color: rgb(123 92 255 / 30%);
+}
+
+.pb-row-main {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  background: transparent;
+  border: none;
+  color: inherit;
+  text-align: left;
+  font-family: inherit;
+  padding: 0.45rem 0.55rem;
+  cursor: pointer;
+  min-width: 0;
+}
+
+.pb-row-main:focus { outline: none; }
+.pb-row-main:focus-visible {
+  outline: 2px solid #7b5cff;
+  outline-offset: -2px;
+  border-radius: 0.4rem;
+}
+
+.pb-row-label {
+  font-size: 0.72rem;
+  color: #f4f0ff;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+  flex: 1;
+}
+
+.pb-row-time {
+  font-size: 0.58rem;
+  color: #6a5fa0;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  text-transform: lowercase;
+  letter-spacing: 0.04em;
+}
+
+.pb-rename-input {
+  flex: 1;
+  background: rgb(17 16 24 / 80%);
+  border: 1px solid #7b5cff;
+  border-radius: 0.3rem;
+  color: #f4f0ff;
+  font-family: inherit;
+  font-size: 0.72rem;
+  padding: 0.18rem 0.35rem;
+  min-width: 0;
+}
+
+.pb-rename-input:focus {
+  outline: 2px solid #7b5cff;
+  outline-offset: 1px;
+}
+
+.pb-star-btn {
+  background: transparent;
+  border: none;
+  color: #6a5fa0;
+  font-size: 1rem;
+  line-height: 1;
+  padding: 0 0.5rem;
+  cursor: pointer;
+  border-left: 1px solid rgb(255 255 255 / 6%);
+  transition: color 0.12s;
+}
+
+.pb-star-btn:hover {
+  color: #ffd166;
+}
+
+.pb-star-on {
+  color: #ffd166;
+}
+
+.pb-star-btn:focus { outline: none; }
+.pb-star-btn:focus-visible {
+  outline: 2px solid #7b5cff;
+  outline-offset: -2px;
+  border-radius: 0.3rem;
+}

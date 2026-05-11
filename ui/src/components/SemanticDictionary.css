@@ -18,12 +18,12 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: #91e8ff;
+  color: var(--color-accent-hot);
 }
 
 .sem-dict-count {
   font-size: 0.6rem;
-  color: #6a5fa0;
+  color: var(--color-fg-muted);
 }
 
 .sem-dict-toolbar {
@@ -34,31 +34,31 @@
 
 .sem-dict-search {
   flex: 1;
-  background: rgb(255 255 255 / 5%);
-  border: 1px solid rgb(255 255 255 / 12%);
+  background: var(--fill-medium);
+  border: 1px solid var(--fill-stronger);
   border-radius: 0.4rem;
   padding: 0.3rem 0.5rem;
   font-size: 0.75rem;
-  color: #f4f0ff;
+  color: var(--color-fg-primary);
   font-family: inherit;
 }
 
 .sem-dict-search:focus {
   outline: none;
-  border-color: rgb(123 92 255 / 50%);
+  border-color: var(--accent-tint-60);
 }
 
 .sem-dict-search:focus-visible {
-  outline: 2px solid #7b5cff;
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
 .sem-btn {
   padding: 0.3rem 0.6rem;
-  border: 1px solid rgb(255 255 255 / 15%);
+  border: 1px solid var(--color-border-strong);
   border-radius: 0.4rem;
   background: transparent;
-  color: #b8a8ff;
+  color: var(--color-accent-soft);
   font-family: inherit;
   font-size: 0.72rem;
   cursor: pointer;
@@ -67,7 +67,7 @@
 }
 
 .sem-btn:hover:not(:disabled) {
-  background: rgb(255 255 255 / 8%);
+  background: var(--fill-strong);
 }
 
 .sem-btn:disabled {
@@ -76,18 +76,18 @@
 }
 
 .sem-btn-primary {
-  border-color: rgb(123 92 255 / 40%);
-  color: #c8b8ff;
+  border-color: var(--accent-tint-40);
+  color: var(--color-accent-strong);
 }
 
 .sem-btn-primary:hover:not(:disabled) {
-  background: rgb(123 92 255 / 18%);
-  border-color: #7b5cff;
+  background: var(--accent-tint-18);
+  border-color: var(--color-accent);
 }
 
 .sem-dict-status {
   font-size: 0.68rem;
-  color: #7be0b8;
+  color: var(--color-success-soft);
   padding: 0.2rem 0;
 }
 
@@ -100,13 +100,13 @@
 }
 
 .sem-entry {
-  border: 1px solid rgb(255 255 255 / 7%);
+  border: 1px solid var(--color-border);
   border-radius: 0.5rem;
   overflow: hidden;
 }
 
 .sem-entry-custom {
-  border-color: rgb(123 92 255 / 25%);
+  border-color: var(--accent-tint-25);
 }
 
 .sem-entry-header {
@@ -117,7 +117,7 @@
   padding: 0.4rem 0.6rem;
   background: transparent;
   border: none;
-  color: #f4f0ff;
+  color: var(--color-fg-primary);
   cursor: pointer;
   text-align: left;
   font-family: inherit;
@@ -126,13 +126,13 @@
 }
 
 .sem-entry-header:hover {
-  background: rgb(255 255 255 / 4%);
+  background: var(--fill-medium);
 }
 
 .sem-entry-keyword {
   font-weight: 600;
   min-width: 5rem;
-  color: #e0d8ff;
+  color: var(--color-fg-primary);
 }
 
 .sem-ctx-badge {
@@ -142,32 +142,32 @@
   text-transform: uppercase;
   letter-spacing: 0.06em;
   font-weight: 600;
-  background: rgb(255 255 255 / 8%);
-  color: #91e8ff;
+  background: var(--fill-strong);
+  color: var(--color-accent-hot);
 }
 
-.sem-ctx-bass     { background: rgb(255 100 100 / 15%); color: #ff8888; }
-.sem-ctx-pad      { background: rgb(100 200 255 / 15%); color: #80d4ff; }
-.sem-ctx-lead     { background: rgb(255 200 100 / 15%); color: #ffc880; }
-.sem-ctx-keys     { background: rgb(150 255 150 / 15%); color: #88ee88; }
-.sem-ctx-percussion { background: rgb(255 150 50 / 15%);  color: #ffaa44; }
-.sem-ctx-arp      { background: rgb(200 100 255 / 15%); color: #cc88ff; }
-.sem-ctx-texture  { background: rgb(100 220 200 / 15%); color: #66ccbb; }
-.sem-ctx-generic  { background: rgb(255 255 255 / 8%);  color: #aaa0cc; }
+.sem-ctx-bass     { background: var(--color-ctx-bass-bg); color: var(--color-ctx-bass-fg); }
+.sem-ctx-pad      { background: var(--color-ctx-pad-bg); color: var(--color-ctx-pad-fg); }
+.sem-ctx-lead     { background: var(--color-ctx-lead-bg); color: var(--color-ctx-lead-fg); }
+.sem-ctx-keys     { background: var(--color-ctx-keys-bg); color: var(--color-ctx-keys-fg); }
+.sem-ctx-percussion { background: var(--color-ctx-perc-bg); color: var(--color-ctx-perc-fg); }
+.sem-ctx-arp     { background: var(--color-ctx-arp-bg); color: var(--color-ctx-arp-fg); }
+.sem-ctx-texture { background: var(--color-ctx-texture-bg); color: var(--color-ctx-texture-fg); }
+.sem-ctx-generic { background: var(--color-ctx-generic-bg); color: var(--color-ctx-generic-fg); }
 
 .sem-badge-custom {
   font-size: 0.55rem;
   padding: 0.1rem 0.35rem;
   border-radius: 0.3rem;
-  background: rgb(123 92 255 / 25%);
-  color: #a088ff;
+  background: var(--accent-tint-25);
+  color: var(--color-accent-soft);
   font-weight: 600;
 }
 
 .sem-entry-preview {
   flex: 1;
   font-size: 0.6rem;
-  color: #6a5fa0;
+  color: var(--color-fg-muted);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -175,7 +175,7 @@
 
 .sem-entry-chevron {
   font-size: 0.55rem;
-  color: #6a5fa0;
+  color: var(--color-fg-muted);
 }
 
 .sem-entry-body {
@@ -183,8 +183,8 @@
   grid-template-columns: 1fr 1fr;
   gap: 0.2rem 0.5rem;
   padding: 0.5rem 0.6rem 0.6rem;
-  border-top: 1px solid rgb(255 255 255 / 6%);
-  background: rgb(0 0 0 / 15%);
+  border-top: 1px solid var(--color-border);
+  background: var(--fill-soft);
 }
 
 .sem-field-row {
@@ -195,7 +195,7 @@
 
 .sem-field-label {
   font-size: 0.58rem;
-  color: #6a5fa0;
+  color: var(--color-fg-muted);
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -205,7 +205,7 @@
 
 .sem-field-val {
   font-size: 0.65rem;
-  color: #c8c0e8;
+  color: var(--color-fg-secondary);
   font-variant-numeric: tabular-nums;
   min-width: 4rem;
   text-align: right;
@@ -213,12 +213,12 @@
 
 .sem-field-input {
   width: 5rem;
-  background: rgb(255 255 255 / 6%);
-  border: 1px solid rgb(255 255 255 / 12%);
+  background: var(--fill-strong);
+  border: 1px solid var(--fill-stronger);
   border-radius: 0.3rem;
   padding: 0.15rem 0.3rem;
   font-size: 0.65rem;
-  color: #f4f0ff;
+  color: var(--color-fg-primary);
   font-family: inherit;
   font-variant-numeric: tabular-nums;
   text-align: right;
@@ -226,22 +226,22 @@
 
 .sem-field-input:focus {
   outline: none;
-  border-color: rgb(123 92 255 / 50%);
+  border-color: var(--accent-tint-60);
 }
 
 .sem-field-input:focus-visible {
-  outline: 2px solid #7b5cff;
+  outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
 
 .sem-add-panel {
-  border: 1px solid rgb(123 92 255 / 30%);
+  border: 1px solid var(--accent-tint-35);
   border-radius: 0.5rem;
   padding: 0.6rem;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  background: rgb(123 92 255 / 5%);
+  background: var(--accent-tint-12);
 }
 
 .sem-add-row {
@@ -269,11 +269,11 @@
 .sem-add-trigger {
   align-self: flex-start;
   font-size: 0.7rem;
-  color: #7b5cff;
-  border-color: rgb(123 92 255 / 30%);
+  color: var(--color-accent);
+  border-color: var(--accent-tint-35);
 }
 
 .sem-add-trigger:hover {
-  background: rgb(123 92 255 / 10%);
-  color: #a088ff;
+  background: var(--accent-tint-12);
+  color: var(--color-accent-soft);
 }

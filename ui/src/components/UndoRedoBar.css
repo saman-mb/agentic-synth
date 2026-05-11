@@ -1,0 +1,55 @@
+/* ── Undo / Redo toolbar ──────────────────────────────────────────────
+   Sits at the top of the knob panel. Uses the same purple accent palette
+   as the rest of the app (matches .knob-grid-tool and .panel-tab focus
+   ring at #7b5cff). */
+
+.undo-redo-bar {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.35rem 0;
+  margin-bottom: 0.4rem;
+  border-bottom: 1px solid rgb(255 255 255 / 6%);
+}
+
+.undo-redo-btn {
+  background: rgb(255 255 255 / 4%);
+  border: 1px solid rgb(123 92 255 / 35%);
+  color: #c8b8ff;
+  font-family: inherit;
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.32rem 0.7rem;
+  border-radius: 0.4rem;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s, color 0.12s;
+}
+
+.undo-redo-btn:hover:not(:disabled) {
+  background: rgb(123 92 255 / 18%);
+  border-color: #7b5cff;
+  color: #f4f0ff;
+}
+
+.undo-redo-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+  border-color: rgb(255 255 255 / 8%);
+  color: #6a5fa0;
+}
+
+.undo-redo-btn:focus { outline: none; }
+.undo-redo-btn:focus-visible {
+  outline: 2px solid #7b5cff;
+  outline-offset: 1px;
+}
+
+.history-count {
+  margin-left: auto;
+  font-size: 0.6rem;
+  font-variant-numeric: tabular-nums;
+  color: #9080bb;
+  letter-spacing: 0.04em;
+}
