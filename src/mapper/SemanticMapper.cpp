@@ -305,11 +305,16 @@ std::optional<const DescriptorEntry*> SemanticMapper::best_match(const std::stri
         }
     }
 
-    // Prefer context-specific match; fall back to generic
-    if (best_ctx)
+    // Prefer context-specific match when its score is competitive with the
+    // generic match; otherwise fall back to the higher-scoring generic entry.
+    // This avoids fuzzy-matching a query like "pad" to "plucky"/Bass when an
+    // exact-match "pad"/Generic entry exists.
+    if (best_ctx && best_ctx_score + 0.05f >= best_generic_score)
         return best_ctx;
     if (best_generic)
         return best_generic;
+    if (best_ctx)
+        return best_ctx;
     return std::nullopt;
 }
 

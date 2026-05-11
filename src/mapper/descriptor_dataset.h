@@ -206,7 +206,7 @@ inline const std::array<DescriptorEntry, 74>& get_descriptor_dataset() {
         {"evolving", SoundContext::Generic,   {.lfo0_target=LfoTarget::FilterCutoff, .lfo0_rate=0.1f}},
         {"morphing", SoundContext::Generic,   {.lfo0_target=LfoTarget::FilterCutoff, .lfo0_rate=0.05f}},
         {"tremolo",  SoundContext::Generic,   {.lfo0_target=LfoTarget::Amplitude, .lfo0_rate=5.0f}},
-        {"vibrato",  SoundContext::Generic,   {.lfo0_target=LfoTarget::Pitch, .lfo0_rate=5.5f}},
+        {"vibrato",  SoundContext::Generic,   {.lfo0_target=LfoTarget::Pitch, .lfo0_rate=5.5f, .lfo0_depth=0.05f}},
         {"wobble",   SoundContext::Generic,   {.lfo0_target=LfoTarget::FilterCutoff, .lfo0_rate=3.0f}},
         {"glitchy",  SoundContext::Generic,   {.lfo0_waveform=LfoWaveform::Square, .lfo0_rate=15.0f}},
         {"pulsing",  SoundContext::Generic,   {.lfo0_target=LfoTarget::Amplitude, .lfo0_rate=2.0f}},
@@ -215,7 +215,7 @@ inline const std::array<DescriptorEntry, 74>& get_descriptor_dataset() {
         // ── Envelope / Attack character ───────────────────────────────────────
         {"plucky",   SoundContext::Generic,   {.amp_attack=0.001f, .amp_decay=0.08f, .amp_sustain=0.0f}},
         {"plucky",   SoundContext::Bass,      {.filter_cutoff=600.0f, .amp_attack=0.001f, .amp_decay=0.12f, .amp_sustain=0.0f, .amp_release=0.15f, .flt_decay=0.1f}},
-        {"pad",      SoundContext::Generic,   {.amp_attack=0.5f, .amp_decay=0.5f, .amp_sustain=0.8f, .amp_release=1.5f}},
+        {"pad",      SoundContext::Generic,   {.amp_attack=0.5f, .amp_decay=0.5f, .amp_sustain=0.8f, .amp_release=1.5f, .reverb_size=0.7f, .reverb_mix=0.3f}},
         {"punchy",   SoundContext::Generic,   {.amp_attack=0.001f, .amp_decay=0.05f, .amp_sustain=0.3f}},
         {"soft",     SoundContext::Generic,   {.amp_attack=0.15f, .amp_decay=0.2f, .amp_sustain=0.7f}},
         {"sharp",    SoundContext::Generic,   {.amp_attack=0.001f, .amp_decay=0.03f}},
@@ -247,7 +247,7 @@ inline const std::array<DescriptorEntry, 74>& get_descriptor_dataset() {
 
         // ── Polyphony / Voice ─────────────────────────────────────────────────
         {"unison",   SoundContext::Generic,   {.osc1_enabled=true, .osc1_detune=12.0f}},
-        {"mono",     SoundContext::Generic,   {.voice_count=1}},
+        {"mono",     SoundContext::Generic,   {.portamento=0.05f, .voice_count=1}},
         {"poly",     SoundContext::Generic,   {.voice_count=8}},
 
         // ── Distortion / Drive ────────────────────────────────────────────────
