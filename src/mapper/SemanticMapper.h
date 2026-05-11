@@ -1,7 +1,9 @@
 #pragma once
 
+#include <mutex>
 #include <optional>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include "engine/PatchStruct.h"
@@ -67,9 +69,20 @@ public:
 
     [[nodiscard]] const std::vector<CustomEntry>& customEntries() const noexcept { return customEntries_; }
 
+    // Phase 9B: prefetch embeddings for every static descriptor keyword so
+    // that best_match() no longer triggers an HTTP round-trip per keyword
+    // per query word. No-op when server_url is empty (offline / unit tests).
+    void prewarmEmbeddings();
+
 private:
     SemanticMapperConfig cfg_;
     std::vector<CustomEntry> customEntries_;
+
+    // Phase 9B: lifetime-of-mapper embedding cache. Indexed by raw query
+    // text (keyword or user descriptor). Empty vector is cached as well so
+    // we don't re-hit the server for transient failures within one session.
+    mutable std::unordered_map<std::string, std::vector<float>> embeddingCache_;
+    mutable std::mutex embeddingCacheMutex_;
 
     // Tokenise prompt into lowercase words
     [[nodiscard]] static std::vector<std::string> tokenise(const std::string& prompt);

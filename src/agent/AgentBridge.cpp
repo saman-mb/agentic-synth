@@ -8,6 +8,8 @@
 #include <sstream>
 #include <utility>
 
+#include "agent/ParamMap.h"
+
 namespace agentic_synth::agent {
 
 namespace {
@@ -152,162 +154,9 @@ void AgentBridge::notifyTranscript(const juce::var& payload) { dispatch(transcri
 
 namespace {
 
-// ---------------------------------------------------------------------------
-// Map a UI param path (e.g. "filter.cutoff_hz") to a PatchDelta with that
-// one field set, leaving all other fields as nullopt.
-// ---------------------------------------------------------------------------
-
-mapper::PatchDelta paramToDelta(const std::string& param, float value) {
-    mapper::PatchDelta d;
-    // Filter
-    if (param == "filter.cutoff_hz") {
-        d.filter_cutoff = value;
-        return d;
-    }
-    if (param == "filter.resonance") {
-        d.filter_resonance = value;
-        return d;
-    }
-    if (param == "filter.env_mod") {
-        d.filter_env_mod = value;
-        return d;
-    }
-    if (param == "filter.drive") {
-        d.filter_drive = value;
-        return d;
-    }
-    // Amp envelope
-    if (param == "amp_env.attack_s") {
-        d.amp_attack = value;
-        return d;
-    }
-    if (param == "amp_env.decay_s") {
-        d.amp_decay = value;
-        return d;
-    }
-    if (param == "amp_env.sustain") {
-        d.amp_sustain = value;
-        return d;
-    }
-    if (param == "amp_env.release_s") {
-        d.amp_release = value;
-        return d;
-    }
-    // Filter envelope
-    if (param == "filter_env.attack_s") {
-        d.flt_attack = value;
-        return d;
-    }
-    if (param == "filter_env.decay_s") {
-        d.flt_decay = value;
-        return d;
-    }
-    if (param == "filter_env.sustain") {
-        d.flt_sustain = value;
-        return d;
-    }
-    if (param == "filter_env.release_s") {
-        d.flt_release = value;
-        return d;
-    }
-    // LFO 0
-    if (param == "lfo.0.rate_hz") {
-        d.lfo0_rate = value;
-        return d;
-    }
-    if (param == "lfo.0.depth") {
-        d.lfo0_depth = value;
-        return d;
-    }
-    // Reverb
-    if (param == "reverb.size") {
-        d.reverb_size = value;
-        return d;
-    }
-    if (param == "reverb.damping") {
-        d.reverb_damping = value;
-        return d;
-    }
-    if (param == "reverb.width") {
-        d.reverb_width = value;
-        return d;
-    }
-    if (param == "reverb.mix") {
-        d.reverb_mix = value;
-        return d;
-    }
-    // Delay
-    if (param == "delay.time_s") {
-        d.delay_time = value;
-        return d;
-    }
-    if (param == "delay.feedback") {
-        d.delay_feedback = value;
-        return d;
-    }
-    if (param == "delay.mix") {
-        d.delay_mix = value;
-        return d;
-    }
-    // Global
-    if (param == "master_gain") {
-        d.master_gain = value;
-        return d;
-    }
-    if (param == "portamento_s") {
-        d.portamento = value;
-        return d;
-    }
-    // Oscillators (osc.N.field)
-    if (param.size() > 4 && param.compare(0, 4, "osc.") == 0) {
-        const auto p2 = param.substr(4);
-        const auto dot = p2.find('.');
-        if (dot != std::string::npos) {
-            int idx = 0;
-            try {
-                idx = std::stoi(p2.substr(0, dot));
-            } catch (...) {
-            }
-            const std::string field = p2.substr(dot + 1);
-            if (idx == 0) {
-                if (field == "volume") {
-                    d.osc0_volume = value;
-                    return d;
-                }
-                if (field == "detune_cents") {
-                    d.osc0_detune = value;
-                    return d;
-                }
-                if (field == "semitone_offset") {
-                    d.osc0_semitone = value;
-                    return d;
-                }
-                if (field == "fm_ratio") {
-                    d.osc0_fm_ratio = value;
-                    return d;
-                }
-                if (field == "fm_depth") {
-                    d.osc0_fm_depth = value;
-                    return d;
-                }
-                if (field == "pulse_width") {
-                    d.osc0_pulse_width = value;
-                    return d;
-                }
-            } else if (idx == 1) {
-                if (field == "volume") {
-                    d.osc1_volume = value;
-                    return d;
-                }
-                if (field == "detune_cents") {
-                    d.osc1_detune = value;
-                    return d;
-                }
-            }
-        }
-    }
-    return d; // unknown param → empty delta (no-op)
-}
+// Phase 9C: paramToDelta (UI param path → PatchDelta) now lives in
+// ParamMap.cpp as a single source-of-truth table. AgentBridge calls
+// agent::paramToDelta directly — see handleKnobTweak below.
 
 // Load text file; returns empty string on failure.
 std::string load_text_file(const std::string& path) {

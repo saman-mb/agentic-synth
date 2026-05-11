@@ -10,6 +10,8 @@
 #include <sstream>
 #include <unordered_map>
 
+#include <juce_core/juce_core.h>
+
 #ifndef _WIN32
 #include <arpa/inet.h>
 #include <netdb.h>
@@ -27,7 +29,13 @@ namespace agentic_synth::mapper {
 // Construction
 // ---------------------------------------------------------------------------
 
-SemanticMapper::SemanticMapper(SemanticMapperConfig cfg) : cfg_(std::move(cfg)) {}
+SemanticMapper::SemanticMapper(SemanticMapperConfig cfg) : cfg_(std::move(cfg)) {
+    // Phase 9B: prewarm only when a server is configured. Offline path used
+    // by unit tests stays a pure no-op; we never block the constructor on
+    // network calls when server_url is empty.
+    if (!cfg_.server_url.empty())
+        prewarmEmbeddings();
+}
 
 // ---------------------------------------------------------------------------
 // Tokenisation
@@ -220,46 +228,94 @@ std::string SemanticMapper::http_post_embedding(const std::string& text) const {
 }
 
 // ---------------------------------------------------------------------------
-// Parse embedding JSON: {"embedding": [f, f, f, ...]}
+// Parse embedding JSON. llama.cpp /embedding can return either:
+//   {"embedding": [f, f, ...]}
+//   [{"embedding": [f, f, ...]}, ...]   (server-mode batched response)
+//   {"embedding": [[f, f, ...]]}         (nested when encoding_format is set)
+// All three shapes are handled via juce::var traversal so we no longer
+// substring-scan the raw response body.
 // ---------------------------------------------------------------------------
 
 std::vector<float> SemanticMapper::parse_embedding_json(const std::string& json) {
     std::vector<float> result;
-    const std::string key = "\"embedding\"";
-    auto pos = json.find(key);
-    if (pos == std::string::npos)
+    const auto parsed = juce::JSON::parse(juce::String(json));
+    if (parsed.isVoid())
         return result;
-    pos = json.find('[', pos + key.size());
-    if (pos == std::string::npos)
-        return result;
-    ++pos;
-    while (pos < json.size() && json[pos] != ']') {
-        while (pos < json.size() && (json[pos] == ' ' || json[pos] == ',' || json[pos] == '\n'))
-            ++pos;
-        if (pos >= json.size() || json[pos] == ']')
-            break;
-        const char* begin = json.data() + pos;
-        char* end = nullptr;
-        float v = std::strtof(begin, &end);
-        if (end == begin)
-            break;
-        result.push_back(v);
-        pos = static_cast<size_t>(end - json.data());
+
+    // Unwrap top-level array → first element.
+    juce::var node = parsed;
+    if (auto* arr = node.getArray()) {
+        if (arr->isEmpty())
+            return result;
+        node = arr->getReference(0);
     }
+
+    auto* obj = node.getDynamicObject();
+    if (obj == nullptr)
+        return result;
+
+    juce::var emb = obj->getProperty("embedding");
+    auto* embArr = emb.getArray();
+    if (embArr == nullptr)
+        return result;
+
+    // Nested form: [[f, f, ...]] → unwrap one level.
+    if (!embArr->isEmpty() && embArr->getReference(0).isArray())
+        embArr = embArr->getReference(0).getArray();
+    if (embArr == nullptr)
+        return result;
+
+    result.reserve(static_cast<size_t>(embArr->size()));
+    for (const auto& v : *embArr)
+        result.push_back(static_cast<float>(static_cast<double>(v)));
     return result;
 }
 
 // ---------------------------------------------------------------------------
-// fetch_embedding — calls server or returns empty (fallback to word-overlap)
+// fetch_embedding — calls server or returns empty (fallback to word-overlap).
+//
+// Phase 9B: results are memoised in embeddingCache_ for the SemanticMapper's
+// lifetime. Mutex guards only the cache read/write; the HTTP call itself
+// runs outside the lock so concurrent misses still issue parallel network
+// requests instead of serialising on the cache mutex.
 // ---------------------------------------------------------------------------
 
 std::vector<float> SemanticMapper::fetch_embedding(const std::string& text) const {
     if (cfg_.server_url.empty())
         return {};
+
+    {
+        std::lock_guard<std::mutex> lock(embeddingCacheMutex_);
+        const auto it = embeddingCache_.find(text);
+        if (it != embeddingCache_.end())
+            return it->second;
+    }
+
     const std::string resp = http_post_embedding(text);
-    if (resp.empty())
-        return {};
-    return parse_embedding_json(resp);
+    std::vector<float> emb;
+    if (!resp.empty())
+        emb = parse_embedding_json(resp);
+
+    {
+        std::lock_guard<std::mutex> lock(embeddingCacheMutex_);
+        // Insert even an empty vector so transient server failures don't
+        // hammer the endpoint repeatedly within one session. Caller already
+        // treats an empty vector as "fall back to word-overlap".
+        embeddingCache_.emplace(text, emb);
+    }
+    return emb;
+}
+
+// ---------------------------------------------------------------------------
+// prewarmEmbeddings — populate the cache for every static descriptor keyword
+// in one synchronous pass at construction time. No-op when offline.
+// ---------------------------------------------------------------------------
+
+void SemanticMapper::prewarmEmbeddings() {
+    if (cfg_.server_url.empty())
+        return;
+    for (const auto& entry : get_descriptor_dataset())
+        (void)fetch_embedding(std::string(entry.keyword));
 }
 
 // ---------------------------------------------------------------------------
@@ -283,7 +339,9 @@ std::optional<const DescriptorEntry*> SemanticMapper::best_match(const std::stri
         float score = 0.0f;
 
         if (use_embedding) {
-            // Fetch embedding for keyword (cached in a real implementation)
+            // Phase 9B: embedding is served from embeddingCache_ on hit; we
+            // only block on HTTP for the cold misses (in practice none, since
+            // prewarmEmbeddings() ran from the constructor).
             auto kw_emb = fetch_embedding(std::string(entry.keyword));
             if (kw_emb.size() == query_emb.size())
                 score = cosine(query_emb, kw_emb);
@@ -366,50 +424,32 @@ int SemanticMapper::apply(const std::string& prompt, PatchStruct& patch) const {
 }
 
 // ---------------------------------------------------------------------------
-// Issue #90: JSON serialisation helpers (anonymous namespace)
+// Phase 9B: JSON serialisation helpers built on juce::JSON / juce::var.
+// Replaces the hand-rolled substring scans that lived here originally
+// (engineering audit flagged the same pattern AgentBridge already migrated
+// away from in commit 91d5e4b).
 // ---------------------------------------------------------------------------
 
 namespace {
 
-std::string mapJsStr(const std::string& json, const std::string& key) {
-    const std::string needle = "\"" + key + "\"";
-    auto pos = json.find(needle);
-    if (pos == std::string::npos)
-        return {};
-    pos = json.find(':', pos + needle.size());
-    if (pos == std::string::npos)
-        return {};
-    pos = json.find('"', pos + 1);
-    if (pos == std::string::npos)
-        return {};
-    const auto end = json.find('"', pos + 1);
-    if (end == std::string::npos)
-        return {};
-    return json.substr(pos + 1, end - pos - 1);
+// juce::var lookups never throw and treat missing keys as void; these
+// helpers normalise the access pattern across the loader / parser.
+bool varHasKey(const juce::var& v, const char* key) {
+    if (auto* obj = v.getDynamicObject())
+        return obj->hasProperty(juce::Identifier{key});
+    return false;
 }
 
-bool mapHasKey(const std::string& json, const std::string& key) {
-    return json.find("\"" + key + "\"") != std::string::npos;
+std::string varStr(const juce::var& v, const char* key) {
+    if (auto* obj = v.getDynamicObject())
+        return obj->getProperty(juce::Identifier{key}).toString().toStdString();
+    return {};
 }
 
-float mapJsFloat(const std::string& json, const std::string& key) {
-    const std::string needle = "\"" + key + "\"";
-    auto pos = json.find(needle);
-    if (pos == std::string::npos)
-        return 0.0f;
-    pos = json.find(':', pos + needle.size());
-    if (pos == std::string::npos)
-        return 0.0f;
-    ++pos;
-    while (pos < json.size() && (json[pos] == ' ' || json[pos] == '\t'))
-        ++pos;
-    if (pos >= json.size())
-        return 0.0f;
-    try {
-        return std::stof(json.substr(pos));
-    } catch (...) {
-        return 0.0f;
-    }
+float varFloat(const juce::var& v, const char* key) {
+    if (auto* obj = v.getDynamicObject())
+        return static_cast<float>(static_cast<double>(obj->getProperty(juce::Identifier{key})));
+    return 0.0f;
 }
 
 const char* contextToStr(SoundContext c) {
@@ -498,19 +538,15 @@ LfoTarget lfoTargetFromStr(const std::string& s) {
     return LfoTarget::FilterCutoff;
 }
 
-std::string deltaToJson(const PatchDelta& d) {
-    std::ostringstream ss;
-    ss << std::fixed << std::setprecision(4);
-    bool first = true;
-    ss << '{';
+// deltaToVar — serialise a PatchDelta to a juce::var DynamicObject. Only
+// fields with a value are emitted (preserves the round-trip semantics of
+// the previous std::ostringstream implementation).
+juce::var deltaToVar(const PatchDelta& d) {
+    auto* obj = new juce::DynamicObject{};
 
 #define EMIT_F(name, member)                                                                                           \
-    if (d.member) {                                                                                                    \
-        if (!first)                                                                                                    \
-            ss << ',';                                                                                                 \
-        first = false;                                                                                                 \
-        ss << "\"" #name "\":" << *d.member;                                                                           \
-    }
+    if (d.member)                                                                                                      \
+        obj->setProperty(juce::Identifier{#name}, static_cast<double>(*d.member));
 
     EMIT_F(osc0_volume, osc0_volume)
     EMIT_F(osc0_semitone, osc0_semitone)
@@ -546,54 +582,30 @@ std::string deltaToJson(const PatchDelta& d) {
 
 #undef EMIT_F
 
-    if (d.osc0_type) {
-        if (!first)
-            ss << ',';
-        first = false;
-        ss << "\"osc0_type\":\"" << oscTypeToStr(*d.osc0_type) << '"';
-    }
-    if (d.filter_type) {
-        if (!first)
-            ss << ',';
-        first = false;
-        ss << "\"filter_type\":\"LowPass\""; // conservative: only LowPass confirmed in dataset
-    }
-    if (d.lfo0_waveform) {
-        if (!first)
-            ss << ',';
-        first = false;
-        ss << "\"lfo0_waveform\":\"" << ((*d.lfo0_waveform == LfoWaveform::Square) ? "Square" : "Sine") << '"';
-    }
-    if (d.lfo0_target) {
-        if (!first)
-            ss << ',';
-        first = false;
-        ss << "\"lfo0_target\":\"" << lfoTargetToStr(*d.lfo0_target) << '"';
-    }
-    if (d.osc1_enabled) {
-        if (!first)
-            ss << ',';
-        first = false;
-        ss << "\"osc1_enabled\":" << (*d.osc1_enabled ? "true" : "false");
-    }
-    if (d.voice_count) {
-        if (!first)
-            ss << ',';
-        first = false;
-        ss << "\"voice_count\":" << static_cast<int>(*d.voice_count);
-    }
+    if (d.osc0_type)
+        obj->setProperty("osc0_type", juce::String(oscTypeToStr(*d.osc0_type)));
+    if (d.filter_type)
+        obj->setProperty("filter_type", juce::String("LowPass")); // conservative: only LowPass confirmed in dataset
+    if (d.lfo0_waveform)
+        obj->setProperty("lfo0_waveform",
+                         juce::String((*d.lfo0_waveform == LfoWaveform::Square) ? "Square" : "Sine"));
+    if (d.lfo0_target)
+        obj->setProperty("lfo0_target", juce::String(lfoTargetToStr(*d.lfo0_target)));
+    if (d.osc1_enabled)
+        obj->setProperty("osc1_enabled", *d.osc1_enabled);
+    if (d.voice_count)
+        obj->setProperty("voice_count", static_cast<int>(*d.voice_count));
 
-    ss << '}';
-    return ss.str();
+    return juce::var{obj};
 }
 
-PatchDelta parseDeltaFromJson(const std::string& json) {
+PatchDelta parseDeltaFromVar(const juce::var& v) {
     PatchDelta d;
 
     auto getF = [&](const char* k) -> std::optional<float> {
-        if (!mapHasKey(json, k))
+        if (!varHasKey(v, k))
             return std::nullopt;
-        return mapJsFloat(json, k);
+        return varFloat(v, k);
     };
 
     d.osc0_volume = getF("osc0_volume");
@@ -628,41 +640,68 @@ PatchDelta parseDeltaFromJson(const std::string& json) {
     d.master_gain = getF("master_gain");
     d.portamento = getF("portamento");
 
-    const auto ost = mapJsStr(json, "osc0_type");
+    const auto ost = varStr(v, "osc0_type");
     if (!ost.empty())
         d.osc0_type = oscTypeFromStr(ost);
 
-    if (mapHasKey(json, "filter_type"))
+    if (varHasKey(v, "filter_type"))
         d.filter_type = FilterType::LowPass;
 
-    if (mapHasKey(json, "lfo0_waveform")) {
-        const auto lw = mapJsStr(json, "lfo0_waveform");
+    if (varHasKey(v, "lfo0_waveform")) {
+        const auto lw = varStr(v, "lfo0_waveform");
         d.lfo0_waveform = (lw == "Square") ? LfoWaveform::Square : LfoWaveform::Sine;
     }
 
-    const auto lt = mapJsStr(json, "lfo0_target");
+    const auto lt = varStr(v, "lfo0_target");
     if (!lt.empty())
         d.lfo0_target = lfoTargetFromStr(lt);
 
-    if (mapHasKey(json, "osc1_enabled")) {
-        auto p = json.find("\"osc1_enabled\"");
-        p = json.find(':', p);
-        ++p;
-        while (p < json.size() && json[p] == ' ')
-            ++p;
-        d.osc1_enabled = (json.size() > p + 3 && json.substr(p, 4) == "true");
+    if (varHasKey(v, "osc1_enabled")) {
+        if (auto* obj = v.getDynamicObject())
+            d.osc1_enabled = static_cast<bool>(obj->getProperty("osc1_enabled"));
     }
 
-    if (mapHasKey(json, "voice_count")) {
-        auto p = json.find("\"voice_count\"");
-        p = json.find(':', p);
-        try {
-            d.voice_count = static_cast<uint8_t>(std::stoi(json.substr(p + 1)));
-        } catch (...) {
-        }
+    if (varHasKey(v, "voice_count")) {
+        if (auto* obj = v.getDynamicObject())
+            d.voice_count = static_cast<uint8_t>(static_cast<int>(obj->getProperty("voice_count")));
     }
 
     return d;
+}
+
+// Walk a juce::var that is either an array of entries or an object with an
+// "entries" array, populating `out`. Static (readonly=true) entries are
+// skipped — the loader only owns user-defined customs.
+void parseCustomEntriesFromVar(const juce::var& root, std::vector<CustomEntry>& out) {
+    // Accept either a bare array of entries or {"entries": [...]} (the shape
+    // emitted by AgentBridge::buildDictionarySaveFrame).
+    juce::var arrVar = root;
+    if (auto* rootObj = root.getDynamicObject()) {
+        if (rootObj->hasProperty("entries"))
+            arrVar = rootObj->getProperty("entries");
+    }
+    auto* arr = arrVar.getArray();
+    if (arr == nullptr)
+        return;
+
+    for (const auto& entryVar : *arr) {
+        auto* entryObj = entryVar.getDynamicObject();
+        if (entryObj == nullptr)
+            continue;
+        if (static_cast<bool>(entryObj->getProperty("readonly")))
+            continue;
+
+        CustomEntry e;
+        e.keyword = entryObj->getProperty("keyword").toString().toStdString();
+        e.context = contextFromStr(entryObj->getProperty("context").toString().toStdString());
+
+        const auto deltaVar = entryObj->getProperty("delta");
+        if (deltaVar.getDynamicObject() != nullptr)
+            e.delta = parseDeltaFromVar(deltaVar);
+
+        if (!e.keyword.empty())
+            out.push_back(std::move(e));
+    }
 }
 
 } // anonymous namespace
@@ -678,170 +717,69 @@ void SemanticMapper::loadCustomEntries(const std::string& json_path) {
     const std::string json((std::istreambuf_iterator<char>(f)), std::istreambuf_iterator<char>());
     customEntries_.clear();
 
-    size_t i = 0;
-    while (i < json.size()) {
-        const auto start = json.find('{', i);
-        if (start == std::string::npos)
-            break;
-
-        // Find the matching closing brace, respecting nesting.
-        int depth = 1;
-        size_t j = start + 1;
-        while (j < json.size() && depth > 0) {
-            if (json[j] == '{')
-                ++depth;
-            else if (json[j] == '}')
-                --depth;
-            ++j;
-        }
-        if (depth != 0)
-            break;
-
-        const std::string entry_str = json.substr(start, j - start);
-        // Skip static entries (generated by dumpAllToJson with readonly:true).
-        if (entry_str.find("\"readonly\":true") != std::string::npos) {
-            i = j;
-            continue;
-        }
-
-        CustomEntry e;
-        e.keyword = mapJsStr(entry_str, "keyword");
-        e.context = contextFromStr(mapJsStr(entry_str, "context"));
-
-        const auto delta_start = entry_str.find("\"delta\"");
-        if (delta_start != std::string::npos) {
-            const auto brace = entry_str.find('{', delta_start);
-            if (brace != std::string::npos) {
-                // Find matching } for the delta object.
-                int dd = 1;
-                size_t k = brace + 1;
-                while (k < entry_str.size() && dd > 0) {
-                    if (entry_str[k] == '{')
-                        ++dd;
-                    else if (entry_str[k] == '}')
-                        --dd;
-                    ++k;
-                }
-                if (dd == 0)
-                    e.delta = parseDeltaFromJson(entry_str.substr(brace, k - brace));
-            }
-        }
-
-        if (!e.keyword.empty())
-            customEntries_.push_back(std::move(e));
-        i = j;
-    }
+    const auto parsed = juce::JSON::parse(juce::String(json));
+    if (parsed.isVoid())
+        return;
+    parseCustomEntriesFromVar(parsed, customEntries_);
 }
 
 void SemanticMapper::parseAndSaveCustomEntries(const std::string& json, const std::string& json_path) {
-    // Extract the "entries" array and parse it through loadCustomEntries logic.
-    const auto arr_start = json.find("\"entries\"");
-    if (arr_start == std::string::npos)
-        return;
-    const auto bracket = json.find('[', arr_start);
-    if (bracket == std::string::npos)
-        return;
-    const auto bracket_end = json.rfind(']');
-    if (bracket_end == std::string::npos || bracket_end <= bracket)
+    // Frame shape from AgentBridge::buildDictionarySaveFrame:
+    //   {"type":"save_dictionary","entries":[ {...}, ... ]}
+    // We accept either the wrapped object or a bare array for robustness.
+    const auto parsed = juce::JSON::parse(juce::String(json));
+    if (parsed.isVoid())
         return;
 
-    // Build a minimal JSON array and re-parse it.
-    const std::string arr = "[" + json.substr(bracket + 1, bracket_end - bracket - 1) + "]";
-    loadCustomEntries(""); // no-op since no file; use in-memory parse
-
-    // Inline parse of the extracted array.
     customEntries_.clear();
-    size_t i = 0;
-    while (i < arr.size()) {
-        const auto start = arr.find('{', i);
-        if (start == std::string::npos)
-            break;
-        int depth = 1;
-        size_t j = start + 1;
-        while (j < arr.size() && depth > 0) {
-            if (arr[j] == '{')
-                ++depth;
-            else if (arr[j] == '}')
-                --depth;
-            ++j;
-        }
-        if (depth != 0)
-            break;
-        const std::string entry_str = arr.substr(start, j - start);
-        if (entry_str.find("\"readonly\":true") != std::string::npos) {
-            i = j;
-            continue;
-        }
+    parseCustomEntriesFromVar(parsed, customEntries_);
 
-        CustomEntry e;
-        e.keyword = mapJsStr(entry_str, "keyword");
-        e.context = contextFromStr(mapJsStr(entry_str, "context"));
-        const auto delta_start = entry_str.find("\"delta\"");
-        if (delta_start != std::string::npos) {
-            const auto brace = entry_str.find('{', delta_start);
-            if (brace != std::string::npos) {
-                int dd = 1;
-                size_t k = brace + 1;
-                while (k < entry_str.size() && dd > 0) {
-                    if (entry_str[k] == '{')
-                        ++dd;
-                    else if (entry_str[k] == '}')
-                        --dd;
-                    ++k;
-                }
-                if (dd == 0)
-                    e.delta = parseDeltaFromJson(entry_str.substr(brace, k - brace));
-            }
-        }
-        if (!e.keyword.empty())
-            customEntries_.push_back(std::move(e));
-        i = j;
+    if (json_path.empty())
+        return;
+
+    juce::Array<juce::var> outArr;
+    outArr.ensureStorageAllocated(static_cast<int>(customEntries_.size()));
+    for (const auto& ce : customEntries_) {
+        auto* obj = new juce::DynamicObject{};
+        obj->setProperty("keyword", juce::String(ce.keyword));
+        obj->setProperty("context", juce::String(contextToStr(ce.context)));
+        obj->setProperty("delta", deltaToVar(ce.delta));
+        outArr.add(juce::var{obj});
     }
 
-    // Persist custom entries only.
-    if (!json_path.empty()) {
-        std::ofstream f(json_path, std::ios::out | std::ios::trunc);
-        if (!f)
-            return;
-        f << '[';
-        for (size_t n = 0; n < customEntries_.size(); ++n) {
-            const auto& ce = customEntries_[n];
-            if (n > 0)
-                f << ',';
-            f << "{\"keyword\":\"" << ce.keyword << "\"" << ",\"context\":\"" << contextToStr(ce.context) << "\""
-              << ",\"delta\":" << deltaToJson(ce.delta) << "}";
-        }
-        f << ']';
-    }
+    std::ofstream out(json_path, std::ios::out | std::ios::trunc);
+    if (!out)
+        return;
+    out << juce::JSON::toString(juce::var{outArr}, /*allOnOneLine*/ true).toStdString();
 }
 
 void SemanticMapper::addCustomEntry(CustomEntry e) { customEntries_.push_back(std::move(e)); }
 
 std::string SemanticMapper::dumpAllToJson() const {
-    std::ostringstream ss;
-    ss << '[';
-    bool first = true;
+    juce::Array<juce::var> arr;
+    arr.ensureStorageAllocated(static_cast<int>(get_descriptor_dataset().size() + customEntries_.size()));
 
     // Static dataset (readonly).
     for (const auto& e : get_descriptor_dataset()) {
-        if (!first)
-            ss << ',';
-        first = false;
-        ss << "{\"keyword\":\"" << e.keyword << "\"" << ",\"context\":\"" << contextToStr(e.context) << "\""
-           << ",\"readonly\":true" << ",\"delta\":" << deltaToJson(e.delta) << "}";
+        auto* obj = new juce::DynamicObject{};
+        obj->setProperty("keyword", juce::String(std::string(e.keyword)));
+        obj->setProperty("context", juce::String(contextToStr(e.context)));
+        obj->setProperty("readonly", true);
+        obj->setProperty("delta", deltaToVar(e.delta));
+        arr.add(juce::var{obj});
     }
 
     // User-defined custom entries (editable).
     for (const auto& e : customEntries_) {
-        if (!first)
-            ss << ',';
-        first = false;
-        ss << "{\"keyword\":\"" << e.keyword << "\"" << ",\"context\":\"" << contextToStr(e.context) << "\""
-           << ",\"readonly\":false" << ",\"delta\":" << deltaToJson(e.delta) << "}";
+        auto* obj = new juce::DynamicObject{};
+        obj->setProperty("keyword", juce::String(e.keyword));
+        obj->setProperty("context", juce::String(contextToStr(e.context)));
+        obj->setProperty("readonly", false);
+        obj->setProperty("delta", deltaToVar(e.delta));
+        arr.add(juce::var{obj});
     }
 
-    ss << ']';
-    return ss.str();
+    return juce::JSON::toString(juce::var{arr}, /*allOnOneLine*/ true).toStdString();
 }
 
 } // namespace agentic_synth::mapper

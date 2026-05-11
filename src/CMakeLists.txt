@@ -50,6 +50,7 @@ target_link_libraries(agentic_synth_engine
 # AI agent layer: depends on engine_lib, never the other way around.
 add_library(agentic_synth_agent STATIC
     agent/AgentBridge.cpp
+    agent/ParamMap.cpp
     agent/SessionMemory.cpp
     agent/PrePatchPipeline.cpp
     agent/StreamParser.cpp

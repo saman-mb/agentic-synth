@@ -4,6 +4,8 @@
 #include <string>
 #include <string_view>
 
+#include <juce_core/juce_core.h>
+
 #include "engine/PatchStruct.h"
 
 namespace agentic_synth::agent {
@@ -31,7 +33,8 @@ private:
 
     void processChar(char c);
     void onFieldComplete();
-    void applyField(const std::string& key, const std::string& value);
+    // Apply a parsed one-key wrapper var ({"<key>": <value>}) to partial_.
+    void applyField(const std::string& key, const juce::var& wrapper);
 
     State state_{State::Idle};
     int depth_{0}; // nesting depth inside the current field value

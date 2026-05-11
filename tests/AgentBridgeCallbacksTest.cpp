@@ -18,6 +18,7 @@
 #include <vector>
 
 #include "agent/AgentBridge.h"
+#include "agent/ParamMap.h"
 
 using namespace agentic_synth;
 using namespace agentic_synth::agent;
@@ -199,4 +200,127 @@ TEST_CASE("AgentBridge: dispatch from audio thread drops, does not allocate") {
 
     CHECK(calls.load() == 0);
     CHECK(bridge.audioThreadDropCount() == 1u);
+}
+
+// ── Phase 9C: ParamMap table-driven paramToDelta ─────────────────────────────
+//
+// The 5-place parameter→delta sync (paramToDelta / StreamParser / validator /
+// KnobGrid / applyParamToPatch) has been collapsed on the C++ side to a single
+// static table in ParamMap.cpp. These tests pin the contract for that table
+// so a future row edit can't silently drop a parameter.
+
+TEST_CASE("ParamMap: representative params populate the right PatchDelta field") {
+    using agent::paramToDelta;
+
+    SECTION("filter group") {
+        auto d = paramToDelta("filter.cutoff_hz", 1234.5f);
+        REQUIRE(d.filter_cutoff.has_value());
+        CHECK(*d.filter_cutoff == 1234.5f);
+        // Spot-check non-targets stay nullopt (single-field invariant).
+        CHECK_FALSE(d.filter_resonance.has_value());
+        CHECK_FALSE(d.amp_attack.has_value());
+        CHECK_FALSE(d.reverb_mix.has_value());
+    }
+    SECTION("filter.resonance") {
+        auto d = paramToDelta("filter.resonance", 0.42f);
+        REQUIRE(d.filter_resonance.has_value());
+        CHECK(*d.filter_resonance == 0.42f);
+    }
+    SECTION("amp_env.attack_s") {
+        auto d = paramToDelta("amp_env.attack_s", 0.05f);
+        REQUIRE(d.amp_attack.has_value());
+        CHECK(*d.amp_attack == 0.05f);
+    }
+    SECTION("filter_env.release_s") {
+        auto d = paramToDelta("filter_env.release_s", 1.5f);
+        REQUIRE(d.flt_release.has_value());
+        CHECK(*d.flt_release == 1.5f);
+    }
+    SECTION("lfo.0.depth") {
+        auto d = paramToDelta("lfo.0.depth", 0.8f);
+        REQUIRE(d.lfo0_depth.has_value());
+        CHECK(*d.lfo0_depth == 0.8f);
+    }
+    SECTION("reverb.mix") {
+        auto d = paramToDelta("reverb.mix", 0.3f);
+        REQUIRE(d.reverb_mix.has_value());
+        CHECK(*d.reverb_mix == 0.3f);
+    }
+    SECTION("delay.feedback") {
+        auto d = paramToDelta("delay.feedback", 0.55f);
+        REQUIRE(d.delay_feedback.has_value());
+        CHECK(*d.delay_feedback == 0.55f);
+    }
+    SECTION("master_gain (global)") {
+        auto d = paramToDelta("master_gain", 0.9f);
+        REQUIRE(d.master_gain.has_value());
+        CHECK(*d.master_gain == 0.9f);
+    }
+    SECTION("osc.0.volume") {
+        auto d = paramToDelta("osc.0.volume", 0.65f);
+        REQUIRE(d.osc0_volume.has_value());
+        CHECK(*d.osc0_volume == 0.65f);
+    }
+    SECTION("osc.1.detune_cents") {
+        auto d = paramToDelta("osc.1.detune_cents", 7.0f);
+        REQUIRE(d.osc1_detune.has_value());
+        CHECK(*d.osc1_detune == 7.0f);
+    }
+}
+
+TEST_CASE("ParamMap: unknown param returns a default-constructed delta") {
+    // Pre-9C the cascade fell through to `return d;` with everything nullopt.
+    // The table-driven version must preserve that behaviour exactly — silent
+    // no-op, not an exception, not a partial write.
+    auto d = agent::paramToDelta("bogus.field", 42.0f);
+    CHECK_FALSE(d.filter_cutoff.has_value());
+    CHECK_FALSE(d.filter_resonance.has_value());
+    CHECK_FALSE(d.amp_attack.has_value());
+    CHECK_FALSE(d.amp_decay.has_value());
+    CHECK_FALSE(d.amp_sustain.has_value());
+    CHECK_FALSE(d.amp_release.has_value());
+    CHECK_FALSE(d.flt_attack.has_value());
+    CHECK_FALSE(d.flt_release.has_value());
+    CHECK_FALSE(d.lfo0_rate.has_value());
+    CHECK_FALSE(d.lfo0_depth.has_value());
+    CHECK_FALSE(d.reverb_mix.has_value());
+    CHECK_FALSE(d.delay_mix.has_value());
+    CHECK_FALSE(d.master_gain.has_value());
+    CHECK_FALSE(d.portamento.has_value());
+    CHECK_FALSE(d.osc0_volume.has_value());
+    CHECK_FALSE(d.osc1_volume.has_value());
+    CHECK_FALSE(d.voice_count.has_value());
+}
+
+TEST_CASE("ParamMap: empty / malformed osc paths fall through cleanly") {
+    // Old cascade had a try/catch around std::stoi for `osc.N.field`. The
+    // table flattens those into literal-path rows, so anything that wasn't
+    // an exact match in the old code is also unmatched here — no parsing,
+    // no surprises.
+    CHECK_FALSE(agent::paramToDelta("osc.", 1.0f).osc0_volume.has_value());
+    CHECK_FALSE(agent::paramToDelta("osc.0.", 1.0f).osc0_volume.has_value());
+    CHECK_FALSE(agent::paramToDelta("osc.2.volume", 1.0f).osc0_volume.has_value());
+    CHECK_FALSE(agent::paramToDelta("osc.0.unknown", 1.0f).osc0_volume.has_value());
+}
+
+TEST_CASE("ParamMap: int-typed PatchDelta fields are unreachable through paramToDelta") {
+    // PatchDelta::voice_count is uint8_t. The prior if/else cascade never
+    // exposed it via a UI path, and neither does the table. This test pins
+    // that contract so a future "add voice_count row" change has to also
+    // pick a cast policy (truncate vs round) deliberately — by failing
+    // here first.
+    CHECK_FALSE(agent::paramToDelta("voice_count", 8.7f).voice_count.has_value());
+    CHECK_FALSE(agent::paramToDelta("global.voice_count", 8.7f).voice_count.has_value());
+}
+
+TEST_CASE("ParamMap: table is non-empty and every row has a non-null assign") {
+    // Defensive invariant: a row with a null assign would segfault inside
+    // paramToDelta. CTAD makes the row count compile-time so an accidental
+    // 0-row table would also be caught here.
+    const auto map = agent::getParamMap();
+    REQUIRE(map.size() > 0);
+    for (const auto& slot : map) {
+        CHECK(slot.assign != nullptr);
+        CHECK_FALSE(slot.path.empty());
+    }
 }
