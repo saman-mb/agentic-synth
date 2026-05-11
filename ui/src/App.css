@@ -56,11 +56,53 @@ body,
 .knob-section {
   border: 1px solid rgb(255 255 255 / 8%);
   border-radius: 0.6rem;
-  padding: 0.6rem 0.75rem 0.75rem;
+  overflow: hidden;
 }
 
-.knob-section h3 {
-  margin: 0 0 0.5rem;
+.knob-section-collapsed {
+  background: rgb(255 255 255 / 1.5%);
+}
+
+/* Section header is a button so it gets proper keyboard semantics */
+.knob-section-header {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background 0.12s;
+}
+
+.knob-section-header:hover {
+  background: rgb(255 255 255 / 4%);
+}
+
+.knob-section-header:focus { outline: none; }
+.knob-section-header:focus-visible {
+  outline: 2px solid #7b5cff;
+  outline-offset: -2px;
+}
+
+.knob-section-chevron {
+  font-size: 0.7rem;
+  color: #6a5fa0;
+  transition: transform 0.15s;
+  display: inline-block;
+  width: 0.7rem;
+}
+
+.knob-section-chevron.open {
+  transform: rotate(90deg);
+  color: #91e8ff;
+}
+
+.knob-section-title {
   font-size: 0.65rem;
   font-weight: 700;
   text-transform: uppercase;
@@ -68,10 +110,78 @@ body,
   color: #91e8ff;
 }
 
+.knob-section-summary {
+  margin-left: auto;
+  font-size: 0.6rem;
+  color: #9080bb;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 60%;
+}
+
 .knob-row {
   display: flex;
   flex-wrap: wrap;
   gap: 0.5rem;
+  padding: 0 0.75rem 0.75rem;
+}
+
+/* Expand/collapse-all toolbar */
+.knob-grid-toolbar {
+  display: flex;
+  gap: 0.4rem;
+  padding-bottom: 0.2rem;
+}
+
+.knob-grid-tool {
+  flex: 1;
+  background: rgb(255 255 255 / 4%);
+  border: 1px solid rgb(255 255 255 / 10%);
+  color: #c8b8ff;
+  font-family: inherit;
+  font-size: 0.6rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.4rem;
+  cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+
+.knob-grid-tool:hover {
+  background: rgb(123 92 255 / 15%);
+  border-color: rgb(123 92 255 / 40%);
+}
+
+.knob-grid-tool:focus { outline: none; }
+.knob-grid-tool:focus-visible {
+  outline: 2px solid #7b5cff;
+  outline-offset: 1px;
+}
+
+/* Persistent agent-edit indicator — small purple "AI" badge in the corner
+   of the knob. Stays visible until the next agent generation replaces the set. */
+.knob-slot {
+  position: relative;
+}
+
+.knob-agent-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  z-index: 2;
+  background: #7b5cff;
+  color: #fff;
+  font-size: 0.5rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 1px 4px;
+  border-radius: 6px;
+  pointer-events: none;
+  box-shadow: 0 0 0 1px rgb(17 16 24 / 80%), 0 0 6px rgb(123 92 255 / 60%);
 }
 
 /* ── Individual knob ──────────────────────────────────────────────── */
@@ -174,4 +284,51 @@ body,
 .ptt-btn:disabled {
   opacity: 0.35;
   cursor: default;
+}
+
+/* ── Accessibility: focus-visible outlines ────────────────────────────
+   Only show the purple ring for keyboard focus; pointer focus stays
+   clean. 2px solid #7b5cff matches the existing brand accent. */
+
+.panel-tab:focus { outline: none; }
+.panel-tab:focus-visible {
+  outline: 2px solid #7b5cff;
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+.knob-wrap { outline: none; }
+.knob-wrap:focus { outline: none; }
+.knob-wrap:focus-visible {
+  outline: 2px solid #7b5cff;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Slider role applied to knob-wrap — covers any future container too */
+[role="slider"]:focus { outline: none; }
+[role="slider"]:focus-visible {
+  outline: 2px solid #7b5cff;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+.ptt-btn:focus { outline: none; }
+.ptt-btn:focus-visible {
+  outline: 2px solid #7b5cff;
+  outline-offset: 2px;
+}
+
+.send-btn:focus,
+.feedback-btn:focus,
+.copy-btn:focus,
+.mic-btn:focus { outline: none; }
+
+.send-btn:focus-visible,
+.feedback-btn:focus-visible,
+.copy-btn:focus-visible,
+.mic-btn:focus-visible {
+  outline: 2px solid #7b5cff;
+  outline-offset: 2px;
+  border-radius: 4px;
 }

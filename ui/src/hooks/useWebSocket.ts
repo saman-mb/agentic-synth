@@ -127,6 +127,11 @@ function dispatchNative(msg: Record<string, unknown>): void {
     case 'set_telemetry_enabled':
       void callNative('set_telemetry_enabled', [msg.enabled]);
       return;
+    case 'play_midi_note':
+      // Audition keyboard: triggers a one-shot note via the JUCE engine.
+      // duration_ms drives the C++-side scheduled note-off.
+      void callNative('play_midi_note', [msg.note, msg.velocity, msg.duration_ms]);
+      return;
     default:
       // eslint-disable-next-line no-console
       console.warn('[bridge] unknown outgoing type:', msg.type);

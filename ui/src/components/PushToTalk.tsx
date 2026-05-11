@@ -7,61 +7,110 @@ interface PushToTalkProps {
 
 type RecordState = 'idle' | 'recording' | 'processing';
 
+// pcm-tap.js lives in ui/public/ and is copied verbatim to the build root.
+// Root-absolute path (NOT relative) so sub-path deploys — e.g. the plugin
+// WebView served at https://agenticsynth.local/app/ — don't resolve this
+// against the document URL and 404. We don't use new URL(..., import.meta.url)
+// here because the worklet must remain a standalone fetchable module, not a
+// bundle-inlined chunk.
+const PUBLIC_WORKLET_PATH = '/pcm-tap.js';
+
 export function PushToTalk({ onData, wsReady }: PushToTalkProps) {
   const [state, setState] = useState<RecordState>('idle');
+  const [error, setError] = useState<string | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
-  const processorRef = useRef<ScriptProcessorNode | null>(null);
+  const workletRef = useRef<AudioWorkletNode | null>(null);
   const chunksRef = useRef<Float32Array[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
 
+  const teardown = useCallback(async () => {
+    workletRef.current?.port.close();
+    workletRef.current?.disconnect();
+    workletRef.current = null;
+    sourceRef.current?.disconnect();
+    sourceRef.current = null;
+    streamRef.current?.getTracks().forEach((t) => t.stop());
+    streamRef.current = null;
+    const ctx = audioCtxRef.current;
+    audioCtxRef.current = null;
+    await ctx?.close().catch(() => {});
+  }, []);
+
   const start = useCallback(async () => {
     if (state !== 'idle') return;
+    setError(null);
+    let stream: MediaStream;
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      streamRef.current = stream;
+      stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (e) {
+      // Most common: NotAllowedError (user denied) or NotFoundError (no mic).
+      // Surface to the UI instead of dropping silently.
+      const name = e instanceof Error ? e.name : 'MicError';
+      const message =
+        name === 'NotAllowedError'
+          ? 'Microphone permission denied — enable in browser settings.'
+          : name === 'NotFoundError'
+            ? 'No microphone detected.'
+            : `Microphone unavailable (${name}).`;
+      setError(message);
+      setState('idle');
+      return;
+    }
+    streamRef.current = stream;
+    try {
       const ctx = new AudioContext();
       audioCtxRef.current = ctx;
+      // addModule must run before constructing the AudioWorkletNode.
+      await ctx.audioWorklet.addModule(PUBLIC_WORKLET_PATH);
       const src = ctx.createMediaStreamSource(stream);
       sourceRef.current = src;
-      const proc = ctx.createScriptProcessor(4096, 1, 1);
-      processorRef.current = proc;
+      const node = new AudioWorkletNode(ctx, 'pcm-tap', {
+        numberOfInputs: 1,
+        numberOfOutputs: 0,
+        channelCount: 1,
+        channelCountMode: 'explicit',
+      });
+      workletRef.current = node;
       chunksRef.current = [];
-
-      proc.onaudioprocess = (e) => {
-        chunksRef.current.push(new Float32Array(e.inputBuffer.getChannelData(0)));
+      node.port.onmessage = (e: MessageEvent<Float32Array>) => {
+        chunksRef.current.push(e.data);
       };
-
-      src.connect(proc);
-      proc.connect(ctx.destination);
+      src.connect(node);
+      // No destination connection needed: the worklet has zero outputs and
+      // the WebAudio graph still pulls inputs on it because we hold a
+      // strong reference and the source is connected.
       setState('recording');
-    } catch {
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'audio init failed';
+      setError(`Audio pipeline failed: ${message}`);
+      await teardown();
       setState('idle');
     }
-  }, [state]);
+  }, [state, teardown]);
 
   const stop = useCallback(async () => {
     if (state !== 'recording') return;
     setState('processing');
 
-    const proc = processorRef.current;
-    const src = sourceRef.current;
+    // Capture chunks + sample rate before tearing down the context.
     const ctx = audioCtxRef.current;
-    const stream = streamRef.current;
+    const chunks = chunksRef.current;
+    chunksRef.current = [];
+    const sourceRate = ctx?.sampleRate ?? 48000;
 
-    proc?.disconnect();
-    processorRef.current = null;
-    src?.disconnect();
+    // Stop the mic + worklet immediately to release the indicator dot.
+    workletRef.current?.disconnect();
+    workletRef.current = null;
+    sourceRef.current?.disconnect();
     sourceRef.current = null;
-    stream?.getTracks().forEach((t) => t.stop());
+    streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
 
-    const chunks = chunksRef.current;
     const totalLen = chunks.reduce((s, c) => s + c.length, 0);
-
     if (totalLen === 0 || !ctx) {
-      await ctx?.close().catch(() => {});
       audioCtxRef.current = null;
+      await ctx?.close().catch(() => {});
       setState('idle');
       return;
     }
@@ -76,10 +125,10 @@ export function PushToTalk({ onData, wsReady }: PushToTalkProps) {
     const targetRate = 16000;
     const offCtx = new OfflineAudioContext(
       1,
-      Math.ceil((totalLen * targetRate) / ctx.sampleRate),
+      Math.max(1, Math.ceil((totalLen * targetRate) / sourceRate)),
       targetRate,
     );
-    const buf = offCtx.createBuffer(1, totalLen, ctx.sampleRate);
+    const buf = offCtx.createBuffer(1, totalLen, sourceRate);
     buf.getChannelData(0).set(pcm);
     const s = offCtx.createBufferSource();
     s.buffer = buf;
@@ -90,12 +139,13 @@ export function PushToTalk({ onData, wsReady }: PushToTalkProps) {
       const rendered = await offCtx.startRendering();
       const raw = rendered.getChannelData(0);
       onData(raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength));
-    } catch {
-      // audio pipeline error — drop silently
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'render failed';
+      setError(`Audio resample failed: ${message}`);
     }
 
-    await ctx.close().catch(() => {});
     audioCtxRef.current = null;
+    await ctx.close().catch(() => {});
     setState('idle');
   }, [state, onData]);
 
@@ -105,18 +155,25 @@ export function PushToTalk({ onData, wsReady }: PushToTalkProps) {
     : 'Hold to speak';
 
   return (
-    <button
-      type="button"
-      className={`ptt-btn${state === 'recording' ? ' ptt-active' : ''}`}
-      disabled={!wsReady || state === 'processing'}
-      aria-label={label}
-      onMouseDown={start}
-      onMouseUp={stop}
-      onMouseLeave={stop}
-      onTouchStart={(e) => { e.preventDefault(); void start(); }}
-      onTouchEnd={(e) => { e.preventDefault(); void stop(); }}
-    >
-      {label}
-    </button>
+    <>
+      <button
+        type="button"
+        className={`ptt-btn${state === 'recording' ? ' ptt-active' : ''}`}
+        disabled={!wsReady || state === 'processing'}
+        aria-label={label}
+        onMouseDown={start}
+        onMouseUp={stop}
+        onMouseLeave={stop}
+        onTouchStart={(e) => { e.preventDefault(); void start(); }}
+        onTouchEnd={(e) => { e.preventDefault(); void stop(); }}
+      >
+        {label}
+      </button>
+      {error && (
+        <div className="ptt-error" role="alert" aria-live="assertive">
+          {error}
+        </div>
+      )}
+    </>
   );
 }

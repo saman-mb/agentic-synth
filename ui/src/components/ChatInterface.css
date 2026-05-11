@@ -135,6 +135,38 @@
   flex-wrap: wrap;
 }
 
+.ab-variation {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  flex: 1 1 220px;
+  min-width: 200px;
+}
+
+.ab-commit-btn {
+  background: linear-gradient(135deg, #7b5cff, #0cb7f2);
+  border: none;
+  border-radius: 0.5rem;
+  color: #fff;
+  font-family: inherit;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.45rem 0.75rem;
+  cursor: pointer;
+  transition: opacity 0.15s, transform 0.1s;
+}
+
+.ab-commit-btn:hover { opacity: 0.88; }
+.ab-commit-btn:active { transform: scale(0.97); }
+
+.ab-commit-btn:focus { outline: none; }
+.ab-commit-btn:focus-visible {
+  outline: 2px solid #7b5cff;
+  outline-offset: 2px;
+}
+
 /* ── Feedback bar ─────────────────────────────────────────────────── */
 
 .feedback-bar {

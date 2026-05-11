@@ -9,7 +9,16 @@ import {
 } from 'react';
 
 import { useSynthBridge } from '../hooks/useSynthBridge';
-import type { ChatMessage, FeedbackKind, PatchVariation, ProactiveSuggestion, WireIncoming } from '../types/chat';
+import type {
+  ChatMessage,
+  FeedbackKind,
+  PatchPreviewData,
+  PatchVariation,
+  ProactiveSuggestion,
+  WireIncoming,
+  WireOutgoing,
+} from '../types/chat';
+import { AuditionKeyboard } from './AuditionKeyboard';
 import { PatchPreview } from './PatchPreview';
 import { PushToTalk } from './PushToTalk';
 import './ChatInterface.css';
@@ -28,13 +37,26 @@ function nanoid(): string {
 
 interface ABGridProps {
   variations: PatchVariation[];
+  onSelectVariation?: (patch: PatchPreviewData) => void;
 }
 
-function ABVariationGrid({ variations }: ABGridProps) {
+function ABVariationGrid({ variations, onSelectVariation }: ABGridProps) {
   return (
     <div className="ab-grid" role="region" aria-label="A/B patch variations">
       {variations.map((v) => (
-        <PatchPreview key={v.label} patch={v.patch} label={`Variation ${v.label}`} />
+        <div key={v.label} className="ab-variation">
+          <PatchPreview patch={v.patch} label={`Variation ${v.label}`} />
+          {onSelectVariation && (
+            <button
+              type="button"
+              className="ab-commit-btn"
+              onClick={() => onSelectVariation(v.patch)}
+              aria-label={`Use variation ${v.label}`}
+            >
+              Use {v.label}
+            </button>
+          )}
+        </div>
       ))}
     </div>
   );
@@ -82,9 +104,22 @@ function FeedbackBar({ messageId, feedback, onFeedback }: FeedbackBarProps) {
 interface BubbleProps {
   message: ChatMessage;
   onFeedback: (messageId: string, kind: FeedbackKind) => void;
+  onSelectVariation?: (patch: PatchPreviewData) => void;
+  // When provided, an AuditionKeyboard renders next to single-patch
+  // previews so the producer can audition the assistant's patch without
+  // a DAW attached. Wired only to the single-patch path on purpose:
+  // the A/B grid is Engineer B's territory and adds its own audition UI.
+  auditionSend?: (frame: WireOutgoing) => void;
+  auditionReady?: boolean;
 }
 
-function MessageBubble({ message, onFeedback }: BubbleProps) {
+function MessageBubble({
+  message,
+  onFeedback,
+  onSelectVariation,
+  auditionSend,
+  auditionReady,
+}: BubbleProps) {
   const hasContent = message.role === 'assistant';
   return (
     <article
@@ -105,11 +140,25 @@ function MessageBubble({ message, onFeedback }: BubbleProps) {
       )}
 
       {message.variations && message.variations.length > 0 && (
-        <ABVariationGrid variations={message.variations} />
+        <ABVariationGrid variations={message.variations} onSelectVariation={onSelectVariation} />
       )}
 
       {!message.variations && message.patch && (
-        <PatchPreview patch={message.patch} label="Generated patch" />
+        <>
+          <PatchPreview patch={message.patch} label="Generated patch" />
+          {auditionSend && (
+            <AuditionKeyboard
+              sendRaw={(json) => {
+                try {
+                  auditionSend(JSON.parse(json) as WireOutgoing);
+                } catch {
+                  // malformed payload — drop silently
+                }
+              }}
+              ready={!!auditionReady}
+            />
+          )}
+        </>
       )}
 
       {hasContent && !message.streaming && (
@@ -176,9 +225,10 @@ const SESSION_ID = nanoid();
 interface ChatInterfaceProps {
   externalTranscript?: string;
   onAudio?: (buf: ArrayBuffer) => void;
+  onSelectVariation?: (patch: PatchPreviewData) => void;
 }
 
-export function ChatInterface({ externalTranscript, onAudio }: ChatInterfaceProps = {}) {
+export function ChatInterface({ externalTranscript, onAudio, onSelectVariation }: ChatInterfaceProps = {}) {
   const inputId = useId();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -365,7 +415,14 @@ export function ChatInterface({ externalTranscript, onAudio }: ChatInterfaceProp
           </div>
         )}
         {messages.map((msg) => (
-          <MessageBubble key={msg.id} message={msg} onFeedback={handleFeedback} />
+          <MessageBubble
+            key={msg.id}
+            message={msg}
+            onFeedback={handleFeedback}
+            onSelectVariation={onSelectVariation}
+            auditionSend={send}
+            auditionReady={status === 'open'}
+          />
         ))}
         {proactiveSuggestions.length > 0 && (
           <ProactiveSuggestionStrip
