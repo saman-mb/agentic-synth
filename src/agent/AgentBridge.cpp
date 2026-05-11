@@ -1,18 +1,154 @@
 #include "agent/AgentBridge.h"
-#include "agent/WebSocketBridge.h"
 
+#include <algorithm>
 #include <fstream>
 #include <iomanip>
 #include <juce_core/juce_core.h>
+#include <juce_events/juce_events.h>
 #include <sstream>
+#include <utility>
 
 namespace agentic_synth::agent {
+
+namespace {
+
+// Build a juce::var representation of a PatchStruct partial. Emit the shape
+// React expects (PatchPreviewData in ui/src/types/chat.ts):
+// {cutoffHz, resonance, attackS, sustainLevel, lfoDepth, reverbMix}.
+// Snake-case fields would silently render an empty patch preview in the UI.
+juce::var patchToVar(const PatchStruct& p) {
+    auto* obj = new juce::DynamicObject{};
+    obj->setProperty("cutoffHz", p.filter.cutoff_hz);
+    obj->setProperty("resonance", p.filter.resonance);
+    obj->setProperty("attackS", p.amp_env.attack_s);
+    obj->setProperty("sustainLevel", p.amp_env.sustain);
+    obj->setProperty("lfoDepth", p.lfo[0].depth);
+    obj->setProperty("reverbMix", p.reverb.mix);
+    return juce::var{obj};
+}
+
+} // namespace
 
 AgentBridge::AgentBridge() {
     // Wire stream parser: each completed field injects a partial patch
     // directly onto the audio SPSC queue for < 500 ms first-audible-change.
-    streamParser_.setCallback([this](const PatchStruct& p) { pipeline_.injectPatch(p); });
+    // Parallel emission to typed subscribers (Phase 2) — used by the
+    // WebView bridge in Phase 4.  Legacy WSB path remains until Phase 5.
+    streamParser_.setCallback([this](const PatchStruct& p) {
+        pipeline_.injectPatch(p);
+        // Fan out to typed subscribers so the WebView bridge can render the
+        // streaming patch preview as fields complete.
+        auto* obj = new juce::DynamicObject{};
+        obj->setProperty("variation", juce::String("A"));
+        obj->setProperty("data", patchToVar(p));
+        notifyPatch(juce::var{obj});
+    });
 }
+
+// ── Phase 2: subscription + dispatch plumbing ────────────────────────────────
+
+AgentBridge::SubscriberHandle AgentBridge::subscribe(SlotList& slots, Callback cb) {
+    auto holder = std::make_shared<Callback>(std::move(cb));
+    {
+        std::lock_guard<std::mutex> lock(subscribersMutex_);
+        // Compact tombstones opportunistically so the slot list does not
+        // grow without bound under churn.
+        slots.erase(std::remove_if(slots.begin(), slots.end(),
+                                   [](const std::weak_ptr<Callback>& w) { return w.expired(); }),
+                    slots.end());
+        slots.emplace_back(holder);
+    }
+    // Aliased shared_ptr<void> keeps the Callback alive; destruction of
+    // the handle drops the strong ref → the weak_ptr in the slot list
+    // expires → the next dispatch skips it.
+    return SubscriberHandle{holder, holder.get()};
+}
+
+void AgentBridge::dispatch(SlotList& slots, const juce::var& payload) {
+    // Audio thread tripwire: dispatch allocates (callAsync, std::vector,
+    // juce::var copies, mutex acquire).  In debug we crash loudly; in
+    // release we must still bail BEFORE any of those allocations to avoid
+    // RT glitches / priority inversion.  Bumping an atomic counter is
+    // wait-free and lets Telemetry surface the drop later.
+    const auto audioId = audioThreadId_.load(std::memory_order_relaxed);
+    if (audioId != nullptr && juce::Thread::getCurrentThreadId() == audioId) {
+        // Release-safe: bail without allocating. Record a drop so it shows in telemetry.
+        jassertfalse; // debug crash, release no-op
+        droppedFromAudioThread_.fetch_add(1, std::memory_order_relaxed);
+        return;
+    }
+
+    // Snapshot live callbacks under the lock, then release before invoking
+    // so subscribers may register/unregister inside their own callback.
+    std::vector<CallbackPtr> live;
+    {
+        std::lock_guard<std::mutex> lock(subscribersMutex_);
+        live.reserve(slots.size());
+        for (auto& weak : slots) {
+            if (auto strong = weak.lock())
+                live.emplace_back(std::move(strong));
+        }
+    }
+
+    if (live.empty())
+        return;
+
+    // Marshal every invocation to the message thread; emission sites may
+    // be on the streaming/network thread.  Audio thread is explicitly NOT
+    // a supported caller — never emit from the realtime callback.
+    auto* mm = juce::MessageManager::getInstanceWithoutCreating();
+    if (mm == nullptr) {
+        // Headless context (some test harness paths): invoke synchronously.
+        for (auto& cb : live) {
+            try {
+                (*cb)(payload);
+            } catch (const std::exception& e) {
+                DBG("AgentBridge subscriber threw: " << e.what());
+            } catch (...) {
+                DBG("AgentBridge subscriber threw non-std exception");
+            }
+        }
+        return;
+    }
+
+    for (auto& cb : live) {
+        auto cbCopy = cb;
+        auto payloadCopy = payload;
+        juce::MessageManager::callAsync([cbCopy = std::move(cbCopy), payloadCopy = std::move(payloadCopy)]() {
+            try {
+                (*cbCopy)(payloadCopy);
+            } catch (const std::exception& e) {
+                DBG("AgentBridge subscriber threw: " << e.what());
+            } catch (...) {
+                DBG("AgentBridge subscriber threw non-std exception");
+            }
+        });
+    }
+}
+
+AgentBridge::SubscriberHandle AgentBridge::onToken(Callback cb) { return subscribe(tokenSlots_, std::move(cb)); }
+AgentBridge::SubscriberHandle AgentBridge::onPatch(Callback cb) { return subscribe(patchSlots_, std::move(cb)); }
+AgentBridge::SubscriberHandle AgentBridge::onDone(Callback cb) { return subscribe(doneSlots_, std::move(cb)); }
+AgentBridge::SubscriberHandle AgentBridge::onError(Callback cb) { return subscribe(errorSlots_, std::move(cb)); }
+AgentBridge::SubscriberHandle AgentBridge::onRationale(Callback cb) { return subscribe(rationaleSlots_, std::move(cb)); }
+AgentBridge::SubscriberHandle AgentBridge::onSuggestVariations(Callback cb) {
+    return subscribe(suggestVariationsSlots_, std::move(cb));
+}
+AgentBridge::SubscriberHandle AgentBridge::onPatchUpdate(Callback cb) {
+    return subscribe(patchUpdateSlots_, std::move(cb));
+}
+AgentBridge::SubscriberHandle AgentBridge::onTranscript(Callback cb) {
+    return subscribe(transcriptSlots_, std::move(cb));
+}
+
+void AgentBridge::notifyToken(const juce::var& payload) { dispatch(tokenSlots_, payload); }
+void AgentBridge::notifyPatch(const juce::var& payload) { dispatch(patchSlots_, payload); }
+void AgentBridge::notifyDone(const juce::var& payload) { dispatch(doneSlots_, payload); }
+void AgentBridge::notifyError(const juce::var& payload) { dispatch(errorSlots_, payload); }
+void AgentBridge::notifyRationale(const juce::var& payload) { dispatch(rationaleSlots_, payload); }
+void AgentBridge::notifySuggestVariations(const juce::var& payload) { dispatch(suggestVariationsSlots_, payload); }
+void AgentBridge::notifyPatchUpdate(const juce::var& payload) { dispatch(patchUpdateSlots_, payload); }
+void AgentBridge::notifyTranscript(const juce::var& payload) { dispatch(transcriptSlots_, payload); }
 
 namespace {
 
@@ -275,60 +411,6 @@ void AgentBridge::handleKnobTweak(const std::string& param, float value) {
     pipeline_.injectPatch(patch);
     // Record so the session memory can bias future generations towards user tweaks.
     memory_.recordFeedback(FeedbackKind::Tweak, param, patch);
-}
-
-void AgentBridge::handleTextMessage(const std::string& json, int clientId) {
-    const auto parsed = juce::JSON::parse(juce::String(json));
-    const auto* obj = parsed.getDynamicObject();
-    if (!obj)
-        return;
-
-    const std::string type = obj->getProperty("type").toString().toStdString();
-
-    if (type == "knob_tweak") {
-        const std::string param = obj->getProperty("param").toString().toStdString();
-        const float value = static_cast<float>(static_cast<double>(obj->getProperty("value")));
-        handleKnobTweak(param, value);
-
-    } else if (type == "get_dictionary") {
-        if (wsb_)
-            wsb_->sendToClient(clientId, getDictionaryJson());
-
-    } else if (type == "save_dictionary") {
-        saveDictionary(json);
-
-    } else if (type == "get_telemetry") {
-        if (wsb_)
-            wsb_->sendToClient(clientId, getTelemetryJson());
-
-    } else if (type == "set_telemetry_enabled") {
-        setTelemetryEnabled(static_cast<bool>(obj->getProperty("enabled")));
-        if (wsb_)
-            wsb_->sendToClient(clientId, getTelemetryJson());
-
-    } else if (type == "generate") {
-        // Issue #85: submit prompt, then send back narrative rationale.
-        const std::string userPrompt = obj->getProperty("prompt").toString().toStdString();
-        const PatchStruct patch = submitPrompt(userPrompt);
-        if (wsb_) {
-            const std::string rationale = generateRationale(userPrompt, patch);
-            // Escape for JSON
-            std::string escaped;
-            escaped.reserve(rationale.size());
-            for (char c : rationale) {
-                if (c == '"')
-                    escaped += "\\\"";
-                else if (c == '\\')
-                    escaped += "\\\\";
-                else if (c == '\n')
-                    escaped += "\\n";
-                else
-                    escaped += c;
-            }
-            const std::string msg = "{\"type\":\"rationale\",\"text\":\"" + escaped + "\"}";
-            wsb_->sendToClient(clientId, msg);
-        }
-    }
 }
 
 // ── Issue #90: Semantic dictionary ───────────────────────────────────────────

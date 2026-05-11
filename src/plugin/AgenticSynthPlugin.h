@@ -40,11 +40,15 @@ public:
 
     juce::AudioProcessorValueTreeState& getAPVTS() noexcept { return apvts_; }
 
+    // Phase 4: editor needs access to the AgentBridge so the WebView native
+    // bridge can submit prompts, record feedback, push knob tweaks, etc.
+    agentic_synth::agent::AgentBridge& agentBridge() noexcept { return agentBridge_; }
+
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout();
 
 private:
     void applyParameters() noexcept;
-    void applyPatch(const PatchStruct& patch) noexcept;
+    void applyPatch(const agentic_synth::PatchStruct& patch) noexcept;
 
     agentic_synth::engine::VoiceManager voiceManager_;
     agentic_synth::agent::AgentBridge agentBridge_;

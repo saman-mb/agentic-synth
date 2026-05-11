@@ -56,6 +56,28 @@ void Telemetry::recordGeneration(double latency_ms, int tokens, double elapsed_s
     records_.push_back(std::move(r));
 }
 
+void Telemetry::recordUiEvent(std::string kind, std::string detail) {
+    if (!enabled_)
+        return;
+    UiEvent e;
+    e.ts_ms = nowMs();
+    e.kind = std::move(kind);
+    e.detail = std::move(detail);
+
+    std::lock_guard<std::mutex> lock(ui_mutex_);
+    if (ui_events_.size() >= kUiEventCap) {
+        // Drop oldest. Vector-erase at front is O(n) but n<=256 and these events
+        // are infrequent (page loads), so a deque is unnecessary complexity.
+        ui_events_.erase(ui_events_.begin());
+    }
+    ui_events_.push_back(std::move(e));
+}
+
+std::vector<UiEvent> Telemetry::uiEvents() const {
+    std::lock_guard<std::mutex> lock(ui_mutex_);
+    return ui_events_;
+}
+
 static std::string jsonEscape(const std::string& s) {
     std::string out;
     out.reserve(s.size());
@@ -127,6 +149,21 @@ std::string Telemetry::toJson() const {
         if (!r.error_type.empty())
             ss << ",\"error\":\"" << jsonEscape(r.error_type) << '"';
         ss << '}';
+    }
+    ss << "],\"ui_events\":[";
+
+    // Snapshot under lock so we don't race a concurrent recordUiEvent.
+    std::vector<UiEvent> ui_snapshot;
+    {
+        std::lock_guard<std::mutex> lock(ui_mutex_);
+        ui_snapshot = ui_events_;
+    }
+    for (size_t i = 0; i < ui_snapshot.size(); ++i) {
+        const auto& e = ui_snapshot[i];
+        if (i > 0)
+            ss << ',';
+        ss << "{\"ts\":" << e.ts_ms << ",\"kind\":\"" << jsonEscape(e.kind) << "\",\"detail\":\""
+           << jsonEscape(e.detail) << "\"}";
     }
     ss << "]}";
     return ss.str();

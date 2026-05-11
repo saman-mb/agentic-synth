@@ -2,9 +2,15 @@
 
 #include <array>
 #include <atomic>
+#include <functional>
+#include <memory>
+#include <mutex>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
+
+#include <juce_core/juce_core.h>
 
 #include "agent/PrePatchPipeline.h"
 #include "agent/SessionMemory.h"
@@ -16,9 +22,6 @@
 #include "mapper/SemanticMapper.h"
 
 namespace agentic_synth::agent {
-
-// Forward declaration — keeps JUCE out of this header.
-class WebSocketBridge;
 
 class AgentBridge {
 public:
@@ -68,14 +71,6 @@ public:
 
     // ── Issue #72: Bidirectional knob bridge ──────────────────────────────────
 
-    // Set the bridge so this class can send replies (dictionary, telemetry data).
-    void setWebSocketBridge(WebSocketBridge* bridge) noexcept { wsb_ = bridge; }
-
-    // Route all incoming WebSocket text frames here.
-    // Dispatches: knob_tweak, get_dictionary, save_dictionary,
-    //             get_telemetry, set_telemetry_enabled.
-    void handleTextMessage(const std::string& json, int clientId);
-
     // Apply one real-time knob change to the audio pipeline (target ≤16 ms).
     // Records the change as FeedbackKind::Tweak in session memory.
     void handleKnobTweak(const std::string& param, float value);
@@ -106,19 +101,92 @@ public:
     // the given patch in the context of the current prompt and session memory.
     [[nodiscard]] std::string generateRationale(const std::string& prompt, const PatchStruct& patch) const;
 
+    // ── Typed callback subscription API ──────────────────────────────────────
+    //
+    // RAII subscription: returned handle owns the slot; when it goes out of
+    // scope the callback is unregistered automatically.  Callbacks are
+    // marshalled to the JUCE message thread via MessageManager::callAsync so
+    // emission sites may run on any thread (audio thread excluded — never
+    // emit from the audio callback).
+
+    using Callback = std::function<void(const juce::var&)>;
+    using SubscriberHandle = std::shared_ptr<void>;
+
+    [[nodiscard]] SubscriberHandle onToken(Callback cb);
+    [[nodiscard]] SubscriberHandle onPatch(Callback cb);
+    [[nodiscard]] SubscriberHandle onDone(Callback cb);
+    [[nodiscard]] SubscriberHandle onError(Callback cb);
+    [[nodiscard]] SubscriberHandle onRationale(Callback cb);
+    [[nodiscard]] SubscriberHandle onSuggestVariations(Callback cb);
+    [[nodiscard]] SubscriberHandle onPatchUpdate(Callback cb);
+    [[nodiscard]] SubscriberHandle onTranscript(Callback cb);
+
+    // Test/integration emission helpers — visible so call sites in this
+    // translation unit and the test fixture can drive the subscriber fan-out
+    // directly.
+    void notifyToken(const juce::var& payload);
+    void notifyPatch(const juce::var& payload);
+    void notifyDone(const juce::var& payload);
+    void notifyError(const juce::var& payload);
+    void notifyRationale(const juce::var& payload);
+    void notifySuggestVariations(const juce::var& payload);
+    void notifyPatchUpdate(const juce::var& payload);
+    void notifyTranscript(const juce::var& payload);
+
 private:
+    using CallbackPtr = std::shared_ptr<Callback>;
+    using SlotList = std::vector<std::weak_ptr<Callback>>;
+
+    SubscriberHandle subscribe(SlotList& slots, Callback cb);
+    void dispatch(SlotList& slots, const juce::var& payload);
+
     PrePatchPipeline pipeline_;
     engine::VariationEngine variationEngine_;
     SessionMemory memory_;
-    mapper::GrammarSampler sampler_;
+    mapper::GrammarSampler sampler_{mapper::GrammarSamplerConfig{}};
     mapper::SemanticMapper semanticMapper_;
     StreamParser streamParser_;
     Telemetry telemetry_{Telemetry::defaultLogPath()};
-    WebSocketBridge* wsb_{nullptr};
+
+    // Subscriber slot lists, guarded by a single mutex.  Each slot holds a
+    // weak_ptr to the Callback; the SubscriberHandle (an aliased shared_ptr)
+    // owns the strong reference and unsubscribes via destruction.
+    mutable std::mutex subscribersMutex_;
+    SlotList tokenSlots_;
+    SlotList patchSlots_;
+    SlotList doneSlots_;
+    SlotList errorSlots_;
+    SlotList rationaleSlots_;
+    SlotList suggestVariationsSlots_;
+    SlotList patchUpdateSlots_;
+    SlotList transcriptSlots_;
 
     // Written by the MIDI/audio thread; read by UI/control thread — must be atomic.
     std::atomic<float> midiCutoffNorm_{0.5f};
     std::atomic<float> midiResonanceNorm_{0.0f};
+
+    // Tripwire: stamped by pollPatch() so dispatch() can assert it is never
+    // reached from the audio thread (callAsync + var copies allocate).
+    std::atomic<juce::Thread::ThreadID> audioThreadId_{nullptr};
+
+    // Count of dispatch() calls that were short-circuited because they
+    // originated on the audio thread.  Bumped before any allocation so the
+    // RT thread stays clean; Telemetry reads this lazily from the UI thread.
+    std::atomic<uint64_t> droppedFromAudioThread_{0};
+
+public:
+    // Called by AudioProcessor::processBlock immediately to register the RT
+    // thread for the lifetime of the audio engine.  Safe to call repeatedly.
+    void markAudioThread() noexcept {
+        audioThreadId_.store(juce::Thread::getCurrentThreadId(),
+                             std::memory_order_relaxed);
+    }
+
+    // Number of dispatch() invocations dropped because they originated on
+    // the audio thread.  Exposed for tests and future Telemetry hookup.
+    [[nodiscard]] uint64_t audioThreadDropCount() const noexcept {
+        return droppedFromAudioThread_.load(std::memory_order_relaxed);
+    }
 };
 
 } // namespace agentic_synth::agent

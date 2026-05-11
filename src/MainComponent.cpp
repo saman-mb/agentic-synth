@@ -1,17 +1,11 @@
 #include "MainComponent.h"
 
 //==============================================================================
-MainComponent::MainComponent() {
-    addAndMakeVisible(welcomeLabel);
-    welcomeLabel.setText("Agentic Synth — ready.", juce::dontSendNotification);
-    welcomeLabel.setFont(juce::Font(18.0f, juce::Font::bold));
-    welcomeLabel.setJustificationType(juce::Justification::centred);
-
-    setSize(600, 400);
+MainComponent::MainComponent(agentic_synth::agent::AgentBridge& bridge) : web_(bridge) {
+    addAndMakeVisible(web_);
+    // 800x500 minimum keeps the WebView load-failure fallback message readable
+    // on small standalone windows (SRE P0/P1 fallback diagnostic visibility).
+    setSize(1200, 800);
 }
 
-void MainComponent::paint(juce::Graphics& g) {
-    g.fillAll(getLookAndFeel().findColour(juce::ResizableWindow::backgroundColourId));
-}
-
-void MainComponent::resized() { welcomeLabel.setBounds(getLocalBounds()); }
+void MainComponent::resized() { web_.setBounds(getLocalBounds()); }

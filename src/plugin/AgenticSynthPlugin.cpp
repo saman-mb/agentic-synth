@@ -91,7 +91,7 @@ void AgenticSynthPlugin::applyParameters() noexcept {
     voiceManager_.setPortamento(portamento);
 }
 
-void AgenticSynthPlugin::applyPatch(const PatchStruct& patch) noexcept {
+void AgenticSynthPlugin::applyPatch(const agentic_synth::PatchStruct& patch) noexcept {
     voiceManager_.setFilterCutoff(patch.filter.cutoff_hz);
     voiceManager_.setFilterResonance(patch.filter.resonance);
 
@@ -107,6 +107,11 @@ void AgenticSynthPlugin::applyPatch(const PatchStruct& patch) noexcept {
 
 void AgenticSynthPlugin::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) {
     juce::ScopedNoDenormals noDenormals;
+
+    // Phase 4: stamp the RT thread ID so AgentBridge::dispatch()'s tripwire
+    // catches any future code that tries to emit subscriber callbacks from
+    // the audio callback (callAsync allocates → never legal in RT).
+    agentBridge_.markAudioThread();
 
     applyParameters();
 

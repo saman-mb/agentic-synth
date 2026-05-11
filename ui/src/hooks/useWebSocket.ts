@@ -9,34 +9,212 @@ export interface UseWebSocketReturn {
   readyState: WSReadyState;
 }
 
+// Phase 5: when running inside the JUCE 8 WebBrowserComponent host,
+// `window.__JUCE__.backend` is injected and we talk to native via
+// event emit + getNativeFunction. In a plain browser (Vite dev outside
+// JUCE), fall back to the legacy WebSocket transport so the dev loop
+// still works without rebuilding the plugin.
+interface JuceBackend {
+  emitEvent: (name: string, payload: unknown) => void;
+  addEventListener: (name: string, cb: (payload: unknown) => void) => number;
+  removeEventListener: (id: number) => void;
+}
+interface JuceGlobal { backend: JuceBackend }
+
+function getJuce(): JuceGlobal | null {
+  const j = (window as unknown as { __JUCE__?: JuceGlobal }).__JUCE__;
+  return j ?? null;
+}
+
+const usingJuce = getJuce() !== null;
+
+// Promise shim matching JUCE's bundled getNativeFunction wire format:
+// emit __juce__invoke with {name, params, resultId}, listen on
+// __juce__complete for {promiseId, result}. Native function lambdas
+// in WebUiComponent.cpp call completion(juce::var{...}) which JUCE
+// routes back as __juce__complete. Verified against
+// third_party/JUCE/modules/juce_gui_extra/native/javascript/index.js.
+interface PendingPromise {
+  resolve: (value: unknown) => void;
+  reject: (err: Error) => void;
+  timer: ReturnType<typeof setTimeout>;
+}
+const pendingPromises = new Map<number, PendingPromise>();
+
+// ID-namespacing: JUCE's bundled getNativeFunction PromiseHandler also
+// listens on __juce__complete with its own counter starting at 0. We
+// start ours at a large offset so our IDs never collide with JUCE's,
+// and the __juce__complete listener below ignores anything below the
+// offset (it belongs to JUCE's internal handler, not us).
+const PROMISE_ID_OFFSET = 1_000_000;
+let nextPromiseId = PROMISE_ID_OFFSET;
+let completeListenerWired = false;
+
+const DEFAULT_TIMEOUT_MS = 10_000;
+
+function ensureCompleteListener(juce: JuceGlobal): void {
+  if (completeListenerWired) return;
+  completeListenerWired = true;
+  juce.backend.addEventListener('__juce__complete', (payload) => {
+    const p = payload as { promiseId: number; result: unknown };
+    // Namespace guard: IDs below offset belong to JUCE's bundled
+    // getNativeFunction handler — ignore so we don't double-handle.
+    if (typeof p.promiseId !== 'number' || p.promiseId < PROMISE_ID_OFFSET) return;
+    const entry = pendingPromises.get(p.promiseId);
+    if (entry) {
+      clearTimeout(entry.timer);
+      pendingPromises.delete(p.promiseId);
+      entry.resolve(p.result);
+    }
+  });
+}
+
+// Timeout-based reject prevents the resolver from sitting in
+// pendingPromises forever if the C++ side never calls completion(...)
+// (lambda throws, app teardown mid-call, etc). On timeout we delete
+// the entry and reject so callers can surface the failure.
+function callNative(
+  name: string,
+  args: unknown[],
+  timeoutMs: number = DEFAULT_TIMEOUT_MS,
+): Promise<unknown> {
+  const juce = getJuce();
+  if (!juce) return Promise.reject(new Error('JUCE backend not present'));
+  ensureCompleteListener(juce);
+  const id = nextPromiseId++;
+  return new Promise<unknown>((resolve, reject) => {
+    const timer = setTimeout(() => {
+      if (pendingPromises.delete(id)) {
+        reject(new Error('callNative timeout: ' + name));
+      }
+    }, timeoutMs);
+    pendingPromises.set(id, { resolve, reject, timer });
+    juce.backend.emitEvent('__juce__invoke', { name, params: args, resultId: id });
+  });
+}
+
+// Route an outgoing JSON message to the matching native function with
+// positional args (the C++ side reads args[0]/args[1] etc., so wrapping
+// into a single object breaks every handler).
+function dispatchNative(msg: Record<string, unknown>): void {
+  switch (msg.type) {
+    case 'knob_tweak':
+      void callNative('knob_tweak', [msg.param, msg.value]);
+      return;
+    case 'generate':
+      void callNative('generate', [msg.prompt, msg.sessionId]);
+      return;
+    case 'feedback':
+      void callNative('feedback', [msg.messageId, msg.kind, msg.patch ?? null]);
+      return;
+    case 'get_dictionary':
+      void callNative('get_dictionary', [])
+        .then((result) => {
+          emitInbound({ type: 'dictionary_data', ...(result as object) });
+        })
+        .catch((err) => console.warn('[bridge]', 'get_dictionary', 'failed:', err));
+      return;
+    case 'save_dictionary':
+      void callNative('save_dictionary', [msg.entries]);
+      return;
+    case 'get_telemetry':
+      void callNative('get_telemetry', [])
+        .then((result) => {
+          emitInbound({ type: 'telemetry_data', ...(result as object) });
+        })
+        .catch((err) => console.warn('[bridge]', 'get_telemetry', 'failed:', err));
+      return;
+    case 'set_telemetry_enabled':
+      void callNative('set_telemetry_enabled', [msg.enabled]);
+      return;
+    default:
+      // eslint-disable-next-line no-console
+      console.warn('[bridge] unknown outgoing type:', msg.type);
+  }
+}
+
+// Pull-query responses re-enter the inbound stream by calling this
+// module-scoped emitter, which every active hook instance subscribes to.
+type InboundListener = (msg: Record<string, unknown>) => void;
+const inboundListeners = new Set<InboundListener>();
+
+function emitInbound(msg: Record<string, unknown>): void {
+  for (const l of inboundListeners) l(msg);
+}
+
+const INBOUND_EVENTS = [
+  'token', 'patch', 'done', 'error', 'rationale',
+  'suggest_variations', 'patch_update', 'transcript',
+] as const;
+
 export function useWebSocket(url: string): UseWebSocketReturn {
   const ws = useRef<WebSocket | null>(null);
-  const [readyState, setReadyState] = useState<WSReadyState>(WebSocket.CONNECTING);
+  const [readyState, setReadyState] = useState<WSReadyState>(
+    usingJuce ? (WebSocket.OPEN as WSReadyState) : WebSocket.CONNECTING,
+  );
   const [lastMessage, setLastMessage] = useState<string | null>(null);
 
+  // JUCE native bridge path
   useEffect(() => {
+    if (!usingJuce) return;
+    const juce = getJuce();
+    if (!juce) return;
+
+    const tokens: number[] = [];
+    for (const name of INBOUND_EVENTS) {
+      const id = juce.backend.addEventListener(name, (payload) => {
+        setLastMessage(JSON.stringify({ type: name, ...(payload as object) }));
+      });
+      tokens.push(id);
+    }
+
+    const listener: InboundListener = (msg) => setLastMessage(JSON.stringify(msg));
+    inboundListeners.add(listener);
+
+    return () => {
+      for (const id of tokens) juce.backend.removeEventListener(id);
+      inboundListeners.delete(listener);
+    };
+  }, []);
+
+  // WebSocket path (pure-browser dev only)
+  useEffect(() => {
+    if (usingJuce) return;
     const socket = new WebSocket(url);
     ws.current = socket;
-
     socket.onopen = () => setReadyState(WebSocket.OPEN as WSReadyState);
     socket.onclose = () => setReadyState(WebSocket.CLOSED as WSReadyState);
     socket.onerror = () => setReadyState(WebSocket.CLOSED as WSReadyState);
     socket.onmessage = (e: MessageEvent) => {
       if (typeof e.data === 'string') setLastMessage(e.data);
     };
-
-    return () => {
-      socket.close();
-    };
+    return () => { socket.close(); };
   }, [url]);
 
   const sendMessage = useCallback((msg: string) => {
+    if (usingJuce) {
+      try {
+        const parsed = JSON.parse(msg) as Record<string, unknown>;
+        dispatchNative(parsed);
+      } catch {
+        // ignore malformed frames
+      }
+      return;
+    }
     if (ws.current?.readyState === WebSocket.OPEN) {
       ws.current.send(msg);
     }
   }, []);
 
   const sendBinary = useCallback((data: ArrayBuffer) => {
+    if (usingJuce) {
+      // 16 kHz mono Float32 PCM → forward to push_audio_pcm. Per SRE
+      // review this is a known perf hotspot for sustained capture;
+      // base64 / typed-array encoding is a tracked follow-up.
+      const pcm = Array.from(new Float32Array(data));
+      void callNative('push_audio_pcm', [pcm]);
+      return;
+    }
     if (ws.current?.readyState === WebSocket.OPEN) {
       ws.current.send(data);
     }
