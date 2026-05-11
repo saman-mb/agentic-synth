@@ -218,8 +218,7 @@ public:
     // Called by AudioProcessor::processBlock immediately to register the RT
     // thread for the lifetime of the audio engine.  Safe to call repeatedly.
     void markAudioThread() noexcept {
-        audioThreadId_.store(juce::Thread::getCurrentThreadId(),
-                             std::memory_order_relaxed);
+        audioThreadId_.store(juce::Thread::getCurrentThreadId(), std::memory_order_relaxed);
     }
 
     // Number of dispatch() invocations dropped because they originated on

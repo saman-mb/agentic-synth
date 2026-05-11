@@ -39,7 +39,7 @@ public:
 private:
     float state_{0.0f};
     float target_{0.0f};
-    float coeff_{0.0f};   // pre-computed (1 - exp(-2*pi*fc/Fs)) per sample-rate + cutoff
+    float coeff_{0.0f}; // pre-computed (1 - exp(-2*pi*fc/Fs)) per sample-rate + cutoff
     double sampleRate_{44100.0};
     float cutoffHz_{30.0f};
     void recomputeCoeff() noexcept;

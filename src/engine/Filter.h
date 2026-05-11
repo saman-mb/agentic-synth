@@ -42,9 +42,9 @@ private:
     float drive_ = 0.0f;
 
     double g_ = 0.0;
-    double a_ = 0.0; // g / (1 + g)
-    double b_ = 0.0; // 1 / (1 + g)
-    double k_ = 0.0; // feedback gain; reaches 4.0 at resonance=1.0 (self-oscillation threshold).
+    double a_ = 0.0;         // g / (1 + g)
+    double b_ = 0.0;         // 1 / (1 + g)
+    double k_ = 0.0;         // feedback gain; reaches 4.0 at resonance=1.0 (self-oscillation threshold).
     double driveGain_ = 1.0; // 1 + drive * kDriveFactor
     double driveComp_ = 1.0; // output compensation (inverse of a softer share of driveGain_)
 

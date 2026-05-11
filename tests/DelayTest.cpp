@@ -16,7 +16,7 @@ constexpr float kPi = 3.14159265358979323846f;
 TEST_CASE("Delay: impulse appears at correct delay time") {
     Delay d;
     d.prepare(kSR);
-    d.setTimeSeconds(0.1f);   // 4410 samples
+    d.setTimeSeconds(0.1f); // 4410 samples
     d.setFeedback(0.0f);
     d.setMix(1.0f);
     d.setStereo(0.0f);

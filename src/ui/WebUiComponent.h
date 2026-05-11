@@ -44,8 +44,7 @@ public:
     //
     // Returns std::nullopt for unknown paths. "/" is rewritten to
     // "/index.html". MIME type is selected by file extension.
-    static std::optional<juce::WebBrowserComponent::Resource>
-    serveResource(const juce::String& path);
+    static std::optional<juce::WebBrowserComponent::Resource> serveResource(const juce::String& path);
 
     // Exposed for testing: returns the number of live SubscriberHandles
     // currently held by this component (one per AgentBridge.on* hookup).
@@ -67,9 +66,7 @@ private:
     // route them into AgentBridge::telemetry() for visibility on failure.
     class TelemetryAwareBrowser : public juce::WebBrowserComponent {
     public:
-        TelemetryAwareBrowser(const Options& options,
-                              agent::AgentBridge& bridge,
-                              WebUiComponent& owner)
+        TelemetryAwareBrowser(const Options& options, agent::AgentBridge& bridge, WebUiComponent& owner)
             : juce::WebBrowserComponent(options), bridge_(bridge), owner_(owner) {}
 
         bool pageAboutToLoad(const juce::String& url) override;

@@ -10,27 +10,25 @@ namespace agentic_synth::engine {
 
 // ── Comb ────────────────────────────────────────────────────────────────────
 
-float Reverb::Comb::process(float input) noexcept
-{
+float Reverb::Comb::process(float input) noexcept {
     const int size = static_cast<int>(buf.size());
     float out = buf[static_cast<std::size_t>(idx)];
     // One-pole lowpass on the feedback path (Freeverb-original).
     // y[n] = x[n] * (1-d) + y[n-1] * d
     lowpassState = out * (1.0f - damping) + lowpassState * damping;
     buf[static_cast<std::size_t>(idx)] = input + lowpassState * feedback;
-    if (++idx >= size) idx = 0;
+    if (++idx >= size)
+        idx = 0;
     return out;
 }
 
-void Reverb::Comb::resize(int sizeSamples)
-{
+void Reverb::Comb::resize(int sizeSamples) {
     buf.assign(static_cast<std::size_t>(std::max(1, sizeSamples)), 0.0f);
     idx = 0;
     lowpassState = 0.0f;
 }
 
-void Reverb::Comb::reset() noexcept
-{
+void Reverb::Comb::reset() noexcept {
     std::fill(buf.begin(), buf.end(), 0.0f);
     idx = 0;
     lowpassState = 0.0f;
@@ -38,8 +36,7 @@ void Reverb::Comb::reset() noexcept
 
 // ── Allpass ─────────────────────────────────────────────────────────────────
 
-float Reverb::Allpass::process(float input) noexcept
-{
+float Reverb::Allpass::process(float input) noexcept {
     const int size = static_cast<int>(buf.size());
     const float bufout = buf[static_cast<std::size_t>(idx)];
     // Schroeder allpass:
@@ -47,18 +44,17 @@ float Reverb::Allpass::process(float input) noexcept
     //   buf = input + bufout * feedback
     const float out = -input + bufout;
     buf[static_cast<std::size_t>(idx)] = input + bufout * feedback;
-    if (++idx >= size) idx = 0;
+    if (++idx >= size)
+        idx = 0;
     return out;
 }
 
-void Reverb::Allpass::resize(int sizeSamples)
-{
+void Reverb::Allpass::resize(int sizeSamples) {
     buf.assign(static_cast<std::size_t>(std::max(1, sizeSamples)), 0.0f);
     idx = 0;
 }
 
-void Reverb::Allpass::reset() noexcept
-{
+void Reverb::Allpass::reset() noexcept {
     std::fill(buf.begin(), buf.end(), 0.0f);
     idx = 0;
 }
@@ -67,12 +63,11 @@ void Reverb::Allpass::reset() noexcept
 
 Reverb::Reverb() = default;
 
-void Reverb::prepare(double sampleRate)
-{
+void Reverb::prepare(double sampleRate) {
     sampleRate_ = (sampleRate > 0.0) ? sampleRate : 44100.0;
 
     // Freeverb-original tunings (samples @ 44.1 kHz).
-    static constexpr int kCombL[kNumCombs]     = {1116, 1188, 1277, 1356};
+    static constexpr int kCombL[kNumCombs] = {1116, 1188, 1277, 1356};
     static constexpr int kAllpassL[kNumAllpasses] = {556, 441};
     static constexpr int kStereoSpread = 23;
 
@@ -100,31 +95,29 @@ void Reverb::prepare(double sampleRate)
     setDamp(damp_);
 }
 
-void Reverb::setSize(float size01) noexcept
-{
+void Reverb::setSize(float size01) noexcept {
     size_ = std::clamp(size01, 0.0f, 1.0f);
     // size=0 → 0.70  (short room), size=1 → 0.98 (long hall)
     const float fb = 0.70f + size_ * 0.28f;
-    for (auto& c : combsL_) c.feedback = fb;
-    for (auto& c : combsR_) c.feedback = fb;
+    for (auto& c : combsL_)
+        c.feedback = fb;
+    for (auto& c : combsR_)
+        c.feedback = fb;
 }
 
-void Reverb::setDamp(float damp01) noexcept
-{
+void Reverb::setDamp(float damp01) noexcept {
     damp_ = std::clamp(damp01, 0.0f, 1.0f);
     // Gentle 0..0.5 mapping — Freeverb-original "damp1 = damp * 0.5"
     const float d = damp_ * 0.5f;
-    for (auto& c : combsL_) c.damping = d;
-    for (auto& c : combsR_) c.damping = d;
+    for (auto& c : combsL_)
+        c.damping = d;
+    for (auto& c : combsR_)
+        c.damping = d;
 }
 
-void Reverb::setMix(float mix01) noexcept
-{
-    mix_ = std::clamp(mix01, 0.0f, 1.0f);
-}
+void Reverb::setMix(float mix01) noexcept { mix_ = std::clamp(mix01, 0.0f, 1.0f); }
 
-void Reverb::process(float inL, float inR, float& outL, float& outR) noexcept
-{
+void Reverb::process(float inL, float inR, float& outL, float& outR) noexcept {
     // Mono sum into the reverb network with a small input gain to keep
     // headroom under control (Freeverb uses 0.015; we use 0.5 for a brighter
     // tail since downstream gain stages are unity here).
@@ -133,12 +126,16 @@ void Reverb::process(float inL, float inR, float& outL, float& outR) noexcept
     // Sum of all parallel combs per channel.
     float wetL = 0.0f;
     float wetR = 0.0f;
-    for (auto& c : combsL_) wetL += c.process(in);
-    for (auto& c : combsR_) wetR += c.process(in);
+    for (auto& c : combsL_)
+        wetL += c.process(in);
+    for (auto& c : combsR_)
+        wetR += c.process(in);
 
     // Series allpass diffusers.
-    for (auto& ap : allpassesL_) wetL = ap.process(wetL);
-    for (auto& ap : allpassesR_) wetR = ap.process(wetR);
+    for (auto& ap : allpassesL_)
+        wetL = ap.process(wetL);
+    for (auto& ap : allpassesR_)
+        wetR = ap.process(wetR);
 
     // Equal-power-ish linear crossfade. The combs already add 4× gain;
     // scale wet down so unity-mix output stays in sensible range.
@@ -150,12 +147,15 @@ void Reverb::process(float inL, float inR, float& outL, float& outR) noexcept
     outR = mix_ * wetGainR + (1.0f - mix_) * inR;
 }
 
-void Reverb::reset() noexcept
-{
-    for (auto& c : combsL_) c.reset();
-    for (auto& c : combsR_) c.reset();
-    for (auto& ap : allpassesL_) ap.reset();
-    for (auto& ap : allpassesR_) ap.reset();
+void Reverb::reset() noexcept {
+    for (auto& c : combsL_)
+        c.reset();
+    for (auto& c : combsR_)
+        c.reset();
+    for (auto& ap : allpassesL_)
+        ap.reset();
+    for (auto& ap : allpassesR_)
+        ap.reset();
 }
 
 } // namespace agentic_synth::engine

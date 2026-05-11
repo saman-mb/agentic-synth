@@ -55,9 +55,9 @@ AgentBridge::SubscriberHandle AgentBridge::subscribe(SlotList& slots, Callback c
         std::lock_guard<std::mutex> lock(subscribersMutex_);
         // Compact tombstones opportunistically so the slot list does not
         // grow without bound under churn.
-        slots.erase(std::remove_if(slots.begin(), slots.end(),
-                                   [](const std::weak_ptr<Callback>& w) { return w.expired(); }),
-                    slots.end());
+        slots.erase(
+            std::remove_if(slots.begin(), slots.end(), [](const std::weak_ptr<Callback>& w) { return w.expired(); }),
+            slots.end());
         slots.emplace_back(holder);
     }
     // Aliased shared_ptr<void> keeps the Callback alive; destruction of
@@ -132,7 +132,9 @@ AgentBridge::SubscriberHandle AgentBridge::onToken(Callback cb) { return subscri
 AgentBridge::SubscriberHandle AgentBridge::onPatch(Callback cb) { return subscribe(patchSlots_, std::move(cb)); }
 AgentBridge::SubscriberHandle AgentBridge::onDone(Callback cb) { return subscribe(doneSlots_, std::move(cb)); }
 AgentBridge::SubscriberHandle AgentBridge::onError(Callback cb) { return subscribe(errorSlots_, std::move(cb)); }
-AgentBridge::SubscriberHandle AgentBridge::onRationale(Callback cb) { return subscribe(rationaleSlots_, std::move(cb)); }
+AgentBridge::SubscriberHandle AgentBridge::onRationale(Callback cb) {
+    return subscribe(rationaleSlots_, std::move(cb));
+}
 AgentBridge::SubscriberHandle AgentBridge::onSuggestVariations(Callback cb) {
     return subscribe(suggestVariationsSlots_, std::move(cb));
 }
@@ -354,12 +356,18 @@ void AgentBridge::setMidiNoteSink(MidiNoteSink sink) {
 
 void AgentBridge::postMidiNote(int note, float velocity, int durationMs) {
     // Clamp inputs: bad UI input should never crash the engine.
-    if (note < 0) note = 0;
-    if (note > 127) note = 127;
-    if (velocity < 0.0f) velocity = 0.0f;
-    if (velocity > 1.0f) velocity = 1.0f;
-    if (durationMs < 10) durationMs = 10;
-    if (durationMs > 10000) durationMs = 10000;
+    if (note < 0)
+        note = 0;
+    if (note > 127)
+        note = 127;
+    if (velocity < 0.0f)
+        velocity = 0.0f;
+    if (velocity > 1.0f)
+        velocity = 1.0f;
+    if (durationMs < 10)
+        durationMs = 10;
+    if (durationMs > 10000)
+        durationMs = 10000;
 
     // Snapshot the sink under the lock so a concurrent setMidiNoteSink
     // cannot race the dispatch below.
@@ -369,8 +377,7 @@ void AgentBridge::postMidiNote(int note, float velocity, int durationMs) {
         sinkCopy = midiNoteSink_;
     }
     if (!sinkCopy) {
-        DBG("AgentBridge::postMidiNote: no sink registered, note dropped (note="
-            << note << ")");
+        DBG("AgentBridge::postMidiNote: no sink registered, note dropped (note=" << note << ")");
         return;
     }
 
@@ -386,17 +393,14 @@ void AgentBridge::postMidiNote(int note, float velocity, int durationMs) {
     // Drive note-on now on the message thread; AudioProcessor's
     // processBlock will pick up the queued event from the sink on the
     // next audio block.
-    juce::MessageManager::callAsync([sinkCopy, note, velocity]() {
-        sinkCopy(note, velocity, /*isNoteOn=*/true);
-    });
+    juce::MessageManager::callAsync([sinkCopy, note, velocity]() { sinkCopy(note, velocity, /*isNoteOn=*/true); });
 
     // Schedule the matched note-off. Timer::callAfterDelay runs on the
     // message thread, mirroring the note-on dispatch above so ordering
     // is preserved end-to-end. Capturing by value keeps the sink alive
     // even if setMidiNoteSink swaps it before the timer fires.
-    juce::Timer::callAfterDelay(durationMs, [sinkCopy, note, velocity]() {
-        sinkCopy(note, velocity, /*isNoteOn=*/false);
-    });
+    juce::Timer::callAfterDelay(durationMs,
+                                [sinkCopy, note, velocity]() { sinkCopy(note, velocity, /*isNoteOn=*/false); });
 }
 
 } // namespace agentic_synth::agent

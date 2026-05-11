@@ -42,8 +42,7 @@ juce::String findCssAssetOriginalName() {
 
 } // namespace
 
-TEST_CASE("serveResource: root path returns index.html with text/html",
-          "[WebUiComponent][ResourceProvider]") {
+TEST_CASE("serveResource: root path returns index.html with text/html", "[WebUiComponent][ResourceProvider]") {
     auto resource = WebUiComponent::serveResource("/");
     REQUIRE(resource.has_value());
     CHECK(resource->mimeType == "text/html");
@@ -56,15 +55,13 @@ TEST_CASE("serveResource: root path returns index.html with text/html",
     CHECK(head.containsIgnoreCase("<div id=\"root\""));
 }
 
-TEST_CASE("serveResource: empty path also returns index.html",
-          "[WebUiComponent][ResourceProvider]") {
+TEST_CASE("serveResource: empty path also returns index.html", "[WebUiComponent][ResourceProvider]") {
     auto resource = WebUiComponent::serveResource("");
     REQUIRE(resource.has_value());
     CHECK(resource->mimeType == "text/html");
 }
 
-TEST_CASE("serveResource: CSS asset is reachable with text/css MIME",
-          "[WebUiComponent][ResourceProvider]") {
+TEST_CASE("serveResource: CSS asset is reachable with text/css MIME", "[WebUiComponent][ResourceProvider]") {
     const juce::String cssName = findCssAssetOriginalName();
     REQUIRE(cssName.isNotEmpty()); // Vite must have emitted at least one CSS file.
 
@@ -75,14 +72,12 @@ TEST_CASE("serveResource: CSS asset is reachable with text/css MIME",
     CHECK_FALSE(resource->data.empty());
 }
 
-TEST_CASE("serveResource: unknown path returns std::nullopt",
-          "[WebUiComponent][ResourceProvider]") {
+TEST_CASE("serveResource: unknown path returns std::nullopt", "[WebUiComponent][ResourceProvider]") {
     CHECK_FALSE(WebUiComponent::serveResource("/nonexistent").has_value());
     CHECK_FALSE(WebUiComponent::serveResource("/assets/does-not-exist.js").has_value());
 }
 
-TEST_CASE("serveResource: query strings and fragments are stripped",
-          "[WebUiComponent][ResourceProvider]") {
+TEST_CASE("serveResource: query strings and fragments are stripped", "[WebUiComponent][ResourceProvider]") {
     auto resource = WebUiComponent::serveResource("/?cachebust=42");
     REQUIRE(resource.has_value());
     CHECK(resource->mimeType == "text/html");

@@ -296,22 +296,23 @@ TEST_CASE("VoiceManager filter envelope produces time-varying output") {
         p.filter.resonance = 0.6f;
         p.filter.env_mod = envMod;
         p.filter_env.attack_s = 0.001f;
-        p.filter_env.decay_s = 0.03f;   // env active ~31 ms
+        p.filter_env.decay_s = 0.03f; // env active ~31 ms
         p.filter_env.sustain = 0.0f;
         p.filter_env.release_s = 0.05f;
         p.amp_env.attack_s = 0.001f;
         p.amp_env.decay_s = 0.001f;
-        p.amp_env.sustain = 1.0f;       // hold amp open so we isolate filter-env effect
+        p.amp_env.sustain = 1.0f; // hold amp open so we isolate filter-env effect
         p.amp_env.release_s = 0.5f;
         vm.applyPatch(p);
-        vm.noteOn(72, 1.0f);            // C5 ≈ 523 Hz so harmonics span the cutoff sweep
+        vm.noteOn(72, 1.0f); // C5 ≈ 523 Hz so harmonics span the cutoff sweep
         std::vector<float> buf(8192, 0.0f);
         vm.renderBlock(buf.data(), static_cast<int>(buf.size()));
         // Compare RMS of "env active" window (samples 200-1400, ~5-32 ms)
         // vs "env settled" window (samples 4000-8000, ~91-181 ms).
         auto windowRms = [&](int start, int end) {
             double s = 0.0;
-            for (int i = start; i < end; ++i) s += buf[i] * buf[i];
+            for (int i = start; i < end; ++i)
+                s += buf[i] * buf[i];
             return std::sqrt(s / (end - start));
         };
         const double active = windowRms(200, 1400);
@@ -654,11 +655,11 @@ double renderPostReleaseRms(const PatchStruct& patch, int releaseSamples) {
 
 TEST_CASE("VoiceManager reverb mix=1 produces decaying tail after note off") {
     PatchStruct wet = make_default_patch();
-    wet.amp_env.release_s = 0.01f;     // dry signal dies fast
+    wet.amp_env.release_s = 0.01f; // dry signal dies fast
     wet.reverb.mix = 1.0f;
     wet.reverb.size = 0.8f;
     wet.reverb.damping = 0.3f;
-    wet.delay.mix = 0.0f;              // isolate reverb
+    wet.delay.mix = 0.0f; // isolate reverb
 
     PatchStruct dry = wet;
     dry.reverb.mix = 0.0f;
@@ -679,7 +680,7 @@ TEST_CASE("VoiceManager delay mix=1 produces echoes after note off") {
     wet.delay.mix = 1.0f;
     wet.delay.time_s = 0.1f;
     wet.delay.feedback = 0.5f;
-    wet.reverb.mix = 0.0f;             // isolate delay
+    wet.reverb.mix = 0.0f; // isolate delay
 
     PatchStruct dry = wet;
     dry.delay.mix = 0.0f;

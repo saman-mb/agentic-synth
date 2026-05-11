@@ -119,8 +119,7 @@ TEST_CASE("Telemetry::defaultLogPath returns unique paths per call", "[Telemetry
     REQUIRE(p3.find(pid_tag) != std::string::npos);
 }
 
-TEST_CASE("Telemetry instances constructed back-to-back have distinct log paths",
-          "[Telemetry][PathCollision]") {
+TEST_CASE("Telemetry instances constructed back-to-back have distinct log paths", "[Telemetry][PathCollision]") {
     // Mirrors AgentBridge's `Telemetry telemetry_{Telemetry::defaultLogPath()}`
     // default member init — two AgentBridges in the same process must not
     // collide.
@@ -132,8 +131,7 @@ TEST_CASE("Telemetry instances constructed back-to-back have distinct log paths"
     REQUIRE(a.logPath() != b.logPath());
 }
 
-TEST_CASE("Telemetry::defaultLogPath(index) is stable for a given index",
-          "[Telemetry][PathCollision]") {
+TEST_CASE("Telemetry::defaultLogPath(index) is stable for a given index", "[Telemetry][PathCollision]") {
     // The explicit-index overload is the deterministic escape hatch (tests,
     // pinned slots). Same index → same path; different indices → different.
     REQUIRE(Telemetry::defaultLogPath(42) == Telemetry::defaultLogPath(42));

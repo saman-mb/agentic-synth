@@ -16,16 +16,13 @@ constexpr double kSR = 44100.0;
 
 float rms(const float* x, std::size_t n) {
     double acc = 0.0;
-    for (std::size_t i = 0; i < n; ++i) acc += static_cast<double>(x[i]) * x[i];
+    for (std::size_t i = 0; i < n; ++i)
+        acc += static_cast<double>(x[i]) * x[i];
     return static_cast<float>(std::sqrt(acc / static_cast<double>(std::max<std::size_t>(1, n))));
 }
 
 // Render numSamples to outL/outR with constant input (default zero).
-void render(Reverb& rev,
-            std::vector<float>& outL,
-            std::vector<float>& outR,
-            std::size_t numSamples,
-            float inL = 0.0f,
+void render(Reverb& rev, std::vector<float>& outL, std::vector<float>& outR, std::size_t numSamples, float inL = 0.0f,
             float inR = 0.0f) {
     outL.assign(numSamples, 0.0f);
     outR.assign(numSamples, 0.0f);
@@ -91,12 +88,11 @@ TEST_CASE("Reverb size controls tail length", "[reverb]") {
 
         const std::size_t tailLen = static_cast<std::size_t>(kSR * 0.5);
         const std::size_t tailStart = total - tailLen;
-        return 0.5f * (rms(outL.data() + tailStart, tailLen) +
-                       rms(outR.data() + tailStart, tailLen));
+        return 0.5f * (rms(outL.data() + tailStart, tailLen) + rms(outR.data() + tailStart, tailLen));
     };
 
-    const float small  = measureTailRms(0.2f);
-    const float large  = measureTailRms(0.9f);
+    const float small = measureTailRms(0.2f);
+    const float large = measureTailRms(0.9f);
 
     REQUIRE(large > small);
     // Sanity: large-size tail should be meaningfully louder, not just numerical noise.

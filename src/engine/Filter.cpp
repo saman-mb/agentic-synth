@@ -19,9 +19,7 @@ static constexpr double kDriveGainFactor = 4.0;
 // Output compensation: scale by 1 / sqrt(driveGain) so that at unity sub-cutoff
 // the perceived level stays sane (the tanh also reduces gain, so this is a
 // gentle counter-balance rather than full make-up).
-static inline double driveCompensation(double driveGain) {
-    return 1.0 / std::sqrt(driveGain);
-}
+static inline double driveCompensation(double driveGain) { return 1.0 / std::sqrt(driveGain); }
 
 void MoogLadder::prepare(double sampleRate) {
     sampleRate_ = sampleRate;
@@ -34,19 +32,22 @@ void MoogLadder::setCutoff(float hz) {
     // modulation source can't poison the coefficient state. VoiceManager
     // sanitises modulation via safe() in applyPatch already (Phase 1); this
     // is a belt-and-braces second layer at the filter boundary.
-    if (!std::isfinite(hz)) return;
+    if (!std::isfinite(hz))
+        return;
     cutoff_ = hz;
     updateCoefficients();
 }
 
 void MoogLadder::setResonance(float resonance) {
-    if (!std::isfinite(resonance)) return;
+    if (!std::isfinite(resonance))
+        return;
     resonance_ = std::clamp(resonance, 0.0f, 1.0f);
     updateCoefficients();
 }
 
 void MoogLadder::setDrive(float drive) {
-    if (!std::isfinite(drive)) return;
+    if (!std::isfinite(drive))
+        return;
     drive_ = std::clamp(drive, 0.0f, 1.0f);
     driveGain_ = 1.0 + static_cast<double>(drive_) * kDriveGainFactor;
     driveComp_ = driveCompensation(driveGain_);
@@ -137,13 +138,15 @@ void SVFilter::prepare(double sampleRate) {
 }
 
 void SVFilter::setCutoff(float hz) {
-    if (!std::isfinite(hz)) return;
+    if (!std::isfinite(hz))
+        return;
     cutoff_ = hz;
     updateCoefficients();
 }
 
 void SVFilter::setResonance(float resonance) {
-    if (!std::isfinite(resonance)) return;
+    if (!std::isfinite(resonance))
+        return;
     resonance_ = std::clamp(resonance, 0.0f, 1.0f);
     updateCoefficients();
 }

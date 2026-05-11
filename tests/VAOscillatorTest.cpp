@@ -223,7 +223,7 @@ TEST_CASE("VAOscillator Triangle at high note has bounded harmonic content") {
     VAOscillator osc;
     osc.prepare(kSampleRate);
     osc.setWaveform(VAOscillator::Waveform::Triangle);
-    constexpr double freq = 2093.005;  // MIDI 96
+    constexpr double freq = 2093.005; // MIDI 96
     osc.setFrequency(freq);
 
     constexpr int N = 2048;

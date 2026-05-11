@@ -34,8 +34,7 @@ struct JuceFixture {
 
 // Spin the message queue until either the expected count is reached or the
 // timeout elapses.  Returns true if the predicate became satisfied.
-template <typename Pred>
-bool drainUntil(Pred pred, int timeoutMs = 200) {
+template <typename Pred> bool drainUntil(Pred pred, int timeoutMs = 200) {
     auto* mm = juce::MessageManager::getInstance();
     const auto deadline = juce::Time::getMillisecondCounter() + (juce::uint32)timeoutMs;
     while (juce::Time::getMillisecondCounter() < deadline) {
@@ -110,9 +109,8 @@ TEST_CASE("AgentBridge: onRationale / onSuggestVariations / onPatchUpdate / onTr
     bridge.notifyPatchUpdate(makeWith("param", "filter.cutoff_hz"));
     bridge.notifyTranscript(makeWith("text", "hello world"));
 
-    REQUIRE(drainUntil([&] {
-        return rationale.isObject() && suggest.isObject() && update.isObject() && transcript.isObject();
-    }));
+    REQUIRE(drainUntil(
+        [&] { return rationale.isObject() && suggest.isObject() && update.isObject() && transcript.isObject(); }));
     CHECK(rationale["text"].toString() == "because reasons");
     CHECK(suggest["kind"].toString() == "darker");
     CHECK(update["param"].toString() == "filter.cutoff_hz");

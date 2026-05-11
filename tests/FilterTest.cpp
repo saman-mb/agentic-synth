@@ -81,8 +81,7 @@ TEST_CASE("MoogLadder — reset clears state", "[filter][moog]") {
 // MoogLadder nonlinear-feedback / drive / stability tests
 // ---------------------------------------------------------------------------
 
-TEST_CASE("MoogLadder — stable at max resonance across cutoffs and sample rates",
-          "[filter][moog][stability]") {
+TEST_CASE("MoogLadder — stable at max resonance across cutoffs and sample rates", "[filter][moog][stability]") {
     const float sampleRates[] = {44100.0f, 48000.0f, 96000.0f};
     const float cutoffs[] = {200.0f, 1000.0f, 4000.0f, 8000.0f};
 
@@ -106,8 +105,7 @@ TEST_CASE("MoogLadder — stable at max resonance across cutoffs and sample rate
     }
 }
 
-TEST_CASE("MoogLadder — self-oscillates AT the cutoff frequency at max resonance",
-          "[filter][moog][self-oscillation]") {
+TEST_CASE("MoogLadder — self-oscillates AT the cutoff frequency at max resonance", "[filter][moog][self-oscillation]") {
     const float sampleRate = 44100.0f;
     const float cutoff = 500.0f;
     MoogLadder f;
@@ -155,19 +153,16 @@ TEST_CASE("MoogLadder — self-oscillates AT the cutoff frequency at max resonan
     // Spectral check: actual oscillation frequency from zero-crossing count.
     // tailSamples ≈ 0.8 s, so expected ZCs = 2 * cutoff * 0.8 = 800.
     const float tailSeconds = static_cast<float>(tailSamples) / sampleRate;
-    const float measuredHz =
-        static_cast<float>(zeroCrossings) / (2.0f * tailSeconds);
+    const float measuredHz = static_cast<float>(zeroCrossings) / (2.0f * tailSeconds);
     const float lower = cutoff * 0.90f;
     const float upper = cutoff * 1.10f;
-    INFO("cutoff=" << cutoff << " Hz, measured oscillation="
-                   << measuredHz << " Hz, zero-crossings=" << zeroCrossings
+    INFO("cutoff=" << cutoff << " Hz, measured oscillation=" << measuredHz << " Hz, zero-crossings=" << zeroCrossings
                    << " over " << tailSeconds << " s");
     REQUIRE(measuredHz > lower);
     REQUIRE(measuredHz < upper);
 }
 
-TEST_CASE("MoogLadder — NaN input doesn't poison subsequent samples",
-          "[filter][moog][nan-guard]") {
+TEST_CASE("MoogLadder — NaN input doesn't poison subsequent samples", "[filter][moog][nan-guard]") {
     MoogLadder f;
     f.prepare(44100.0);
     f.setCutoff(1000.0f);
@@ -186,8 +181,7 @@ TEST_CASE("MoogLadder — NaN input doesn't poison subsequent samples",
     REQUIRE(poisoned == 0.0f);
 
     // Also try +Inf — same recovery contract.
-    const float poisonedInf =
-        f.process(std::numeric_limits<float>::infinity());
+    const float poisonedInf = f.process(std::numeric_limits<float>::infinity());
     REQUIRE(std::isfinite(poisonedInf));
 
     // Post-recovery: all samples must be finite, and the filter must again
@@ -202,8 +196,7 @@ TEST_CASE("MoogLadder — NaN input doesn't poison subsequent samples",
     REQUIRE(maxAbs > 0.1f);
 }
 
-TEST_CASE("SVFilter — NaN input doesn't poison subsequent samples",
-          "[filter][svf][nan-guard]") {
+TEST_CASE("SVFilter — NaN input doesn't poison subsequent samples", "[filter][svf][nan-guard]") {
     SVFilter f(FilterMode::LP);
     f.prepare(44100.0);
     f.setCutoff(1000.0f);
@@ -229,8 +222,7 @@ TEST_CASE("SVFilter — NaN input doesn't poison subsequent samples",
     REQUIRE(maxAbs > 0.1f);
 }
 
-TEST_CASE("MoogLadder — non-finite setter values are rejected",
-          "[filter][moog][nan-guard]") {
+TEST_CASE("MoogLadder — non-finite setter values are rejected", "[filter][moog][nan-guard]") {
     MoogLadder f;
     f.prepare(44100.0);
     f.setCutoff(1000.0f);
@@ -241,9 +233,7 @@ TEST_CASE("MoogLadder — non-finite setter values are rejected",
     const float omega = 2.0f * static_cast<float>(M_PI) * 200.0f / 44100.0f;
     float baseline = 0.0f;
     for (int i = 0; i < 1024; ++i)
-        baseline = std::max(baseline,
-                            std::abs(f.process(std::sin(omega *
-                                                        static_cast<float>(i)))));
+        baseline = std::max(baseline, std::abs(f.process(std::sin(omega * static_cast<float>(i)))));
     REQUIRE(baseline > 0.1f);
 
     // Throw NaN/Inf at every setter — must be ignored, state unchanged.
@@ -267,13 +257,10 @@ TEST_CASE("MoogLadder — non-finite setter values are rejected",
 // sine via in-phase/quadrature correlation, subtracts it, returns
 // residualRMS / fundamentalRMS. A pure sine through a linear system → ~0.
 // Any nonlinearity adds harmonics, raising the ratio.
-static double harmonicResidualRatio(Filter& filter, float freq, float sampleRate,
-                                    int cycles = 64) {
-    const double w = 2.0 * M_PI * static_cast<double>(freq) /
-                     static_cast<double>(sampleRate);
-    const int totalSamples = static_cast<int>(
-        static_cast<double>(sampleRate) / static_cast<double>(freq) *
-        static_cast<double>(cycles));
+static double harmonicResidualRatio(Filter& filter, float freq, float sampleRate, int cycles = 64) {
+    const double w = 2.0 * M_PI * static_cast<double>(freq) / static_cast<double>(sampleRate);
+    const int totalSamples =
+        static_cast<int>(static_cast<double>(sampleRate) / static_cast<double>(freq) * static_cast<double>(cycles));
     const int measureStart = totalSamples / 4;
     const int measureLen = totalSamples - measureStart;
 
@@ -295,16 +282,14 @@ static double harmonicResidualRatio(Filter& filter, float freq, float sampleRate
         s += outBuf[static_cast<size_t>(j)] * std::sin(w * n);
     }
     // amplitude * cos(w*n + phi) least-squares fit: a = 2/N * sqrt(c^2 + s^2)
-    const double amp = 2.0 * std::sqrt(c * c + s * s) /
-                       static_cast<double>(measureLen);
+    const double amp = 2.0 * std::sqrt(c * c + s * s) / static_cast<double>(measureLen);
 
     // Build the linear fundamental estimate and compute residual RMS.
     double resSqSum = 0.0;
     double fundSqSum = 0.0;
     for (int j = 0; j < measureLen; ++j) {
         const double n = static_cast<double>(j + measureStart);
-        const double fundEst = (2.0 / static_cast<double>(measureLen)) *
-                               (c * std::cos(w * n) + s * std::sin(w * n));
+        const double fundEst = (2.0 / static_cast<double>(measureLen)) * (c * std::cos(w * n) + s * std::sin(w * n));
         const double res = outBuf[static_cast<size_t>(j)] - fundEst;
         resSqSum += res * res;
         fundSqSum += fundEst * fundEst;
@@ -315,8 +300,7 @@ static double harmonicResidualRatio(Filter& filter, float freq, float sampleRate
     return resRms / std::max(fundRms, 1.0e-12);
 }
 
-TEST_CASE("MoogLadder — tanh saturation bounds output and adds harmonics",
-          "[filter][moog][saturation]") {
+TEST_CASE("MoogLadder — tanh saturation bounds output and adds harmonics", "[filter][moog][saturation]") {
     const float sampleRate = 48000.0f;
     // Choose a fundamental near (but below) cutoff so the saturator hits hard
     // and the resulting harmonics are still partially in the passband.
@@ -359,8 +343,7 @@ TEST_CASE("MoogLadder — tanh saturation bounds output and adds harmonics",
     REQUIRE(ratioHot > 0.05); // > 5% non-fundamental energy
 }
 
-TEST_CASE("MoogLadder — denormal-safe under prolonged silence",
-          "[filter][moog][denormal]") {
+TEST_CASE("MoogLadder — denormal-safe under prolonged silence", "[filter][moog][denormal]") {
     MoogLadder f;
     f.prepare(48000.0);
     f.setCutoff(1000.0f);
@@ -375,8 +358,7 @@ TEST_CASE("MoogLadder — denormal-safe under prolonged silence",
     }
 }
 
-TEST_CASE("MoogLadder — drive parameter adds harmonic energy",
-          "[filter][moog][drive]") {
+TEST_CASE("MoogLadder — drive parameter adds harmonic energy", "[filter][moog][drive]") {
     const float sampleRate = 48000.0f;
     const float fund = 300.0f;
     const float cutoff = 1500.0f;
