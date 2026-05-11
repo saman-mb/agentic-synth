@@ -277,7 +277,7 @@ export function KnobGrid({ patch, agentKeys, onKnobChange }: KnobGridProps) {
 
       <div className="visually-hidden" aria-live="polite" aria-atomic="true">
         {agentKeys.size > 0
-          ? `Agent updated ${agentKeys.size} parameter${agentKeys.size === 1 ? '' : 's'}`
+          ? `Agent updated ${agentKeys.size} patch parameter${agentKeys.size === 1 ? '' : 's'}`
           : ''}
       </div>
 

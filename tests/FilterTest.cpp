@@ -106,60 +106,94 @@ TEST_CASE("MoogLadder — stable at max resonance across cutoffs and sample rate
 }
 
 TEST_CASE("MoogLadder — self-oscillates AT the cutoff frequency at max resonance", "[filter][moog][self-oscillation]") {
-    const float sampleRate = 44100.0f;
     const float cutoff = 500.0f;
+    const float sampleRates[] = {44100.0f, 48000.0f, 96000.0f};
+
+    for (float sampleRate : sampleRates) {
+        MoogLadder f;
+        f.prepare(static_cast<double>(sampleRate));
+        f.setCutoff(cutoff);
+        f.setResonance(1.0f);
+
+        // Kick the system with a brief impulse so the soft-saturation fixed point
+        // doesn't trap it at zero. With tanh feedback the system has a soft limit
+        // cycle that needs a finite perturbation to settle into.
+        float out = 0.0f;
+        for (int i = 0; i < 8; ++i) {
+            out = f.process(0.5f);
+            REQUIRE(std::isfinite(out));
+        }
+
+        // Run for ~1 s of zero input, skip 200 ms ring-in, then count zero
+        // crossings on the tail. A pure 500 Hz oscillator produces 2 ZCs per
+        // period → ~1000 ZCs per second; tightened tolerance ±5% — the
+        // prewarp-corrected pole frequency now hugs the requested cutoff.
+        const int ringInSamples = static_cast<int>(sampleRate * 0.2f);
+        const int totalSamples = static_cast<int>(sampleRate); // 1 second total
+        for (int i = 0; i < ringInSamples; ++i) {
+            out = f.process(0.0f);
+            REQUIRE(std::isfinite(out));
+        }
+
+        float peak = 0.0f;
+        float prev = out;
+        int zeroCrossings = 0;
+        const int tailSamples = totalSamples - ringInSamples;
+        for (int i = 0; i < tailSamples; ++i) {
+            out = f.process(0.0f);
+            REQUIRE(std::isfinite(out));
+            peak = std::max(peak, std::abs(out));
+            // Rising-or-falling crossings, ignoring exact-zero plateau samples.
+            if ((prev < 0.0f && out >= 0.0f) || (prev >= 0.0f && out < 0.0f))
+                ++zeroCrossings;
+            prev = out;
+        }
+
+        // Amplitude check (legacy assertion preserved).
+        REQUIRE(peak > 0.1f);
+
+        // Spectral check: actual oscillation frequency from zero-crossing count.
+        const float tailSeconds = static_cast<float>(tailSamples) / sampleRate;
+        const float measuredHz = static_cast<float>(zeroCrossings) / (2.0f * tailSeconds);
+        const float lower = cutoff * 0.95f;
+        const float upper = cutoff * 1.05f;
+        INFO("sr=" << sampleRate << " Hz, cutoff=" << cutoff << " Hz, measured=" << measuredHz
+                   << " Hz, ZCs=" << zeroCrossings << " over " << tailSeconds << " s");
+        REQUIRE(measuredHz > lower);
+        REQUIRE(measuredHz < upper);
+    }
+}
+
+TEST_CASE("MoogLadder — k=0.95 just below self-osc decays to silence", "[filter][moog][self-oscillation]") {
+    // At full resonance the ladder rings forever; just below, the impulse tail
+    // must decay. Guards against accidental gain bumps in the k-mapping.
+    const float sampleRate = 48000.0f;
     MoogLadder f;
     f.prepare(static_cast<double>(sampleRate));
-    f.setCutoff(cutoff);
-    f.setResonance(1.0f);
+    f.setCutoff(500.0f);
+    f.setResonance(0.95f);
 
-    // Kick the system with a brief impulse so the soft-saturation fixed point
-    // doesn't trap it at zero. With tanh feedback the system has a soft limit
-    // cycle that needs a finite perturbation to settle into.
-    float out = 0.0f;
-    for (int i = 0; i < 8; ++i) {
-        out = f.process(0.5f);
-        REQUIRE(std::isfinite(out));
-    }
+    // Single impulse, then 1 s of zeros.
+    float out = f.process(1.0f);
+    REQUIRE(std::isfinite(out));
 
-    // Run for ~1 s of zero input, skip 200 ms ring-in, then count zero
-    // crossings on the tail. A pure 500 Hz oscillator produces 2 ZCs per
-    // period → ~1000 ZCs per second; tolerance ±10% for the cutoff-vs-actual
-    // pole-frequency offset (tan() prewarp leaves a small bias).
-    const int ringInSamples = static_cast<int>(sampleRate * 0.2f);
-    const int totalSamples = static_cast<int>(sampleRate); // 1 second total
-    for (int i = 0; i < ringInSamples; ++i) {
+    const int totalSamples = static_cast<int>(sampleRate);
+    // Walk through the run and measure RMS over the *last* 100 ms — by then
+    // any sub-self-osc resonance must have decayed below the noise floor.
+    const int tailStart = totalSamples - static_cast<int>(sampleRate * 0.1f);
+    double tailSqSum = 0.0;
+    int tailCount = 0;
+    for (int i = 0; i < totalSamples; ++i) {
         out = f.process(0.0f);
         REQUIRE(std::isfinite(out));
+        if (i >= tailStart) {
+            tailSqSum += static_cast<double>(out) * static_cast<double>(out);
+            ++tailCount;
+        }
     }
-
-    float peak = 0.0f;
-    float prev = out;
-    int zeroCrossings = 0;
-    const int tailSamples = totalSamples - ringInSamples;
-    for (int i = 0; i < tailSamples; ++i) {
-        out = f.process(0.0f);
-        REQUIRE(std::isfinite(out));
-        peak = std::max(peak, std::abs(out));
-        // Rising-or-falling crossings, ignoring exact-zero plateau samples.
-        if ((prev < 0.0f && out >= 0.0f) || (prev >= 0.0f && out < 0.0f))
-            ++zeroCrossings;
-        prev = out;
-    }
-
-    // Amplitude check (legacy assertion preserved).
-    REQUIRE(peak > 0.1f);
-
-    // Spectral check: actual oscillation frequency from zero-crossing count.
-    // tailSamples ≈ 0.8 s, so expected ZCs = 2 * cutoff * 0.8 = 800.
-    const float tailSeconds = static_cast<float>(tailSamples) / sampleRate;
-    const float measuredHz = static_cast<float>(zeroCrossings) / (2.0f * tailSeconds);
-    const float lower = cutoff * 0.90f;
-    const float upper = cutoff * 1.10f;
-    INFO("cutoff=" << cutoff << " Hz, measured oscillation=" << measuredHz << " Hz, zero-crossings=" << zeroCrossings
-                   << " over " << tailSeconds << " s");
-    REQUIRE(measuredHz > lower);
-    REQUIRE(measuredHz < upper);
+    const double tailRms = std::sqrt(tailSqSum / std::max(tailCount, 1));
+    INFO("k=0.95 tail RMS=" << tailRms);
+    REQUIRE(tailRms < 0.01);
 }
 
 TEST_CASE("MoogLadder — NaN input doesn't poison subsequent samples", "[filter][moog][nan-guard]") {

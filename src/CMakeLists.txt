@@ -93,7 +93,9 @@ target_link_libraries(agentic_synth_engine INTERFACE agentic_synth_engine_juce)
 add_library(agentic_synth_agent STATIC
     agent/AgentBridge.cpp
     agent/DictionaryService.cpp
+    agent/KnobBridge.cpp
     agent/ParamMap.cpp
+    agent/PromptHandler.cpp
     agent/SessionMemory.cpp
     agent/PrePatchPipeline.cpp
     agent/StreamParser.cpp

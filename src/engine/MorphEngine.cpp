@@ -144,17 +144,17 @@ PatchStruct MorphEngine::lerp(const PatchStruct& a, const PatchStruct& b, float 
     out.reverb.width = u * a.reverb.width + t * b.reverb.width;
     out.reverb.mix = u * a.reverb.mix + t * b.reverb.mix;
 
-    // Delay
-    out.delay.time_s = u * a.delay.time_s + t * b.delay.time_s;
+    // Delay — time_s is log-domain (perceptually octave-spaced across ms .. s)
+    out.delay.time_s = loglerp(a.delay.time_s, b.delay.time_s, 0.001f, 2.0f);
     out.delay.feedback = u * a.delay.feedback + t * b.delay.feedback;
     out.delay.mix = u * a.delay.mix + t * b.delay.mix;
     out.delay.stereo = u * a.delay.stereo + t * b.delay.stereo;
     if (t >= 0.5f)
         out.delay.bpm_sync = b.delay.bpm_sync;
 
-    // Global
+    // Global — portamento_s is a time constant; log-domain matches perception.
     out.master_gain = u * a.master_gain + t * b.master_gain;
-    out.portamento_s = u * a.portamento_s + t * b.portamento_s;
+    out.portamento_s = loglerp(a.portamento_s, b.portamento_s, 0.001f, 10.0f);
     if (t >= 0.5f)
         out.voice_count = b.voice_count;
 

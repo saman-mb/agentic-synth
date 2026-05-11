@@ -255,6 +255,8 @@ TEST_CASE("MorphEngine: identical patches morph to identity", "[morph][log]") {
     p.filter_env.decay_s = 0.3f;
     p.filter_env.release_s = 0.5f;
     p.master_gain = 0.7f;
+    p.portamento_s = 0.123f;
+    p.delay.time_s = 0.456f;
     morph.saveTarget(p);
     morph.saveTarget(p);
 
@@ -268,5 +270,43 @@ TEST_CASE("MorphEngine: identical patches morph to identity", "[morph][log]") {
         REQUIRE_THAT(out.amp_env.release_s, Catch::Matchers::WithinRel(p.amp_env.release_s, 1e-4f));
         REQUIRE_THAT(out.filter_env.attack_s, Catch::Matchers::WithinRel(p.filter_env.attack_s, 1e-4f));
         REQUIRE_THAT(out.master_gain, Catch::Matchers::WithinAbs(p.master_gain, 1e-5f));
+        REQUIRE_THAT(out.portamento_s, Catch::Matchers::WithinRel(p.portamento_s, 1e-4f));
+        REQUIRE_THAT(out.delay.time_s, Catch::Matchers::WithinRel(p.delay.time_s, 1e-4f));
     }
+}
+
+TEST_CASE("MorphEngine: portamento sweeps in log domain", "[morph][log]") {
+    MorphEngine morph;
+    PatchStruct a = make_default_patch();
+    a.portamento_s = 0.01f;
+    PatchStruct b = make_default_patch();
+    b.portamento_s = 1.0f;
+    morph.saveTarget(a);
+    morph.saveTarget(b);
+
+    // Endpoints exact.
+    REQUIRE_THAT(morph.morphedPatchAt(0.0f).portamento_s, Catch::Matchers::WithinRel(0.01f, 1e-4f));
+    REQUIRE_THAT(morph.morphedPatchAt(1.0f).portamento_s, Catch::Matchers::WithinRel(1.0f, 1e-4f));
+
+    // Midpoint = geometric mean = sqrt(0.01 * 1.0) = 0.1, NOT linear 0.505.
+    auto mid = morph.morphedPatchAt(0.5f);
+    REQUIRE_THAT(mid.portamento_s, Catch::Matchers::WithinRel(0.1f, 0.05f));
+}
+
+TEST_CASE("MorphEngine: delay.time_s sweeps in log domain", "[morph][log]") {
+    MorphEngine morph;
+    PatchStruct a = make_default_patch();
+    a.delay.time_s = 0.01f;
+    PatchStruct b = make_default_patch();
+    b.delay.time_s = 1.0f;
+    morph.saveTarget(a);
+    morph.saveTarget(b);
+
+    // Endpoints exact.
+    REQUIRE_THAT(morph.morphedPatchAt(0.0f).delay.time_s, Catch::Matchers::WithinRel(0.01f, 1e-4f));
+    REQUIRE_THAT(morph.morphedPatchAt(1.0f).delay.time_s, Catch::Matchers::WithinRel(1.0f, 1e-4f));
+
+    // Midpoint = geometric mean = sqrt(0.01 * 1.0) = 0.1, NOT linear 0.505.
+    auto mid = morph.morphedPatchAt(0.5f);
+    REQUIRE_THAT(mid.delay.time_s, Catch::Matchers::WithinRel(0.1f, 0.05f));
 }
