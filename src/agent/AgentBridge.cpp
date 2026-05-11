@@ -262,29 +262,19 @@ void AgentBridge::handleKnobTweak(const std::string& param, float value) {
     memory_.recordFeedback(FeedbackKind::Tweak, param, patch);
 }
 
-// ── Issue #90: Semantic dictionary ───────────────────────────────────────────
+// ── Issue #90: Semantic dictionary (Phase 10C: forwards to DictionaryService) ─
 
-std::string AgentBridge::getDictionaryJson() const {
-    return "{\"type\":\"dictionary_data\",\"entries\":" + semanticMapper_.dumpAllToJson() + "}";
-}
+std::string AgentBridge::getDictionaryJson() const { return dictionary_.getDictionaryJson(); }
 
-void AgentBridge::saveDictionary(const std::string& json) {
-    semanticMapper_.parseAndSaveCustomEntries(json, "descriptor_dataset_custom.json");
-}
+void AgentBridge::saveDictionary(const std::string& json) { dictionary_.saveDictionary(json); }
 
-void AgentBridge::loadDictionary(const std::string& path) { semanticMapper_.loadCustomEntries(path); }
+void AgentBridge::loadDictionary(const std::string& path) { dictionary_.loadDictionary(path); }
 
-// ── Issue #91: Telemetry ──────────────────────────────────────────────────────
+// ── Issue #91: Telemetry (Phase 10C: forwards to TelemetryService) ───────────
 
-std::string AgentBridge::getTelemetryJson() const {
-    return "{\"type\":\"telemetry_data\"," + telemetry_.toJson().substr(1); // splice type field in
-}
+std::string AgentBridge::getTelemetryJson() const { return telemetry_.getTelemetryJson(); }
 
-void AgentBridge::setTelemetryEnabled(bool on) {
-    telemetry_.setEnabled(on);
-    if (!on)
-        telemetry_.flush(); // flush remaining records when disabling
-}
+void AgentBridge::setTelemetryEnabled(bool on) { telemetry_.setEnabled(on); }
 
 // ── Issue #85: Session-aware narrative generation ────────────────────────────
 

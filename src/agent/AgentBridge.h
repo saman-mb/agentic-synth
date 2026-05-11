@@ -12,10 +12,12 @@
 
 #include <juce_core/juce_core.h>
 
+#include "agent/DictionaryService.h"
 #include "agent/PrePatchPipeline.h"
 #include "agent/SessionMemory.h"
 #include "agent/StreamParser.h"
 #include "agent/Telemetry.h"
+#include "agent/TelemetryService.h"
 #include "engine/PatchStruct.h"
 #include "engine/VariationEngine.h"
 #include "mapper/GrammarSampler.h"
@@ -23,6 +25,16 @@
 
 namespace agentic_synth::agent {
 
+// Phase 10C god-object split — status:
+//   * DictionaryService  — extracted (this commit).
+//   * TelemetryService   — extracted (this commit).
+//   * PromptHandler      — DEFERRED to Phase 11. Touches the streaming JSON
+//                          parser + heuristic submit path; needs careful
+//                          ordering work to keep < 200 ms first-audible-change
+//                          on the audio thread.
+//   * KnobBridge         — DEFERRED to Phase 11. Owns the realtime knob
+//                          tweak path + MIDI CC atomics; an extraction must
+//                          preserve the audio-thread atomic contracts.
 class AgentBridge {
 public:
     AgentBridge();
@@ -93,7 +105,7 @@ public:
 
     void setTelemetryEnabled(bool on);
 
-    [[nodiscard]] Telemetry& telemetry() noexcept { return telemetry_; }
+    [[nodiscard]] Telemetry& telemetry() noexcept { return telemetry_.telemetry(); }
 
     // ── Issue #85: Session-aware narrative generation ─────────────────────────
 
@@ -162,7 +174,13 @@ private:
     mapper::GrammarSampler sampler_{mapper::GrammarSamplerConfig{}};
     mapper::SemanticMapper semanticMapper_;
     StreamParser streamParser_;
-    Telemetry telemetry_{Telemetry::defaultLogPath()};
+
+    // Phase 10C extracted services (see header comment above). Each owns its
+    // own state; AgentBridge forwards the public API to them. dictionary_
+    // holds a reference to semanticMapper_, so its declaration MUST come
+    // after semanticMapper_ for correct construction order.
+    TelemetryService telemetry_{Telemetry::defaultLogPath()};
+    DictionaryService dictionary_{semanticMapper_};
 
     // Subscriber slot lists, guarded by a single mutex.  Each slot holds a
     // weak_ptr to the Callback; the SubscriberHandle (an aliased shared_ptr)

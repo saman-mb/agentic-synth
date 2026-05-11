@@ -54,3 +54,4 @@ session.db
 # JUCE generated
 JuceLibraryCode/
 scripts/
+.claude/
