@@ -214,6 +214,14 @@ export function AuditionKeyboard({ sendRaw, ready }: AuditionKeyboardProps) {
             onMouseEnter={(e) => {
               if (e.buttons === 1) playNote(k.note, CLICK_DURATION_MS);
             }}
+            // Phase 12C: minimal touch support. Fire on touchstart at
+            // CLICK_DURATION_MS — note-off is C++-side scheduled so no
+            // touchend needed. preventDefault stops the synthetic mouse
+            // click that would otherwise double-fire the note ~300ms later.
+            onTouchStart={(e) => {
+              e.preventDefault();
+              playNote(k.note, CLICK_DURATION_MS);
+            }}
             aria-label={`Play ${k.label}`}
             aria-pressed={activeNotes.has(k.note)}
             title={`${k.label} (${k.keyChar.toUpperCase()})`}

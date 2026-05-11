@@ -1,6 +1,7 @@
 #pragma once
 
 #include <array>
+#include <complex>
 #include <cstddef>
 #include <memory>
 #include <string>
@@ -8,9 +9,20 @@
 
 namespace agentic_synth::engine {
 
+// Test-only entry point for the offline radix-2 FFT used to build mip
+// pyramids. Power-of-two sizes only. `inverse=false` performs the forward
+// transform; `inverse=true` performs the inverse and divides by N.
+// Not for audio-thread use — allocates if `a.size()` is changed by caller.
+void fftRadix2ForTesting(std::vector<std::complex<float>>& a, bool inverse);
+
 inline constexpr int kWavetableSize = 256;
 inline constexpr int kMaxWavetableFrames = 256;
-inline constexpr int kNumMipLevels = 8;
+// 7 mip levels: cutoff bins 128, 64, 32, 16, 8, 4, 2 — the lowest still
+// preserves the fundamental sine (bin 1). An 8th level would land at cutoff=1
+// (DC only) → silent. The phaseIncrement clamp in mipLevelFloat() already
+// guarantees we never request a level above (kNumMipLevels-1), so 7 covers
+// every musically reachable phaseIncrement < 0.5.
+inline constexpr int kNumMipLevels = 7;
 
 // Band-limited mip pyramid: all mips are kWavetableSize samples.
 // Mip level k zeroes DFT bins above kWavetableSize / 2^(k+1), so its harmonic

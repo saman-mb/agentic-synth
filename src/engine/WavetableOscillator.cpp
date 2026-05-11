@@ -53,6 +53,11 @@ void fftRadix2(std::vector<cpx>& a, bool inverse) {
 
 } // namespace
 
+// Test-only shim — forwards to the anonymous-namespace implementation.
+// Keeps the production hot path inlinable inside this TU while still letting
+// tests verify FFT(IFFT) round-trip correctness without duplicating the kernel.
+void fftRadix2ForTesting(std::vector<cpx>& a, bool inverse) { fftRadix2(a, inverse); }
+
 // ---- WavetableData ----
 
 void WavetableData::buildFromFrames(const float* samples, int numFrames) {

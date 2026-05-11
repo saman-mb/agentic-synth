@@ -6,6 +6,7 @@
 #include <cmath>
 #include <complex>
 #include <numbers>
+#include <random>
 #include <vector>
 
 using namespace agentic_synth::engine;
@@ -143,6 +144,36 @@ std::vector<float> makeSaw(int harmonics) {
 
 } // namespace
 
+TEST_CASE("FFT radix-2 round-trip preserves signal", "[wavetable][fft][roundtrip]") {
+    // Deterministic seeded input: any nonzero real signal exercises both
+    // even/odd butterfly paths and the bit-reversal permutation.
+    constexpr int N = 256;
+    std::mt19937 rng(42);
+    std::uniform_real_distribution<float> dist(-1.0f, 1.0f);
+
+    std::vector<float> input(N);
+    for (int i = 0; i < N; ++i)
+        input[i] = dist(rng);
+
+    std::vector<std::complex<float>> spec(N);
+    for (int i = 0; i < N; ++i)
+        spec[i] = std::complex<float>(input[i], 0.0f);
+
+    fftRadix2ForTesting(spec, /*inverse=*/false);
+    fftRadix2ForTesting(spec, /*inverse=*/true);
+
+    // Round-trip tolerance: float butterflies accumulate ~log2(N) ULPs; for
+    // N=256 (8 stages) and unit-scale samples, ~1e-5 abs is comfortable.
+    float maxErr = 0.0f;
+    for (int i = 0; i < N; ++i) {
+        const float reErr = std::abs(spec[i].real() - input[i]);
+        const float imErr = std::abs(spec[i].imag());
+        maxErr = std::max(maxErr, std::max(reErr, imErr));
+    }
+    INFO("max |IFFT(FFT(x)) - x| = " << maxErr);
+    REQUIRE(maxErr < 1e-5f);
+}
+
 TEST_CASE("Band-limited mip removes content above target Nyquist", "[wavetable][mip][fft]") {
     // Saw with 120 harmonics — full spectrum is rich enough to detect leakage at every mip level.
     auto saw = makeSaw(120);
@@ -235,6 +266,35 @@ TEST_CASE("Mip-level crossfade eliminates octave-boundary clicks", "[wavetable][
     INFO("RMS(below vs above boundary): crossfade=" << diffXfade << " step=" << diffStep << "  boundary=" << boundaryHz
                                                     << " Hz");
     REQUIRE(diffXfade * 2.0 < diffStep);
+}
+
+TEST_CASE("Extreme high MIDI note does not fall into a silent mip slot", "[wavetable][mip][silent-guard]") {
+    // MIDI 127 ≈ 12543.85 Hz. At 44.1 kHz sample rate the mip selector picks
+    // the highest level — must still carry the fundamental, not silent DC.
+    constexpr double kSampleRate = 44100.0;
+    constexpr int kBufSize = 2048;
+
+    auto saw = makeSaw(120);
+
+    WavetableOscillator osc;
+    osc.setSampleRate(kSampleRate);
+    osc.loadFromFrames(saw.data(), 1);
+    osc.setFrequency(midiToHz(127));
+    osc.reset();
+
+    std::vector<float> buf(kBufSize);
+    osc.processBlock(buf.data(), kBufSize);
+
+    // Skip startup transient — measure RMS over second half.
+    double sqSum = 0.0;
+    const int start = kBufSize / 2;
+    for (int i = start; i < kBufSize; ++i)
+        sqSum += static_cast<double>(buf[i]) * static_cast<double>(buf[i]);
+    const double rms = std::sqrt(sqSum / (kBufSize - start));
+    INFO("MIDI 127 RMS = " << rms);
+    // A bandlimited saw retaining only the fundamental still RMS ~0.45;
+    // anything above 0.05 proves we're not stuck on a DC-only mip.
+    REQUIRE(rms > 0.05);
 }
 
 TEST_CASE("Aliasing at high notes is reduced", "[wavetable][mip][alias]") {

@@ -55,3 +55,6 @@ session.db
 JuceLibraryCode/
 scripts/
 .claude/
+
+# Editor / temp backups
+*.bak

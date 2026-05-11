@@ -1,14 +1,9 @@
 #include "agent/AgentBridge.h"
 
 #include <algorithm>
-#include <fstream>
-#include <iomanip>
 #include <juce_core/juce_core.h>
 #include <juce_events/juce_events.h>
-#include <sstream>
 #include <utility>
-
-#include "agent/ParamMap.h"
 
 namespace agentic_synth::agent {
 
@@ -154,28 +149,15 @@ void AgentBridge::notifySuggestVariations(const juce::var& payload) { dispatch(s
 void AgentBridge::notifyPatchUpdate(const juce::var& payload) { dispatch(patchUpdateSlots_, payload); }
 void AgentBridge::notifyTranscript(const juce::var& payload) { dispatch(transcriptSlots_, payload); }
 
-namespace {
-
-// Phase 9C: paramToDelta (UI param path → PatchDelta) now lives in
-// ParamMap.cpp as a single source-of-truth table. AgentBridge calls
-// agent::paramToDelta directly — see handleKnobTweak below.
-
-} // namespace
-
 std::string AgentBridge::status() const { return "agent-bridge-v2"; }
 
-PatchStruct AgentBridge::submitPrompt(const std::string& prompt) {
-    // Reset stream parser so field-complete callbacks from a prior LLM call
-    // don't bleed into this submission's heuristic patch.
-    streamParser_.reset();
-    // Issue #65/#68: heuristic dispatched < 200 ms; semantic layer refines in place.
-    PatchStruct patch = pipeline_.submit(prompt);
-    if (semanticMapper_.apply(prompt, patch) > 0)
-        pipeline_.injectPatch(patch);
-    return patch;
-}
+// Phase 12A: submitPrompt / refinePatch / generateLlmPatch / feedChunk /
+// buildSystemPrompt / getParameterBias / generateRationale forward to
+// prompt_ (PromptHandler).
 
-void AgentBridge::refinePatch(const PatchStruct& llmPatch) { pipeline_.refinePatch(llmPatch); }
+PatchStruct AgentBridge::submitPrompt(const std::string& prompt) { return prompt_.submitPrompt(prompt); }
+
+void AgentBridge::refinePatch(const PatchStruct& llmPatch) { prompt_.refinePatch(llmPatch); }
 
 std::optional<PatchStruct> AgentBridge::pollPatch() noexcept { return pipeline_.poll(); }
 
@@ -194,64 +176,25 @@ void AgentBridge::recordFeedback(FeedbackKind kind, const std::string& prompt, c
 }
 
 std::string AgentBridge::buildSystemPrompt(const std::string& userPrompt) const {
-    const std::string& base =
-        sampler_.systemPrompt().empty()
-            ? std::string("You are a synthesizer patch designer. Generate synth parameters as structured JSON.\n")
-            : sampler_.systemPrompt();
-
-    std::string prompt = base;
-
-    // Append MIDI CC context so the AI respects the user's current performance state.
-    if (midiCutoffNorm_ < 0.25f)
-        prompt += "MIDI context: filter is currently closed (dark sound).\n";
-    else if (midiCutoffNorm_ > 0.75f)
-        prompt += "MIDI context: filter is currently open (bright sound).\n";
-    if (midiResonanceNorm_ > 0.5f)
-        prompt += "MIDI context: high resonance is active.\n";
-
-    std::string recap = memory_.buildRecap(userPrompt);
-    if (recap.empty())
-        return prompt;
-    return prompt + "\n## Session Feedback\n" + recap + "\nUse the above feedback to guide parameter choices.\n";
+    return prompt_.buildSystemPrompt(userPrompt);
 }
 
 PatchVector AgentBridge::getParameterBias(const std::string& userPrompt) const {
-    return memory_.computeParameterBias(userPrompt);
+    return prompt_.getParameterBias(userPrompt);
 }
 
 std::optional<PatchStruct> AgentBridge::generateLlmPatch(const std::string& prompt, uint32_t patch_id) {
-    auto result = sampler_.generate(prompt, patch_id);
-    if (result)
-        refinePatch(*result);
-    return result;
+    return prompt_.generateLlmPatch(prompt, patch_id);
 }
 
-void AgentBridge::feedChunk(std::string_view chunk) { streamParser_.feedChunk(chunk); }
+void AgentBridge::feedChunk(std::string_view chunk) { prompt_.feedChunk(chunk); }
 
-void AgentBridge::onMidiCC(int controller, int value) noexcept {
-    // Track CC74 (brightness/filter cutoff) and CC71 (resonance) so the
-    // system prompt can reflect the user's current timbral preference.
-    switch (controller) {
-    case 71:
-        midiResonanceNorm_ = static_cast<float>(value) / 127.0f;
-        break;
-    case 74:
-        midiCutoffNorm_ = static_cast<float>(value) / 127.0f;
-        break;
-    default:
-        break;
-    }
-}
+void AgentBridge::onMidiCC(int controller, int value) noexcept { knob_.onMidiCC(controller, value); }
 
-// ── Issue #72: Bidirectional knob bridge ─────────────────────────────────────
+// ── Issue #72: Bidirectional knob bridge (Phase 12A: forwards to KnobBridge) ─
 
 void AgentBridge::handleKnobTweak(const std::string& param, float value) {
-    // Copy current patch, apply the single-parameter delta, inject immediately.
-    PatchStruct patch = pipeline_.currentPatch();
-    mapper::apply_delta(patch, paramToDelta(param, value));
-    pipeline_.injectPatch(patch);
-    // Record so the session memory can bias future generations towards user tweaks.
-    memory_.recordFeedback(FeedbackKind::Tweak, param, patch);
+    knob_.handleKnobTweak(param, value);
 }
 
 // ── Issue #90: Semantic dictionary (Phase 10C: forwards to DictionaryService) ─
@@ -268,73 +211,10 @@ std::string AgentBridge::getTelemetryJson() const { return telemetry_.getTelemet
 
 void AgentBridge::setTelemetryEnabled(bool on) { telemetry_.setEnabled(on); }
 
-// ── Issue #85: Session-aware narrative generation ────────────────────────────
+// ── Issue #85: Session-aware narrative generation (Phase 12A: forwards) ──────
 
 std::string AgentBridge::generateRationale(const std::string& prompt, const PatchStruct& patch) const {
-    std::ostringstream oss;
-
-    // Describe oscillator character.
-    static const char* kOscNames[] = {"sine", "triangle", "sawtooth", "square", "pulse", "wavetable", "FM", "noise"};
-    const int oscIdx = static_cast<int>(patch.osc[0].type);
-    const char* oscName = (oscIdx >= 0 && oscIdx < 8) ? kOscNames[oscIdx] : "sawtooth";
-
-    oss << "I chose a " << oscName << " oscillator";
-
-    // Filter character.
-    if (patch.filter.cutoff_hz < 500.0f)
-        oss << " with a closed filter for a dark, sub-heavy character";
-    else if (patch.filter.cutoff_hz < 4000.0f)
-        oss << " with a mid-range filter for warmth and presence";
-    else
-        oss << " with an open filter for brightness and clarity";
-
-    if (patch.filter.resonance > 0.6f)
-        oss << ", pushing the resonance for an acidic edge";
-    else if (patch.filter.resonance > 0.3f)
-        oss << " with moderate resonance for character";
-
-    // Amplitude envelope.
-    if (patch.amp_env.attack_s > 0.5f)
-        oss << ". The slow attack lets the sound bloom gradually";
-    else if (patch.amp_env.attack_s < 0.01f)
-        oss << ". The instant attack gives it punch and immediacy";
-
-    if (patch.amp_env.release_s > 1.5f)
-        oss << " with a long release tail";
-
-    // Modulation / movement.
-    if (patch.lfo[0].depth > 0.3f) {
-        const char* lfoTarget = (patch.lfo[0].target == LfoTarget::Pitch)          ? "pitch modulation"
-                                : (patch.lfo[0].target == LfoTarget::FilterCutoff) ? "filter movement"
-                                : (patch.lfo[0].target == LfoTarget::Amplitude)    ? "tremolo"
-                                                                                   : "modulation";
-        oss << ", adding " << lfoTarget << " for animation";
-    }
-
-    // Space.
-    if (patch.reverb.mix > 0.4f)
-        oss << ". Heavy reverb places it in a wide, ambient space";
-    else if (patch.reverb.mix > 0.15f)
-        oss << ". Light reverb adds depth without washing it out";
-
-    if (patch.delay.mix > 0.2f)
-        oss << " with delay for rhythmic echo";
-
-    // Session context influence.
-    const std::string recap = memory_.buildRecap(prompt, 3);
-    if (!recap.empty()) {
-        oss << ". Your session feedback steered me toward this timbral direction"
-            << " — I've adjusted based on what you've liked and passed on previously";
-    }
-
-    // MIDI context.
-    if (midiCutoffNorm_ < 0.25f)
-        oss << ". I respected your MIDI filter position (currently closed/dark)";
-    else if (midiCutoffNorm_ > 0.75f)
-        oss << ". I matched your MIDI filter position (currently open/bright)";
-
-    oss << ".";
-    return oss.str();
+    return prompt_.generateRationale(prompt, patch);
 }
 
 // ── Phase 6C: in-browser audition keyboard ──────────────────────────────────

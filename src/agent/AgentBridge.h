@@ -13,7 +13,9 @@
 #include <juce_core/juce_core.h>
 
 #include "agent/DictionaryService.h"
+#include "agent/KnobBridge.h"
 #include "agent/PrePatchPipeline.h"
+#include "agent/PromptHandler.h"
 #include "agent/SessionMemory.h"
 #include "agent/StreamParser.h"
 #include "agent/Telemetry.h"
@@ -25,16 +27,20 @@
 
 namespace agentic_synth::agent {
 
-// Phase 10C god-object split — status:
-//   * DictionaryService  — extracted (this commit).
-//   * TelemetryService   — extracted (this commit).
-//   * PromptHandler      — DEFERRED to Phase 11. Touches the streaming JSON
-//                          parser + heuristic submit path; needs careful
-//                          ordering work to keep < 200 ms first-audible-change
-//                          on the audio thread.
-//   * KnobBridge         — DEFERRED to Phase 11. Owns the realtime knob
-//                          tweak path + MIDI CC atomics; an extraction must
-//                          preserve the audio-thread atomic contracts.
+// Phase 10C / 12A god-object split — status:
+//   * DictionaryService  — extracted (Phase 10C).
+//   * TelemetryService   — extracted (Phase 10C).
+//   * PromptHandler      — extracted (Phase 12A). Owns submitPrompt /
+//                          refinePatch / generateLlmPatch / feedChunk /
+//                          buildSystemPrompt / generateRationale /
+//                          getParameterBias. AgentBridge methods are thin
+//                          forwards; the streaming-parser callback wiring
+//                          stays here because it has to also fan out to
+//                          typed subscribers via notifyPatch.
+//   * KnobBridge         — extracted (Phase 12A). Owns handleKnobTweak /
+//                          onMidiCC + the midi cutoff/resonance atomics.
+//                          The atomics moved out of AgentBridge; reads
+//                          flow through KnobBridge::midi*Norm() accessors.
 class AgentBridge {
 public:
     AgentBridge();
@@ -175,12 +181,20 @@ private:
     mapper::SemanticMapper semanticMapper_;
     StreamParser streamParser_;
 
-    // Phase 10C extracted services (see header comment above). Each owns its
-    // own state; AgentBridge forwards the public API to them. dictionary_
-    // holds a reference to semanticMapper_, so its declaration MUST come
-    // after semanticMapper_ for correct construction order.
+    // Phase 10C / 12A extracted services (see header comment above). Each
+    // owns its own state; AgentBridge forwards the public API to them.
+    //
+    // Declaration order is load-bearing: services hold non-owning references
+    // to the members above and to each other, so each one MUST come after
+    // every dependency it captures.
+    //   * dictionary_   -> semanticMapper_
+    //   * knob_         -> pipeline_, memory_
+    //   * prompt_       -> pipeline_, sampler_, semanticMapper_,
+    //                      streamParser_, memory_, knob_
     TelemetryService telemetry_{Telemetry::defaultLogPath()};
     DictionaryService dictionary_{semanticMapper_};
+    KnobBridge knob_{pipeline_, memory_};
+    PromptHandler prompt_{pipeline_, sampler_, semanticMapper_, streamParser_, memory_, knob_};
 
     // Subscriber slot lists, guarded by a single mutex.  Each slot holds a
     // weak_ptr to the Callback; the SubscriberHandle (an aliased shared_ptr)
@@ -195,9 +209,8 @@ private:
     SlotList patchUpdateSlots_;
     SlotList transcriptSlots_;
 
-    // Written by the MIDI/audio thread; read by UI/control thread — must be atomic.
-    std::atomic<float> midiCutoffNorm_{0.5f};
-    std::atomic<float> midiResonanceNorm_{0.0f};
+    // Phase 12A: midi cutoff/resonance atomics moved to KnobBridge (knob_);
+    // read via knob_.midiCutoffNorm() / knob_.midiResonanceNorm().
 
     // Phase 6C: optional in-browser-audition note sink. Owned externally
     // (typically by AgenticSynthPlugin). Mutex guards swap-during-callback;
