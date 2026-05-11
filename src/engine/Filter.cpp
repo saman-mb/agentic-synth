@@ -30,16 +30,23 @@ void MoogLadder::prepare(double sampleRate) {
 }
 
 void MoogLadder::setCutoff(float hz) {
+    // Defensive boundary guard: ignore non-finite setter inputs so a bad
+    // modulation source can't poison the coefficient state. VoiceManager
+    // sanitises modulation via safe() in applyPatch already (Phase 1); this
+    // is a belt-and-braces second layer at the filter boundary.
+    if (!std::isfinite(hz)) return;
     cutoff_ = hz;
     updateCoefficients();
 }
 
 void MoogLadder::setResonance(float resonance) {
+    if (!std::isfinite(resonance)) return;
     resonance_ = std::clamp(resonance, 0.0f, 1.0f);
     updateCoefficients();
 }
 
 void MoogLadder::setDrive(float drive) {
+    if (!std::isfinite(drive)) return;
     drive_ = std::clamp(drive, 0.0f, 1.0f);
     driveGain_ = 1.0 + static_cast<double>(drive_) * kDriveGainFactor;
     driveComp_ = driveCompensation(driveGain_);
@@ -60,6 +67,15 @@ void MoogLadder::updateCoefficients() {
 }
 
 float MoogLadder::process(float input) {
+    // NaN/Inf input guard: tanh(NaN) = NaN, which would propagate forever
+    // through the integrator state once a single bad sample lands. Clear
+    // state and return silence so the filter recovers on the very next
+    // valid sample instead of being poisoned for the rest of the session.
+    if (!std::isfinite(input)) {
+        reset();
+        return 0.0f;
+    }
+
     // Denormal protection: inject a tiny DC bias that cancels itself in the
     // sum but pushes integrator accumulators out of the subnormal range.
     // Portable, no SSE intrinsics required.
@@ -121,11 +137,13 @@ void SVFilter::prepare(double sampleRate) {
 }
 
 void SVFilter::setCutoff(float hz) {
+    if (!std::isfinite(hz)) return;
     cutoff_ = hz;
     updateCoefficients();
 }
 
 void SVFilter::setResonance(float resonance) {
+    if (!std::isfinite(resonance)) return;
     resonance_ = std::clamp(resonance, 0.0f, 1.0f);
     updateCoefficients();
 }
@@ -148,6 +166,11 @@ void SVFilter::updateCoefficients() {
 }
 
 float SVFilter::process(float x_in) {
+    // NaN/Inf input guard — same rationale as MoogLadder::process.
+    if (!std::isfinite(x_in)) {
+        reset();
+        return 0.0f;
+    }
     const double x = static_cast<double>(x_in);
     const double v3 = x - ic2eq_;
     const double v1 = a1_ * ic1eq_ + a2_ * v3;

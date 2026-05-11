@@ -77,6 +77,17 @@ PatchStruct MorphEngine::lerp(const PatchStruct& a, const PatchStruct& b, float 
     PatchStruct out = a;
     const float u = 1.0f - t;
 
+    // Log-domain (geometric) interpolation for perceptual frequency/time fields.
+    // Linear interp on cutoff_hz / LFO rate / env times sounds "top-heavy" —
+    // a 20 → 8000 Hz sweep at t=0.5 yields 4010 Hz (linear), perceptually
+    // already near the top of the sweep. Geometric midpoint = sqrt(a*b) = 400 Hz,
+    // which feels like the true midpoint of the octave-spaced sweep.
+    auto loglerp = [u, t](float a_in, float b_in, float lo, float hi) noexcept {
+        const float ac = std::clamp(a_in, lo, hi);
+        const float bc = std::clamp(b_in, lo, hi);
+        return std::exp(u * std::log(ac) + t * std::log(bc));
+    };
+
     // Oscillators
     for (int i = 0; i < kMaxOscillators; ++i) {
         out.osc[i].semitone_offset = u * a.osc[i].semitone_offset + t * b.osc[i].semitone_offset;
@@ -94,8 +105,8 @@ PatchStruct MorphEngine::lerp(const PatchStruct& a, const PatchStruct& b, float 
         }
     }
 
-    // Filter
-    out.filter.cutoff_hz = u * a.filter.cutoff_hz + t * b.filter.cutoff_hz;
+    // Filter — cutoff is log-domain (octave-spaced perception)
+    out.filter.cutoff_hz = loglerp(a.filter.cutoff_hz, b.filter.cutoff_hz, 20.0f, 20000.0f);
     out.filter.resonance = u * a.filter.resonance + t * b.filter.resonance;
     out.filter.env_mod = u * a.filter.env_mod + t * b.filter.env_mod;
     out.filter.key_track = u * a.filter.key_track + t * b.filter.key_track;
@@ -103,21 +114,21 @@ PatchStruct MorphEngine::lerp(const PatchStruct& a, const PatchStruct& b, float 
     if (t >= 0.5f)
         out.filter.type = b.filter.type;
 
-    // Filter envelope
-    out.filter_env.attack_s = u * a.filter_env.attack_s + t * b.filter_env.attack_s;
-    out.filter_env.decay_s = u * a.filter_env.decay_s + t * b.filter_env.decay_s;
+    // Filter envelope — time params log-domain, sustain (amplitude) linear
+    out.filter_env.attack_s = loglerp(a.filter_env.attack_s, b.filter_env.attack_s, 0.001f, 10.0f);
+    out.filter_env.decay_s = loglerp(a.filter_env.decay_s, b.filter_env.decay_s, 0.001f, 10.0f);
     out.filter_env.sustain = u * a.filter_env.sustain + t * b.filter_env.sustain;
-    out.filter_env.release_s = u * a.filter_env.release_s + t * b.filter_env.release_s;
+    out.filter_env.release_s = loglerp(a.filter_env.release_s, b.filter_env.release_s, 0.001f, 10.0f);
 
-    // Amp envelope
-    out.amp_env.attack_s = u * a.amp_env.attack_s + t * b.amp_env.attack_s;
-    out.amp_env.decay_s = u * a.amp_env.decay_s + t * b.amp_env.decay_s;
+    // Amp envelope — time params log-domain, sustain linear
+    out.amp_env.attack_s = loglerp(a.amp_env.attack_s, b.amp_env.attack_s, 0.001f, 10.0f);
+    out.amp_env.decay_s = loglerp(a.amp_env.decay_s, b.amp_env.decay_s, 0.001f, 10.0f);
     out.amp_env.sustain = u * a.amp_env.sustain + t * b.amp_env.sustain;
-    out.amp_env.release_s = u * a.amp_env.release_s + t * b.amp_env.release_s;
+    out.amp_env.release_s = loglerp(a.amp_env.release_s, b.amp_env.release_s, 0.001f, 10.0f);
 
-    // LFOs
+    // LFOs — rate is log-domain, depth/phase linear
     for (int i = 0; i < kMaxLfos; ++i) {
-        out.lfo[i].rate_hz = u * a.lfo[i].rate_hz + t * b.lfo[i].rate_hz;
+        out.lfo[i].rate_hz = loglerp(a.lfo[i].rate_hz, b.lfo[i].rate_hz, 0.01f, 100.0f);
         out.lfo[i].depth = u * a.lfo[i].depth + t * b.lfo[i].depth;
         out.lfo[i].phase_offset = u * a.lfo[i].phase_offset + t * b.lfo[i].phase_offset;
         if (t >= 0.5f) {
@@ -137,6 +148,7 @@ PatchStruct MorphEngine::lerp(const PatchStruct& a, const PatchStruct& b, float 
     out.delay.time_s = u * a.delay.time_s + t * b.delay.time_s;
     out.delay.feedback = u * a.delay.feedback + t * b.delay.feedback;
     out.delay.mix = u * a.delay.mix + t * b.delay.mix;
+    out.delay.stereo = u * a.delay.stereo + t * b.delay.stereo;
     if (t >= 0.5f)
         out.delay.bpm_sync = b.delay.bpm_sync;
 

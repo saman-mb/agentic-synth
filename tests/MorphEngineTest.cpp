@@ -81,7 +81,9 @@ TEST_CASE("MorphEngine: morphed patch at 0.5 is midpoint of two targets", "[morp
     morph.saveTarget(b);
 
     auto result = morph.morphedPatchAt(0.5f);
-    REQUIRE_THAT(result.filter.cutoff_hz, Catch::Matchers::WithinAbs(2000.0f, 1.0f));
+    // cutoff_hz uses log-domain interp → geometric mean = sqrt(1000 * 3000) ≈ 1732.05.
+    REQUIRE_THAT(result.filter.cutoff_hz, Catch::Matchers::WithinAbs(1732.05f, 1.0f));
+    // master_gain stays linear.
     REQUIRE_THAT(result.master_gain, Catch::Matchers::WithinAbs(0.5f, 0.01f));
 }
 
@@ -174,5 +176,97 @@ TEST_CASE("MorphEngine: callback fires with correct morphed patch", "[morph]") {
     morph.pollCallback();
 
     REQUIRE(captured.has_value());
-    REQUIRE_THAT(captured->filter.cutoff_hz, Catch::Matchers::WithinAbs(300.0f, 1.0f));
+    // Log-domain midpoint: sqrt(100 * 500) ≈ 223.6 Hz (NOT linear 300).
+    REQUIRE_THAT(captured->filter.cutoff_hz, Catch::Matchers::WithinAbs(223.6f, 1.0f));
+}
+
+// ── Log-domain interpolation for perceptual fields ────────────────────────────
+
+TEST_CASE("MorphEngine: cutoff sweeps in log domain", "[morph][log]") {
+    MorphEngine morph;
+    PatchStruct a = make_default_patch();
+    a.filter.cutoff_hz = 200.0f;
+    PatchStruct b = make_default_patch();
+    b.filter.cutoff_hz = 20000.0f;
+    morph.saveTarget(a);
+    morph.saveTarget(b);
+
+    // Geometric mean = sqrt(200 * 20000) = 2000 Hz, NOT linear mean 10100 Hz.
+    auto result = morph.morphedPatchAt(0.5f);
+    REQUIRE_THAT(result.filter.cutoff_hz, Catch::Matchers::WithinRel(2000.0f, 0.05f));
+}
+
+TEST_CASE("MorphEngine: LFO rate sweeps in log domain", "[morph][log]") {
+    MorphEngine morph;
+    PatchStruct a = make_default_patch();
+    a.lfo[0].rate_hz = 0.1f;
+    PatchStruct b = make_default_patch();
+    b.lfo[0].rate_hz = 100.0f;
+    morph.saveTarget(a);
+    morph.saveTarget(b);
+
+    // Geometric mean = sqrt(0.1 * 100) ≈ 3.162, NOT linear 50.05.
+    auto result = morph.morphedPatchAt(0.5f);
+    REQUIRE_THAT(result.lfo[0].rate_hz, Catch::Matchers::WithinRel(3.1623f, 0.05f));
+}
+
+TEST_CASE("MorphEngine: amp env attack sweeps in log domain", "[morph][log]") {
+    MorphEngine morph;
+    PatchStruct a = make_default_patch();
+    a.amp_env.attack_s = 0.001f;
+    PatchStruct b = make_default_patch();
+    b.amp_env.attack_s = 1.0f;
+    morph.saveTarget(a);
+    morph.saveTarget(b);
+
+    // Geometric mean = sqrt(0.001 * 1.0) ≈ 0.03162, NOT linear 0.5005.
+    auto result = morph.morphedPatchAt(0.5f);
+    REQUIRE_THAT(result.amp_env.attack_s, Catch::Matchers::WithinRel(0.03162f, 0.05f));
+}
+
+TEST_CASE("MorphEngine: linear fields stay linear", "[morph][log]") {
+    MorphEngine morph;
+    PatchStruct a = make_default_patch();
+    a.master_gain = 0.0f;
+    a.filter.resonance = 0.0f;
+    a.reverb.mix = 0.0f;
+    PatchStruct b = make_default_patch();
+    b.master_gain = 1.0f;
+    b.filter.resonance = 1.0f;
+    b.reverb.mix = 1.0f;
+    morph.saveTarget(a);
+    morph.saveTarget(b);
+
+    auto result = morph.morphedPatchAt(0.5f);
+    REQUIRE_THAT(result.master_gain, Catch::Matchers::WithinAbs(0.5f, 1e-5f));
+    REQUIRE_THAT(result.filter.resonance, Catch::Matchers::WithinAbs(0.5f, 1e-5f));
+    REQUIRE_THAT(result.reverb.mix, Catch::Matchers::WithinAbs(0.5f, 1e-5f));
+}
+
+TEST_CASE("MorphEngine: identical patches morph to identity", "[morph][log]") {
+    MorphEngine morph;
+    PatchStruct p = make_default_patch();
+    p.filter.cutoff_hz = 1234.0f;
+    p.lfo[0].rate_hz = 7.5f;
+    p.amp_env.attack_s = 0.05f;
+    p.amp_env.decay_s = 0.2f;
+    p.amp_env.release_s = 0.4f;
+    p.filter_env.attack_s = 0.01f;
+    p.filter_env.decay_s = 0.3f;
+    p.filter_env.release_s = 0.5f;
+    p.master_gain = 0.7f;
+    morph.saveTarget(p);
+    morph.saveTarget(p);
+
+    for (float t : {0.0f, 0.25f, 0.5f, 0.75f, 1.0f}) {
+        auto out = morph.morphedPatchAt(t);
+        INFO("t = " << t);
+        REQUIRE_THAT(out.filter.cutoff_hz, Catch::Matchers::WithinRel(p.filter.cutoff_hz, 1e-4f));
+        REQUIRE_THAT(out.lfo[0].rate_hz, Catch::Matchers::WithinRel(p.lfo[0].rate_hz, 1e-4f));
+        REQUIRE_THAT(out.amp_env.attack_s, Catch::Matchers::WithinRel(p.amp_env.attack_s, 1e-4f));
+        REQUIRE_THAT(out.amp_env.decay_s, Catch::Matchers::WithinRel(p.amp_env.decay_s, 1e-4f));
+        REQUIRE_THAT(out.amp_env.release_s, Catch::Matchers::WithinRel(p.amp_env.release_s, 1e-4f));
+        REQUIRE_THAT(out.filter_env.attack_s, Catch::Matchers::WithinRel(p.filter_env.attack_s, 1e-4f));
+        REQUIRE_THAT(out.master_gain, Catch::Matchers::WithinAbs(p.master_gain, 1e-5f));
+    }
 }

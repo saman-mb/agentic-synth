@@ -63,6 +63,7 @@ PatchStruct validate_patch(PatchStruct p, UnsafeModeFlags flags) noexcept {
     p.delay.time_s = clamp_f(p.delay.time_s, 0.0f, 2.0f, 0.5f);
     p.delay.feedback = clamp_f(p.delay.feedback, 0.0f, 0.99f, 0.0f);
     p.delay.mix = clamp_f(p.delay.mix, 0.0f, 1.0f, 0.0f);
+    p.delay.stereo = clamp_f(p.delay.stereo, 0.0f, 1.0f, 0.5f);
     p.delay.bpm_sync = (p.delay.bpm_sync != 0) ? 1u : 0u;
 
     p.master_gain = clamp_f(p.master_gain, 0.0f, 1.0f, 1.0f);
@@ -102,7 +103,7 @@ bool patch_is_finite(const PatchStruct& p) noexcept {
     if (!ok(p.reverb.size) || !ok(p.reverb.damping) || !ok(p.reverb.width) || !ok(p.reverb.mix))
         return false;
 
-    if (!ok(p.delay.time_s) || !ok(p.delay.feedback) || !ok(p.delay.mix))
+    if (!ok(p.delay.time_s) || !ok(p.delay.feedback) || !ok(p.delay.mix) || !ok(p.delay.stereo))
         return false;
 
     return ok(p.master_gain) && ok(p.portamento_s);

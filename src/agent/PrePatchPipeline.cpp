@@ -50,6 +50,7 @@ PatchStruct lerpPatch(const PatchStruct& a, const PatchStruct& b, float t) noexc
     out.delay.time_s = lerp(a.delay.time_s, b.delay.time_s, t);
     out.delay.feedback = lerp(a.delay.feedback, b.delay.feedback, t);
     out.delay.mix = lerp(a.delay.mix, b.delay.mix, t);
+    out.delay.stereo = lerp(a.delay.stereo, b.delay.stereo, t);
 
     out.master_gain = lerp(a.master_gain, b.master_gain, t);
     out.portamento_s = lerp(a.portamento_s, b.portamento_s, t);
