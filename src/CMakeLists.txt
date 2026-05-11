@@ -7,11 +7,17 @@ add_library(agentic_synth_mapper STATIC
 )
 target_include_directories(agentic_synth_mapper PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 agentic_synth_configure_target(agentic_synth_mapper)
+# juce::juce_core provides juce::JSON, used by SemanticMapper to replace
+# hand-rolled JSON substring scans (engineering audit; same pattern as
+# commit 91d5e4b in AgentBridge).
+target_link_libraries(agentic_synth_mapper
+    PUBLIC
+        juce::juce_core
+)
 
 # ── Engine Library ───────────────────────────────────────────────────────────
 # Core synth DSP only — no agent code.  Depends on mapper and JUCE audio types.
 add_library(agentic_synth_engine STATIC
-    engine/SynthEngine.cpp
     engine/ADSREnvelope.cpp
     engine/WavetableOscillator.cpp
     engine/VAOscillator.cpp
@@ -26,7 +32,6 @@ add_library(agentic_synth_engine STATIC
     engine/MorphEngine.cpp
     engine/StyleTransfer.cpp
     engine/PresetExporter.cpp
-    engine/PresetDatabase.cpp
     engine/PatchStateManager.cpp
     engine/MultiModalInput.cpp
     engine/Reverb.cpp
