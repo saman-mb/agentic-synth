@@ -182,6 +182,8 @@ void VoiceManager::prepare(double sampleRate) {
     cutoffSmoother_.setSampleRate(sampleRate);
     resonanceSmoother_.setSampleRate(sampleRate);
     gainSmoother_.setSampleRate(sampleRate);
+    delay_.prepare(sampleRate);
+    reverb_.prepare(sampleRate);
 }
 
 void VoiceManager::noteOn(int midiNote, float velocity) {
@@ -308,6 +310,18 @@ void VoiceManager::applyPatch(const PatchStruct& patch) noexcept {
         if (v.filter) v.filter->setDrive(drive);
     }
 
+    // FX bus parameters (stereo path only). Reverb width and delay bpm_sync
+    // are not yet wired — width is folded into Freeverb's fixed stereo spread
+    // and tempo-sync delay times need MorphEngine work first.
+    reverb_.setSize(std::clamp(safe(patch.reverb.size,    0.5f), 0.0f, 1.0f));
+    reverb_.setDamp(std::clamp(safe(patch.reverb.damping, 0.5f), 0.0f, 1.0f));
+    reverb_.setMix (std::clamp(safe(patch.reverb.mix,     0.0f), 0.0f, 1.0f));
+    delay_.setTimeSeconds(std::clamp(safe(patch.delay.time_s,   0.25f), 0.001f, 2.0f));
+    delay_.setFeedback   (std::clamp(safe(patch.delay.feedback, 0.3f),  0.0f,   0.99f));
+    delay_.setMix        (std::clamp(safe(patch.delay.mix,      0.0f),  0.0f,   1.0f));
+    // Stereo cross-feed isn't in PatchStruct yet — fixed at moderate ping-pong.
+    delay_.setStereo(0.5f);
+
     // Amp + filter envelopes.
     ADSREnvelope::Params ampParams{};
     ampParams.attackSeconds = patch.amp_env.attack_s;
@@ -391,8 +405,14 @@ void VoiceManager::renderBlock(float* left, float* right, int numSamples) noexce
             lSum += s * v.panGainL;
             rSum += s * v.panGainR;
         }
-        left[i] = lSum * gain;
-        right[i] = rSum * gain;
+        // FX bus: voices → master gain → delay → reverb. Both FX are
+        // wet/dry-mixed internally; setMix=0 in either bypasses cleanly.
+        float wetL = lSum * gain;
+        float wetR = rSum * gain;
+        delay_.process(wetL, wetR, wetL, wetR);
+        reverb_.process(wetL, wetR, wetL, wetR);
+        left[i] = wetL;
+        right[i] = wetR;
     }
 }
 

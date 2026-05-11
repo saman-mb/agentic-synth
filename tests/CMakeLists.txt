@@ -11,6 +11,8 @@ add_executable(agentic_synth_tests
     ADSREnvelopeTest.cpp
     WavetableOscillatorTest.cpp
     VAOscillatorTest.cpp
+    DelayTest.cpp
+    ReverbTest.cpp
     FilterTest.cpp
     LFOTest.cpp
     ParamSmootherTest.cpp

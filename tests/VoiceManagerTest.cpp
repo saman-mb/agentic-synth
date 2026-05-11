@@ -618,3 +618,76 @@ TEST_CASE("VoiceManager applyPatch wires LFO + filter env + smoothers without cr
         finite = finite && std::isfinite(s);
     REQUIRE(finite);
 }
+
+// ── FX bus wiring (Phase 3) ──────────────────────────────────────────────────
+
+namespace {
+
+// Render the stereo FX bus through note-on/render/note-off/render-tail and
+// return the post-release RMS of the (L,R) sum. Used to compare wet vs dry
+// patches end-to-end.
+double renderPostReleaseRms(const PatchStruct& patch, int releaseSamples) {
+    VoiceManager vm(4);
+    vm.prepare(44100.0);
+    vm.applyPatch(patch);
+    vm.noteOn(60, 1.0f);
+    // Render ~50 ms with note held so the envelope reaches sustain.
+    std::vector<float> l(2205, 0.0f), r(2205, 0.0f);
+    vm.renderBlock(l.data(), r.data(), static_cast<int>(l.size()));
+    vm.noteOff(60);
+    // Now render the tail. With short amp release, the dry signal goes to
+    // zero quickly; any post-release energy must come from the FX bus.
+    std::vector<float> tailL(releaseSamples, 0.0f), tailR(releaseSamples, 0.0f);
+    vm.renderBlock(tailL.data(), tailR.data(), releaseSamples);
+    // Skip the initial release transient (first ~20 ms) so we measure pure
+    // tail energy.
+    const int start = 882;
+    double sum = 0.0;
+    for (int i = start; i < releaseSamples; ++i) {
+        sum += static_cast<double>(tailL[i]) * tailL[i];
+        sum += static_cast<double>(tailR[i]) * tailR[i];
+    }
+    return std::sqrt(sum / static_cast<double>(2 * (releaseSamples - start)));
+}
+
+} // namespace
+
+TEST_CASE("VoiceManager reverb mix=1 produces decaying tail after note off") {
+    PatchStruct wet = make_default_patch();
+    wet.amp_env.release_s = 0.01f;     // dry signal dies fast
+    wet.reverb.mix = 1.0f;
+    wet.reverb.size = 0.8f;
+    wet.reverb.damping = 0.3f;
+    wet.delay.mix = 0.0f;              // isolate reverb
+
+    PatchStruct dry = wet;
+    dry.reverb.mix = 0.0f;
+
+    const double wetRms = renderPostReleaseRms(wet, 88200); // 2 s tail
+    const double dryRms = renderPostReleaseRms(dry, 88200);
+
+    // Wet path must hold a measurable reverb tail long after the amp env
+    // releases; dry path must be effectively silent post-transient.
+    CHECK(wetRms > 10.0 * dryRms);
+    CHECK(wetRms > 1e-4);
+    CHECK(dryRms < 1e-3);
+}
+
+TEST_CASE("VoiceManager delay mix=1 produces echoes after note off") {
+    PatchStruct wet = make_default_patch();
+    wet.amp_env.release_s = 0.01f;
+    wet.delay.mix = 1.0f;
+    wet.delay.time_s = 0.1f;
+    wet.delay.feedback = 0.5f;
+    wet.reverb.mix = 0.0f;             // isolate delay
+
+    PatchStruct dry = wet;
+    dry.delay.mix = 0.0f;
+
+    const double wetRms = renderPostReleaseRms(wet, 88200);
+    const double dryRms = renderPostReleaseRms(dry, 88200);
+
+    CHECK(wetRms > 10.0 * dryRms);
+    CHECK(wetRms > 1e-4);
+    CHECK(dryRms < 1e-3);
+}

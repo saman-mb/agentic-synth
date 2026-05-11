@@ -15,6 +15,7 @@ add_library(agentic_synth_engine STATIC
     engine/ADSREnvelope.cpp
     engine/WavetableOscillator.cpp
     engine/VAOscillator.cpp
+    engine/Delay.cpp
     engine/Filter.cpp
     engine/LFO.cpp
     engine/ParamSmoother.cpp
@@ -28,6 +29,7 @@ add_library(agentic_synth_engine STATIC
     engine/PresetDatabase.cpp
     engine/PatchStateManager.cpp
     engine/MultiModalInput.cpp
+    engine/Reverb.cpp
 )
 target_include_directories(agentic_synth_engine PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 agentic_synth_configure_target(agentic_synth_engine)
