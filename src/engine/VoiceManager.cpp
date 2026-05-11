@@ -8,6 +8,35 @@ namespace agentic_synth::engine {
 
 namespace {
 
+// Round-robin per-voice pan offsets. Phase 2 stereo: each new voice in a
+// chord gets a distinct lateral position so polyphonic content spreads
+// across the field instead of summing to the center. Pattern alternates
+// L/R with shrinking magnitude so the first two voices are widest and
+// later voices fill the middle. Voice 0 → -0.4, 1 → +0.4, 2 → -0.2, 3 →
+// +0.2, 4 → -0.6, 5 → +0.6, 6 → -0.1, 7 → +0.1, repeat for index ≥ 8.
+constexpr float kVoicePanTable[] = {
+    -0.4f, +0.4f, -0.2f, +0.2f, -0.6f, +0.6f, -0.1f, +0.1f,
+};
+
+float panForVoiceIndex(std::size_t i) noexcept {
+    return kVoicePanTable[i % (sizeof(kVoicePanTable) / sizeof(kVoicePanTable[0]))];
+}
+
+// Constant-power pan law. p ∈ [-1, +1]; map to angle θ ∈ [0, π/2] via
+// θ = ((p+1)/2) * π/2 so:
+//   p = -1 → θ = 0     → L = cos 0 = 1,         R = sin 0 = 0
+//   p =  0 → θ = π/4   → L = R = cos(π/4) = √2/2 ≈ 0.7071
+//   p = +1 → θ = π/2   → L = cos(π/2) = 0,      R = sin(π/2) = 1
+// L²+R² = cos²θ + sin²θ = 1 for all p, so total power is preserved
+// regardless of pan position (the perceptual luxury of constant-power).
+void computePanGains(float pan, float& l, float& r) noexcept {
+    pan = std::clamp(pan, -1.0f, 1.0f);
+    constexpr float kHalfPi = 1.57079632679f;
+    const float theta = ((pan + 1.0f) * 0.5f) * kHalfPi;
+    l = std::cos(theta);
+    r = std::sin(theta);
+}
+
 LfoShape toLfoShape(LfoWaveform w) noexcept {
     switch (w) {
     case LfoWaveform::Sine:
@@ -119,6 +148,10 @@ float Voice::render(float portamentoAlpha, float baseCutoffHz, float resonance) 
             dcBlocker.reset();
             noteIsOn = false;
             midiNote = -1;
+            // Snap pan back to center; the next noteOn will re-assign by index.
+            pan = 0.0f;
+            panGainL = 0.7071068f;
+            panGainR = 0.7071068f;
         }
     }
 
@@ -186,6 +219,15 @@ void VoiceManager::noteOn(int midiNote, float velocity) {
     v->noteOnOrder = noteCounter_++;
     v->velocity = std::clamp(velocity, 0.0f, 1.0f);
     v->targetFrequency = midiNoteToHz(midiNote);
+
+    // Assign a deterministic pan position based on this voice's slot index
+    // in the pool. Round-robin pattern spreads polyphonic chords across the
+    // stereo field; precompute constant-power L/R gains here so the audio
+    // thread never calls cos/sin per sample.
+    const std::size_t voiceIndex =
+        static_cast<std::size_t>(v - voices_.data());
+    v->pan = panForVoiceIndex(voiceIndex);
+    computePanGains(v->pan, v->panGainL, v->panGainR);
 
     if (!portando) {
         v->currentFrequency = v->targetFrequency;
@@ -258,6 +300,14 @@ void VoiceManager::applyPatch(const PatchStruct& patch) noexcept {
         gainSmoother_.setTarget(masterGain);
     }
 
+    // Wire patch.filter.drive into each voice's filter. The drive value is
+    // not smoothed per-sample today; if knob-zipper becomes audible, route
+    // through a ParamSmoother like cutoff/resonance.
+    const float drive = std::clamp(safe(patch.filter.drive, 0.0f), 0.0f, 1.0f);
+    for (auto& v : voices_) {
+        if (v.filter) v.filter->setDrive(drive);
+    }
+
     // Amp + filter envelopes.
     ADSREnvelope::Params ampParams{};
     ampParams.attackSeconds = patch.amp_env.attack_s;
@@ -323,10 +373,26 @@ void VoiceManager::renderBlock(float* output, int numSamples) noexcept {
 }
 
 void VoiceManager::renderBlock(float* left, float* right, int numSamples) noexcept {
+    // Real stereo path. Each voice's mono sample is distributed to L/R via
+    // its precomputed constant-power gains, so polyphonic content occupies
+    // distinct positions in the stereo field rather than collapsing to a
+    // dual-mono center. Mono renderBlock and renderNextSample are unchanged
+    // — they call advanceSmoothersAndRender which sums all voices flat (the
+    // mono path is unaffected by per-voice pan, equivalent to L+R summing).
     for (int i = 0; i < numSamples; ++i) {
-        const float s = advanceSmoothersAndRender();
-        left[i] = s;
-        right[i] = s;
+        const float cutoff = cutoffSmoother_.process();
+        const float res = resonanceSmoother_.process();
+        const float gain = gainSmoother_.process();
+        const float alpha = portamentoAlpha();
+        float lSum = 0.0f;
+        float rSum = 0.0f;
+        for (auto& v : voices_) {
+            const float s = v.render(alpha, cutoff, res);
+            lSum += s * v.panGainL;
+            rSum += s * v.panGainR;
+        }
+        left[i] = lSum * gain;
+        right[i] = rSum * gain;
     }
 }
 

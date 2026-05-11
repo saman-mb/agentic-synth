@@ -47,6 +47,13 @@ struct Voice {
     int fadeOutSamplesRemaining{0};
     int fadeOutSamplesTotal{0};
 
+    // Stereo panning, fixed per voice lifetime. pan ∈ [-1, +1]; gains are
+    // precomputed constant-power coefficients so renderBlock doesn't call
+    // cos/sin per sample. panGainL² + panGainR² == 1 within float epsilon.
+    float pan{0.0f};
+    float panGainL{0.7071068f}; // cos(π/4) — center default
+    float panGainR{0.7071068f}; // sin(π/4)
+
     [[nodiscard]] bool isActive() const noexcept {
         return ampEnv.isActive() || fadeOutSamplesRemaining > 0;
     }
