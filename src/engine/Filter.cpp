@@ -1,6 +1,7 @@
 #include "Filter.h"
 
 #include <algorithm>
+#include <cmath>
 
 #ifndef M_PI
 #define M_PI 3.14159265358979323846
@@ -11,6 +12,16 @@ namespace agentic_synth::engine {
 // ---------------------------------------------------------------------------
 // MoogLadder
 // ---------------------------------------------------------------------------
+// Drive gain mapping: input is multiplied by 1 + drive * kDriveGainFactor.
+// kDriveGainFactor = 4.0 → max input boost ~ 5x (~ +14 dB), giving audible
+// character without instantly clipping the tanh into a square wave at drive=1.
+static constexpr double kDriveGainFactor = 4.0;
+// Output compensation: scale by 1 / sqrt(driveGain) so that at unity sub-cutoff
+// the perceived level stays sane (the tanh also reduces gain, so this is a
+// gentle counter-balance rather than full make-up).
+static inline double driveCompensation(double driveGain) {
+    return 1.0 / std::sqrt(driveGain);
+}
 
 void MoogLadder::prepare(double sampleRate) {
     sampleRate_ = sampleRate;
@@ -28,6 +39,12 @@ void MoogLadder::setResonance(float resonance) {
     updateCoefficients();
 }
 
+void MoogLadder::setDrive(float drive) {
+    drive_ = std::clamp(drive, 0.0f, 1.0f);
+    driveGain_ = 1.0 + static_cast<double>(drive_) * kDriveGainFactor;
+    driveComp_ = driveCompensation(driveGain_);
+}
+
 void MoogLadder::reset() { s_.fill(0.0); }
 
 void MoogLadder::updateCoefficients() {
@@ -35,11 +52,19 @@ void MoogLadder::updateCoefficients() {
     g_ = std::tan(M_PI * fc / sampleRate_);
     a_ = g_ / (1.0 + g_);
     b_ = 1.0 - a_;
-    // Cap at 3.8 — self-oscillation onset is k = 4.0
-    k_ = static_cast<double>(resonance_) * 3.8;
+    // Allow full self-oscillation: at resonance=1.0 k reaches 4.1 (just past
+    // the linear k=4.0 threshold so the loop is actively unstable in the
+    // linear regime — but the tanh saturation in the feedback path bounds the
+    // amplitude to a soft limit cycle, giving stable self-oscillation.
+    k_ = static_cast<double>(resonance_) * 4.1;
 }
 
 float MoogLadder::process(float input) {
+    // Denormal protection: inject a tiny DC bias that cancels itself in the
+    // sum but pushes integrator accumulators out of the subnormal range.
+    // Portable, no SSE intrinsics required.
+    constexpr double kAntiDenormal = 1.0e-20;
+
     const double a = a_;
     const double b = b_;
     const double k = k_;
@@ -47,26 +72,40 @@ float MoogLadder::process(float input) {
     const double a3 = a2 * a;
     const double a4 = a3 * a;
 
-    // Solve the implicit feedback equation for y4 in closed form (linear ZDF)
-    const double state_sum = b * (a3 * s_[0] + a2 * s_[1] + a * s_[2] + s_[3]);
-    const double y4 = (a4 * static_cast<double>(input) + state_sum) / (1.0 + k * a4);
+    // Apply input drive (pre-ladder).
+    const double x = static_cast<double>(input) * driveGain_;
 
-    // Forward-propagate stages using the resolved y4
-    const double x_eff = static_cast<double>(input) - k * y4;
+    // Step 1 — Linear ZDF prediction of y4 (closed-form, one shot).
+    //   This gives us the implicit feedback solution under the assumption that
+    //   the feedback is linear (k * y4). We use this prediction *only* to
+    //   compute the saturated feedback signal that goes back into the ladder.
+    const double state_sum = b * (a3 * s_[0] + a2 * s_[1] + a * s_[2] + s_[3]);
+    const double y4_linear = (a4 * x + state_sum) / (1.0 + k * a4);
+
+    // Step 2 — Saturate the predicted feedback path with tanh. This is the
+    // Huovilainen-style nonlinearity that gives the Moog its growl, allows
+    // clean self-oscillation, and bounds the loop gain when k → 4.
+    const double y4_fb = std::tanh(y4_linear);
+
+    // Step 3 — Forward-propagate the four cascaded one-pole stages using the
+    // saturated feedback. The actual output is the post-pass y4 (not the
+    // saturated value), so sub-cutoff passband gain stays ~unity.
+    const double x_eff = x - k * y4_fb;
 
     const double y1 = a * x_eff + b * s_[0];
-    s_[0] = 2.0 * y1 - s_[0];
+    s_[0] = 2.0 * y1 - s_[0] + kAntiDenormal;
 
     const double y2 = a * y1 + b * s_[1];
-    s_[1] = 2.0 * y2 - s_[1];
+    s_[1] = 2.0 * y2 - s_[1] + kAntiDenormal;
 
     const double y3 = a * y2 + b * s_[2];
-    s_[2] = 2.0 * y3 - s_[2];
+    s_[2] = 2.0 * y3 - s_[2] + kAntiDenormal;
 
-    // y4 was solved analytically; update its integrator state consistently
-    s_[3] = 2.0 * y4 - s_[3];
+    const double y4 = a * y3 + b * s_[3];
+    s_[3] = 2.0 * y4 - s_[3] + kAntiDenormal;
 
-    return static_cast<float>(y4);
+    // Output compensation keeps perceived level sane under heavy drive.
+    return static_cast<float>(y4 * driveComp_);
 }
 
 // ---------------------------------------------------------------------------

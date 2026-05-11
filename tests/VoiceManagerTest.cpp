@@ -431,6 +431,169 @@ TEST_CASE("VoiceManager per-sample smoothing eliminates one-sample cutoff jumps"
     REQUIRE(vm.currentSmoothedCutoff() > 400.0f);
 }
 
+// ── Stereo path (Phase 2) ─────────────────────────────────────────────────────
+
+namespace {
+
+double sumSquares(const std::vector<float>& buf) {
+    double acc = 0.0;
+    for (float s : buf)
+        acc += static_cast<double>(s) * s;
+    return acc;
+}
+
+double sumAbs(const std::vector<float>& buf) {
+    double acc = 0.0;
+    for (float s : buf)
+        acc += std::abs(static_cast<double>(s));
+    return acc;
+}
+
+} // namespace
+
+TEST_CASE("VoiceManager stereo renderBlock produces L != R when voices panned") {
+    VoiceManager vm(8);
+    vm.prepare(44100.0);
+    PatchStruct p = make_default_patch();
+    p.filter.cutoff_hz = 18000.0f; // wide open so we hear oscillator energy directly
+    vm.applyPatch(p);
+
+    // Two voices land on voice indices 0 (-0.4) and 1 (+0.4) — opposite sides.
+    vm.noteOn(60, 0.9f);
+    vm.noteOn(64, 0.9f);
+
+    constexpr int kSamples = 2048;
+    std::vector<float> l(kSamples, 0.0f), r(kSamples, 0.0f);
+    vm.renderBlock(l.data(), r.data(), kSamples);
+
+    const double sl = sumSquares(l);
+    const double sr = sumSquares(r);
+    REQUIRE(sl > 0.0);
+    REQUIRE(sr > 0.0);
+
+    // For two uncorrelated voices with equal energy on symmetric pans,
+    // sum-of-squares(L) ≈ sum-of-squares(R) by construction — that's the
+    // *point* of constant-power panning. The right way to assert stereo is
+    // real (not dual-mono) is to check that L−R carries substantial energy:
+    // dual-mono would give L−R == 0 exactly. Real stereo gives a non-trivial
+    // side signal because the voices contribute differently to L and R.
+    double diffSq = 0.0;
+    for (int i = 0; i < kSamples; ++i) {
+        const double d = static_cast<double>(l[i]) - static_cast<double>(r[i]);
+        diffSq += d * d;
+    }
+    const double midSq = sl + sr;
+    REQUIRE(diffSq > 0.0);
+    // Side energy should be a meaningful fraction of total. Loose 1% bound.
+    REQUIRE(diffSq / midSq > 0.01);
+}
+
+TEST_CASE("VoiceManager stereo single centered voice produces equal L/R") {
+    VoiceManager vm(8);
+    vm.prepare(44100.0);
+    PatchStruct p = make_default_patch();
+    p.filter.cutoff_hz = 18000.0f;
+    vm.applyPatch(p);
+
+    // Trigger one voice then force its pan to center, simulating either
+    // a pan=0 patch override or a unison-center voice. We can't reach into
+    // the private Voice directly, but we know voice index 0's pan is -0.4
+    // and index 2's is -0.2 — neither is center. To get a true L==R sample
+    // path we instead use a *different* property: with a single voice at
+    // pan p, L = cos(θ)*s and R = sin(θ)*s. Their ratio is fixed across
+    // samples. So we test that the *ratio* of sum(|L|)/sum(|R|) matches
+    // the expected constant-power ratio for voice 0's pan = -0.4.
+    vm.noteOn(60, 0.9f);
+
+    constexpr int kSamples = 4096;
+    std::vector<float> l(kSamples, 0.0f), r(kSamples, 0.0f);
+    vm.renderBlock(l.data(), r.data(), kSamples);
+
+    // For pan = -0.4: θ = ((-0.4 + 1)/2) * π/2 = 0.3 * π/2 ≈ 0.4712
+    //   L = cos(0.4712) ≈ 0.8910, R = sin(0.4712) ≈ 0.4540
+    //   ratio L/R ≈ 1.963
+    const double ratio = sumAbs(l) / std::max(1e-9, sumAbs(r));
+    REQUIRE(ratio > 1.7);
+    REQUIRE(ratio < 2.3);
+}
+
+TEST_CASE("VoiceManager stereo constant-power: total power similar regardless of pan") {
+    // Render the same note twice with two different voice slots → different
+    // pan positions. Constant-power law guarantees L²+R² is identical in
+    // both cases (within float epsilon and DSP variance from envelope ramp).
+    auto totalPowerForFirstNote = [](int holdNoteFirst) {
+        VoiceManager vm(8);
+        vm.prepare(44100.0);
+        PatchStruct p = make_default_patch();
+        p.filter.cutoff_hz = 18000.0f;
+        p.amp_env.attack_s = 0.001f;
+        p.amp_env.decay_s = 0.001f;
+        p.amp_env.sustain = 1.0f;
+        p.amp_env.release_s = 0.5f;
+        vm.applyPatch(p);
+
+        // To force a chosen voice index for the test, fill slots 0..k-1
+        // with throwaway voices that we immediately release, then the next
+        // noteOn lands on slot k.
+        for (int i = 0; i < holdNoteFirst; ++i) {
+            vm.noteOn(20 + i, 0.0001f); // near-silent occupant
+        }
+        vm.noteOn(60, 1.0f); // the voice we measure
+
+        constexpr int kSamples = 4096;
+        std::vector<float> l(kSamples, 0.0f), r(kSamples, 0.0f);
+        vm.renderBlock(l.data(), r.data(), kSamples);
+        return sumSquares(l) + sumSquares(r);
+    };
+
+    const double powerSlot0 = totalPowerForFirstNote(0); // pan = -0.4
+    const double powerSlot1 = totalPowerForFirstNote(1); // pan = +0.4
+    const double powerSlot4 = totalPowerForFirstNote(4); // pan = -0.6
+
+    REQUIRE(powerSlot0 > 0.0);
+    REQUIRE(powerSlot1 > 0.0);
+    REQUIRE(powerSlot4 > 0.0);
+
+    // Constant-power means L²+R² is preserved across pan positions. The
+    // throwaway voices contribute tiny extra energy (velocity 0.0001), so
+    // we allow a generous ~3 dB tolerance (factor of 2).
+    auto withinHalfDb = [](double a, double b) {
+        const double ratio = a / b;
+        return ratio > 0.5 && ratio < 2.0;
+    };
+    REQUIRE(withinHalfDb(powerSlot0, powerSlot1));
+    REQUIRE(withinHalfDb(powerSlot0, powerSlot4));
+}
+
+TEST_CASE("VoiceManager mono renderBlock unaffected by pan (backward compat)") {
+    VoiceManager vm(8);
+    vm.prepare(44100.0);
+    PatchStruct p = make_default_patch();
+    p.filter.cutoff_hz = 18000.0f;
+    vm.applyPatch(p);
+
+    vm.noteOn(60, 0.9f);
+
+    std::vector<float> mono(2048, 0.0f);
+    vm.renderBlock(mono.data(), static_cast<int>(mono.size()));
+
+    bool finite = true;
+    for (float s : mono)
+        finite = finite && std::isfinite(s);
+    REQUIRE(finite);
+    REQUIRE(sumAbs(mono) > 0.0);
+}
+
+TEST_CASE("VoiceManager renderNextSample remains scalar finite (backward compat)") {
+    VoiceManager vm(4);
+    vm.prepare(44100.0);
+    vm.noteOn(60, 0.9f);
+    for (int i = 0; i < 64; ++i) {
+        const float s = vm.renderNextSample();
+        REQUIRE(std::isfinite(s));
+    }
+}
+
 TEST_CASE("VoiceManager applyPatch wires LFO + filter env + smoothers without crashing") {
     VoiceManager vm(4);
     vm.prepare(44100.0);

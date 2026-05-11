@@ -36,9 +36,11 @@ private:
     double phaseInc_ = 0.0;
     Waveform waveform_ = Waveform::Saw;
 
-    // Triangle integration state; initialised to waveform value at phase=0
+    // Triangle integration state; initialised to waveform value at phase=0.
+    // triLeak_ is a one-pole DC-blocker coefficient (~5 Hz cutoff) applied
+    // every sample to prevent unbounded integrator drift without colouring audio.
     double triAccum_ = -1.0;
-    int triRecenterCounter_ = 0;
+    double triLeak_ = 0.0;
 
     // Analog drift modulator
     double driftCents_ = 0.0;

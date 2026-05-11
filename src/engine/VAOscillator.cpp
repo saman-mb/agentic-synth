@@ -1,6 +1,5 @@
 #include "VAOscillator.h"
 
-#include <algorithm>
 #include <atomic>
 #include <cmath>
 #include <random>
@@ -27,6 +26,12 @@ void VAOscillator::prepare(double sampleRate) {
     constexpr double tau = 2.0;
     driftAlpha_ = 1.0 - std::exp(-1.0 / (tau * sampleRate_));
 
+    // Leaky-integrator coefficient for the triangle path. One-pole DC blocker
+    // with corner ≈ 5 Hz: well below the lowest musical fundamental so the
+    // audible spectrum is untouched, but DC settles in ~30 ms.
+    constexpr double kTriLeakFc = 5.0;
+    triLeak_ = 1.0 - 2.0 * 3.141592653589793 * kTriLeakFc / sampleRate_;
+
     reset();
 }
 
@@ -45,7 +50,6 @@ void VAOscillator::setDetuneCents(double cents) noexcept {
 void VAOscillator::reset() noexcept {
     phase_ = 0.0;
     triAccum_ = -1.0;
-    triRecenterCounter_ = 0;
     driftCents_ = 0.0;
     driftTarget_ = 0.0;
     driftPeriod_ = driftPeriodDist_(rng_);
@@ -103,13 +107,11 @@ double VAOscillator::square() noexcept {
 double VAOscillator::triangle() noexcept {
     // Triangle is the running integral of 4·phaseInc·square.
     // triAccum_ initialises to -1 at phase=0 so the first half-cycle rises to +1.
+    // A one-pole leak (fc≈5 Hz) replaces the previous 1024-sample clamp: it
+    // bleeds off DC continuously rather than letting it accrue between resets,
+    // killing the gritty edge artefacts the clamp produced at high notes.
     double sq = square();
-    triAccum_ += 4.0 * phaseInc_ * sq;
-    // Clamp every 1024 samples to prevent unbounded numerical drift.
-    if (++triRecenterCounter_ >= 1024) {
-        triAccum_ = std::clamp(triAccum_, -1.0, 1.0);
-        triRecenterCounter_ = 0;
-    }
+    triAccum_ = triAccum_ * triLeak_ + 4.0 * phaseInc_ * sq;
     return triAccum_;
 }
 
