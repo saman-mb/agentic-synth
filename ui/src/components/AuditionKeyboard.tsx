@@ -207,6 +207,13 @@ export function AuditionKeyboard({ sendRaw, ready }: AuditionKeyboardProps) {
             // keyboard activation via Space/Enter also fires the note.
             // Trade-off: ~50ms latency vs mousedown; acceptable for audition.
             onClick={() => playNote(k.note, CLICK_DURATION_MS)}
+            // Phase 7A: drag-across-keys legato. e.buttons & 1 means the
+            // primary mouse button is currently held during the enter
+            // event, so a mousedown-then-drag plays each key it crosses.
+            // Plain hover (no button held) is a no-op.
+            onMouseEnter={(e) => {
+              if (e.buttons === 1) playNote(k.note, CLICK_DURATION_MS);
+            }}
             aria-label={`Play ${k.label}`}
             aria-pressed={activeNotes.has(k.note)}
             title={`${k.label} (${k.keyChar.toUpperCase()})`}

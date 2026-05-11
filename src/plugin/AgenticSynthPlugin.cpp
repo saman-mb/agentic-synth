@@ -47,11 +47,41 @@ AgenticSynthPlugin::AgenticSynthPlugin()
     ampSustainParam_ = apvts_.getRawParameterValue("ampSustain");
     ampReleaseParam_ = apvts_.getRawParameterValue("ampRelease");
     portamentoParam_ = apvts_.getRawParameterValue("portamento");
+
+    // Phase 7A: wire the audition keyboard's note-sink into a thread-safe
+    // MidiMessageCollector. The sink fires on the JUCE message thread (or
+    // Timer thread for note-off) but VoiceManager has no synchronisation —
+    // it expects exclusive access from the audio thread. Routing through a
+    // MidiMessageCollector hands the audition note to the same path the
+    // host's MIDI buffer takes, draining inside processBlock under audio-
+    // thread exclusivity. Eliminates the data race vs midiHandler_.
+    //
+    // Lifetime: agentBridge_, auditionCollector_, and voiceManager_ are all
+    // direct members of this plugin. The dtor clears the sink BEFORE other
+    // members destruct so an in-flight Timer note-off cannot push into a
+    // half-destroyed collector.
+    agentBridge_.setMidiNoteSink([this](int note, float velocity, bool isNoteOn) {
+        const auto msg = isNoteOn
+            ? juce::MidiMessage::noteOn(1, note, velocity)
+            : juce::MidiMessage::noteOff(1, note);
+        const juce::ScopedLock sl(auditionMutex_);
+        auditionPending_.addEvent(msg, 0);
+    });
+}
+
+AgenticSynthPlugin::~AgenticSynthPlugin() {
+    // Drop the sink before members destruct so an in-flight Timer note-off
+    // cannot call into a half-destroyed collector.
+    agentBridge_.setMidiNoteSink(nullptr);
 }
 
 //==============================================================================
 void AgenticSynthPlugin::prepareToPlay(double sampleRate, int /*samplesPerBlock*/) {
     voiceManager_.prepare(sampleRate);
+    {
+        const juce::ScopedLock sl(auditionMutex_);
+        auditionPending_.clear();
+    }
     applyParameters();
 }
 
@@ -125,6 +155,17 @@ void AgenticSynthPlugin::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
     // Apply any AI-generated patch from the AgentBridge pipeline.
     if (const auto patch = agentBridge_.pollPatch())
         applyPatch(*patch);
+
+    // Merge audition-keyboard MIDI (from non-audio thread, via the bridge
+    // sink). These notes now flow through the SAME midiHandler_ pipeline
+    // as host MIDI — single producer to VoiceManager from the audio thread.
+    {
+        const juce::ScopedLock sl(auditionMutex_);
+        if (!auditionPending_.isEmpty()) {
+            midiMessages.addEvents(auditionPending_, 0, buffer.getNumSamples(), 0);
+            auditionPending_.clear();
+        }
+    }
 
     // Route all MIDI through MidiHandler (note on/off + CC mapping).
     for (const auto metadata : midiMessages) {
