@@ -62,7 +62,12 @@ jobs:
       - name: Install system dependencies
         run: |
           sudo apt-get update -qq
+          # pkg-config is required by JUCE's juce_gui_extra build path to
+          # locate gtk-3.0 + webkit2gtk-4.1 include flags. Without it the
+          # build hits `gtk/gtk.h: No such file or directory` even with
+          # libgtk-3-dev installed.
           sudo apt-get install -y -qq \
+            pkg-config \
             libgl1-mesa-dev \
             libglu1-mesa-dev \
             libx11-dev \
