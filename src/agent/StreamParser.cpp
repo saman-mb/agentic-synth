@@ -29,7 +29,7 @@ int varI(const juce::var& obj, const char* key, int fallback) noexcept {
         return fallback;
     const juce::var v = obj.getProperty(juce::Identifier(key), juce::var());
     if (v.isInt() || v.isInt64() || v.isDouble())
-        return static_cast<int>(static_cast<int64_t>(v));
+        return static_cast<int>(static_cast<juce::int64>(v));
     if (v.isBool())
         return v ? 1 : 0;
     return fallback;
