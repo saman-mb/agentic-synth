@@ -188,10 +188,11 @@ void StreamParser::applyField(const std::string& key, const juce::var& wrapper) 
             partial_.portamento_s = std::clamp(static_cast<float>(static_cast<double>(val)), 0.0f, 5.0f);
     } else if (key == "voice_count") {
         if (val.isInt() || val.isInt64() || val.isDouble())
-            partial_.voice_count = static_cast<uint8_t>(std::clamp(static_cast<int>(static_cast<int64_t>(val)), 1, 16));
+            partial_.voice_count =
+                static_cast<uint8_t>(std::clamp(static_cast<int>(static_cast<juce::int64>(val)), 1, 16));
     } else if (key == "patch_id") {
         if (val.isInt() || val.isInt64() || val.isDouble())
-            partial_.patch_id = static_cast<uint32_t>(static_cast<int64_t>(val));
+            partial_.patch_id = static_cast<uint32_t>(static_cast<juce::int64>(val));
     } else if (key == "filter") {
         partial_.filter.cutoff_hz = std::clamp(varF(val, "cutoff_hz", partial_.filter.cutoff_hz), 20.0f, 20000.0f);
         partial_.filter.resonance = std::clamp(varF(val, "resonance", partial_.filter.resonance), 0.0f, 1.0f);

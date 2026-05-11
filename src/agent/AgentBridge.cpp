@@ -160,16 +160,6 @@ namespace {
 // ParamMap.cpp as a single source-of-truth table. AgentBridge calls
 // agent::paramToDelta directly — see handleKnobTweak below.
 
-// Load text file; returns empty string on failure.
-std::string load_text_file(const std::string& path) {
-    std::ifstream f(path);
-    if (!f)
-        return {};
-    std::ostringstream ss;
-    ss << f.rdbuf();
-    return ss.str();
-}
-
 } // namespace
 
 std::string AgentBridge::status() const { return "agent-bridge-v2"; }
