@@ -8,50 +8,69 @@ Speak or type a sound idea like *"a dark, wide pad with movement in D minor"* �
 
 ## Current Status
 
-This repository is in early scaffold state.
+The React UI now ships **inside** the JUCE plugin window via JUCE 8's
+`WebBrowserComponent`. One binary, no browser tab needed, no WebSocket
+server. The VST3, AU, and Standalone targets all render the same React
+front-end through a native↔JS bridge to the C++ agent.
 
-- The placeholder C++ test target can be configured, built, and tested with CMake.
-- The JUCE desktop/plugin app source exists under `src/`, but it is not wired into the root CMake build yet.
-- `third_party/JUCE` is currently empty, so the JUCE app/plugin cannot build until JUCE is added.
-- The `ui/` folder contains a Vite/React companion UI with `dev`, `build`, `preview`, and `lint` scripts.
+- C++ engine + agent live under `src/`, built with CMake.
+- React UI lives under `ui/` (Vite + TypeScript). `npx vite build` produces
+  `ui/dist/` which is embedded into the plugin binary via
+  `juce_add_binary_data`.
+- WebView backends: WebView2 on Windows, WKWebView on macOS, WebKitGTK
+  (4.1) on Linux.
 
 ## Getting Started
 
-See [docs/architecture.md](docs/architecture.md) for the high-level system architecture.
+### Prerequisites
 
-### Build Placeholder Target
+- CMake 3.24 or newer.
+- A C++20-capable toolchain (Clang, MSVC, or GCC).
+- Node.js 20 + npm (for the UI build).
+- Platform WebView runtime:
+  - **Windows**: WebView2 Runtime (usually preinstalled on Windows 11; the
+    installer can auto-fetch on older systems).
+  - **macOS**: WKWebView (system-provided, no entitlement needed for
+    bundled assets).
+  - **Linux**: `libwebkit2gtk-4.1-0` and the matching `-dev` package.
+
+### Production Build
 
 From the repository root:
 
 ```sh
-cmake -S . -B build
-cmake --build build
-ctest --test-dir build
+git submodule update --init --recursive
+cd ui && npm ci && npx vite build && cd ..
+cmake -S . -B build -DAGENTIC_SYNTH_BUILD_PLUGIN=ON
+cmake --build build --parallel
+ctest --test-dir build --output-on-failure
 ```
 
-This validates the current placeholder C++ test setup.
+Build outputs:
 
-### Run The App
+- `build/src/AgenticSynth_artefacts/.../AgenticSynth` — standalone app.
+- `build/src/AgenticSynth_Plugin_artefacts/Release/VST3/...` — VST3.
+- `build/src/AgenticSynth_Plugin_artefacts/Release/AU/...` — AU (macOS).
+- `build/src/AgenticSynth_Plugin_artefacts/Release/Standalone/...` —
+  plugin-format standalone.
 
-The companion UI can be started locally:
+### UI Hot-Reload Dev Loop
+
+For fast UI iteration with the live JUCE host, point the WebView at the
+Vite dev server:
 
 ```sh
-cd ui
-npm install
-npm run dev
+# Terminal 1
+cd ui && npm run dev   # serves at http://localhost:5173
+
+# Terminal 2
+cmake -B build -DAGENTIC_SYNTH_UI_DEV=ON
+cmake --build build --target AgenticSynth
+./build/src/AgenticSynth_artefacts/AgenticSynth.app/Contents/MacOS/AgenticSynth
 ```
 
-Vite will print the local URL, usually `http://localhost:5173/`.
-
-The JUCE desktop/plugin app is not runnable yet.
-
-The expected future commands are likely:
-
-```sh
-# Desktop/plugin build, after JUCE is added and src/ is wired into CMake
-cmake -S . -B build
-cmake --build build
-```
+Edits to React components hot-reload inside the JUCE window. The native
+bridge stays wired the same way as in production.
 
 ## Project Structure
 

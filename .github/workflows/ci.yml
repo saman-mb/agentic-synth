@@ -13,7 +13,7 @@ concurrency:
 jobs:
   lint:
     name: Lint
-    runs-on: [self-hosted, Linux, X64, unit-test]
+    runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
 
@@ -49,7 +49,7 @@ jobs:
 
   tests:
     name: Tests
-    runs-on: [self-hosted, Linux, X64, unit-test]
+    runs-on: ubuntu-latest
     needs: lint
     steps:
       - uses: actions/checkout@v4
@@ -76,6 +76,19 @@ jobs:
             libgtk-3-dev \
             libwebkit2gtk-4.1-dev
 
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Build UI (required for juce_add_binary_data)
+        working-directory: ui
+        run: |
+          npm ci
+          npx vite build
+
       - name: Setup CMake
         uses: jwlawson/actions-setup-cmake@v2
         with:
@@ -86,10 +99,256 @@ jobs:
           cmake -S . -B build \
             -DCMAKE_BUILD_TYPE=Debug \
             -DAGENTIC_SYNTH_BUILD_TESTS=ON \
-            -DAGENTIC_SYNTH_BUILD_PLUGIN=OFF
+            -DAGENTIC_SYNTH_BUILD_PLUGIN=ON
 
       - name: Build project
         run: cmake --build build --config Debug --parallel
 
       - name: Run unit tests
         run: ctest --test-dir build --build-config Debug --output-on-failure
+
+  plugin-build:
+    name: Plugin Build (${{ matrix.os }})
+    needs: lint
+    strategy:
+      fail-fast: false
+      matrix:
+        # Ubuntu 22.04 is pinned (NOT 24.04) because JUCE 8 targets
+        # libwebkit2gtk-4.1-0; 24.04 ships an incompatible 6.0 in some
+        # configurations.
+        os: [macos-latest, windows-latest, ubuntu-22.04]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Initialize submodules
+        run: git submodule update --init --recursive
+
+      - name: Install Linux system dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq \
+            libgl1-mesa-dev \
+            libglu1-mesa-dev \
+            libx11-dev \
+            libxrandr-dev \
+            libxinerama-dev \
+            libxcursor-dev \
+            libasound2-dev \
+            libjack-jackd2-dev \
+            libfreetype-dev \
+            libcurl4-openssl-dev \
+            libfontconfig-dev \
+            libgl-dev \
+            libgtk-3-dev \
+            libwebkit2gtk-4.1-dev
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      - name: Build UI (required for juce_add_binary_data)
+        working-directory: ui
+        shell: bash
+        run: |
+          npm ci
+          npx vite build
+
+      - name: Setup CMake
+        uses: jwlawson/actions-setup-cmake@v2
+        with:
+          cmake-version: "3.28.x"
+
+      - name: Configure CMake
+        shell: bash
+        run: |
+          cmake -S . -B build \
+            -DCMAKE_BUILD_TYPE=Release \
+            -DAGENTIC_SYNTH_BUILD_PLUGIN=ON \
+            -DAGENTIC_SYNTH_BUILD_TESTS=OFF
+
+      - name: Build plugin and standalone
+        run: cmake --build build --config Release --parallel
+
+      # =====================================================================
+      # macOS code signing + notarization
+      # ---------------------------------------------------------------------
+      # Requires the following GitHub Secrets (Settings -> Secrets -> Actions):
+      #   APPLE_CERTIFICATE_P12_BASE64  - base64 of Developer ID Application
+      #                                    cert .p12 (used to import into
+      #                                    a temporary keychain)
+      #   APPLE_CERTIFICATE_PASSWORD    - password for the .p12 above
+      #   APPLE_DEVELOPER_ID            - codesign identity string, e.g.
+      #                                    "Developer ID Application: Foo (TEAMID)"
+      #   APPLE_ID                      - Apple ID email for notarytool
+      #   APPLE_TEAM_ID                 - 10-char Apple Team ID
+      #   APPLE_APP_PASSWORD            - app-specific password for notarytool
+      #
+      # If APPLE_DEVELOPER_ID is empty (e.g. PR from a fork) these steps
+      # are skipped and unsigned artifacts are uploaded so the job still
+      # succeeds. If the secret IS set but any signing/notarization step
+      # fails, the job fails loudly (set -euo pipefail + no `|| true`).
+      # =====================================================================
+      - name: Import Apple signing certificate (macOS)
+        if: runner.os == 'macOS' && secrets.APPLE_DEVELOPER_ID != ''
+        uses: apple-actions/import-codesign-certs@v3
+        with:
+          p12-file-base64: ${{ secrets.APPLE_CERTIFICATE_P12_BASE64 }}
+          p12-password: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+
+      - name: Codesign + notarize macOS bundles
+        if: runner.os == 'macOS' && secrets.APPLE_DEVELOPER_ID != ''
+        env:
+          APPLE_DEVELOPER_ID: ${{ secrets.APPLE_DEVELOPER_ID }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          APPLE_APP_PASSWORD: ${{ secrets.APPLE_APP_PASSWORD }}
+        run: |
+          set -euo pipefail
+
+          # Collect every bundle that needs signing.
+          mapfile -t BUNDLES < <(find build \
+            \( -name '*.vst3' -o -name '*.component' -o -name '*.app' \) \
+            -maxdepth 8 -print)
+
+          if [ "${#BUNDLES[@]}" -eq 0 ]; then
+            echo "::error::No macOS bundles found to sign"
+            exit 1
+          fi
+
+          echo "Bundles to sign:"
+          printf '  %s\n' "${BUNDLES[@]}"
+
+          # Sign deepest-first so nested binaries get signed before parents.
+          for bundle in "${BUNDLES[@]}"; do
+            echo "==> codesign $bundle"
+            codesign --force --deep --timestamp \
+              --options runtime \
+              --sign "$APPLE_DEVELOPER_ID" \
+              "$bundle"
+            codesign --verify --deep --strict --verbose=2 "$bundle"
+          done
+
+          # Notarize each bundle (zip -> submit --wait -> staple).
+          for bundle in "${BUNDLES[@]}"; do
+            zip_path="${bundle}.zip"
+            echo "==> ditto $bundle -> $zip_path"
+            ditto -c -k --keepParent "$bundle" "$zip_path"
+
+            echo "==> notarytool submit $zip_path"
+            xcrun notarytool submit "$zip_path" \
+              --apple-id "$APPLE_ID" \
+              --team-id "$APPLE_TEAM_ID" \
+              --password "$APPLE_APP_PASSWORD" \
+              --wait
+
+            echo "==> stapler staple $bundle"
+            xcrun stapler staple "$bundle"
+            xcrun stapler validate "$bundle"
+
+            rm -f "$zip_path"
+          done
+
+      - name: Upload macOS artifacts
+        if: runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentic-synth-macos
+          path: |
+            build/src/AgenticSynth_Plugin_artefacts/Release/VST3/**/*.vst3
+            build/src/AgenticSynth_Plugin_artefacts/Release/AU/**/*.component
+            build/src/AgenticSynth_Plugin_artefacts/Release/Standalone/**/*.app
+            build/src/AgenticSynth_artefacts/Release/**/*.app
+          if-no-files-found: warn
+
+      # =====================================================================
+      # Windows Authenticode signing
+      # ---------------------------------------------------------------------
+      # Requires GitHub Secrets:
+      #   WINDOWS_CERT_PFX_BASE64  - base64 of code-signing .pfx
+      #   WINDOWS_CERT_PASSWORD    - password for the .pfx
+      #
+      # Skipped (unsigned upload) when WINDOWS_CERT_PFX_BASE64 is empty
+      # (e.g. fork PRs). When configured, any failure fails the job.
+      # =====================================================================
+      - name: Sign Windows binaries
+        if: runner.os == 'Windows' && secrets.WINDOWS_CERT_PFX_BASE64 != ''
+        shell: pwsh
+        env:
+          WINDOWS_CERT_PFX_BASE64: ${{ secrets.WINDOWS_CERT_PFX_BASE64 }}
+          WINDOWS_CERT_PASSWORD: ${{ secrets.WINDOWS_CERT_PASSWORD }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+
+          # Materialize the PFX from the base64 secret.
+          $pfxPath = Join-Path $env:RUNNER_TEMP 'cert.pfx'
+          [IO.File]::WriteAllBytes(
+            $pfxPath,
+            [Convert]::FromBase64String($env:WINDOWS_CERT_PFX_BASE64))
+
+          # Locate signtool (latest Windows 10/11 SDK on the runner).
+          $signtool = Get-ChildItem `
+            -Path 'C:\Program Files (x86)\Windows Kits\10\bin' `
+            -Recurse -Filter 'signtool.exe' `
+            | Where-Object { $_.FullName -match 'x64\\signtool.exe$' } `
+            | Sort-Object FullName -Descending `
+            | Select-Object -First 1
+
+          if (-not $signtool) {
+            Write-Error "signtool.exe not found on runner"
+          }
+          Write-Host "Using signtool: $($signtool.FullName)"
+
+          # Find all .vst3 and .exe artifacts produced by the build.
+          $targets = Get-ChildItem -Path build -Recurse `
+            -Include *.vst3, *.exe -File
+
+          if (-not $targets) {
+            Write-Error "No Windows artifacts found to sign"
+          }
+
+          foreach ($t in $targets) {
+            Write-Host "==> signtool sign $($t.FullName)"
+            & $signtool.FullName sign `
+              /tr http://timestamp.digicert.com `
+              /td sha256 /fd sha256 `
+              /f $pfxPath `
+              /p $env:WINDOWS_CERT_PASSWORD `
+              $t.FullName
+            if ($LASTEXITCODE -ne 0) {
+              Write-Error "signtool failed on $($t.FullName)"
+            }
+
+            & $signtool.FullName verify /pa $t.FullName
+            if ($LASTEXITCODE -ne 0) {
+              Write-Error "signtool verify failed on $($t.FullName)"
+            }
+          }
+
+          Remove-Item $pfxPath -Force
+
+      - name: Upload Windows artifacts
+        if: runner.os == 'Windows'
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentic-synth-windows
+          path: |
+            build/src/AgenticSynth_Plugin_artefacts/Release/VST3/**/*.vst3
+            build/src/AgenticSynth_Plugin_artefacts/Release/Standalone/**/*.exe
+            build/src/AgenticSynth_artefacts/Release/**/*.exe
+          if-no-files-found: warn
+
+      - name: Upload Linux artifacts
+        if: runner.os == 'Linux'
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentic-synth-linux
+          path: |
+            build/src/AgenticSynth_Plugin_artefacts/Release/VST3/**/*.vst3
+            build/src/AgenticSynth_Plugin_artefacts/Release/Standalone/AgenticSynth
+            build/src/AgenticSynth_artefacts/Release/AgenticSynth
+          if-no-files-found: warn

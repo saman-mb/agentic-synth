@@ -5,6 +5,7 @@
 #include <cmath>
 #include <vector>
 
+using namespace agentic_synth;
 using namespace agentic_synth::engine;
 using Catch::Approx;
 

@@ -27,6 +27,16 @@ Install the core toolchain:
 - clang-format for local formatting checks.
 - Node.js 20 or newer and npm for UI work.
 - Python 3 with `pre-commit` installed.
+- Platform WebView runtime, matching the platform you build on:
+  - **Windows**: WebView2 Runtime (preinstalled on Windows 11; auto-fetched
+    on older systems by JUCE's `WebBrowserComponent`).
+  - **macOS**: WKWebView is system-provided. No `com.apple.security.network.client`
+    entitlement is required — bundled assets are served by JUCE's
+    resource provider and never touch the network.
+  - **Linux**: `libwebkit2gtk-4.1-0` runtime plus its `-dev` headers (the
+    `dev` package only needed for the build host). JUCE 8 targets the 4.1
+    series, not 6.0 — Ubuntu 22.04 ships the right version; 24.04 may
+    require `libwebkit2gtk-4.1-0` from a backport repo.
 
 Set up hooks after cloning:
 
@@ -36,13 +46,38 @@ pre-commit install --install-hooks
 pre-commit install --hook-type commit-msg
 ```
 
-Build and test the C++ project:
+The React UI is bundled into the plugin via `juce_add_binary_data`, so
+the C++ build needs a fresh `ui/dist/`. On a clean checkout, CMake will
+run `npm ci && npx vite build` automatically at configure time; subsequent
+edits to `ui/src/**` trigger a rebuild via a custom command.
+
+### Production build
 
 ```sh
-cmake -S . -B build -DAGENTIC_SYNTH_BUILD_TESTS=ON
+cmake -S . -B build -DAGENTIC_SYNTH_BUILD_PLUGIN=ON -DAGENTIC_SYNTH_BUILD_TESTS=ON
 cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 ```
+
+### UI hot-reload dev loop
+
+For fast UI iteration inside the live JUCE host, point the WebView at the
+Vite dev server (port 5173) instead of the bundled assets:
+
+```sh
+# Terminal 1
+cd ui && npm run dev
+
+# Terminal 2
+cmake -B build -DAGENTIC_SYNTH_UI_DEV=ON
+cmake --build build --target AgenticSynth
+./build/src/AgenticSynth_artefacts/AgenticSynth.app/Contents/MacOS/AgenticSynth   # macOS
+./build/src/AgenticSynth_artefacts/AgenticSynth                                    # Linux
+build\src\AgenticSynth_artefacts\Debug\AgenticSynth.exe                            # Windows
+```
+
+Edits to React components hot-reload inside the JUCE window. The native
+bridge (`window.__JUCE__.backend`) stays wired identically to production.
 
 Install and lint the UI:
 

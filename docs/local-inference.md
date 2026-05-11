@@ -1,6 +1,8 @@
 # Local LLM Inference for Agentic Synth
 
-Run a local LLM inference server on a dedicated machine (e.g. Framework Desktop with 128GB unified memory) and connect Agentic Synth running on a separate machine (e.g. Mac Mini) to it over your local network.
+> **Runtime dependency, not build dependency.** Agentic Synth links no llama.cpp code. It calls `llama-server` over HTTP (`/completion`, `/embedding`). You must run `llama-server` yourself, either on the same machine or on a LAN-reachable host. The plugin will not produce patches without it.
+
+Run a local LLM inference server on a dedicated machine (e.g. Framework Desktop with 128GB unified memory) and connect Agentic Synth running on a separate machine (e.g. Mac Mini) to it over your local network. A single-box setup (same machine running both `llama-server` and the plugin) is also supported — point `GrammarSamplerConfig::server_url` at `http://127.0.0.1:8080`.
 
 ## Architecture
 

@@ -49,7 +49,6 @@ add_library(agentic_synth_agent STATIC
     agent/VariationRecommender.cpp
     agent/WhisperClient.cpp
     agent/GenerationService.cpp
-    agent/WebSocketBridge.cpp
 )
 target_include_directories(agentic_synth_agent PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 agentic_synth_configure_target(agentic_synth_agent)
@@ -58,10 +57,59 @@ target_link_libraries(agentic_synth_agent
     PUBLIC
         agentic_synth_engine
         juce::juce_core
+        juce::juce_events
 )
 
 # ── Standalone App and Plugin (gated on BUILD_PLUGIN) ───────────────────────
 if(AGENTIC_SYNTH_BUILD_PLUGIN)
+
+# ── React UI bundling ────────────────────────────────────────────────────────
+option(AGENTIC_SYNTH_UI_DEV "Hot-load Vite dev server instead of bundled assets" OFF)
+
+set(UI_SRC_DIR  "${CMAKE_SOURCE_DIR}/ui")
+set(UI_DIST_DIR "${UI_SRC_DIR}/dist")
+
+# Bootstrap on fresh checkout: run npm at configure time if dist missing.
+# Note: invoke `npx vite build` directly rather than `npm run build` because
+# the npm script chains `tsc &&` and the repo currently has pre-existing
+# TypeScript errors that are out of scope for the WebView migration.
+find_program(NPM_EXECUTABLE NAMES npm npm.cmd REQUIRED)
+find_program(NPX_EXECUTABLE NAMES npx npx.cmd REQUIRED)
+
+if(NOT EXISTS "${UI_DIST_DIR}/index.html")
+    execute_process(COMMAND ${NPM_EXECUTABLE} ci
+                    WORKING_DIRECTORY "${UI_SRC_DIR}"
+                    COMMAND_ERROR_IS_FATAL ANY)
+    execute_process(COMMAND ${NPX_EXECUTABLE} vite build
+                    WORKING_DIRECTORY "${UI_SRC_DIR}"
+                    COMMAND_ERROR_IS_FATAL ANY)
+endif()
+
+# Rebuild when UI sources change.
+file(GLOB_RECURSE UI_REACT_SOURCES CONFIGURE_DEPENDS
+     "${UI_SRC_DIR}/src/*.ts"
+     "${UI_SRC_DIR}/src/*.tsx"
+     "${UI_SRC_DIR}/src/*.css"
+     "${UI_SRC_DIR}/index.html")
+add_custom_command(
+    OUTPUT  "${UI_DIST_DIR}/index.html"
+    COMMAND ${NPX_EXECUTABLE} vite build
+    WORKING_DIRECTORY "${UI_SRC_DIR}"
+    DEPENDS "${UI_SRC_DIR}/package.json"
+            "${UI_SRC_DIR}/vite.config.ts"
+            ${UI_REACT_SOURCES}
+    COMMENT "Rebuilding React UI"
+    VERBATIM)
+add_custom_target(agentic_synth_ui ALL DEPENDS "${UI_DIST_DIR}/index.html")
+
+file(GLOB_RECURSE UI_BINARY_ASSETS CONFIGURE_DEPENDS
+     "${UI_DIST_DIR}/index.html"
+     "${UI_DIST_DIR}/assets/*")
+juce_add_binary_data(agentic_synth_ui_assets
+    HEADER_NAME UiBinaryData.h
+    NAMESPACE   UiBinaryData
+    SOURCES     ${UI_BINARY_ASSETS})
+add_dependencies(agentic_synth_ui_assets agentic_synth_ui)
 
 juce_add_gui_app(AgenticSynth
     PRODUCT_NAME "Agentic Synth"
@@ -79,19 +127,25 @@ target_sources(AgenticSynth
         Main.cpp
         MainComponent.cpp
         MainComponent.h
+        ui/WebUiComponent.cpp
+        ui/WebUiComponent.h
 )
 
 target_compile_definitions(AgenticSynth
     PRIVATE
-        JUCE_WEB_BROWSER=0
+        JUCE_WEB_BROWSER=1
         JUCE_USE_CURL=0
         JUCE_APPLICATION_NAME_STRING="$<TARGET_PROPERTY:AgenticSynth,JUCE_PRODUCT_NAME>"
         JUCE_APPLICATION_VERSION_STRING="$<TARGET_PROPERTY:AgenticSynth,JUCE_VERSION>"
+        AGENTIC_SYNTH_UI_DEV=$<BOOL:${AGENTIC_SYNTH_UI_DEV}>
+        AGENTIC_SYNTH_PROJECT_NAME="Agentic Synth"
+        AGENTIC_SYNTH_VERSION_STRING="${PROJECT_VERSION}"
 )
 
 target_link_libraries(AgenticSynth
     PRIVATE
         agentic_synth_agent
+        agentic_synth_ui_assets
         juce::juce_gui_extra
     PUBLIC
         juce::juce_recommended_config_flags
@@ -126,20 +180,27 @@ target_sources(AgenticSynth_Plugin
         plugin/AgenticSynthPlugin.h
         plugin/PluginEditor.cpp
         plugin/PluginEditor.h
+        ui/WebUiComponent.cpp
+        ui/WebUiComponent.h
 )
 
 target_compile_definitions(AgenticSynth_Plugin
     PRIVATE
-        JUCE_WEB_BROWSER=0
+        JUCE_WEB_BROWSER=1
         JUCE_USE_CURL=0
         JUCE_VST3_CAN_REPLACE_VST2=0
+        AGENTIC_SYNTH_UI_DEV=$<BOOL:${AGENTIC_SYNTH_UI_DEV}>
+        AGENTIC_SYNTH_PROJECT_NAME="Agentic Synth"
+        AGENTIC_SYNTH_VERSION_STRING="${PROJECT_VERSION}"
 )
 
 target_link_libraries(AgenticSynth_Plugin
     PRIVATE
         agentic_synth_agent
+        agentic_synth_ui_assets
         juce::juce_audio_utils
         juce::juce_audio_plugin_client
+        juce::juce_gui_extra
     PUBLIC
         juce::juce_recommended_config_flags
         juce::juce_recommended_lto_flags
