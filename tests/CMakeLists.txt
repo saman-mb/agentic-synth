@@ -13,6 +13,7 @@ add_executable(agentic_synth_tests
     VAOscillatorTest.cpp
     FilterTest.cpp
     LFOTest.cpp
+    ParamSmootherTest.cpp
     VoiceManagerTest.cpp
     MidiHandlerTest.cpp
     HeuristicParserTest.cpp

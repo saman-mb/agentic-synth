@@ -17,6 +17,7 @@ add_library(agentic_synth_engine STATIC
     engine/VAOscillator.cpp
     engine/Filter.cpp
     engine/LFO.cpp
+    engine/ParamSmoother.cpp
     engine/VoiceManager.cpp
     engine/PatchValidator.cpp
     engine/VariationEngine.cpp
