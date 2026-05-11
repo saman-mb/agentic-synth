@@ -115,6 +115,22 @@ target_link_libraries(agentic_synth_agent
 # ── Standalone App and Plugin (gated on BUILD_PLUGIN) ───────────────────────
 if(AGENTIC_SYNTH_BUILD_PLUGIN)
 
+# Linux WebView dependency: JUCE 8's juce_gui_extra includes <gtk/gtk.h>
+# directly when JUCE_WEB_BROWSER=1 but does NOT declare linuxPackages in
+# its module manifest, so callers must supply the include paths + libs.
+# Resolve via pkg-config; the resulting INTERFACE library is linked into
+# the plugin + standalone targets below on Linux only.
+if(UNIX AND NOT APPLE)
+    find_package(PkgConfig REQUIRED)
+    pkg_check_modules(WEBKIT2GTK REQUIRED IMPORTED_TARGET webkit2gtk-4.1)
+    pkg_check_modules(GTK3       REQUIRED IMPORTED_TARGET gtk+-3.0)
+    add_library(agentic_synth_linux_webview INTERFACE)
+    target_link_libraries(agentic_synth_linux_webview INTERFACE
+        PkgConfig::WEBKIT2GTK PkgConfig::GTK3)
+else()
+    add_library(agentic_synth_linux_webview INTERFACE)  # no-op on mac/win
+endif()
+
 # ── React UI bundling ────────────────────────────────────────────────────────
 option(AGENTIC_SYNTH_UI_DEV "Hot-load Vite dev server instead of bundled assets" OFF)
 
@@ -198,6 +214,7 @@ target_link_libraries(AgenticSynth
     PRIVATE
         agentic_synth_agent
         agentic_synth_ui_assets
+        agentic_synth_linux_webview
         juce::juce_gui_extra
     PUBLIC
         juce::juce_recommended_config_flags
@@ -250,6 +267,7 @@ target_link_libraries(AgenticSynth_Plugin
     PRIVATE
         agentic_synth_agent
         agentic_synth_ui_assets
+        agentic_synth_linux_webview
         juce::juce_audio_utils
         juce::juce_audio_plugin_client
         juce::juce_gui_extra
