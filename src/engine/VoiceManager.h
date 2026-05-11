@@ -1,11 +1,13 @@
 #pragma once
 
 #include "engine/ADSREnvelope.h"
+#include "engine/Delay.h"
 #include "engine/Filter.h"
 #include "engine/LFO.h"
 #include "engine/ParamSmoother.h"
 #include "engine/PatchStruct.h"
 #include "engine/PatchValidator.h"
+#include "engine/Reverb.h"
 #include "engine/VAOscillator.h"
 #include "engine/WavetableOscillator.h"
 
@@ -139,6 +141,12 @@ private:
     // First applyPatch after prepare() snaps the smoothers to the target
     // value so the synth doesn't glide audibly from the default on load.
     bool primed_{false};
+
+    // FX bus: voices → delay → reverb. Stereo path only — mono renderBlock
+    // and renderNextSample produce dry voices × master gain. Bus state has
+    // no per-voice ownership; FX run once on the summed stereo signal.
+    Delay delay_;
+    Reverb reverb_;
 };
 
 } // namespace agentic_synth::engine
