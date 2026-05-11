@@ -50,12 +50,7 @@ add_executable(agentic_synth_tests
     #   would be a real (small) change to the test's expectations and is
     #   out of scope for the WebView migration; tracked separately.
     #
-    # MorphEngineTest remains excluded because it predates the PatchStruct
-    # namespace move (uses unqualified `PatchStruct` / `make_default_patch`)
-    # and its `REQUIRE(x == Catch::Matchers::WithinAbs(...))` comparisons use
-    # the wrong Catch2 syntax (should be `REQUIRE_THAT(x, WithinAbs(...))`).
-    # Re-enabling it requires a small rewrite that is out of scope here.
-    # MorphEngineTest.cpp
+    MorphEngineTest.cpp
     PatchStateManagerTest.cpp
     SPSCQueueTest.cpp
     # Phase 3: bundled React UI + resource provider lookup. Compiles in only

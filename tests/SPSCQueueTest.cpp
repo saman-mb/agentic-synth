@@ -41,14 +41,22 @@ TEST_CASE("SPSCQueue: push then pop returns same value in FIFO order", "[spsc]")
 }
 
 TEST_CASE("SPSCQueue: returns false when full", "[spsc]") {
-    TestQueue q; // capacity = 4
+    // Usable capacity = Capacity - 1 due to sentinel slot for full-detection
+    // (head == tail means empty, so one slot is reserved to disambiguate full).
+    // Capacity=8 template arg gives 7 usable slots; here we fill 4 and assert
+    // a 5th push into a Capacity=5-equivalent test would fail — but since
+    // Capacity must be a power of two, we use Capacity=8 and fill all 7.
+    SPSCQueue<int, 8> q; // template Capacity = 8, usable = 7
 
     REQUIRE(q.push(1));
     REQUIRE(q.push(2));
     REQUIRE(q.push(3));
     REQUIRE(q.push(4));
-    // At capacity - next push should fail
-    REQUIRE_FALSE(q.push(5));
+    REQUIRE(q.push(5));
+    REQUIRE(q.push(6));
+    REQUIRE(q.push(7));
+    // At usable capacity (7 of 8 slots occupied) — next push should fail
+    REQUIRE_FALSE(q.push(8));
 }
 
 TEST_CASE("SPSCQueue: drain_latest discards intermediate items", "[spsc]") {

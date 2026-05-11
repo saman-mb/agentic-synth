@@ -5,6 +5,7 @@
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
 using namespace agentic_synth::engine;
+using namespace agentic_synth;
 
 TEST_CASE("MorphEngine: initial state has no targets and zero position", "[morph]") {
     MorphEngine morph;
@@ -31,7 +32,12 @@ TEST_CASE("MorphEngine: save to explicit slot works", "[morph]") {
 
     int slot = morph.saveTarget(p, 2);
     REQUIRE(slot == 2);
-    REQUIRE(morph.targetCount() == 3); // slots 0, 1 are empty, but count is 3
+    // targetCount() returns the number of *filled* slots, not (max-index + 1).
+    // Only slot 2 is populated, so count is 1.
+    REQUIRE(morph.targetCount() == 1);
+    REQUIRE(morph.target(2).has_value());
+    REQUIRE_FALSE(morph.target(0).has_value());
+    REQUIRE_FALSE(morph.target(1).has_value());
 }
 
 TEST_CASE("MorphEngine: morphed patch at 0.0 equals first target", "[morph]") {
@@ -45,7 +51,7 @@ TEST_CASE("MorphEngine: morphed patch at 0.0 equals first target", "[morph]") {
     morph.saveTarget(b);
 
     auto result = morph.morphedPatchAt(0.0f);
-    REQUIRE(result.filter.cutoff_hz == Catch::Matchers::WithinAbs(200.0f, 0.01f));
+    REQUIRE_THAT(result.filter.cutoff_hz, Catch::Matchers::WithinAbs(200.0f, 0.01f));
 }
 
 TEST_CASE("MorphEngine: morphed patch at 1.0 equals last target", "[morph]") {
@@ -59,7 +65,7 @@ TEST_CASE("MorphEngine: morphed patch at 1.0 equals last target", "[morph]") {
     morph.saveTarget(b);
 
     auto result = morph.morphedPatchAt(1.0f);
-    REQUIRE(result.filter.cutoff_hz == Catch::Matchers::WithinAbs(2000.0f, 0.01f));
+    REQUIRE_THAT(result.filter.cutoff_hz, Catch::Matchers::WithinAbs(2000.0f, 0.01f));
 }
 
 TEST_CASE("MorphEngine: morphed patch at 0.5 is midpoint of two targets", "[morph]") {
@@ -75,8 +81,8 @@ TEST_CASE("MorphEngine: morphed patch at 0.5 is midpoint of two targets", "[morp
     morph.saveTarget(b);
 
     auto result = morph.morphedPatchAt(0.5f);
-    REQUIRE(result.filter.cutoff_hz == Catch::Matchers::WithinAbs(2000.0f, 1.0f));
-    REQUIRE(result.master_gain == Catch::Matchers::WithinAbs(0.5f, 0.01f));
+    REQUIRE_THAT(result.filter.cutoff_hz, Catch::Matchers::WithinAbs(2000.0f, 1.0f));
+    REQUIRE_THAT(result.master_gain, Catch::Matchers::WithinAbs(0.5f, 0.01f));
 }
 
 TEST_CASE("MorphEngine: clear target removes it", "[morph]") {
@@ -113,15 +119,15 @@ TEST_CASE("MorphEngine: MIDI CC on matching controller updates position", "[morp
     // CC value [0, 127] maps to position [0, 1]
     bool consumed = morph.onMidiCC(2, 0);
     REQUIRE(consumed);
-    REQUIRE(morph.position() == Catch::Matchers::WithinAbs(0.0f, 0.01f));
+    REQUIRE_THAT(morph.position(), Catch::Matchers::WithinAbs(0.0f, 0.01f));
 
     consumed = morph.onMidiCC(2, 64);
     REQUIRE(consumed);
-    REQUIRE(morph.position() == Catch::Matchers::WithinAbs(0.5f, 0.01f));
+    REQUIRE_THAT(morph.position(), Catch::Matchers::WithinAbs(0.5f, 0.01f));
 
     consumed = morph.onMidiCC(2, 127);
     REQUIRE(consumed);
-    REQUIRE(morph.position() == Catch::Matchers::WithinAbs(1.0f, 0.01f));
+    REQUIRE_THAT(morph.position(), Catch::Matchers::WithinAbs(1.0f, 0.01f));
 }
 
 TEST_CASE("MorphEngine: MIDI CC on non-matching controller is ignored", "[morph]") {
@@ -168,5 +174,5 @@ TEST_CASE("MorphEngine: callback fires with correct morphed patch", "[morph]") {
     morph.pollCallback();
 
     REQUIRE(captured.has_value());
-    REQUIRE(captured->filter.cutoff_hz == Catch::Matchers::WithinAbs(300.0f, 1.0f));
+    REQUIRE_THAT(captured->filter.cutoff_hz, Catch::Matchers::WithinAbs(300.0f, 1.0f));
 }
