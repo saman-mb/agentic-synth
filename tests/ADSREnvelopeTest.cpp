@@ -292,3 +292,41 @@ TEST_CASE("ADSREnvelope zero-time attack is sample-accurate") {
     // First sample must already be at peak
     REQUIRE(env.process() >= 1.0F);
 }
+
+TEST_CASE("ADSREnvelope re-noteOff during release is idempotent",
+          "[adsr][release][idempotent]") {
+    // Phase 5: guard against re-rescaling release trajectory on repeated
+    // noteOff during the release stage. Without the guard, the second
+    // noteOff re-measures output_ (now lower) and re-rescales the coeff so
+    // "remaining decay finishes in releaseSeconds from NOW" — extending the
+    // total release duration beyond what was configured.
+    ADSREnvelope env(kSR);
+    env.setParams(makeParams(0.001F, 0.0F, 1.0F, 0.2F)); // 200ms release
+    env.noteOn();
+    for (int i = 0; i < 200; ++i)
+        env.process(); // reach sustain (1.0)
+
+    env.noteOff();
+    // Process halfway through release.
+    const int halfSamples = static_cast<int>(0.1 * kSR);
+    for (int i = 0; i < halfSamples; ++i)
+        env.process();
+
+    // Capture output, second noteOff, see if release re-extends.
+    const float midRelease = env.process();
+    REQUIRE(midRelease > 0.0F);
+    REQUIRE(midRelease < 1.0F);
+
+    env.noteOff(); // re-noteOff — should be no-op
+    int samplesToZero = 0;
+    while (env.isActive() && samplesToZero < static_cast<int>(0.5 * kSR)) {
+        env.process();
+        ++samplesToZero;
+    }
+    // Total release should be ~200ms (started 100ms ago, ~100ms remaining).
+    // Bound: samplesToZero must be < 0.15s. Without idempotent guard,
+    // it would be ~200ms (rescaled from current).
+    const double remainingSeconds = static_cast<double>(samplesToZero) / kSR;
+    INFO("remaining release after re-noteOff = " << remainingSeconds << "s");
+    REQUIRE(remainingSeconds < 0.15);
+}
