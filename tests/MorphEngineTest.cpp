@@ -4,6 +4,8 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
+#include <cmath>
+
 using namespace agentic_synth::engine;
 using namespace agentic_synth;
 
@@ -291,6 +293,144 @@ TEST_CASE("MorphEngine: portamento sweeps in log domain", "[morph][log]") {
     // Midpoint = geometric mean = sqrt(0.01 * 1.0) = 0.1, NOT linear 0.505.
     auto mid = morph.morphedPatchAt(0.5f);
     REQUIRE_THAT(mid.portamento_s, Catch::Matchers::WithinRel(0.1f, 0.05f));
+}
+
+// ── Zero-endpoint guard (architect P1 #14) ────────────────────────────────────
+
+TEST_CASE("MorphEngine: loglerp preserves zero when both endpoints are zero", "[morph][log][zero]") {
+    // A patch with delay.time_s = 0 means "delay bypassed". Morphing
+    // bypass→bypass must stay bypassed at every t, not snap to 1ms.
+    MorphEngine morph;
+    PatchStruct a = make_default_patch();
+    a.delay.time_s = 0.0f;
+    a.filter.cutoff_hz = 0.0f;
+    a.amp_env.attack_s = 0.0f;
+    PatchStruct b = make_default_patch();
+    b.delay.time_s = 0.0f;
+    b.filter.cutoff_hz = 0.0f;
+    b.amp_env.attack_s = 0.0f;
+    morph.saveTarget(a);
+    morph.saveTarget(b);
+
+    for (float t : {0.0f, 0.25f, 0.5f, 0.75f, 1.0f}) {
+        auto out = morph.morphedPatchAt(t);
+        INFO("t = " << t);
+        REQUIRE(out.delay.time_s == 0.0f);
+        REQUIRE(out.filter.cutoff_hz == 0.0f);
+        REQUIRE(out.amp_env.attack_s == 0.0f);
+    }
+}
+
+TEST_CASE("MorphEngine: loglerp asymmetric zero snaps to lo (documented behavior)", "[morph][log][zero]") {
+    // Asymmetric zero: a=0 (bypass), b=1000Hz. User is morphing OUT of bypass.
+    // We deliberately do NOT discontinuously jump at t=0; instead we treat 0
+    // as `lo` (20Hz for cutoff) and log-interp smoothly from lo to b.
+    // This avoids an audible click at the start of the morph; cost is that
+    // exact bypass (cutoff_hz==0) is only preserved when BOTH endpoints are 0.
+    MorphEngine morph;
+    PatchStruct a = make_default_patch();
+    a.filter.cutoff_hz = 0.0f;
+    PatchStruct b = make_default_patch();
+    b.filter.cutoff_hz = 1000.0f;
+    morph.saveTarget(a);
+    morph.saveTarget(b);
+
+    // t=0 (pure a): snaps to lo=20Hz, NOT 0.
+    REQUIRE_THAT(morph.morphedPatchAt(0.0f).filter.cutoff_hz,
+                 Catch::Matchers::WithinRel(20.0f, 1e-3f));
+    // t=0.5: geometric mean of (lo=20, b=1000) = sqrt(20*1000) ≈ 141.42.
+    REQUIRE_THAT(morph.morphedPatchAt(0.5f).filter.cutoff_hz,
+                 Catch::Matchers::WithinRel(141.42f, 0.05f));
+    // t=1.0 (pure b): exact b.
+    REQUIRE_THAT(morph.morphedPatchAt(1.0f).filter.cutoff_hz,
+                 Catch::Matchers::WithinRel(1000.0f, 1e-3f));
+    // All values finite (no NaN/Inf).
+    for (float t : {0.0f, 0.25f, 0.5f, 0.75f, 1.0f}) {
+        auto out = morph.morphedPatchAt(t);
+        INFO("t = " << t);
+        REQUIRE(std::isfinite(out.filter.cutoff_hz));
+    }
+}
+
+TEST_CASE("MorphEngine: existing log-midpoint behavior unchanged by zero-guard", "[morph][log][zero]") {
+    // Regression: ensure the zero-guard does not perturb the normal in-range
+    // log-midpoint case (20 → 18000 Hz, t=0.5 → sqrt(20*18000) ≈ 600).
+    MorphEngine morph;
+    PatchStruct a = make_default_patch();
+    a.filter.cutoff_hz = 20.0f;
+    PatchStruct b = make_default_patch();
+    b.filter.cutoff_hz = 18000.0f;
+    morph.saveTarget(a);
+    morph.saveTarget(b);
+
+    auto mid = morph.morphedPatchAt(0.5f);
+    REQUIRE_THAT(mid.filter.cutoff_hz, Catch::Matchers::WithinRel(600.0f, 0.01f));
+}
+
+TEST_CASE("MorphEngine: delay.time_s=0 bypass survives round-trip morph", "[morph][log][zero]") {
+    // The motivating bug: user sets delay.time_s = 0 to bypass the delay.
+    // Round-tripping through morph at any t MUST yield exactly 0, never 1ms.
+    MorphEngine morph;
+    PatchStruct a = make_default_patch();
+    a.delay.time_s = 0.0f;
+    PatchStruct b = make_default_patch();
+    b.delay.time_s = 0.0f;
+    morph.saveTarget(a);
+    morph.saveTarget(b);
+
+    for (float t : {0.0f, 0.1f, 0.5f, 0.9f, 1.0f}) {
+        auto out = morph.morphedPatchAt(t);
+        INFO("t = " << t);
+        REQUIRE(out.delay.time_s == 0.0f);
+    }
+}
+
+TEST_CASE("MorphEngine: asymmetric-zero delay.time_s follows lo-snap convention",
+          "[morph][log][zero]") {
+    // Convention (mirrors the asymmetric-zero filter-cutoff test above): when
+    // ONE endpoint of a log-interpolated field is zero, that endpoint is
+    // treated as `lo` (the field's documented log-floor) and a smooth log
+    // interp runs from lo to the non-zero endpoint. This avoids an audible
+    // click at t=0 when a user morphs OUT of a "delay bypassed" patch.
+    //
+    // For delay.time_s the lo value is 0.001 (1 ms). Documented in
+    // MorphEngine.cpp's log-interp lo table; this test pins the contract so
+    // future refactors can't silently change it.
+    MorphEngine morph;
+    PatchStruct a = make_default_patch();
+    a.delay.time_s = 0.0f;
+    PatchStruct b = make_default_patch();
+    b.delay.time_s = 0.1f;
+    morph.saveTarget(a);
+    morph.saveTarget(b);
+
+    // t=0.01 (barely into morph): result snaps to the lo floor (0.001),
+    // not to 0. log-interp on [lo, 0.1] at t=0.01 is very close to lo.
+    {
+        const auto out = morph.morphedPatchAt(0.01f);
+        INFO("t=0.01 delay.time_s = " << out.delay.time_s);
+        REQUIRE(out.delay.time_s >= 0.001f);
+        REQUIRE(out.delay.time_s < 0.0015f); // well below the b endpoint
+    }
+    // t=0.5: somewhere strictly between lo (0.001) and b (0.1).
+    {
+        const auto out = morph.morphedPatchAt(0.5f);
+        INFO("t=0.5 delay.time_s = " << out.delay.time_s);
+        REQUIRE(out.delay.time_s > 0.001f);
+        REQUIRE(out.delay.time_s < 0.1f);
+        // Geometric mean of (0.001, 0.1) = sqrt(0.0001) = 0.01.
+        REQUIRE_THAT(out.delay.time_s, Catch::Matchers::WithinRel(0.01f, 0.05f));
+    }
+    // t=0.99: almost at the non-zero endpoint.
+    {
+        const auto out = morph.morphedPatchAt(0.99f);
+        INFO("t=0.99 delay.time_s = " << out.delay.time_s);
+        REQUIRE(out.delay.time_s > 0.09f);
+        REQUIRE(out.delay.time_s <= 0.1f);
+    }
+    // t=1.0: exact b endpoint.
+    REQUIRE_THAT(morph.morphedPatchAt(1.0f).delay.time_s,
+                 Catch::Matchers::WithinRel(0.1f, 1e-4f));
 }
 
 TEST_CASE("MorphEngine: delay.time_s sweeps in log domain", "[morph][log]") {

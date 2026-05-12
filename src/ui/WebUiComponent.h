@@ -6,6 +6,8 @@
 #include <optional>
 #include <vector>
 
+#include <juce_core/juce_core.h>
+
 #include "agent/AgentBridge.h"
 
 namespace agentic_synth::agent {
@@ -27,6 +29,21 @@ namespace agentic_synth::ui {
 //
 // Multi-instance safety: each instance gets its own WebView2 user-data
 // folder under temp/, disambiguated via juce::Uuid (Windows only).
+//
+// Lifetime contract:
+//   WebUiComponent holds a reference to AgentBridge (bridge_ below). The
+//   owner (typically AgenticSynthPlugin's editor) MUST guarantee that the
+//   AgentBridge outlives this WebUiComponent.
+//
+//   The internal ThreadPool drains workers in the dtor with
+//   removeAllJobs(/*interruptRunning=*/true, /*timeoutMs=*/5000). Cooperative
+//   jobs that capture `this` or `bridge_` MUST poll
+//   juce::ThreadPoolJob::getCurrentThreadPoolJob()->shouldExit() before any
+//   long-running step so they exit inside that 5-second window. If a job
+//   blocks past the timeout it may still hold a reference to `bridge_` after
+//   ~WebUiComponent returns — therefore the owner MUST NOT destroy the
+//   AgentBridge until every WebUiComponent that references it has been
+//   destructed AND its dtor has returned.
 class WebUiComponent : public juce::Component {
 public:
     explicit WebUiComponent(agent::AgentBridge& bridge);
@@ -54,6 +71,15 @@ public:
     // TelemetryAwareBrowser lifecycle hook. Exposed for tests and for parent
     // components that want to know whether the fallback UI is showing.
     [[nodiscard]] bool didLoadSucceed() const noexcept { return !loadFailed_.load(); }
+
+    // Test hook: submit a worker job through the same ThreadPool the
+    // `generate` native handler uses. Lets tests assert lifecycle (cancel on
+    // dtor, concurrent jobs) without driving the WebView's JS bridge.
+    void submitWorkerForTesting(std::function<void()> job);
+
+    // Test hook: number of jobs currently queued or running in the worker
+    // pool. Useful for asserting that the dtor drained them.
+    [[nodiscard]] int pendingWorkerJobsForTesting() const noexcept;
 
     // Pure helper for composing the user-facing fallback message. Factored as
     // a static so unit tests can exercise it without instantiating the
@@ -103,6 +129,20 @@ private:
     void handleLoadFailure(const juce::String& errorInfo);
 
     agent::AgentBridge& bridge_;
+
+    // Pool for UI worker tasks (LLM call, rationale, etc.). Declared BEFORE
+    // browser_/subs_ so that when ~WebUiComponent runs, member destruction
+    // order (reverse-declaration) tears down browser_/subs_ first, and the
+    // pool last. However we explicitly drain the pool at the very top of the
+    // dtor (with interruptRunningJobs=true) so workers never observe a
+    // half-destructed component or bridge.
+    //
+    // Cancellation contract: jobs that capture `this`/`bridge_` MUST check
+    // juce::ThreadPoolJob::getCurrentThreadPoolJob()->shouldExit() before
+    // long-running steps; the dtor calls removeAllJobs(true, timeout) which
+    // signals every active job to exit.
+    juce::ThreadPool workerPool_;
+
     std::unique_ptr<TelemetryAwareBrowser> browser_;
     FallbackComponent fallback_;
     std::vector<agent::AgentBridge::SubscriberHandle> subs_;

@@ -289,7 +289,19 @@ void WebUiComponent::handleLoadFailure(const juce::String& errorInfo) {
 
 // ── Constructor: wire everything ─────────────────────────────────────────────
 
-WebUiComponent::WebUiComponent(agent::AgentBridge& bridge) : bridge_(bridge) {
+WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
+    : bridge_(bridge),
+      // Worker pool for `generate` (and any future native handler that needs
+      // a background thread but must NOT outlive the component). 2 threads is
+      // enough for UI-driven work (LLM heuristic + rationale, file IO,
+      // future async handlers) — these tasks are coarse-grained and not
+      // latency-sensitive. The pool is owned by the component so dtor can
+      // drain pending/active jobs via removeAllJobs(interrupt=true) before
+      // bridge_ goes away, eliminating the use-after-free that
+      // `juce::Thread::launch` had (architect P1 #15).
+      workerPool_(juce::ThreadPool::Options{}
+                      .withNumberOfThreads(2)
+                      .withThreadName("WebUiWorker")) {
     using Options = juce::WebBrowserComponent::Options;
     using NativeFnCompletion = juce::WebBrowserComponent::NativeFunctionCompletion;
 
@@ -327,9 +339,32 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge) : bridge_(bridge) {
                                              // The actual heuristic + rationale work runs on a worker; results
                                              // arrive at the UI via the onPatch / onRationale / onDone events.
                                              completion(juce::var{});
-                                             juce::Thread::launch([this, prompt]() {
+
+                                             // Architect P1 #15: switched from juce::Thread::launch to the
+                                             // component-owned juce::ThreadPool so ~WebUiComponent can
+                                             // drain in-flight work (removeAllJobs(interrupt=true)) before
+                                             // bridge_ disappears, fixing a use-after-free when the editor
+                                             // closes mid-submitPrompt.
+                                             //
+                                             // The job checks shouldExit() at each natural step boundary so
+                                             // a dtor-issued signalJobShouldExit() can short-circuit the
+                                             // rationale step and the subsequent notify*() calls.
+                                             workerPool_.addJob([this, prompt]() {
+                                                 auto* const self = juce::ThreadPoolJob::getCurrentThreadPoolJob();
+                                                 const auto cancelled = [self]() noexcept {
+                                                     return self != nullptr && self->shouldExit();
+                                                 };
+
+                                                 if (cancelled())
+                                                     return;
                                                  const PatchStruct patch = bridge_.submitPrompt(prompt);
+
+                                                 if (cancelled())
+                                                     return;
                                                  const std::string rationale = bridge_.generateRationale(prompt, patch);
+
+                                                 if (cancelled())
+                                                     return;
                                                  auto* pobj = new juce::DynamicObject{};
                                                  pobj->setProperty("variation", juce::String("A"));
                                                  pobj->setProperty("data", [&patch]() {
@@ -344,9 +379,14 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge) : bridge_(bridge) {
                                                  }());
                                                  bridge_.notifyPatch(juce::var{pobj});
 
+                                                 if (cancelled())
+                                                     return;
                                                  auto* robj = new juce::DynamicObject{};
                                                  robj->setProperty("text", juce::String(rationale));
                                                  bridge_.notifyRationale(juce::var{robj});
+
+                                                 if (cancelled())
+                                                     return;
                                                  bridge_.notifyDone(juce::var{});
                                              });
                                          });
@@ -528,10 +568,28 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge) : bridge_(bridge) {
 }
 
 WebUiComponent::~WebUiComponent() {
-    // SubscriberHandles release first so no late callback can fire against a
+    // Architect P1 #15: drain the worker pool BEFORE anything else. Pending /
+    // running `generate` jobs capture `this` and touch `bridge_`; if we let
+    // the editor go away first they UAF. removeAllJobs(interruptRunningJobs,
+    // timeoutMs) signals each active job's shouldExit() and blocks until they
+    // either return or the timeout expires. 5 s is comfortably more than any
+    // heuristic + rationale call costs in practice; if a worker truly hangs
+    // past that, leaking is worse than letting the destructor return, so we
+    // do not assert on the bool result.
+    workerPool_.removeAllJobs(/*interruptRunningJobs=*/true, /*timeOutMilliseconds=*/5000);
+
+    // SubscriberHandles release next so no late callback can fire against a
     // half-destructed browser_. (Members are destroyed in reverse-declaration
     // order; subs_ comes after browser_ in the header, so destroy it manually.)
     subs_.clear();
+}
+
+void WebUiComponent::submitWorkerForTesting(std::function<void()> job) {
+    workerPool_.addJob(std::move(job));
+}
+
+int WebUiComponent::pendingWorkerJobsForTesting() const noexcept {
+    return workerPool_.getNumJobs();
 }
 
 void WebUiComponent::resized() {

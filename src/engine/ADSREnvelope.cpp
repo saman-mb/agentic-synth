@@ -29,8 +29,30 @@ void ADSREnvelope::setParams(const Params& params) {
 void ADSREnvelope::noteOn() { stage_ = Stage::Attack; }
 
 void ADSREnvelope::noteOff() {
-    if (stage_ != Stage::Idle)
-        stage_ = Stage::Release;
+    if (stage_ == Stage::Idle)
+        return;
+    stage_ = Stage::Release;
+    // Recalibrate release coefficients so the trajectory crosses zero in
+    // exactly params_.releaseSeconds, starting from the CURRENT output level
+    // (rather than the implicit start=1.0 used in recalcCoefficients()).
+    // Without this, releasing during attack/decay (output_ < 1) lands earlier
+    // than the configured release time — perceived as a short release.
+    rescaleReleaseFromCurrent();
+}
+
+void ADSREnvelope::rescaleReleaseFromCurrent() {
+    const double tco = std::max(1.0e-6, static_cast<double>(params_.curvature));
+    const double N = static_cast<double>(params_.releaseSeconds) * sampleRate_;
+    const double start = std::max(0.0, static_cast<double>(output_));
+    if (N <= 0.0 || start <= 0.0) {
+        releaseCoeff_ = 0.0F;
+        releaseBase_ = 0.0F;
+    } else {
+        const double ratio = std::max(1e-10, (start + tco) / tco);
+        const double c = std::exp(-std::log(ratio) / N);
+        releaseCoeff_ = static_cast<float>(c);
+        releaseBase_ = static_cast<float>(-tco * (1.0 - c));
+    }
 }
 
 float ADSREnvelope::process() {
@@ -109,17 +131,33 @@ void ADSREnvelope::recalcCoefficients() {
         }
     }
 
-    // Release: currentLevel → 0, fixed point = -tco, calibrated from 1.0→0
+    // Release: currentLevel → 0, fixed point = -tco. Two calibrations:
+    //   • releaseCoeffStart_/releaseBaseStart_ — start=1.0 (canonical)
+    //   • releaseCoeff_/releaseBase_         — what process() actually uses
+    //
+    // When NOT in Release stage we mirror start into the live pair, so the
+    // next noteOff() seeds from up-to-date params. When currently IN Release,
+    // we MUST NOT overwrite the live pair at all — VoiceManager::applyPatch
+    // calls setParams() every block; if we either (a) snapped back to the
+    // start=1.0 trajectory we'd click + shorten the release, or (b)
+    // re-rescaled from the current level each call we'd geometrically extend
+    // the release each block. Both regress the user-visible release time.
+    // The live pair stays exactly as noteOff() set it; release-knob edits
+    // are picked up on the NEXT noteOff (start pair is always up to date).
     {
         const double N = static_cast<double>(params_.releaseSeconds) * sr;
         if (N <= 0.0) {
-            releaseCoeff_ = 0.0F;
-            releaseBase_ = 0.0F;
+            releaseCoeffStart_ = 0.0F;
+            releaseBaseStart_ = 0.0F;
         } else {
             const double ratio = std::max(1e-10, (1.0 + tco) / tco);
             const double c = std::exp(-std::log(ratio) / N);
-            releaseCoeff_ = static_cast<float>(c);
-            releaseBase_ = static_cast<float>(-tco * (1.0 - c));
+            releaseCoeffStart_ = static_cast<float>(c);
+            releaseBaseStart_ = static_cast<float>(-tco * (1.0 - c));
+        }
+        if (stage_ != Stage::Release) {
+            releaseCoeff_ = releaseCoeffStart_;
+            releaseBase_ = releaseBaseStart_;
         }
     }
 }
