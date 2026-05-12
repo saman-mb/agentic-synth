@@ -66,14 +66,15 @@ APVTS::ParameterLayout AgenticSynthPlugin::createParameterLayout() {
     // Portamento: log skew so small values get more knob travel.
     layout.add(std::make_unique<FloatParam>("portamento", "Portamento",
                                             Range(0.0f, 5.0f, 0.0f, 0.5f), defaults.portamento_s));
-    // TODO(phase-3): not consumed by DSP yet — VoiceManager has a fixed
-    // 16-voice pool. Exposed for state-recall completeness.
+    // voice_count: Phase 3 wired this — VoiceManager::applyPatch caps active
+    // voice allocation to voices_[0..voice_count) via activeVoiceCap_.
     layout.add(std::make_unique<IntParam>("voice_count", "Voice Count", 1, 16,
                                           static_cast<int>(defaults.voice_count)));
 
     // ── Filter ─────────────────────────────────────────────────────────────
-    // TODO(phase-3): not consumed by DSP yet — engine always runs the Moog
-    // ladder LPF regardless of this enum.
+    // filter_type: Phase 3 wired this — applyPatch pointer-swaps between the
+    // pre-allocated MoogLadder (LowPass) and SVFilter (HP/BP/Notch/Peak) per
+    // voice. Phase 4 added a ~5ms crossfade on type change for click-free swap.
     layout.add(std::make_unique<ChoiceParam>("filter_type", "Filter Type", kFilterTypeNames(),
                                              safeEnumIndex(defaults.filter.type,
                                                            kFilterTypeNames().size() - 1)));
@@ -110,10 +111,10 @@ APVTS::ParameterLayout AgenticSynthPlugin::createParameterLayout() {
                                             Range(0.001f, 20.0f, 0.0f, 0.3f), defaults.filter_env.release_s));
 
     // ── Oscillators (3 × 10 fields) ───────────────────────────────────────
-    // TODO(phase-3): per-osc enabled / pan / volume / type are routing-only
-    // today — the engine renders osc[0] through a fixed WT/VA path. Pan/
-    // volume/enable/type are persisted via APVTS for state-recall and will
-    // be wired into the per-voice oscillator mixer in Phase 3.
+    // Phase 3 wired per-osc enabled/pan/volume/type: Voice::renderStereo
+    // iterates each enabled osc, sums into mono filter input, then re-splits
+    // L/R via volume-weighted per-osc pan (panWeightL/R). Type drives a
+    // switch dispatching to VA / Wavetable / FM / Noise paths.
     for (int i = 0; i < agentic_synth::kMaxOscillators; ++i) {
         const auto& d = defaults.osc[i];
         layout.add(std::make_unique<ChoiceParam>(oscId(i, "type"),
@@ -156,10 +157,9 @@ APVTS::ParameterLayout AgenticSynthPlugin::createParameterLayout() {
                                                  juce::String("LFO ") + juce::String(i) + " Waveform",
                                                  kLfoWaveformNames(),
                                                  safeEnumIndex(d.waveform, kLfoWaveformNames().size() - 1)));
-        // TODO(phase-3): the engine consumes only Pitch / FilterCutoff /
-        // Amplitude LFO targets. Pan / WavetablePos / FmRatio are exposed
-        // here so AI/UI selections survive state recall but currently have
-        // no audio-rate effect.
+        // Phase 3 wired all LFO targets: Pitch / FilterCutoff / Amplitude /
+        // Pan / WavetablePos / FmRatio. Phase 5 dropped the slot-0 gate so
+        // Pan / WavetablePos / FmRatio modulate every enabled osc uniformly.
         layout.add(std::make_unique<ChoiceParam>(lfoId(i, "target"),
                                                  juce::String("LFO ") + juce::String(i) + " Target",
                                                  kLfoTargetNames(),
@@ -182,8 +182,9 @@ APVTS::ParameterLayout AgenticSynthPlugin::createParameterLayout() {
     layout.add(std::make_unique<FloatParam>("reverb_size", "Reverb Size", Range(0.0f, 1.0f), defaults.reverb.size));
     layout.add(std::make_unique<FloatParam>("reverb_damping", "Reverb Damping", Range(0.0f, 1.0f),
                                             defaults.reverb.damping));
-    // TODO(phase-3): not consumed by DSP yet — Reverb stereo width spread is
-    // currently fixed at 1.0 in the engine. Persisted for state recall.
+    // reverb_width: Phase 3 wired this as an M/S blend on the reverb output
+    // (width=0 collapses to mono, width=1 is full stereo pass-through).
+    // Smoothed via reverbWidthSmoother_ (~50ms) with snap on first apply.
     layout.add(std::make_unique<FloatParam>("reverb_width", "Reverb Width", Range(0.0f, 1.0f),
                                             defaults.reverb.width));
     layout.add(std::make_unique<FloatParam>("reverb_mix", "Reverb Mix", Range(0.0f, 1.0f), defaults.reverb.mix));
@@ -196,8 +197,9 @@ APVTS::ParameterLayout AgenticSynthPlugin::createParameterLayout() {
     layout.add(std::make_unique<FloatParam>("delay_mix", "Delay Mix", Range(0.0f, 1.0f), defaults.delay.mix));
     layout.add(std::make_unique<FloatParam>("delay_stereo", "Delay Stereo", Range(0.0f, 1.0f),
                                             defaults.delay.stereo));
-    // TODO(phase-3): not consumed by DSP yet — Delay uses time_s directly;
-    // host-tempo-relative delay time will land alongside MPE in Phase 3.
+    // delay_bpm_sync: Phase 3 wired this. When true, delay.time_s is
+    // reinterpreted as beats (1.0=quarter, 0.5=eighth, etc) and converted to
+    // seconds via host BPM (or 120 BPM fallback when no AudioPlayHead).
     layout.add(std::make_unique<BoolParam>("delay_bpm_sync", "Delay BPM Sync", defaults.delay.bpm_sync != 0));
 
     return layout;
