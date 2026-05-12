@@ -29,8 +29,9 @@ void ADSREnvelope::setParams(const Params& params) {
 void ADSREnvelope::noteOn() { stage_ = Stage::Attack; }
 
 void ADSREnvelope::noteOff() {
-    if (stage_ == Stage::Idle)
-        return;
+    if (stage_ == Stage::Idle || stage_ == Stage::Release)
+        return; // idempotent: re-noteOff during release would re-rescale c
+                // from now-lower output, extending the total release time.
     stage_ = Stage::Release;
     // Recalibrate release coefficients so the trajectory crosses zero in
     // exactly params_.releaseSeconds, starting from the CURRENT output level
