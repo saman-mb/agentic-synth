@@ -132,6 +132,159 @@ TEST_CASE("ADSREnvelope reset returns to idle") {
     REQUIRE(env.process() == 0.0F);
 }
 
+TEST_CASE("ADSREnvelope release-from-sustain duration matches releaseSeconds") {
+    const float releaseSec = 0.1F;
+    ADSREnvelope env(kSR);
+    env.setParams(makeParams(0.0F, 0.0F, 1.0F, releaseSec));
+    env.noteOn();
+    // Reach steady sustain (attack/decay are zero, so first sample is at 1.0)
+    for (int i = 0; i < static_cast<int>(0.1 * kSR); ++i)
+        (void)env.process();
+
+    env.noteOff();
+    int samples = 0;
+    const int budget = static_cast<int>(releaseSec * kSR * 4);
+    while (env.isActive() && samples < budget) {
+        env.process();
+        ++samples;
+    }
+    const double measured = samples / kSR;
+    // Allow ±10%
+    REQUIRE(measured >= releaseSec * 0.9);
+    REQUIRE(measured <= releaseSec * 1.1);
+}
+
+TEST_CASE("ADSREnvelope release-from-mid-attack still takes releaseSeconds") {
+    // Bug regression: noteOff during attack used to produce a noticeably
+    // shorter release because releaseBase_ was calibrated assuming start=1.0.
+    const float attackSec = 1.0F;
+    const float releaseSec = 0.2F;
+    ADSREnvelope env(kSR);
+    env.setParams(makeParams(attackSec, 0.0F, 1.0F, releaseSec));
+    env.noteOn();
+
+    // Advance 100 ms — well inside attack
+    const int preSamples = static_cast<int>(0.1 * kSR);
+    float midLevel = 0.0F;
+    for (int i = 0; i < preSamples; ++i)
+        midLevel = env.process();
+    REQUIRE(midLevel > 0.01F);
+    REQUIRE(midLevel < 1.0F);
+
+    env.noteOff();
+    int samples = 0;
+    const int budget = static_cast<int>(releaseSec * kSR * 4);
+    while (env.isActive() && samples < budget) {
+        env.process();
+        ++samples;
+    }
+    const double measured = samples / kSR;
+    // Must be close to configured releaseSec (not faster — that was the bug).
+    REQUIRE(measured >= releaseSec * 0.9);
+    REQUIRE(measured <= releaseSec * 1.1);
+}
+
+TEST_CASE("ADSREnvelope release-from-zero terminates without UB") {
+    ADSREnvelope env(kSR);
+    env.setParams(makeParams(1.0F, 0.0F, 1.0F, 0.2F));
+    env.noteOn();
+    // output_ is still 0 on the very first sample before any process() call.
+    REQUIRE(env.isActive());
+    env.noteOff();
+    // Should immediately go idle (start=0 → nothing to release).
+    const float v = env.process();
+    REQUIRE(v == 0.0F);
+    REQUIRE_FALSE(env.isActive());
+}
+
+TEST_CASE("ADSREnvelope release-from-mid-decay duration matches releaseSeconds") {
+    // SDET gap: every previous "release-time matches releaseSeconds" check
+    // entered Release from sustain (level 0.5 or 1.0) or from attack. Entering
+    // Release in the middle of the DECAY stage exercises a separate path —
+    // the start level is somewhere between sustain and 1.0 — and must also
+    // honour the configured release time.
+    const float releaseSec = 0.2F;
+    ADSREnvelope env(kSR);
+    env.setParams(makeParams(0.001F, 1.0F, 0.2F, releaseSec));
+    env.noteOn();
+
+    // Walk forward until we land in the middle of decay — output ≈ 0.6.
+    // The 1 s decay from 1.0 to 0.2 means level 0.6 occurs ~midway.
+    float lvl = 0.0F;
+    int safety = 0;
+    while (lvl < 0.6F && safety++ < static_cast<int>(kSR * 2)) {
+        lvl = env.process();
+    }
+    REQUIRE(lvl >= 0.55F);
+    REQUIRE(lvl <= 0.75F);
+
+    env.noteOff();
+    int samples = 0;
+    const int budget = static_cast<int>(releaseSec * kSR * 4);
+    while (env.isActive() && samples < budget) {
+        env.process();
+        ++samples;
+    }
+    const double measured = samples / kSR;
+    INFO("measured release from mid-decay = " << measured << "s (expected " << releaseSec << ")");
+    REQUIRE(measured >= releaseSec * 0.9);
+    REQUIRE(measured <= releaseSec * 1.1);
+}
+
+TEST_CASE("ADSREnvelope release rescale survives setParams (applyPatch-every-block regression)") {
+    // CRITICAL regression: VoiceManager::applyPatch runs every audio block
+    // and calls setAmpEnvelope/setFilterEnvelope, which forwards to
+    // setParams → recalcCoefficients. Before the FIX, recalcCoefficients
+    // unconditionally re-derived the release coeffs from start=1.0,
+    // clobbering the current-level rescale that noteOff() had installed.
+    // Symptom: any held-then-released note got its release trajectory snapped
+    // back to a 1.0→0 ramp mid-flight → click + wrong release time.
+    const float releaseSec = 0.5F;
+    const ADSREnvelope::Params p = makeParams(0.001F, 0.001F, 0.5F, releaseSec);
+    ADSREnvelope env(kSR);
+    env.setParams(p);
+    env.noteOn();
+
+    // Settle into sustain.
+    for (int i = 0; i < static_cast<int>(0.05 * kSR); ++i)
+        (void)env.process();
+
+    env.noteOff(); // Enter Release at output ≈ sustain (0.5).
+
+    // Process 100 ms — well into release.
+    const int preSamples = static_cast<int>(0.1 * kSR);
+    float midLevel = 0.0F;
+    for (int i = 0; i < preSamples; ++i)
+        midLevel = env.process();
+
+    // With a working rescale, after 100 ms (= 1/5 of releaseSec) the
+    // exponential should be a fraction of the start level. Just sanity-check
+    // it's somewhere reasonable (not 0, not near start).
+    INFO("mid-release level = " << midLevel);
+    REQUIRE(midLevel > 0.001F);
+    REQUIRE(midLevel < 0.5F);
+
+    // Now hammer setParams with the SAME params, simulating applyPatch every
+    // block. The FIX guarantees this does NOT reset releaseCoeff_/Base_ to
+    // the start=1.0 calibration when stage == Release.
+    env.setParams(p);
+    env.setParams(p);
+    env.setParams(p);
+
+    // Continue processing until idle. Total release time (from noteOff to
+    // idle) must still be ≈ releaseSec.
+    int samplesAfterMid = 0;
+    const int budget = static_cast<int>(releaseSec * kSR * 4);
+    while (env.isActive() && samplesAfterMid < budget) {
+        env.process();
+        ++samplesAfterMid;
+    }
+    const double total = static_cast<double>(preSamples + samplesAfterMid) / kSR;
+    INFO("total measured release = " << total << "s (expected " << releaseSec << ")");
+    REQUIRE(total >= releaseSec * 0.9);
+    REQUIRE(total <= releaseSec * 1.1);
+}
+
 TEST_CASE("ADSREnvelope zero-time attack is sample-accurate") {
     ADSREnvelope env(kSR);
     env.setParams(makeParams(0.0F, 0.0F, 1.0F, 0.0F));

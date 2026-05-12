@@ -104,14 +104,88 @@ void WavetableData::buildMipLevel(int level) {
 
 // ---- WavetableOscillator ----
 
-WavetableOscillator::WavetableOscillator() {
-    std::vector<float> sine(kWavetableSize);
+namespace {
+
+// Build the shared default table once and cache it. Multi-frame so that
+// LFO/automation on WavetablePos (setMorphPosition) produces an audible
+// timbre sweep out of the box. Frames progress sine → triangle-ish →
+// saw → square, normalised to peak ≈ 1.0 each.
+//
+// Memory: 4 frames × kWavetableSize (256) × kNumMipLevels (7) × 4 bytes
+//        ≈ 28 KB total, shared across every default-constructed oscillator
+// instance via shared_ptr — no per-voice multiplication.
+std::shared_ptr<const WavetableData> buildDefaultTable() {
+    constexpr int kFrames = 4;
+    std::vector<float> frames(kFrames * kWavetableSize);
+
+    auto norm = [](float* dst, int n) noexcept {
+        float peak = 0.0f;
+        for (int i = 0; i < n; ++i)
+            peak = std::max(peak, std::abs(dst[i]));
+        if (peak > 1e-9f) {
+            const float inv = 1.0f / peak;
+            for (int i = 0; i < n; ++i)
+                dst[i] *= inv;
+        }
+    };
+
+    // Frame 0 — pure sine.
+    float* f0 = &frames[0 * kWavetableSize];
     for (int i = 0; i < kWavetableSize; ++i)
-        sine[i] = static_cast<float>(std::sin(2.0 * std::numbers::pi * i / kWavetableSize));
+        f0[i] = static_cast<float>(std::sin(2.0 * std::numbers::pi * i / kWavetableSize));
+
+    // Frame 1 — triangle-ish: odd harmonics with 1/h^2 amplitude (the band-
+    // limited triangle series). Sounds noticeably brighter than the pure sine
+    // but still quite soft.
+    float* f1 = &frames[1 * kWavetableSize];
+    for (int i = 0; i < kWavetableSize; ++i) {
+        double y = 0.0;
+        for (int h = 1; h <= 31; h += 2) {
+            const double sign = ((h - 1) / 2) % 2 == 0 ? 1.0 : -1.0;
+            y += sign * std::sin(2.0 * std::numbers::pi * h * i / kWavetableSize) / static_cast<double>(h * h);
+        }
+        f1[i] = static_cast<float>(y);
+    }
+    norm(f1, kWavetableSize);
+
+    // Frame 2 — sawtooth: sum of 1/h harmonics up to a generous count. The
+    // FFT mip pyramid further band-limits this per-octave at render time.
+    float* f2 = &frames[2 * kWavetableSize];
+    for (int i = 0; i < kWavetableSize; ++i) {
+        double y = 0.0;
+        for (int h = 1; h <= 64; ++h)
+            y += std::sin(2.0 * std::numbers::pi * h * i / kWavetableSize) / static_cast<double>(h);
+        f2[i] = static_cast<float>(y);
+    }
+    norm(f2, kWavetableSize);
+
+    // Frame 3 — square: sum of odd 1/h harmonics. Strongest harmonic content
+    // → maximum timbre contrast against frame 0.
+    float* f3 = &frames[3 * kWavetableSize];
+    for (int i = 0; i < kWavetableSize; ++i) {
+        double y = 0.0;
+        for (int h = 1; h <= 63; h += 2)
+            y += std::sin(2.0 * std::numbers::pi * h * i / kWavetableSize) / static_cast<double>(h);
+        f3[i] = static_cast<float>(y);
+    }
+    norm(f3, kWavetableSize);
+
     auto data = std::make_shared<WavetableData>();
-    data->buildFromFrames(sine.data(), 1);
-    table_ = std::move(data);
+    data->buildFromFrames(frames.data(), kFrames);
+    return data;
 }
+
+const std::shared_ptr<const WavetableData>& defaultTable() {
+    // Magic-static: one shared copy across every default-constructed
+    // oscillator instance for the lifetime of the process. Construction
+    // happens on first call (offline, allocates) — never on the audio thread.
+    static const std::shared_ptr<const WavetableData> kTable = buildDefaultTable();
+    return kTable;
+}
+
+} // namespace
+
+WavetableOscillator::WavetableOscillator() { table_ = defaultTable(); }
 
 void WavetableOscillator::setSampleRate(double sampleRate) noexcept {
     sampleRate_ = sampleRate < 1.0 ? 1.0 : sampleRate;
@@ -136,21 +210,19 @@ void WavetableOscillator::loadFromFrames(const float* samples, int numFrames) {
 }
 
 float WavetableOscillator::mipLevelFloat() const noexcept {
-    // We want mip k to be the smallest level whose cutoff bin still sits at or
-    // above Nyquist for the current phase increment, exactly as before but
-    // expressed continuously so the fractional part can drive the crossfade.
+    // For phase increment phi cycles/sample, the highest harmonic that fits below
+    // Nyquist is h_max = 1/(2*phi). Mip k preserves bins below N/2^(k+1), so we
+    // need N/2^(k+1) >= h_max + 1, giving the minimum safe k:
     //
-    //   bin index of the fundamental = phaseIncrement * kWavetableSize
-    //   mip k allows bins up to (kWavetableSize >> (k+1))
-    //   need bins_used <= cutoff(k)  →  k >= log2(N / (2 * bins_used))
-    //                                 = log2(1 / (2 * phaseIncrement))
+    //   k_safe = log2(N / (h_max + 1)) - 1
+    //          ≈ log2(2 * N * phi) - 1
+    //          = log2(N * phi)
     //
-    // Solving for k: k = -log2(2 * phaseIncrement) = log2(N * phaseIncrement * 2) - log2(N).
-    // Equivalent simplification: ratio = kWavetableSize * phaseIncrement * 2;
-    // k_continuous = log2(ratio). Matches the old integer code's "ceil(log2(ratio))".
+    // Previously this used ratio = 2 * N * phi (i.e. log2 result was 1 too high),
+    // which over-bandlimited the top octave of harmonics. Architect P1 #10.
     if (phaseIncrement_ <= 0.0)
-        return static_cast<float>(kNumMipLevels - 1);
-    const double ratio = static_cast<double>(kWavetableSize) * phaseIncrement_ * 2.0;
+        return 0.0f;
+    const double ratio = static_cast<double>(kWavetableSize) * phaseIncrement_;
     if (ratio <= 1.0)
         return 0.0f;
     return static_cast<float>(std::log2(ratio));
@@ -195,17 +267,34 @@ float WavetableOscillator::readMorphedSample(int mipLevel, double phase) const n
     return s0 + frameFrac * (s1 - s0);
 }
 
+// Resolve crossfade endpoints given a continuous safe-mip threshold.
+// k_safe = log2(N*phi) is the EXACT threshold: the minimum INTEGER mip that
+// fully bandlimits is ceil(k_safe). The floor mip would alias. Therefore the
+// crossfade pair is (ceil(k_safe), ceil(k_safe)+1) — both alias-safe — with
+// weight rising toward the higher mip as we approach the next octave boundary.
+namespace {
+inline void resolveMipPair(float levelF, int& idxLow, int& idxHigh, float& weight) noexcept {
+    const float ceilF = std::ceil(levelF);
+    idxLow = std::clamp(static_cast<int>(ceilF), 0, kNumMipLevels - 1);
+    idxHigh = std::clamp(idxLow + 1, 0, kNumMipLevels - 1);
+    // weight on idxHigh = frac(levelF). At an exact integer levelF, ceil==floor
+    // so weight=0 and we sit on idxLow; on both sides of an integer the
+    // resolved pair shifts by exactly one mip with weight transitioning through
+    // 0 → continuous output.
+    weight = std::clamp(levelF - std::floor(levelF), 0.0f, 1.0f);
+}
+} // namespace
+
 float WavetableOscillator::processSample() noexcept {
     const float levelF = mipLevelFloat();
-    const int idxLow = std::clamp(static_cast<int>(std::floor(levelF)), 0, kNumMipLevels - 1);
-    const int idxHigh = std::clamp(idxLow + 1, 0, kNumMipLevels - 1);
-    const float fracLevel = std::clamp(levelF - static_cast<float>(idxLow), 0.0f, 1.0f);
+    int idxLow, idxHigh;
+    float fracLevel;
+    resolveMipPair(levelF, idxLow, idxHigh, fracLevel);
 
     float out;
     if (!mipCrossfadeEnabled_ || idxLow == idxHigh) {
-        // Match the old behaviour: pick the higher (more bandlimited) integer mip.
-        const int single = std::clamp(static_cast<int>(std::ceil(levelF)), 0, kNumMipLevels - 1);
-        out = readMorphedSample(single, phase_);
+        // Pick the minimum-safe integer mip (ceil of the continuous threshold).
+        out = readMorphedSample(idxLow, phase_);
     } else {
         const float sLow = readMorphedSample(idxLow, phase_);
         const float sHigh = readMorphedSample(idxHigh, phase_);
@@ -220,11 +309,10 @@ void WavetableOscillator::processBlock(float* output, int numSamples) noexcept {
     // mipLevelFloat() depends only on phaseIncrement, which is constant across
     // the block — pull the indices out of the inner loop.
     const float levelF = mipLevelFloat();
-    const int idxLow = std::clamp(static_cast<int>(std::floor(levelF)), 0, kNumMipLevels - 1);
-    const int idxHigh = std::clamp(idxLow + 1, 0, kNumMipLevels - 1);
-    const float fracLevel = std::clamp(levelF - static_cast<float>(idxLow), 0.0f, 1.0f);
+    int idxLow, idxHigh;
+    float fracLevel;
+    resolveMipPair(levelF, idxLow, idxHigh, fracLevel);
     const bool useCrossfade = mipCrossfadeEnabled_ && idxLow != idxHigh;
-    const int singleIdx = useCrossfade ? idxLow : std::clamp(static_cast<int>(std::ceil(levelF)), 0, kNumMipLevels - 1);
 
     for (int i = 0; i < numSamples; ++i) {
         if (useCrossfade) {
@@ -232,7 +320,7 @@ void WavetableOscillator::processBlock(float* output, int numSamples) noexcept {
             const float sHigh = readMorphedSample(idxHigh, phase_);
             output[i] = sLow * (1.0f - fracLevel) + sHigh * fracLevel;
         } else {
-            output[i] = readMorphedSample(singleIdx, phase_);
+            output[i] = readMorphedSample(idxLow, phase_);
         }
         phase_ = std::fmod(phase_ + phaseIncrement_, 1.0);
     }

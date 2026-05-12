@@ -43,7 +43,7 @@ private:
     int bufferSize_{0};
 
     double sampleRate_{44100.0};
-    int delaySamples_{0};
+    float delaySamples_{0.0f};
     float feedback_{0.3f};
     float mix_{0.25f};
     float stereo_{0.5f};

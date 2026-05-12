@@ -15,24 +15,16 @@ target_link_libraries(agentic_synth_mapper
         juce::juce_core
 )
 
-# ── Engine Library (Phase 10A split) ─────────────────────────────────────────
-# The engine library is split along the JUCE boundary so the JUCE-free DSP
-# core can be consumed (and tested) without dragging in juce_core,
-# juce_audio_basics, or juce_data_structures.
+# ── Engine Library ───────────────────────────────────────────────────────────
+# Phase 2 (Item #2): PatchStateManager is removed (APVTS owns persistence), so
+# the engine library no longer needs a JUCE-flavour split — the only TU that
+# pulled juce_data_structures (PatchStateManager.cpp) is gone. We keep a single
+# engine_core target plus an INTERFACE alias `agentic_synth_engine` for
+# backwards-compat with consumers that still link by the legacy name.
 #
-#   agentic_synth_engine_core   — pure C++ DSP + helpers (no JUCE in PUBLIC).
-#   agentic_synth_engine_juce   — modules that legitimately require JUCE
-#                                  (PatchStateManager uses juce::ValueTree;
-#                                  PresetExporter uses juce::File/JSON).
-#
-# The historical name `agentic_synth_engine` is kept as an INTERFACE library
-# alias for the JUCE flavour so existing consumers (agent_lib, plugin,
-# standalone, tests) continue to link unchanged.
-
-# ── engine_core: JUCE-free DSP ───────────────────────────────────────────────
-# Verified JUCE-free via grep of src/engine/*.{cpp,h}: the only TU pulling
-# <juce_*> headers is PatchStateManager.{h,cpp}. The other "juce" hits in
-# WavetableOscillator.cpp and MidiHandler.h are in comments only.
+# `agentic_synth_engine_core` is JUCE-light: the only juce dep is `juce_core`
+# transitively via mapper (SemanticMapper uses juce::JSON). No juce_audio_basics
+# / juce_data_structures dependency from the engine side.
 add_library(agentic_synth_engine_core STATIC
     engine/ADSREnvelope.cpp
     engine/WavetableOscillator.cpp
@@ -65,29 +57,16 @@ target_link_libraries(agentic_synth_engine_core
         agentic_synth_mapper
 )
 
-# ── engine_juce: JUCE-dependent parts ────────────────────────────────────────
-# PatchStateManager uses juce::ValueTree / juce::Identifier as its serialization
-# substrate. PresetExporter uses juce::File and juce::JSON for disk I/O.
-add_library(agentic_synth_engine_juce STATIC
-    engine/PatchStateManager.cpp
-)
-target_include_directories(agentic_synth_engine_juce PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
-agentic_synth_configure_target(agentic_synth_engine_juce)
-
-target_link_libraries(agentic_synth_engine_juce
-    PUBLIC
-        agentic_synth_engine_core
-        juce::juce_core
-        juce::juce_audio_basics
-        juce::juce_data_structures
-)
-
 # ── Backward-compat alias ────────────────────────────────────────────────────
-# Existing call sites link `agentic_synth_engine`. Keep that name as an
-# INTERFACE library that forwards to engine_juce (which transitively pulls
-# engine_core + JUCE). No consumer edits required.
+# Phase 2 (Item #2): PatchStateManager removed — APVTS is the single source of
+# truth for persistent state. The engine_juce static library that wrapped it
+# is gone; existing call sites that link `agentic_synth_engine` still work via
+# the INTERFACE alias below, which now forwards directly to engine_core. JUCE
+# data-structures / audio-basics are still pulled in transitively by consumers
+# that need them (agent_lib, plugin) — engine_core itself remains JUCE-light
+# (only juce_core via the mapper).
 add_library(agentic_synth_engine INTERFACE)
-target_link_libraries(agentic_synth_engine INTERFACE agentic_synth_engine_juce)
+target_link_libraries(agentic_synth_engine INTERFACE agentic_synth_engine_core)
 # ── Agent Library ────────────────────────────────────────────────────────────
 # AI agent layer: depends on engine_lib, never the other way around.
 add_library(agentic_synth_agent STATIC

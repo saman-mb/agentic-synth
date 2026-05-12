@@ -106,8 +106,19 @@ struct ReverbParams {
 };
 static_assert(sizeof(ReverbParams) == 16);
 
+// delay.bpm_sync semantics:
+//   - When false: time_s is the delay length in seconds.
+//   - When true:  time_s is reinterpreted as BEATS (not seconds). The
+//                 convention is: 1.0 = quarter note, 0.5 = eighth,
+//                 0.25 = sixteenth, 2.0 = half, 4.0 = whole. Conversion:
+//                     delay_seconds = time_s * 60.0 / host_bpm
+//                 The engine clamps beats to [0.0625, 4.0] and the resulting
+//                 seconds value to [0.001, 2.0].
+//   - Null AudioPlayHead (no host tempo reported) → engine falls back to
+//     120 BPM so plug-in standalone hosts still produce a deterministic
+//     beat length.
 struct DelayParams {
-    float time_s;     // 0 .. 2
+    float time_s;     // 0 .. 2 seconds  (or beats when bpm_sync=true; see above)
     float feedback;   // 0 .. 0.99
     float mix;        // 0 .. 1
     float stereo;     // 0 .. 1 (0 = parallel, 1 = ping-pong cross-feed)
@@ -164,6 +175,16 @@ inline PatchStruct make_default_patch() noexcept {
     p.version = kPatchStructVersion;
     p.patch_id = 0;
 
+    // Per-osc sensible non-zero defaults so APVTS layout, make_default_patch
+    // and AI-written patches all agree on what "unset" means. Phase 2
+    // follow-up (Code Fix 3): defaults live here exclusively — APVTS layout
+    // reads from this function, and writePatchToApvts no longer rewrites
+    // zero values to "sensible" replacements behind the AI's back.
+    for (auto& o : p.osc) {
+        o.pulse_width = 0.5f; // square at 50% duty
+        o.fm_ratio = 1.0f;    // 1:1 carrier:modulator
+    }
+
     // Osc 0: sawtooth, unity
     p.osc[0].type = OscType::Sawtooth;
     p.osc[0].volume = 1.0f;
@@ -194,7 +215,15 @@ inline PatchStruct make_default_patch() noexcept {
     }
 
     // Default delay stereo to moderate ping-pong (matches prior hardcoded VoiceManager value).
+    p.delay.time_s = 0.25f;
     p.delay.stereo = 0.5f;
+
+    // Default reverb width to full stereo (1.0). Phase 3 wires this to a
+    // post-Reverb M/S blend: width=0 collapses wet to mono, width=1 leaves
+    // the full stereo image. Older code ignored the field, so historical
+    // default of 0 (memset) would now silently make every patch mono. 1.0
+    // matches what Freeverb produced pre-Phase-3.
+    p.reverb.width = 1.0f;
 
     p.master_gain = 1.0f;
     p.voice_count = 8;

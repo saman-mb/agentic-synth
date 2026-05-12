@@ -82,7 +82,20 @@ PatchStruct MorphEngine::lerp(const PatchStruct& a, const PatchStruct& b, float 
     // a 20 → 8000 Hz sweep at t=0.5 yields 4010 Hz (linear), perceptually
     // already near the top of the sweep. Geometric midpoint = sqrt(a*b) = 400 Hz,
     // which feels like the true midpoint of the octave-spaced sweep.
+    //
+    // Zero-endpoint guard (architect P1 #14):
+    //   Some patch fields use exact 0.0 as a "discrete bypass" sentinel (notably
+    //   delay.time_s = 0 → delay disabled, and cutoff_hz = 0 on uninitialised
+    //   patches). The plain clamp+log path snaps 0 to `lo`, which silently
+    //   turns "bypass" into "1ms delay" or "20Hz cutoff". We preserve bypass
+    //   only when BOTH endpoints are zero (interpolating a bypass-to-bypass
+    //   morph). For asymmetric zero (one endpoint 0, the other non-zero) we
+    //   keep the existing snap-to-lo behaviour: the user is actively morphing
+    //   from bypass into a real value, so a smooth log sweep from `lo` to the
+    //   non-zero endpoint is the desired audible result (no discontinuity).
     auto loglerp = [u, t](float a_in, float b_in, float lo, float hi) noexcept {
+        if (a_in == 0.0f && b_in == 0.0f)
+            return 0.0f;
         const float ac = std::clamp(a_in, lo, hi);
         const float bc = std::clamp(b_in, lo, hi);
         return std::exp(u * std::log(ac) + t * std::log(bc));

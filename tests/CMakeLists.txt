@@ -47,7 +47,11 @@ add_executable(agentic_synth_tests
     # Phase 5: re-enabled tests that were orphaned at the start of the JUCE 8
     # WebView migration QA review.
     #
-    # PatchStateManagerTest now compiles and runs.
+    # Phase 2 (Item #2): PatchStateManagerTest removed alongside the
+    # PatchStateManager class itself — APVTS is the single source of truth
+    # for persistent state. Equivalent coverage now lives in
+    # PluginLifecycleTest's APVTS-roundtrip cases (added Phase 2).
+    #
     # SPSCQueueTest compiles and 6/7 cases pass. The 7th
     #   ("returns false when full") expects capacity=4 to hold 4 items, but
     #   the lock-free ring reserves one slot to distinguish full from empty
@@ -57,8 +61,19 @@ add_executable(agentic_synth_tests
     #   out of scope for the WebView migration; tracked separately.
     #
     MorphEngineTest.cpp
-    PatchStateManagerTest.cpp
     SPSCQueueTest.cpp
+    # Phase 1 P0 ship-blocker verification: SPSC audition path,
+    # releaseResources state-clear, primeSmoothers no-glide,
+    # state-restore reapply.
+    PluginLifecycleTest.cpp
+    # Phase 2 follow-up: unwired-field audio-differs tests. Marked [!shouldfail]
+    # since the engine ignores these params today; flip green when Phase 3 lands.
+    $<$<BOOL:${AGENTIC_SYNTH_BUILD_PLUGIN}>:UnwiredParamsTest.cpp>
+    # Phase 3 follow-up: quantitative tests covering FM SR fix, FM phase fix,
+    # voice-level pan double-multiply fix, FilterType swap stability,
+    # voice_count drop stability, BPM-sync delay timing, WavetablePos
+    # expected-fail gate. Plugin TU needed for BPM-sync delay timing test.
+    $<$<BOOL:${AGENTIC_SYNTH_BUILD_PLUGIN}>:Phase3FollowupTest.cpp>
     # Phase 3: bundled React UI + resource provider lookup. Compiles in only
     # when the plugin target (and thus agentic_synth_ui_assets) is built.
     $<$<BOOL:${AGENTIC_SYNTH_BUILD_PLUGIN}>:WebUiComponentResourceProviderTest.cpp>
@@ -66,7 +81,17 @@ add_executable(agentic_synth_tests
     $<$<BOOL:${AGENTIC_SYNTH_BUILD_PLUGIN}>:WebUiComponentEmissionTest.cpp>
     # SRE P0/P1: WebView load-failure fallback diagnostic.
     $<$<BOOL:${AGENTIC_SYNTH_BUILD_PLUGIN}>:WebUiComponentFallbackTest.cpp>
+    # Architect P1 #15: WebUiComponent worker ThreadPool lifecycle &
+    # cooperative cancellation on dtor.
+    $<$<BOOL:${AGENTIC_SYNTH_BUILD_PLUGIN}>:WebUiComponentWorkerPoolTest.cpp>
     $<$<BOOL:${AGENTIC_SYNTH_BUILD_PLUGIN}>:${CMAKE_SOURCE_DIR}/src/ui/WebUiComponent.cpp>
+    # Phase 1 P0 follow-up: PluginLifecycleTest exercises real AgenticSynthPlugin
+    # construction (state-recall round-trip, SR-change drain, audition → audio).
+    # Compile the plugin + editor TUs into the test executable so the test code
+    # can instantiate AgenticSynthPlugin directly without the JUCE plugin
+    # wrapper machinery.
+    $<$<BOOL:${AGENTIC_SYNTH_BUILD_PLUGIN}>:${CMAKE_SOURCE_DIR}/src/plugin/AgenticSynthPlugin.cpp>
+    $<$<BOOL:${AGENTIC_SYNTH_BUILD_PLUGIN}>:${CMAKE_SOURCE_DIR}/src/plugin/PluginEditor.cpp>
 )
 
 target_include_directories(agentic_synth_tests PRIVATE ../src)
@@ -94,6 +119,11 @@ target_link_libraries(agentic_synth_tests
         agentic_synth_mapper
         $<$<BOOL:${AGENTIC_SYNTH_BUILD_PLUGIN}>:agentic_synth_ui_assets>
         $<$<BOOL:${AGENTIC_SYNTH_BUILD_PLUGIN}>:juce::juce_gui_extra>
+        # Plugin TU (AgenticSynthPlugin.cpp / PluginEditor.cpp) needs
+        # AudioProcessor + APVTS (juce_audio_processors) and juce_audio_utils
+        # for the editor's PluginHostType / look-and-feel includes.
+        $<$<BOOL:${AGENTIC_SYNTH_BUILD_PLUGIN}>:juce::juce_audio_processors>
+        $<$<BOOL:${AGENTIC_SYNTH_BUILD_PLUGIN}>:juce::juce_audio_utils>
 )
 
 list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
