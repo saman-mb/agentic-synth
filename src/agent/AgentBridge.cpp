@@ -1,9 +1,12 @@
 #include "agent/AgentBridge.h"
 
 #include <algorithm>
+#include <iostream>
 #include <juce_core/juce_core.h>
 #include <juce_events/juce_events.h>
 #include <utility>
+
+#include "mapper/EnvLoader.h"
 
 namespace agentic_synth::agent {
 
@@ -27,6 +30,20 @@ juce::var patchToVar(const PatchStruct& p) {
 } // namespace
 
 AgentBridge::AgentBridge() {
+    // Look up GEMINI_KEY (env var, falling back to a `.env` walked up from
+    // cwd). When found, enable the GeminiSampler so PromptHandler can use
+    // it as a cloud fallback whenever the local llama.cpp /completion
+    // server is unreachable. When the key is absent the sampler stays
+    // disabled and the existing nullopt-on-failure behaviour is preserved.
+    const auto geminiKey = mapper::loadEnvKey("GEMINI_KEY");
+    if (!geminiKey.empty()) {
+        gemini_.setApiKey(geminiKey);
+        gemini_.setSystemPrompt(sampler_.systemPrompt());
+        std::cerr << "[AgentBridge] GEMINI_KEY loaded; Gemini fallback enabled\n";
+    } else {
+        std::cerr << "[AgentBridge] GEMINI_KEY not set; Gemini fallback disabled\n";
+    }
+
     // Wire stream parser: each completed field injects a partial patch
     // directly onto the audio SPSC queue for < 500 ms first-audible-change.
     // Parallel emission to typed subscribers (Phase 2) — used by the

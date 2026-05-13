@@ -9,6 +9,7 @@
 #include "agent/SessionMemory.h"
 #include "agent/StreamParser.h"
 #include "engine/PatchStruct.h"
+#include "mapper/GeminiSampler.h"
 #include "mapper/GrammarSampler.h"
 #include "mapper/SemanticMapper.h"
 
@@ -37,10 +38,11 @@ class KnobBridge; // for read-only MIDI CC state accessors
 // owns only the methods that read/write the StreamParser state.
 class PromptHandler {
 public:
-    PromptHandler(PrePatchPipeline& pipeline, mapper::GrammarSampler& sampler, mapper::SemanticMapper& semanticMapper,
-                  StreamParser& streamParser, SessionMemory& memory, const KnobBridge& knob) noexcept
-        : pipeline_(pipeline), sampler_(sampler), semanticMapper_(semanticMapper), streamParser_(streamParser),
-          memory_(memory), knob_(knob) {}
+    PromptHandler(PrePatchPipeline& pipeline, mapper::GrammarSampler& sampler, mapper::GeminiSampler& gemini,
+                  mapper::SemanticMapper& semanticMapper, StreamParser& streamParser, SessionMemory& memory,
+                  const KnobBridge& knob) noexcept
+        : pipeline_(pipeline), sampler_(sampler), gemini_(gemini), semanticMapper_(semanticMapper),
+          streamParser_(streamParser), memory_(memory), knob_(knob) {}
 
     // Issue #65/#68: parse heuristically and dispatch to audio thread
     // immediately (< 200 ms); semantic mapper refines in place.
@@ -70,6 +72,7 @@ public:
 private:
     PrePatchPipeline& pipeline_;
     mapper::GrammarSampler& sampler_;
+    mapper::GeminiSampler& gemini_;
     mapper::SemanticMapper& semanticMapper_;
     StreamParser& streamParser_;
     SessionMemory& memory_;

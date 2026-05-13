@@ -1,9 +1,11 @@
 .chat-shell {
   display: grid;
   grid-template-rows: auto 1fr auto;
-  height: 100vh;
-  max-width: 860px;
-  margin: 0 auto;
+  /* Fill the parent (.rc-prompt-dock) — the parent owns sizing via
+     flex-grow on the right column. Falls back to 100% of any host. */
+  height: 100%;
+  width: 100%;
+  min-height: 0;
   background: var(--bg-panel);
   color: var(--text-primary);
   font-family: var(--font-sans);
@@ -278,6 +280,28 @@
   align-items: flex-end;
 }
 
+/* Wraps the prompt textarea + a tiny helper line. We make it a flex
+ * column so the hint always sits directly under the input without
+ * stealing horizontal space from the send button next to it. */
+.prompt-input-col {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.prompt-input-hint {
+  font-family: var(--font-sans);
+  font-size: 0.68rem;
+  letter-spacing: 0.02em;
+  color: var(--text-tertiary);
+  padding-left: 0.25rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Prompt input wrap — owns the idle shimmer border. The textarea sits
  * inside on top of an inset background; the wrapper draws a gradient
  * frame that animates while idle and snaps to solid violet on focus. */
@@ -337,7 +361,12 @@
   font-family: var(--font-sans);
   font-size: 0.95rem;
   padding: 0.65rem 0.9rem;
-  resize: none;
+  /* Allow vertical user-resize up to a sensible cap so long prompts
+     don't squeeze the message list. resize:vertical keeps the width
+     stable while letting the user tug down. */
+  resize: vertical;
+  min-height: calc(1.5em * 3 + 1.3em); /* ~3 line rows + padding */
+  max-height: 8.5em; /* ~5 line cap before scroll */
   line-height: 1.5;
   box-shadow: var(--depth-inset);
   transition: border-color 0.15s;

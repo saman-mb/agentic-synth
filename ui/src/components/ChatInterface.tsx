@@ -766,21 +766,29 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation, 
         <label htmlFor={inputId} className="visually-hidden">
           Describe a sound
         </label>
-        <div
-          className={`prompt-input-wrap${inputFocused ? ' is-focused' : ''}${isGenerating ? ' is-generating' : ''}`}
-        >
-          <textarea
-            id={inputId}
-            className="prompt-input"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={handleKeyDown}
-            onFocus={() => setInputFocused(true)}
-            onBlur={() => setInputFocused(false)}
-            placeholder="Describe a sound… (⌘K — Enter to send, Shift+Enter for newline)"
-            disabled={isGenerating}
-            rows={2}
-          />
+        <div className="prompt-input-col">
+          <div
+            className={`prompt-input-wrap${inputFocused ? ' is-focused' : ''}${isGenerating ? ' is-generating' : ''}`}
+            title="Enter to send, Shift+Enter for newline"
+          >
+            <textarea
+              id={inputId}
+              className="prompt-input"
+              value={inputValue}
+              onChange={(e) => setInputValue(e.target.value)}
+              onKeyDown={handleKeyDown}
+              onFocus={() => setInputFocused(true)}
+              onBlur={() => setInputFocused(false)}
+              placeholder="Describe a sound… (⌘K)"
+              disabled={isGenerating}
+              rows={3}
+            />
+          </div>
+          {/* Tiny helper line — never wraps, mutes to tertiary so it
+              reads as ambient guidance, not chrome. */}
+          <span className="prompt-input-hint" aria-hidden="true">
+            Enter to send · Shift+Enter for newline
+          </span>
         </div>
         {onAudio && (
           <PushToTalk

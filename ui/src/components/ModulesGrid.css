@@ -7,7 +7,9 @@
    parent .app-body keeps the center column reasonable down to ~600px. */
 
 .modules-grid {
-  grid-column: 2;
+  /* Sits in track 3 of .app-body's 5-column layout
+     (sidebar | handle | modules | handle | right). */
+  grid-column: 3;
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--sp-2);

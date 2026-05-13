@@ -288,7 +288,18 @@ body {
 .app-body {
   grid-row: 3;
   display: grid;
-  grid-template-columns: 240px minmax(0, 1fr) minmax(380px, 32%);
+  /* Live-resizable: --col-left-width + --col-right-width are set by
+     useColumnLayout. Two 6px handle tracks sit between the panels.
+     Falls back to sensible defaults so the layout is sane on first
+     paint before the hook hydrates. */
+  --col-left-width: 220px;
+  --col-right-width: 40%;
+  grid-template-columns:
+    var(--col-left-width)
+    6px
+    minmax(480px, 1fr)
+    6px
+    var(--col-right-width);
   overflow: hidden;
   min-height: 0;
 }
@@ -308,6 +319,7 @@ body {
     grid-template-rows: auto auto;
   }
   .presets-sidebar { display: none; }
+  .resize-handle { display: none; } /* handles are meaningless when stacked */
   .modules-grid { grid-column: 1; }
   .right-column { grid-column: 1; }
 }

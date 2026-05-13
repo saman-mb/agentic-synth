@@ -22,6 +22,7 @@
 #include "agent/TelemetryService.h"
 #include "engine/PatchStruct.h"
 #include "engine/VariationEngine.h"
+#include "mapper/GeminiSampler.h"
 #include "mapper/GrammarSampler.h"
 #include "mapper/SemanticMapper.h"
 
@@ -178,6 +179,11 @@ private:
     engine::VariationEngine variationEngine_;
     SessionMemory memory_;
     mapper::GrammarSampler sampler_{mapper::GrammarSamplerConfig{}};
+    // Constructed in AgentBridge() after looking up GEMINI_KEY via
+    // mapper::loadEnvKey — disabled (enabled()==false) when no key is found
+    // so the fallback degrades silently in unit-test/CI environments that
+    // don't ship credentials.
+    mapper::GeminiSampler gemini_{mapper::GeminiSamplerConfig{}};
     mapper::SemanticMapper semanticMapper_;
     StreamParser streamParser_;
 
@@ -194,7 +200,7 @@ private:
     TelemetryService telemetry_{Telemetry::defaultLogPath()};
     DictionaryService dictionary_{semanticMapper_};
     KnobBridge knob_{pipeline_, memory_};
-    PromptHandler prompt_{pipeline_, sampler_, semanticMapper_, streamParser_, memory_, knob_};
+    PromptHandler prompt_{pipeline_, sampler_, gemini_, semanticMapper_, streamParser_, memory_, knob_};
 
     // Subscriber slot lists, guarded by a single mutex.  Each slot holds a
     // weak_ptr to the Callback; the SubscriberHandle (an aliased shared_ptr)
