@@ -1,0 +1,86 @@
+/* ── ModulesGrid (Phase 4) ────────────────────────────────────────────
+   Always-visible CSS grid. Three columns at base; row spans place
+   Filter / Amp Env / FX cards across two columns each so the layout
+   matches REBRAND.md §5 wireframe.
+
+   On narrow widths the grid collapses to one column gracefully — the
+   parent .app-body keeps the center column reasonable down to ~600px. */
+
+.modules-grid {
+  grid-column: 2;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  overflow-y: auto;
+  align-content: start;
+  min-width: 0;
+}
+
+/* ── Module card ─────────────────────────────────────────────────── */
+
+.module {
+  background: var(--bg-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--r-3);
+  box-shadow: var(--depth-card);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  /* 1px hairline highlight (synthetic glass) */
+  position: relative;
+}
+
+.module::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 1px;
+  background: rgba(255, 255, 255, 0.04);
+  pointer-events: none;
+  border-radius: var(--r-3) var(--r-3) 0 0;
+}
+
+.module-header {
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--color-border);
+}
+
+.module-title {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+}
+
+.module-knobs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3) var(--sp-3);
+}
+
+/* ── Row spans matching the wireframe ─────────────────────────────── */
+
+/* Row 2: Filter spans 2 cols, Amp Env spans 1 (or grow to fill). */
+.module-filter   { grid-column: span 2; }
+.module-amp-env  { grid-column: span 1; }
+
+/* Row 4: Reverb spans 2, Delay spans 1. */
+.module-reverb   { grid-column: span 2; }
+.module-delay    { grid-column: span 1; }
+
+/* Row 5: Global spans all 3 cols (compact 2-knob strip). */
+.module-global   { grid-column: span 3; }
+
+/* Narrow fallback: stack everything single column. */
+@media (max-width: 720px) {
+  .modules-grid { grid-template-columns: 1fr; }
+  .module-filter,
+  .module-amp-env,
+  .module-reverb,
+  .module-delay,
+  .module-global { grid-column: span 1; }
+}

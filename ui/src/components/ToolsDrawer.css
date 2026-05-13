@@ -1,0 +1,119 @@
+/* ── ToolsDrawer (Phase 4) ────────────────────────────────────────────
+   Right-side modal drawer for Dictionary / Telemetry / History.
+   Backdrop is a transparent button so click-outside-to-close is a
+   normal click target (better than a div + role=button). */
+
+.tools-drawer-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  justify-content: flex-end;
+  pointer-events: auto;
+}
+
+.tools-drawer-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  border: none;
+  cursor: pointer;
+  padding: 0;
+}
+
+.tools-drawer {
+  position: relative;
+  width: min(540px, 90vw);
+  height: 100vh;
+  background: var(--bg-panel);
+  border-left: 1px solid var(--color-border);
+  box-shadow: -8px 0 32px rgba(0, 0, 0, 0.45);
+  display: flex;
+  flex-direction: column;
+  /* Slide-in is subtle: 220ms considered easing, no bounce. */
+  animation: tools-drawer-slide-in 220ms var(--ease-considered);
+}
+
+@keyframes tools-drawer-slide-in {
+  from { transform: translateX(16px); opacity: 0.6; }
+  to   { transform: translateX(0);    opacity: 1;   }
+}
+
+.tools-drawer-header {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--color-border);
+  padding: 0 var(--sp-2);
+  height: 44px;
+  flex-shrink: 0;
+}
+
+.tools-drawer-tabs {
+  display: flex;
+  align-items: center;
+  flex: 1;
+}
+
+.tools-drawer-tab {
+  padding: var(--sp-2) var(--sp-3);
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-tertiary);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: color var(--dur-micro) var(--ease-considered),
+              border-color var(--dur-micro) var(--ease-considered);
+}
+
+.tools-drawer-tab:hover { color: var(--text-secondary); }
+
+.tools-drawer-tab-active {
+  color: var(--text-primary);
+  border-bottom-color: var(--accent-primary);
+}
+
+.tools-drawer-tab:focus { outline: none; }
+.tools-drawer-tab:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.tools-drawer-close {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--r-2);
+  color: var(--text-secondary);
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--dur-micro) var(--ease-considered),
+              color var(--dur-micro) var(--ease-considered);
+}
+
+.tools-drawer-close:hover {
+  background: var(--fill-medium);
+  color: var(--text-accent);
+}
+
+.tools-drawer-close:focus { outline: none; }
+.tools-drawer-close:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.tools-drawer-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--sp-3);
+  min-height: 0;
+}

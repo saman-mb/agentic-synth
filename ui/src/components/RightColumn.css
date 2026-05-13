@@ -1,0 +1,147 @@
+/* ── RightColumn (Phase 4) ───────────────────────────────────────────
+   3 stacked cards: visualiser (fixed 240–280px), prompt dock (flex 1,
+   capped at ~360px so it doesn't dominate), mod matrix (auto, opens
+   from header). Background = --bg-void so the cards float.
+
+   ChatInterface owns its own internal padding; we just constrain its
+   outer frame here. Phase 7 will theatre-fy the prompt; today we keep
+   the existing component as-is. */
+
+.right-column {
+  grid-column: 3;
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+  padding: var(--sp-3);
+  background: var(--bg-void);
+  overflow: hidden;
+  min-width: 0;
+}
+
+.rc-card {
+  background: var(--bg-panel);
+  border: 1px solid var(--color-border);
+  border-radius: var(--r-3);
+  box-shadow: var(--depth-card);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.rc-card-header {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2) var(--sp-3);
+  border-bottom: 1px solid var(--color-border);
+  background: transparent;
+  border-top: none;
+  border-left: none;
+  border-right: none;
+  cursor: default;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  color: inherit;
+}
+
+.rc-modmatrix-header { cursor: pointer; }
+.rc-modmatrix-header:hover { background: var(--fill-medium); }
+.rc-modmatrix-header:focus { outline: none; }
+.rc-modmatrix-header:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+
+.rc-card-title {
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+  flex: 1;
+}
+
+.rc-card-chev {
+  color: var(--text-tertiary);
+  font-size: 10px;
+  width: 10px;
+  display: inline-block;
+}
+
+.rc-card-tag {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+  padding: 1px var(--sp-1);
+  border: 1px solid var(--color-border);
+  border-radius: var(--r-1);
+}
+
+/* ── Visualiser placeholder ──────────────────────────────────────── */
+
+.rc-visualizer {
+  flex: 0 0 auto;
+  min-height: 220px;
+  max-height: 280px;
+}
+
+.rc-visualizer-well {
+  flex: 1;
+  margin: var(--sp-2);
+  background: var(--bg-inset);
+  border-radius: var(--r-2);
+  box-shadow: var(--depth-inset);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* Subtle violet grid lines hint at the upcoming oscilloscope. */
+  background-image:
+    linear-gradient(rgba(124, 77, 255, 0.04) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(124, 77, 255, 0.04) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+.rc-visualizer-hint {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-tertiary);
+  letter-spacing: 0.08em;
+}
+
+/* ── AI prompt dock ──────────────────────────────────────────────── */
+
+.rc-prompt-dock {
+  flex: 1 1 auto;
+  min-height: 280px;
+  max-height: 420px;
+  overflow: hidden;
+  /* ChatInterface lays itself out as a flex column; let it own its
+     interior. We just need a border-radius clip so its children don't
+     overflow our rounded corners. */
+}
+
+.rc-prompt-dock > * {
+  flex: 1;
+  min-height: 0;
+}
+
+/* ── Mod matrix placeholder ──────────────────────────────────────── */
+
+.rc-modmatrix {
+  flex: 0 0 auto;
+}
+
+.rc-modmatrix-body {
+  padding: var(--sp-3);
+}
+
+.rc-modmatrix-hint {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-tertiary);
+  letter-spacing: 0.08em;
+}

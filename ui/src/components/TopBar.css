@@ -1,0 +1,271 @@
+/* ── TopBar (Phase 4) ─────────────────────────────────────────────────
+   Fixed 48px chrome strip. All sections are flex children of a single
+   row so resize collapses preset/meters gracefully without wrapping.
+   Background uses --bg-panel for separation from --bg-void below. */
+
+.topbar {
+  grid-row: 1;
+  display: flex;
+  align-items: center;
+  height: 48px;
+  padding: 0 var(--sp-3);
+  background: var(--bg-panel);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  gap: var(--sp-3);
+  font-family: var(--font-sans);
+  color: var(--text-secondary);
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.topbar-section {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+.topbar-left {
+  min-width: 120px;
+}
+
+.topbar-wordmark {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 16px;
+  letter-spacing: 0.18em;
+  color: var(--text-primary);
+  text-transform: uppercase;
+  /* Subtle violet→magenta glow under the wordmark — quietly signature. */
+  text-shadow: 0 0 12px rgba(124, 77, 255, 0.25);
+}
+
+/* ── Preset selector (placeholder) ─────────────────────────────────── */
+
+.topbar-preset {
+  display: flex;
+  align-items: stretch;
+  height: 28px;
+}
+
+.topbar-preset-arrow,
+.topbar-preset-dropdown {
+  background: var(--bg-raised);
+  border: 1px solid var(--color-border);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  cursor: pointer;
+  padding: 0 var(--sp-2);
+  transition: background var(--dur-micro) var(--ease-considered),
+              color var(--dur-micro) var(--ease-considered);
+}
+
+.topbar-preset-arrow {
+  width: 24px;
+  padding: 0;
+}
+
+.topbar-preset-arrow:first-child {
+  border-radius: var(--r-2) 0 0 var(--r-2);
+  border-right: none;
+}
+
+.topbar-preset-arrow:last-child {
+  border-radius: 0 var(--r-2) var(--r-2) 0;
+  border-left: none;
+}
+
+.topbar-preset-dropdown {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 140px;
+  border-radius: 0;
+  border-left: none;
+  border-right: none;
+}
+
+.topbar-preset-name {
+  flex: 1;
+  text-align: left;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.topbar-preset-chev {
+  color: var(--text-tertiary);
+  font-size: 10px;
+}
+
+.topbar-preset-arrow:disabled,
+.topbar-preset-dropdown:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.topbar-preset-arrow:not(:disabled):hover,
+.topbar-preset-dropdown:not(:disabled):hover {
+  background: var(--fill-medium);
+  color: var(--text-primary);
+}
+
+/* ── A/B segmented control ─────────────────────────────────────────── */
+
+.topbar-ab {
+  display: flex;
+  align-items: stretch;
+  height: 28px;
+}
+
+.topbar-ab-seg {
+  width: 28px;
+  background: var(--bg-raised);
+  border: 1px solid var(--color-border);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--dur-micro) var(--ease-considered),
+              color var(--dur-micro) var(--ease-considered);
+}
+
+.topbar-ab-seg:first-child { border-radius: var(--r-2) 0 0 var(--r-2); }
+.topbar-ab-seg:last-child  { border-radius: 0 var(--r-2) var(--r-2) 0; }
+
+.topbar-ab-seg-active {
+  background: var(--accent-tint-18);
+  color: var(--text-accent);
+  border-color: var(--accent-tint-40);
+}
+
+.topbar-ab-copy {
+  width: 24px;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-left: none;
+  border-right: none;
+  color: var(--text-tertiary);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.topbar-ab-seg:disabled,
+.topbar-ab-copy:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+/* ── History (undo/redo + counter) ─────────────────────────────────── */
+
+.topbar-history {
+  gap: var(--sp-2);
+}
+
+.topbar-history-count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+  min-width: 38px;
+  text-align: right;
+}
+
+/* ── Generic icon button ───────────────────────────────────────────── */
+
+.topbar-icon-btn {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--r-2);
+  color: var(--text-secondary);
+  font-size: 14px;
+  cursor: pointer;
+  transition: background var(--dur-micro) var(--ease-considered),
+              color var(--dur-micro) var(--ease-considered),
+              border-color var(--dur-micro) var(--ease-considered);
+}
+
+.topbar-icon-btn:hover:not(:disabled) {
+  background: var(--fill-medium);
+  color: var(--text-accent);
+  border-color: var(--accent-tint-40);
+}
+
+.topbar-icon-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.topbar-icon-btn:focus { outline: none; }
+.topbar-icon-btn:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* ── Meters (CPU/MIDI/OUT) ─────────────────────────────────────────── */
+
+.topbar-meters {
+  margin-left: auto;
+  gap: var(--sp-3);
+  padding-right: var(--sp-2);
+  border-right: 1px solid var(--color-border);
+  height: 24px;
+}
+
+.topbar-meter {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+}
+
+.topbar-meter-label {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+}
+
+.topbar-meter-value {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-secondary);
+  font-variant-numeric: tabular-nums;
+}
+
+.topbar-led {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--text-disabled);
+  box-shadow: 0 0 4px transparent;
+}
+
+.topbar-meter-bar {
+  display: inline-block;
+  width: 48px;
+  height: 4px;
+  background: var(--bg-inset);
+  border-radius: 2px;
+  overflow: hidden;
+  box-shadow: var(--depth-inset);
+}
+
+.topbar-meter-bar-fill {
+  display: block;
+  height: 100%;
+  width: 30%;
+  background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+  border-radius: 2px;
+}
+
+/* ── Tools cluster (theme + gear) ──────────────────────────────────── */
+
+.topbar-tools {
+  gap: var(--sp-1);
+}
