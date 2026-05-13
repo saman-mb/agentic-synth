@@ -282,7 +282,8 @@
  * inside on top of an inset background; the wrapper draws a gradient
  * frame that animates while idle and snaps to solid violet on focus. */
 .prompt-input-wrap {
-  flex: 1;
+  flex: 1 1 0;
+  min-width: 0;
   position: relative;
   border-radius: var(--r-3);
   padding: 1px; /* visual border thickness */

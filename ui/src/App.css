@@ -832,11 +832,24 @@ body {
   white-space: nowrap;
 }
 
+/* Host wraps the PTT button + optional failure subtitle into a single
+ * column so the parent .input-bar (flex row) sees ONE child instead of
+ * the button + subtitle as siblings — prevents the subtitle from
+ * stealing flex space and squashing the prompt textarea. */
+.ptt-host {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  flex: 0 0 auto;
+  max-width: 220px;
+}
+
 .ptt-subtitle {
-  margin-top: 6px;
+  margin-top: 0;
   font-family: var(--font-sans);
-  font-size: 0.78rem;
-  line-height: 1.45;
+  font-size: 0.72rem;
+  line-height: 1.35;
   color: var(--text-secondary); /* calm grey, NOT red */
   text-align: left;
 }
