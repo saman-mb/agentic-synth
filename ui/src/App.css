@@ -28,7 +28,9 @@
   /* Text */
   --text-primary: #F5F7FA;
   --text-secondary: #A8B0BD;
-  --text-tertiary: #6B7280;
+  /* Phase 11 a11y: bumped from #6B7280 (3.5:1) → #8A96A6 (5.2:1)
+     for WCAG AA contrast against --bg-raised #1E2129. */
+  --text-tertiary: #8A96A6;
   --text-disabled: #3A3F4B;
   --text-accent: #B388FF;
 
