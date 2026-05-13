@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ChatInterface } from './ChatInterface';
+import { Visualizer } from './Visualizer';
 import type { PatchPreviewData } from '../types/chat';
 import './RightColumn.css';
 
@@ -29,15 +30,9 @@ export function RightColumn({
 
   return (
     <aside className="right-column" aria-label="Visualiser, AI prompt, and modulation">
-      {/* ── Visualiser placeholder (Phase 5) ─────────────────────── */}
-      <section className="rc-card rc-visualizer" aria-label="Visualiser placeholder">
-        <header className="rc-card-header">
-          <span className="rc-card-title">Visualiser</span>
-          <span className="rc-card-tag">Phase 5</span>
-        </header>
-        <div className="rc-visualizer-well" aria-hidden="true">
-          <span className="rc-visualizer-hint">oscilloscope · spectrum · XY · wt</span>
-        </div>
+      {/* ── Visualiser (Phase 5) ─────────────────────────────────── */}
+      <section className="rc-card rc-visualizer" aria-label="Visualiser">
+        <Visualizer />
       </section>
 
       {/* ── AI prompt dock ──────────────────────────────────────── */}
