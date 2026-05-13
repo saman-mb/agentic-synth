@@ -32,6 +32,11 @@ export interface KnobProps {
   disabled?: boolean;
   onContextMenu?: (e: React.MouseEvent) => void;
   agentDriven?: boolean; // brief flash when the value was just changed by AI
+  // When true, value changes lerp from the previous displayed value to the
+  // new value over var(--dur-patch) instead of snapping. Used during
+  // orchestrated patch loads (agent / preset). Optional staggered start.
+  animatePatchLoad?: boolean;
+  animateDelayMs?: number;
 }
 
 // Arc geometry: 270° sweep, starting at 7 o'clock (135° in SVG coords, which
@@ -106,8 +111,88 @@ export function Knob({
   disabled = false,
   onContextMenu,
   agentDriven = false,
+  animatePatchLoad = false,
+  animateDelayMs = 0,
 }: KnobProps) {
-  const norm = clamp01(value);
+  // ---------------------------------------------------------------------
+  // Patch-load lerp
+  // ---------------------------------------------------------------------
+  // When animatePatchLoad goes true and `value` changes, we run a RAF-based
+  // lerp from the prior displayed value to the new `value`. While the lerp
+  // is active, `lerpNorm` overrides the incoming `value`. When idle,
+  // `lerpNorm` is null and we render `value` directly (snap behavior).
+  const [lerpNorm, setLerpNorm] = useState<number | null>(null);
+  const rafRef = useRef<number | null>(null);
+  const delayTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastValueRef = useRef<number>(value);
+  const lerpNormRef = useRef<number | null>(null);
+  lerpNormRef.current = lerpNorm;
+
+  useEffect(() => {
+    const target = clamp01(value);
+    const prev = lastValueRef.current;
+    if (prev === value) return;
+    if (!animatePatchLoad) {
+      lastValueRef.current = value;
+      // Snap by clearing any in-flight lerp.
+      if (rafRef.current !== null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+      if (delayTimerRef.current) {
+        clearTimeout(delayTimerRef.current);
+        delayTimerRef.current = null;
+      }
+      setLerpNorm(null);
+      return;
+    }
+    // Start a lerp from whatever we're currently displaying.
+    const from = lerpNormRef.current ?? clamp01(prev);
+    lastValueRef.current = value;
+    if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+    if (delayTimerRef.current) clearTimeout(delayTimerRef.current);
+
+    const DUR_MS = 1100; // var(--dur-patch)
+    // cubic-bezier(0.22, 0.61, 0.36, 1) — approximate with cubic ease-out.
+    const ease = (t: number) => 1 - Math.pow(1 - t, 3);
+
+    const start = () => {
+      const t0 = performance.now();
+      setLerpNorm(from);
+      const tick = (now: number) => {
+        const t = Math.min(1, (now - t0) / DUR_MS);
+        const v = from + (target - from) * ease(t);
+        if (t < 1) {
+          setLerpNorm(v);
+          rafRef.current = requestAnimationFrame(tick);
+        } else {
+          rafRef.current = null;
+          setLerpNorm(null); // hand control back to `value`
+        }
+      };
+      rafRef.current = requestAnimationFrame(tick);
+    };
+
+    if (animateDelayMs > 0) {
+      // Hold the "from" value visually during the stagger delay so
+      // earlier-stage knobs visibly move first.
+      setLerpNorm(from);
+      delayTimerRef.current = setTimeout(start, animateDelayMs);
+    } else {
+      start();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [value, animatePatchLoad, animateDelayMs]);
+
+  useEffect(
+    () => () => {
+      if (rafRef.current !== null) cancelAnimationFrame(rafRef.current);
+      if (delayTimerRef.current) clearTimeout(delayTimerRef.current);
+    },
+    [],
+  );
+
+  const norm = clamp01(lerpNorm !== null ? lerpNorm : value);
   const pxSize = SIZE_PX[size];
   const cx = VIEWBOX / 2;
   const cy = VIEWBOX / 2;

@@ -111,6 +111,8 @@ interface BubbleProps {
   // the A/B grid is Engineer B's territory and adds its own audition UI.
   auditionSend?: (frame: WireOutgoing) => void;
   auditionReady?: boolean;
+  // When true, the bubble text shows the cyan reading-sweep underline.
+  submittedFlash?: boolean;
 }
 
 function MessageBubble({
@@ -119,15 +121,17 @@ function MessageBubble({
   onSelectVariation,
   auditionSend,
   auditionReady,
+  submittedFlash,
 }: BubbleProps) {
   const hasContent = message.role === 'assistant';
+  const bubbleTextClass = `bubble-text${submittedFlash ? ' prompt-submitted' : ''}`;
   return (
     <article
       className={`message-bubble ${message.role}`}
       aria-label={`${message.role} message`}
     >
       <div className="bubble-role">{message.role === 'user' ? 'You' : 'Agent'}</div>
-      <p className="bubble-text">
+      <p className={bubbleTextClass}>
         {message.content}
         {message.streaming && <span className="cursor" aria-hidden="true" />}
       </p>
@@ -201,6 +205,70 @@ function ProactiveSuggestionStrip({ suggestions, onDismiss }: ProactiveSuggestio
 }
 
 // ---------------------------------------------------------------------------
+// Reasoning ticker (telegraph)
+// ---------------------------------------------------------------------------
+//
+// While the agent is generating, a small monospace stack at the bottom of the
+// chat ghost-fades through short reasoning fragments. Mock content for now;
+// real reasoning streaming is a separate concern. Each line fades in 300ms,
+// holds 1.5s, fades out 300ms; lines are staggered 400ms apart and the ticker
+// loops while `active` is true.
+
+const MOCK_TICKER_LINES = [
+  'low fundamental… 55Hz…',
+  'soft saturation…',
+  'long release…',
+  'opening filter…',
+  'shaping body…',
+];
+
+interface ReasoningTickerProps {
+  active: boolean;
+}
+
+function ReasoningTicker({ active }: ReasoningTickerProps) {
+  // Index of which mock line currently leads the stack. Bumps on a cadence
+  // while active. When `active` flips off, the whole ticker container fades
+  // out via the CSS opacity transition and unmounts on the next tick.
+  const [cursor, setCursor] = useState(0);
+
+  useEffect(() => {
+    if (!active) return;
+    setCursor(0);
+    const id = window.setInterval(() => {
+      setCursor((c) => (c + 1) % MOCK_TICKER_LINES.length);
+    }, 400);
+    return () => window.clearInterval(id);
+  }, [active]);
+
+  // Show three visible lines at any moment, each with its own fade phase
+  // offset. CSS animation on `.reasoning-line` drives the 300/1500/300 cycle.
+  // We use the cursor + offset to pick text, keying on cursor so React
+  // remounts the spans and restarts each animation on every cadence tick.
+  const lines = [0, 1, 2].map((offset) => {
+    const idx = (cursor + offset) % MOCK_TICKER_LINES.length;
+    return (
+      <span
+        key={`${cursor}-${offset}`}
+        className="reasoning-line"
+        style={{ animationDelay: `${offset * 400}ms` }}
+      >
+        {MOCK_TICKER_LINES[idx]}
+      </span>
+    );
+  });
+
+  return (
+    <div
+      className={`reasoning-ticker${active ? ' is-active' : ''}`}
+      aria-hidden="true"
+    >
+      {active && lines}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
 // Status indicator
 // ---------------------------------------------------------------------------
 
@@ -234,6 +302,15 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation }
   const [inputValue, setInputValue] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [proactiveSuggestions, setProactiveSuggestions] = useState<ProactiveSuggestion[]>([]);
+  // ID of the just-submitted user message — the bubble shows the cyan
+  // reading-sweep underline while this matches, then clears after 800ms.
+  const [submittedFlashId, setSubmittedFlashId] = useState<string | null>(null);
+  // Brief scale-down pulse on the send button (100ms). CSS owns the
+  // animation; we just toggle the class.
+  const [sendPulse, setSendPulse] = useState(false);
+  // Focus state on the prompt input — drives the shimmer/solid border
+  // distinction (idle = shimmer, focused = solid violet).
+  const [inputFocused, setInputFocused] = useState(false);
   const listEndRef = useRef<HTMLDivElement>(null);
   const streamingIdRef = useRef<string | null>(null);
 
@@ -365,6 +442,14 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation }
     setInputValue('');
     setIsGenerating(true);
     streamingIdRef.current = assistantId;
+    // Theatrical reading-sweep on the just-submitted bubble — 800ms.
+    setSubmittedFlashId(userMsg.id);
+    window.setTimeout(() => {
+      setSubmittedFlashId((cur) => (cur === userMsg.id ? null : cur));
+    }, 800);
+    // Send-button micro-pulse — CSS handles the 0.92 scale via the class.
+    setSendPulse(true);
+    window.setTimeout(() => setSendPulse(false), 100);
 
     send({ type: 'generate', prompt, sessionId: SESSION_ID });
 
@@ -425,6 +510,7 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation }
             onSelectVariation={onSelectVariation}
             auditionSend={send}
             auditionReady={status === 'open'}
+            submittedFlash={submittedFlashId === msg.id}
           />
         ))}
         {proactiveSuggestions.length > 0 && (
@@ -436,20 +522,28 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation }
         <div ref={listEndRef} />
       </section>
 
+      <ReasoningTicker active={isGenerating} />
+
       <form className="input-bar" onSubmit={handleSubmit} aria-label="Prompt input">
         <label htmlFor={inputId} className="visually-hidden">
           Describe a sound
         </label>
-        <textarea
-          id={inputId}
-          className="prompt-input"
-          value={inputValue}
-          onChange={(e) => setInputValue(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder="Describe a sound… (Enter to send, Shift+Enter for newline)"
-          disabled={isGenerating}
-          rows={2}
-        />
+        <div
+          className={`prompt-input-wrap${inputFocused ? ' is-focused' : ''}${isGenerating ? ' is-generating' : ''}`}
+        >
+          <textarea
+            id={inputId}
+            className="prompt-input"
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onFocus={() => setInputFocused(true)}
+            onBlur={() => setInputFocused(false)}
+            placeholder="Describe a sound… (⌘K — Enter to send, Shift+Enter for newline)"
+            disabled={isGenerating}
+            rows={2}
+          />
+        </div>
         {onAudio && (
           <PushToTalk
             onData={onAudio}
@@ -458,11 +552,19 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation }
         )}
         <button
           type="submit"
-          className="send-btn"
+          className={`send-btn${sendPulse ? ' send-pulse' : ''}${isGenerating ? ' is-generating' : ''}`}
           disabled={!inputValue.trim() || isGenerating}
           aria-label="Send prompt"
         >
-          {isGenerating ? '…' : '→'}
+          {isGenerating ? (
+            <span className="send-dots" aria-hidden="true">
+              <span />
+              <span />
+              <span />
+            </span>
+          ) : (
+            <span aria-hidden="true">→</span>
+          )}
         </button>
       </form>
     </div>
