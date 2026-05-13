@@ -4,8 +4,9 @@
   height: 100vh;
   max-width: 860px;
   margin: 0 auto;
-  background: var(--color-bg-app);
-  color: var(--color-fg-primary);
+  background: var(--bg-panel);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
 }
 
 /* ── Header ──────────────────────────────────────────────────────── */
@@ -15,8 +16,8 @@
   align-items: center;
   gap: 0.6rem;
   padding: 0.9rem 1.25rem;
-  border-bottom: 1px solid var(--color-border);
-  background: var(--fill-soft);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+  background: var(--bg-panel);
 }
 
 .chat-title {
@@ -33,10 +34,10 @@
   flex-shrink: 0;
 }
 
-.status-dot.open { background: var(--color-success); }
-.status-dot.connecting { background: var(--color-warning); animation: blink 1s step-start infinite; }
+.status-dot.open { background: var(--state-success); }
+.status-dot.connecting { background: var(--state-warning); animation: blink 1s step-start infinite; }
 .status-dot.closed,
-.status-dot.error { background: var(--color-error-dot); }
+.status-dot.error { background: var(--state-error); }
 
 @keyframes blink {
   50% { opacity: 0.2; }
@@ -87,18 +88,18 @@
   font-weight: 700;
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: var(--color-accent-hot);
+  color: var(--accent-secondary);
   opacity: 0.7;
 }
 
 .message-bubble.user .bubble-role {
-  color: var(--color-accent-soft);
+  color: var(--accent-primary);
 }
 
 .bubble-text {
   margin: 0;
   padding: 0.75rem 1rem;
-  border-radius: 1rem;
+  border-radius: var(--r-4);
   line-height: 1.6;
   font-size: 0.95rem;
   white-space: pre-wrap;
@@ -106,22 +107,23 @@
 }
 
 .message-bubble.user .bubble-text {
-  background: var(--accent-tint-25);
-  border: 1px solid var(--accent-tint-35);
-  border-bottom-right-radius: 0.25rem;
+  background: var(--accent-tint-25, rgba(124, 77, 255, 0.25));
+  border: 1px solid var(--accent-tint-35, rgba(124, 77, 255, 0.35));
+  border-bottom-right-radius: var(--r-2);
 }
 
 .message-bubble.assistant .bubble-text {
-  background: var(--fill-medium);
-  border: 1px solid var(--fill-stronger);
-  border-bottom-left-radius: 0.25rem;
+  background: var(--bg-raised);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-bottom-left-radius: var(--r-2);
+  box-shadow: var(--depth-raised);
 }
 
 .cursor {
   display: inline-block;
   width: 2px;
   height: 1em;
-  background: var(--color-accent-hot);
+  background: var(--accent-secondary);
   margin-left: 2px;
   vertical-align: text-bottom;
   animation: blink 0.8s step-start infinite;
@@ -144,11 +146,11 @@
 }
 
 .ab-commit-btn {
-  background: linear-gradient(135deg, var(--grad-accent-a), var(--grad-accent-b));
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
   border: none;
-  border-radius: 0.5rem;
-  color: #fff;
-  font-family: inherit;
+  border-radius: var(--r-3);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
   font-size: 0.75rem;
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -163,7 +165,7 @@
 
 .ab-commit-btn:focus { outline: none; }
 .ab-commit-btn:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
+  outline: 2px solid var(--accent-primary);
   outline-offset: 2px;
 }
 
@@ -182,6 +184,7 @@
   cursor: pointer;
   border: 1px solid;
   background: transparent;
+  font-family: var(--font-sans);
   transition: background 0.15s, opacity 0.15s;
 }
 
@@ -191,23 +194,23 @@
 }
 
 .feedback-btn.like {
-  color: var(--color-success);
-  border-color: var(--success-tint-40);
+  color: var(--state-success);
+  border-color: var(--success-tint-40, rgba(0, 200, 120, 0.40));
 }
 
 .feedback-btn.like.active,
 .feedback-btn.like:hover:not(:disabled) {
-  background: var(--success-tint-15);
+  background: var(--success-tint-15, rgba(0, 200, 120, 0.15));
 }
 
 .feedback-btn.dislike {
-  color: var(--color-error);
-  border-color: var(--error-tint-40);
+  color: var(--state-error);
+  border-color: var(--error-tint-40, rgba(255, 61, 136, 0.40));
 }
 
 .feedback-btn.dislike.active,
 .feedback-btn.dislike:hover:not(:disabled) {
-  background: var(--error-tint-15);
+  background: var(--error-tint-15, rgba(255, 61, 136, 0.15));
 }
 
 /* ── Input bar ────────────────────────────────────────────────────── */
@@ -216,34 +219,35 @@
   display: flex;
   gap: 0.5rem;
   padding: 0.75rem 1rem;
-  border-top: 1px solid var(--color-border);
-  background: var(--fill-soft);
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  background: var(--bg-panel);
   align-items: flex-end;
 }
 
 .prompt-input {
   flex: 1;
-  background: var(--fill-strong);
-  border: 1px solid var(--color-border-strong);
-  border-radius: 0.75rem;
-  color: var(--color-fg-primary);
-  font-family: inherit;
+  background: var(--bg-inset);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: var(--r-3);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
   font-size: 0.95rem;
   padding: 0.65rem 0.9rem;
   resize: none;
   line-height: 1.5;
+  box-shadow: var(--depth-inset);
   transition: border-color 0.15s;
 }
 
-.prompt-input::placeholder { color: var(--color-fg-muted); }
+.prompt-input::placeholder { color: var(--text-tertiary); }
 
 .prompt-input:focus {
   outline: none;
-  border-color: var(--accent-tint-60);
+  border-color: var(--accent-tint-60, rgba(124, 77, 255, 0.60));
 }
 
 .prompt-input:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
+  outline: 2px solid var(--accent-primary);
   outline-offset: 2px;
 }
 
@@ -252,10 +256,10 @@
 }
 
 .send-btn {
-  background: linear-gradient(135deg, var(--grad-accent-a), var(--grad-accent-b));
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
   border: none;
-  border-radius: 0.75rem;
-  color: #fff;
+  border-radius: var(--r-3);
+  color: var(--text-primary);
   font-size: 1.1rem;
   font-weight: 700;
   width: 2.75rem;

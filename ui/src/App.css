@@ -1,222 +1,251 @@
-/* ── Design tokens (Phase 11C) ─────────────────────────────────────
-   All component CSS in `ui/src/**` references these custom properties
-   instead of hardcoded literals. Dark is the default; `data-theme='light'`
-   overrides the colour set. Visual parity in dark mode is required;
-   light mode is brand-new and must hit WCAG AA contrast on text/bg pairs. */
+/* ── TIMBRE Design Tokens (Phase 1 rebrand) ─────────────────────────
+   Foundation tokens for the TIMBRE rebrand. Components inside
+   `ui/src/components/*.css` continue to reference the legacy token
+   names; those are aliased to the new TIMBRE palette at the bottom of
+   `:root` so the whole app re-skins automatically.
+
+   Dark is default. `[data-theme="light"]` is a warmer "dark-light"
+   variant (bone-white) — never harsh pure white.
+
+   TODO Phase 2: Inter Display isn't on Google Fonts. We approximate
+   with Inter 700+. Replace with self-hosted Söhne / Inter Display
+   when the wordmark work lands. */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 :root {
+  /* Backgrounds */
+  --bg-void: #0A0B0F;
+  --bg-panel: #14161D;
+  --bg-raised: #1E2129;
+  --bg-inset: #07080B;
+
+  /* Accents */
+  --accent-primary: #7C4DFF;
+  --accent-secondary: #FF3D88;
+  --accent-glow: rgba(124, 77, 255, 0.45);
+
+  /* Text */
+  --text-primary: #F5F7FA;
+  --text-secondary: #A8B0BD;
+  --text-tertiary: #6B7280;
+  --text-disabled: #3A3F4B;
+  --text-accent: #B388FF;
+
+  /* State */
+  --state-success: #00E676;
+  --state-warning: #FFB300;
+  --state-error: #FF5252;
+  --state-info: #40C4FF;
+  --state-ai-active: #FF3D88;
+
+  /* Modulation source palette */
+  --mod-lfo1: #00E5FF;
+  --mod-lfo2: #00FFAA;
+  --mod-env1: #FFB300;
+  --mod-env2: #FF6B35;
+  --mod-macro1: #E040FB;
+  --mod-macro2: #76FF03;
+  --mod-velocity: #FFFFFF;
+  --mod-keytrack: #B0BEC5;
+
+  /* Typography */
+  --font-display: 'Inter Display', 'Söhne', 'Inter', system-ui, sans-serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+
+  /* Spacing — 4px base */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-12: 48px;
+  --sp-16: 64px;
+
+  /* Radius */
+  --r-1: 2px;
+  --r-2: 4px;
+  --r-3: 8px;
+  --r-4: 12px;
+  --r-5: 16px;
+
+  /* Depth */
+  --depth-inset: inset 0 1px 0 rgba(0,0,0,0.6), inset 0 -1px 0 rgba(255,255,255,0.03);
+  --depth-raised: 0 1px 0 rgba(255,255,255,0.04), 0 8px 24px rgba(0,0,0,0.4);
+  --depth-card: 0 2px 12px rgba(0,0,0,0.5);
+
+  /* Motion */
+  --ease-considered: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --dur-micro: 180ms;
+  --dur-state: 320ms;
+  --dur-patch: 1100ms;
+  --dur-boot: 1800ms;
+
+  /* ── Legacy token aliases ─────────────────────────────────────────
+     Component CSS in `ui/src/components/*.css` still references these
+     names. Aliasing here re-skins those components onto the TIMBRE
+     palette without touching component files (Engineer B's surface). */
+
   /* Surfaces */
-  --color-bg-app: #111018;
-  --color-bg-panel: #18171f;
-  --color-bg-elevated: #1f1e28;
+  --color-bg-app: var(--bg-void);
+  --color-bg-panel: var(--bg-panel);
+  --color-bg-elevated: var(--bg-raised);
 
   /* Foreground text */
-  --color-fg-primary: #f4f0ff;
-  --color-fg-secondary: #9080bb;
-  --color-fg-muted: #6a5fa0;
+  --color-fg-primary: var(--text-primary);
+  --color-fg-secondary: var(--text-secondary);
+  --color-fg-muted: var(--text-tertiary);
 
   /* Brand / accent */
-  --color-accent: #7b5cff;
-  --color-accent-hot: #91e8ff;
-  --color-accent-soft: #b8a8ff;
-  --color-accent-strong: #c8b8ff;
-  --color-accent-deep: #6a5cff;
+  --color-accent: var(--accent-primary);
+  --color-accent-hot: var(--accent-secondary);
+  --color-accent-soft: var(--text-accent);
+  --color-accent-strong: var(--text-accent);
+  --color-accent-deep: var(--accent-primary);
 
   /* Status */
-  --color-success: #4afa8a;
-  --color-success-soft: #7be0b8;
-  --color-warning: #f4c842;
-  --color-error: #ff6b6b;
-  --color-error-soft: #ff8c8c;
-  --color-error-dot: #ff5c5c;
+  --color-success: var(--state-success);
+  --color-success-soft: var(--state-success);
+  --color-warning: var(--state-warning);
+  --color-error: var(--state-error);
+  --color-error-soft: var(--state-error);
+  --color-error-dot: var(--state-error);
 
-  /* Status tints (feedback buttons, record rows) */
-  --success-tint-15: rgb(74 250 138 / 15%);
-  --success-tint-40: rgb(74 250 138 / 40%);
-  --error-tint-08: rgb(255 80 80 / 8%);
-  --error-tint-12: rgb(255 92 92 / 12%);
-  --error-tint-15: rgb(255 107 107 / 15%);
-  --error-tint-30: rgb(255 92 92 / 30%);
-  --error-tint-40: rgb(255 107 107 / 40%);
+  /* Status tints */
+  --success-tint-15: rgb(0 230 118 / 15%);
+  --success-tint-40: rgb(0 230 118 / 40%);
+  --error-tint-08: rgb(255 82 82 / 8%);
+  --error-tint-12: rgb(255 82 82 / 12%);
+  --error-tint-15: rgb(255 82 82 / 15%);
+  --error-tint-30: rgb(255 82 82 / 30%);
+  --error-tint-40: rgb(255 82 82 / 40%);
 
   /* Knob readout value */
-  --color-knob-value: #d4cce8;
-  --color-accent-hot-glow: #91e8ff88;
+  --color-knob-value: var(--text-primary);
+  --color-accent-hot-glow: rgb(255 61 136 / 55%);
 
-  /* Semantic context colours (dictionary badges) */
-  --color-ctx-bass-fg: #ff8888;
-  --color-ctx-bass-bg: rgb(255 100 100 / 15%);
-  --color-ctx-pad-fg: #80d4ff;
-  --color-ctx-pad-bg: rgb(100 200 255 / 15%);
-  --color-ctx-lead-fg: #ffc880;
-  --color-ctx-lead-bg: rgb(255 200 100 / 15%);
-  --color-ctx-keys-fg: #88ee88;
-  --color-ctx-keys-bg: rgb(150 255 150 / 15%);
-  --color-ctx-perc-fg: #ffaa44;
-  --color-ctx-perc-bg: rgb(255 150 50 / 15%);
-  --color-ctx-arp-fg: #cc88ff;
-  --color-ctx-arp-bg: rgb(200 100 255 / 15%);
-  --color-ctx-texture-fg: #66ccbb;
-  --color-ctx-texture-bg: rgb(100 220 200 / 15%);
-  --color-ctx-generic-fg: #aaa0cc;
-  --color-ctx-generic-bg: rgb(255 255 255 / 8%);
+  /* Semantic context colours (dictionary badges) — mapped to mod palette */
+  --color-ctx-bass-fg: var(--mod-env2);
+  --color-ctx-bass-bg: rgb(255 107 53 / 15%);
+  --color-ctx-pad-fg: var(--mod-lfo1);
+  --color-ctx-pad-bg: rgb(0 229 255 / 15%);
+  --color-ctx-lead-fg: var(--mod-env1);
+  --color-ctx-lead-bg: rgb(255 179 0 / 15%);
+  --color-ctx-keys-fg: var(--mod-macro2);
+  --color-ctx-keys-bg: rgb(118 255 3 / 15%);
+  --color-ctx-perc-fg: var(--mod-env2);
+  --color-ctx-perc-bg: rgb(255 107 53 / 15%);
+  --color-ctx-arp-fg: var(--mod-macro1);
+  --color-ctx-arp-bg: rgb(224 64 251 / 15%);
+  --color-ctx-texture-fg: var(--mod-lfo2);
+  --color-ctx-texture-bg: rgb(0 255 170 / 15%);
+  --color-ctx-generic-fg: var(--text-secondary);
+  --color-ctx-generic-bg: rgb(255 255 255 / 6%);
 
   /* Borders / lines */
-  --color-border: rgb(255 255 255 / 8%);
-  --color-border-strong: rgb(255 255 255 / 14%);
-  --color-focus-ring: var(--color-accent);
+  --color-border: rgb(255 255 255 / 6%);
+  --color-border-strong: rgb(255 255 255 / 12%);
+  --color-focus-ring: var(--accent-primary);
 
-  /* Translucent fills (used for hovers, tints) */
+  /* Translucent fills */
   --fill-soft: rgb(255 255 255 / 2%);
   --fill-medium: rgb(255 255 255 / 4%);
   --fill-strong: rgb(255 255 255 / 8%);
   --fill-stronger: rgb(255 255 255 / 12%);
 
-  /* Accent tints */
-  --accent-tint-12: rgb(123 92 255 / 12%);
-  --accent-tint-15: rgb(123 92 255 / 15%);
-  --accent-tint-18: rgb(106 92 255 / 18%);
-  --accent-tint-25: rgb(123 92 255 / 25%);
-  --accent-tint-35: rgb(123 92 255 / 35%);
-  --accent-tint-40: rgb(123 92 255 / 40%);
-  --accent-tint-60: rgb(123 92 255 / 60%);
+  /* Accent tints — built around violet primary */
+  --accent-tint-12: rgb(124 77 255 / 12%);
+  --accent-tint-15: rgb(124 77 255 / 15%);
+  --accent-tint-18: rgb(124 77 255 / 18%);
+  --accent-tint-25: rgb(124 77 255 / 25%);
+  --accent-tint-35: rgb(124 77 255 / 35%);
+  --accent-tint-40: rgb(124 77 255 / 40%);
+  --accent-tint-60: rgb(124 77 255 / 60%);
 
-  /* Keyboard / piano (audition keyboard) */
-  --color-key-white-top: #f5f1ff;
-  --color-key-white-bot: #d9d3ec;
-  --color-key-white-hover-top: #ffffff;
-  --color-key-white-hover-bot: #e5dfff;
-  --color-key-white-label: #1b1626;
-  --color-key-black-top: #1b1626;
-  --color-key-black-bot: #2c2440;
-  --color-key-black-hover-top: #2c2440;
-  --color-key-black-hover-bot: #3d3358;
-  --color-key-black-label: #f4f0ff;
-  --color-key-active-white-top: #c2b4ff;
-  --color-key-active-white-bot: #8a78ff;
-  --color-key-active-black-top: #6a5cff;
-  --color-key-active-black-bot: #4434c4;
-  --color-key-strip-bg: #0c0b14;
+  /* Keyboard / piano */
+  --color-key-white-top: #F5F7FA;
+  --color-key-white-bot: #C9CDD8;
+  --color-key-white-hover-top: #FFFFFF;
+  --color-key-white-hover-bot: #D9DDE8;
+  --color-key-white-label: #14161D;
+  --color-key-black-top: #14161D;
+  --color-key-black-bot: #1E2129;
+  --color-key-black-hover-top: #1E2129;
+  --color-key-black-hover-bot: #2A2E39;
+  --color-key-black-label: #F5F7FA;
+  --color-key-active-white-top: #B388FF;
+  --color-key-active-white-bot: #7C4DFF;
+  --color-key-active-black-top: #7C4DFF;
+  --color-key-active-black-bot: #4A2DCC;
+  --color-key-strip-bg: var(--bg-inset);
 
-  /* Gradient stops for branded buttons / bars */
-  --grad-accent-a: #7b5cff;
-  --grad-accent-b: #0cb7f2;
+  /* Gradient stops — violet → magenta (signature TIMBRE sweep) */
+  --grad-accent-a: var(--accent-primary);
+  --grad-accent-b: var(--accent-secondary);
 
-  /* Radii */
-  --radius-sm: 4px;
-  --radius-md: 6px;
-  --radius-lg: 12px;
+  /* Legacy radii → map to new scale */
+  --radius-sm: var(--r-2);
+  --radius-md: var(--r-3);
+  --radius-lg: var(--r-4);
 
-  /* Type scale */
+  /* Legacy type scale */
   --font-size-xs: 0.75rem;
   --font-size-sm: 0.875rem;
   --font-size-base: 1rem;
 }
 
-:root[data-theme='light'] {
-  /* Surfaces */
-  --color-bg-app: #f7f5fa;
-  --color-bg-panel: #ffffff;
-  --color-bg-elevated: #ece9f2;
+/* ── Light theme: warm "dark-light" variant, never harsh white ──── */
+[data-theme="light"],
+:root[data-theme="light"] {
+  --bg-void: #F5F4F0;        /* bone */
+  --bg-panel: #FAFAF6;
+  --bg-raised: #FFFFFF;
+  --bg-inset: #ECEBE5;
 
-  /* Foreground text — chosen so primary on app bg = ~14:1, plenty of
-     headroom over WCAG AA 4.5:1 for body and 3:1 for large text. */
-  --color-fg-primary: #1a1620;       /* 14.5:1 on #f7f5fa */
-  --color-fg-secondary: #514766;     /* 7.4:1  on #f7f5fa */
-  --color-fg-muted: #6a5f7a;         /* 5.4:1  on #f7f5fa */
+  --text-primary: #14161D;
+  --text-secondary: #4A4E5C;
+  --text-tertiary: #6B7280;
+  --text-disabled: #B0B4BD;
+  /* accents unchanged — they pop on both dark and light */
 
-  /* Brand / accent — pulled darker for contrast on light surfaces */
-  --color-accent: #5d3bff;           /* 6.0:1 on #f7f5fa, AA for text */
-  --color-accent-hot: #2099b8;       /* 4.6:1 on #f7f5fa */
-  --color-accent-soft: #4a2dcc;      /* used as text colour, ~7:1 */
-  --color-accent-strong: #3a1fb8;    /* used as text colour, ~9:1 */
-  --color-accent-deep: #5d3bff;
+  /* Re-derive legacy aliases for light theme */
+  --color-bg-app: var(--bg-void);
+  --color-bg-panel: var(--bg-panel);
+  --color-bg-elevated: var(--bg-raised);
+  --color-fg-primary: var(--text-primary);
+  --color-fg-secondary: var(--text-secondary);
+  --color-fg-muted: var(--text-tertiary);
+  --color-knob-value: var(--text-primary);
 
-  /* Status — darkened for legibility on near-white */
-  --color-success: #1f9e57;          /* 4.5:1 */
-  --color-success-soft: #0f7a47;     /* 6.6:1 */
-  --color-warning: #b88500;          /* 4.5:1 */
-  --color-error: #c63333;            /* 5.4:1 */
-  --color-error-soft: #a82424;
-  --color-error-dot: #c63333;
-
-  /* Status tints — darker for light bg */
-  --success-tint-15: rgb(31 158 87 / 14%);
-  --success-tint-40: rgb(31 158 87 / 50%);
-  --error-tint-08: rgb(198 51 51 / 10%);
-  --error-tint-12: rgb(198 51 51 / 12%);
-  --error-tint-15: rgb(198 51 51 / 14%);
-  --error-tint-30: rgb(198 51 51 / 40%);
-  --error-tint-40: rgb(198 51 51 / 55%);
-
-  /* Knob readout value */
-  --color-knob-value: #2a2235;       /* ~12:1 on near-white */
-  --color-accent-hot-glow: rgb(32 153 184 / 55%);
-
-  /* Context colours — darkened foregrounds for AA on light bg */
-  --color-ctx-bass-fg: #b32424;
-  --color-ctx-bass-bg: rgb(255 100 100 / 18%);
-  --color-ctx-pad-fg: #1a6da3;
-  --color-ctx-pad-bg: rgb(100 200 255 / 22%);
-  --color-ctx-lead-fg: #8a5a00;
-  --color-ctx-lead-bg: rgb(255 200 100 / 28%);
-  --color-ctx-keys-fg: #1f7a1f;
-  --color-ctx-keys-bg: rgb(150 255 150 / 30%);
-  --color-ctx-perc-fg: #a04500;
-  --color-ctx-perc-bg: rgb(255 150 50 / 22%);
-  --color-ctx-arp-fg: #7a2db0;
-  --color-ctx-arp-bg: rgb(200 100 255 / 18%);
-  --color-ctx-texture-fg: #146d5e;
-  --color-ctx-texture-bg: rgb(100 220 200 / 25%);
-  --color-ctx-generic-fg: #4a4360;
-  --color-ctx-generic-bg: rgb(0 0 0 / 6%);
-
-  /* Borders / lines */
   --color-border: rgb(0 0 0 / 10%);
   --color-border-strong: rgb(0 0 0 / 16%);
 
-  /* Translucent fills inverted to dark-on-light */
   --fill-soft: rgb(0 0 0 / 2%);
   --fill-medium: rgb(0 0 0 / 4%);
   --fill-strong: rgb(0 0 0 / 6%);
   --fill-stronger: rgb(0 0 0 / 10%);
 
-  /* Accent tints — recoloured around the darker accent */
-  --accent-tint-12: rgb(93 59 255 / 10%);
-  --accent-tint-15: rgb(93 59 255 / 13%);
-  --accent-tint-18: rgb(93 59 255 / 14%);
-  --accent-tint-25: rgb(93 59 255 / 18%);
-  --accent-tint-35: rgb(93 59 255 / 22%);
-  --accent-tint-40: rgb(93 59 255 / 28%);
-  --accent-tint-60: rgb(93 59 255 / 50%);
-
-  /* Piano keys: invert relationship so blacks stay dark, whites stay pale */
-  --color-key-white-top: #ffffff;
-  --color-key-white-bot: #e6e0f2;
-  --color-key-white-hover-top: #faf8ff;
-  --color-key-white-hover-bot: #d4cce8;
-  --color-key-white-label: #1a1620;
-  --color-key-black-top: #2c2440;
-  --color-key-black-bot: #4434c4;
-  --color-key-black-hover-top: #3d3358;
-  --color-key-black-hover-bot: #5d3bff;
-  --color-key-black-label: #f4f0ff;
-  --color-key-active-white-top: #b8a8ff;
-  --color-key-active-white-bot: #8a78ff;
-  --color-key-active-black-top: #5d3bff;
-  --color-key-active-black-bot: #3a1fb8;
-  --color-key-strip-bg: #d8d2e6;
-
-  /* Branded gradient — anchor on darker accent so white text on top still passes AA */
-  --grad-accent-a: #5d3bff;
-  --grad-accent-b: #1a6da3;
+  /* Piano keys: invert relationship on light bg */
+  --color-key-white-top: #FFFFFF;
+  --color-key-white-bot: #E8E6DE;
+  --color-key-white-hover-top: #FAFAF6;
+  --color-key-white-hover-bot: #D8D5CB;
+  --color-key-white-label: #14161D;
+  --color-key-black-top: #2A2E39;
+  --color-key-black-bot: #14161D;
+  --color-key-black-hover-top: #3A3F4B;
+  --color-key-black-hover-bot: #1E2129;
+  --color-key-black-label: #F5F7FA;
+  --color-key-strip-bg: #ECEBE5;
 }
 
+/* ── Body baseline ──────────────────────────────────────────────── */
 :root {
-  color: var(--color-fg-primary);
-  background: var(--color-bg-app);
-  font-family:
-    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--text-primary);
+  background: var(--bg-void);
+  font-family: var(--font-sans);
 }
 
 html,
@@ -226,6 +255,14 @@ body,
   margin: 0;
 }
 
+body {
+  background: var(--bg-void);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
 /* ── Root layout: knob grid left, chat right ──────────────────────── */
 
 .app-layout {
@@ -233,7 +270,7 @@ body,
   grid-template-columns: minmax(340px, 420px) 1fr;
   height: 100vh;
   overflow: hidden;
-  background: var(--color-bg-app);
+  background: var(--bg-void);
 }
 
 @media (max-width: 900px) {
@@ -248,8 +285,8 @@ body,
 .panel-knobs {
   overflow-y: auto;
   border-right: 1px solid var(--color-border);
-  background: var(--fill-soft);
-  padding: 0.75rem;
+  background: var(--bg-panel);
+  padding: var(--sp-3);
 }
 
 /* ── Chat panel ───────────────────────────────────────────────────── */
@@ -265,33 +302,35 @@ body,
 .knob-grid {
   display: flex;
   flex-direction: column;
-  gap: 0.6rem;
+  gap: var(--sp-2);
 }
 
 .knob-section {
   border: 1px solid var(--color-border);
-  border-radius: 0.6rem;
+  border-radius: var(--r-3);
   overflow: hidden;
+  background: var(--bg-panel);
+  box-shadow: var(--depth-card);
 }
 
 .knob-section-collapsed {
-  background: var(--fill-soft);
+  background: var(--bg-panel);
 }
 
 /* Section header is a button so it gets proper keyboard semantics */
 .knob-section-header {
   display: flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: var(--sp-2);
   width: 100%;
-  padding: 0.5rem 0.75rem;
+  padding: var(--sp-2) var(--sp-3);
   background: transparent;
   border: none;
   color: inherit;
   font-family: inherit;
   text-align: left;
   cursor: pointer;
-  transition: background 0.12s;
+  transition: background var(--dur-micro) var(--ease-considered);
 }
 
 .knob-section-header:hover {
@@ -306,29 +345,31 @@ body,
 
 .knob-section-chevron {
   font-size: 0.7rem;
-  color: var(--color-fg-muted);
-  transition: transform 0.15s;
+  color: var(--text-tertiary);
+  transition: transform var(--dur-micro) var(--ease-considered);
   display: inline-block;
   width: 0.7rem;
 }
 
 .knob-section-chevron.open {
   transform: rotate(90deg);
-  color: var(--color-accent-hot);
+  color: var(--accent-primary);
 }
 
 .knob-section-title {
-  font-size: 0.65rem;
-  font-weight: 700;
+  font-size: 11px;
+  font-weight: 600;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
-  color: var(--color-accent-hot);
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
 }
 
 .knob-section-summary {
   margin-left: auto;
-  font-size: 0.6rem;
-  color: var(--color-fg-secondary);
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   overflow: hidden;
@@ -339,36 +380,39 @@ body,
 .knob-row {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  padding: 0 0.75rem 0.75rem;
+  gap: var(--sp-2);
+  padding: 0 var(--sp-3) var(--sp-3);
 }
 
 /* Expand/collapse-all toolbar */
 .knob-grid-toolbar {
   display: flex;
-  gap: 0.4rem;
-  padding-bottom: 0.2rem;
+  gap: var(--sp-1);
+  padding-bottom: var(--sp-1);
 }
 
 .knob-grid-tool {
   flex: 1;
-  background: var(--fill-medium);
-  border: 1px solid var(--fill-stronger);
-  color: var(--color-accent-strong);
-  font-family: inherit;
-  font-size: 0.6rem;
+  background: var(--bg-raised);
+  border: 1px solid var(--color-border);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 10px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  padding: 0.35rem 0.5rem;
-  border-radius: 0.4rem;
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--r-2);
   cursor: pointer;
-  transition: background 0.12s, border-color 0.12s;
+  transition: background var(--dur-micro) var(--ease-considered),
+              border-color var(--dur-micro) var(--ease-considered),
+              color var(--dur-micro) var(--ease-considered);
 }
 
 .knob-grid-tool:hover {
   background: var(--accent-tint-15);
   border-color: var(--accent-tint-40);
+  color: var(--text-accent);
 }
 
 .knob-grid-tool:focus { outline: none; }
@@ -377,7 +421,7 @@ body,
   outline-offset: 1px;
 }
 
-/* Persistent agent-edit indicator — small purple "AI" badge in the corner
+/* Persistent agent-edit indicator — small violet "AI" badge in the corner
    of the knob. Stays visible until the next agent generation replaces the set. */
 .knob-slot {
   position: relative;
@@ -388,15 +432,16 @@ body,
   top: -2px;
   right: -2px;
   z-index: 2;
-  background: var(--color-accent);
+  background: var(--accent-secondary);
   color: #fff;
   font-size: 0.5rem;
   font-weight: 800;
   letter-spacing: 0.06em;
   padding: 1px 4px;
-  border-radius: 6px;
+  border-radius: var(--r-3);
   pointer-events: none;
-  box-shadow: 0 0 0 1px rgb(17 16 24 / 80%), 0 0 6px rgb(123 92 255 / 60%);
+  font-family: var(--font-mono);
+  box-shadow: 0 0 0 1px var(--bg-void), 0 0 6px var(--accent-glow);
 }
 
 /* ── Individual knob ──────────────────────────────────────────────── */
@@ -411,30 +456,34 @@ body,
 }
 
 .knob-label {
-  font-size: 0.58rem;
-  color: var(--color-fg-secondary);
+  font-size: 10px;
+  color: var(--text-secondary);
   text-transform: uppercase;
   letter-spacing: 0.08em;
+  font-family: var(--font-sans);
+  font-weight: 500;
 }
 
 .knob-value {
-  font-size: 0.62rem;
-  color: var(--color-knob-value);
+  font-size: 11px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-weight: 500;
   font-variant-numeric: tabular-nums;
 }
 
 .knob-agent svg {
-  animation: knob-flash 0.4s ease-out;
+  animation: knob-flash var(--dur-state) var(--ease-considered);
 }
 
 @keyframes knob-flash {
-  0%   { filter: drop-shadow(0 0 6px var(--color-accent)); }
+  0%   { filter: drop-shadow(0 0 6px var(--accent-secondary)); }
   100% { filter: none; }
 }
 
-/* Active user drag — cyan glow so the user knows the knob is live */
+/* Active user drag — violet glow so the user knows the knob is live */
 .knob-editing svg {
-  filter: drop-shadow(0 0 5px var(--color-accent-hot-glow));
+  filter: drop-shadow(0 0 5px var(--accent-glow));
 }
 
 /* ── Left panel tabs ──────────────────────────────────────────────────── */
@@ -443,53 +492,56 @@ body,
   display: flex;
   align-items: center;
   border-bottom: 1px solid var(--color-border);
-  margin-bottom: 0.5rem;
+  margin-bottom: var(--sp-2);
 }
 
 .panel-tab {
   flex: 1;
-  padding: 0.45rem 0;
+  padding: var(--sp-2) 0;
   background: transparent;
   border: none;
   border-bottom: 2px solid transparent;
-  color: var(--color-fg-muted);
-  font-family: inherit;
-  font-size: 0.65rem;
+  color: var(--text-tertiary);
+  font-family: var(--font-sans);
+  font-size: 11px;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s;
+  transition: color var(--dur-micro) var(--ease-considered),
+              border-color var(--dur-micro) var(--ease-considered);
 }
 
 .panel-tab:hover {
-  color: var(--color-accent-strong);
+  color: var(--text-secondary);
 }
 
 .panel-tab-active {
-  color: var(--color-accent-hot);
-  border-bottom-color: var(--color-accent-hot);
+  color: var(--text-primary);
+  border-bottom-color: var(--accent-primary);
 }
 
 /* Theme toggle button — sits at the end of the tablist */
 .theme-toggle {
   flex: 0 0 auto;
-  margin-left: 0.4rem;
-  padding: 0.3rem 0.55rem;
+  margin-left: var(--sp-1);
+  padding: var(--sp-1) var(--sp-2);
   background: transparent;
   border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  color: var(--color-fg-secondary);
-  font-family: inherit;
+  border-radius: var(--r-3);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
   font-size: 0.85rem;
   line-height: 1;
   cursor: pointer;
-  transition: background 0.12s, color 0.12s, border-color 0.12s;
+  transition: background var(--dur-micro) var(--ease-considered),
+              color var(--dur-micro) var(--ease-considered),
+              border-color var(--dur-micro) var(--ease-considered);
 }
 
 .theme-toggle:hover {
   background: var(--fill-medium);
-  color: var(--color-accent-hot);
+  color: var(--text-accent);
   border-color: var(--color-border-strong);
 }
 
@@ -503,15 +555,16 @@ body,
 
 .ptt-btn {
   width: 100%;
-  padding: 0.5rem 0.75rem;
+  padding: var(--sp-2) var(--sp-3);
   border: 1px solid var(--accent-tint-40);
-  border-radius: 0.5rem;
+  border-radius: var(--r-3);
   background: transparent;
-  color: var(--color-accent-soft);
-  font-family: inherit;
+  color: var(--text-accent);
+  font-family: var(--font-sans);
   font-size: 0.85rem;
   cursor: pointer;
-  transition: background 0.15s, border-color 0.15s;
+  transition: background var(--dur-micro) var(--ease-considered),
+              border-color var(--dur-micro) var(--ease-considered);
   touch-action: none;
 }
 
@@ -521,8 +574,9 @@ body,
 
 .ptt-btn.ptt-active {
   background: var(--accent-tint-25);
-  border-color: var(--color-accent);
-  color: var(--color-fg-primary);
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+  box-shadow: 0 0 12px var(--accent-glow);
 }
 
 .ptt-btn:disabled {
@@ -538,7 +592,7 @@ body,
 .panel-tab:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
-  border-radius: 2px;
+  border-radius: var(--r-1);
 }
 
 .knob-wrap { outline: none; }
@@ -546,7 +600,7 @@ body,
 .knob-wrap:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
-  border-radius: 6px;
+  border-radius: var(--r-3);
 }
 
 /* Slider role applied to knob-wrap — covers any future container too */
@@ -554,7 +608,7 @@ body,
 [role="slider"]:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
-  border-radius: 6px;
+  border-radius: var(--r-3);
 }
 
 .ptt-btn:focus { outline: none; }
@@ -574,5 +628,5 @@ body,
 .mic-btn:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
-  border-radius: 4px;
+  border-radius: var(--r-2);
 }

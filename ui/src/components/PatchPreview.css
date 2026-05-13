@@ -1,12 +1,14 @@
 .patch-preview {
-  background: var(--fill-medium);
-  border: 1px solid var(--fill-stronger);
-  border-radius: 0.75rem;
+  background: var(--bg-raised);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: var(--r-3);
   padding: 0.75rem 1rem;
   display: flex;
   flex-direction: column;
   gap: 0.4rem;
   min-width: 180px;
+  font-family: var(--font-sans);
+  box-shadow: var(--depth-raised);
 }
 
 .patch-preview-label {
@@ -14,7 +16,7 @@
   font-weight: 700;
   letter-spacing: 0.1em;
   text-transform: uppercase;
-  color: var(--color-accent-hot);
+  color: var(--accent-secondary);
   margin-bottom: 0.25rem;
 }
 
@@ -27,27 +29,29 @@
 
 .param-label {
   font-size: 0.7rem;
-  color: var(--color-fg-secondary);
+  color: var(--text-secondary);
   text-align: right;
 }
 
 .param-track {
   height: 4px;
-  background: var(--fill-stronger);
-  border-radius: 2px;
+  background: var(--bg-inset);
+  border-radius: var(--r-2);
   overflow: hidden;
+  box-shadow: var(--depth-inset);
 }
 
 .param-fill {
   height: 100%;
-  background: linear-gradient(90deg, var(--grad-accent-a), var(--grad-accent-b));
-  border-radius: 2px;
+  background: linear-gradient(90deg, var(--accent-primary), var(--accent-secondary));
+  border-radius: var(--r-2);
   transition: width 0.3s ease;
 }
 
 .param-value {
   font-size: 0.65rem;
-  color: var(--color-fg-primary);
+  color: var(--text-primary);
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   opacity: 0.85;
 }
