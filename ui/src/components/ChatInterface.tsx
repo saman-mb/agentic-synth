@@ -403,7 +403,10 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation }
   return (
     <div className="chat-shell">
       <header className="chat-header">
-        <span className="chat-title">Agentic Synth</span>
+        <div className="chat-wordmark">
+          <span className="chat-title">TIMBRE</span>
+          <span className="chat-tagline">Say it. Hear it.</span>
+        </div>
         <StatusDot status={status} />
       </header>
 

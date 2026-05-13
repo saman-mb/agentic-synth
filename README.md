@@ -1,4 +1,6 @@
-# Agentic Synth
+# TIMBRE
+
+*Say it. Hear it.*
 
 An agent-driven VST plugin / desktop app that lets producers describe synth sounds in natural language and get a playable patch.
 

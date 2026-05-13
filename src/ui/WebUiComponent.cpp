@@ -206,7 +206,7 @@ juce::String WebUiComponent::buildFallbackMessage(const juce::String& errorInfo)
     // string stays in sync with project(... VERSION X.Y.Z) at root level.
     // Test target also defines these (see tests/CMakeLists.txt).
 #ifndef AGENTIC_SYNTH_PROJECT_NAME
-#define AGENTIC_SYNTH_PROJECT_NAME "Agentic Synth"
+#define AGENTIC_SYNTH_PROJECT_NAME "TIMBRE"
 #endif
 #ifndef AGENTIC_SYNTH_VERSION_STRING
 #define AGENTIC_SYNTH_VERSION_STRING "0.0.0"

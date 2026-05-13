@@ -1,0 +1,113 @@
+/* BootSplash — 1.8s opening moment (REBRAND.md §10).
+   Phase classes drive opacity + timing; the SVG path itself swaps via React
+   state so a CSS transition on `d` animates between waveforms. */
+
+.boot-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: var(--bg-void);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none; /* never blocks anything; auto-dismounts at 1800ms */
+  opacity: 1;
+  transition: opacity 100ms var(--ease-considered);
+}
+
+.boot-splash-fade {
+  opacity: 0;
+}
+
+.boot-splash-stage {
+  position: relative;
+  width: min(560px, 70vw);
+  height: 180px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1.2rem;
+}
+
+/* ── Waveform ─────────────────────────────────────────────────────── */
+
+.boot-splash-wave {
+  width: 100%;
+  height: 80px;
+  overflow: visible;
+  opacity: 0;
+  transition: opacity 400ms var(--ease-considered);
+}
+
+.boot-splash-wave path {
+  fill: none;
+  stroke: var(--mod-lfo1, #00E5FF);
+  stroke-width: 1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 6px var(--mod-lfo1, #00E5FF))
+          drop-shadow(0 0 12px rgba(0, 229, 255, 0.4));
+  /* `d` is animatable in modern browsers; falls back to a hard swap
+     when unsupported, which still reads as the 150ms cadence. */
+  transition: d 150ms var(--ease-considered);
+}
+
+/* Phase 1 (0-400ms): fade the line in over the first 400ms. */
+.boot-splash-line .boot-splash-wave,
+.boot-splash-morph .boot-splash-wave,
+.boot-splash-wordmark .boot-splash-wave,
+.boot-splash-fade .boot-splash-wave {
+  opacity: 1;
+}
+
+/* ── Wordmark ─────────────────────────────────────────────────────── */
+
+.boot-splash-wordmark {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 0.05em;
+  min-height: 1.4em;
+  opacity: 0;
+  transition: opacity 200ms var(--ease-considered);
+}
+
+.boot-splash-wordmark .boot-splash-text,
+.boot-splash-wordmark .boot-splash-caret {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 2.4rem;
+  letter-spacing: 0.32em;
+  /* shift left by half the trailing letter-spacing so the wordmark optically centers */
+  padding-left: 0.32em;
+  color: var(--text-primary);
+  text-shadow:
+    0 0 12px var(--accent-glow, rgba(124, 77, 255, 0.45)),
+    0 0 24px var(--accent-glow, rgba(124, 77, 255, 0.45));
+}
+
+.boot-splash-caret {
+  color: var(--accent-primary);
+  opacity: 1;
+  transition: opacity 100ms steps(1, end);
+}
+
+.boot-splash-caret-off {
+  opacity: 0;
+}
+
+/* Wordmark only visible during phase 3 (wordmark) and phase 4 (fade). */
+.boot-splash.boot-splash-wordmark .boot-splash-wordmark,
+.boot-splash.boot-splash-fade .boot-splash-wordmark {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boot-splash-wave,
+  .boot-splash-wave path,
+  .boot-splash-wordmark,
+  .boot-splash-caret {
+    transition-duration: 1ms;
+  }
+}

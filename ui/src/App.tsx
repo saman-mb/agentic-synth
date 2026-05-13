@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
+import { BootSplash } from './components/BootSplash';
 import { ChatInterface } from './components/ChatInterface';
 import { KnobGrid, makeDefaultPatch, PatchParams } from './components/KnobGrid';
 import {
@@ -132,6 +133,10 @@ export function App() {
   const [transcript, setTranscript] = useState('');
   const [leftPanel, setLeftPanel] = useState<LeftPanel>('knobs');
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
+  // Boot splash visibility — tracked in state (not a ref) so React unmounts
+  // the overlay after 1.8s. Initialized true on first mount only; HMR keeps
+  // state across module reloads so we don't re-trigger the splash mid-dev.
+  const [splashVisible, setSplashVisible] = useState<boolean>(true);
 
   // Apply theme to <html data-theme="..."> on every change so all CSS custom
   // properties switch atomically. No persistence on mount — only on explicit
@@ -392,6 +397,7 @@ export function App() {
 
   return (
     <div className="app-layout">
+      {splashVisible ? <BootSplash onDone={() => setSplashVisible(false)} /> : null}
       <aside className="panel-knobs">
         <div
           className="panel-tabs"
