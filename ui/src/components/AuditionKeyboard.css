@@ -51,6 +51,28 @@
   cursor: pointer;
 }
 
+.audition-octave {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.audition-octave-btn {
+  min-width: 24px;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.audition-octave-label {
+  font-family: var(--font-mono);
+  font-size: 0.72rem;
+  color: var(--text-secondary);
+  min-width: 48px;
+  text-align: center;
+  letter-spacing: 0.04em;
+}
+
 .audition-hint {
   font-size: 0.72rem;
   color: var(--text-tertiary);

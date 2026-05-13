@@ -20,7 +20,7 @@ import { useWebSocket } from './hooks/useWebSocket';
 import { usePatchHistory } from './hooks/usePatchHistory';
 import { useUiAudioSettings } from './hooks/useUiAudioSettings';
 import { playTapeStop, playVoicePip } from './data/uiAudio';
-import type { PatchPreviewData } from './types/chat';
+import type { AgentModulationPlan, PatchPreviewData } from './types/chat';
 import {
   ModMatrix,
   ModConnection,
@@ -37,6 +37,7 @@ type DrawerTab = 'dictionary' | 'telemetry' | 'history' | 'settings';
 
 const KNOB_BRIDGE_URL = 'ws://localhost:9002';
 const THEME_KEY = 'agentic-synth.theme.v1';
+const AGENT_CONNECTION_PREFIX = 'agent-';
 
 // Cap on session-only (unstarred) entries before the oldest is dropped.
 const MAX_UNSTARRED_ENTRIES = 50;
@@ -73,6 +74,8 @@ function makeEntryId(ts: number): string {
 function makeRtfmPatch(base: PatchParams): PatchParams {
   const p = JSON.parse(JSON.stringify(base)) as PatchParams;
   // OSC1 carrier — 220Hz reference.
+  p.osc[0].type = 6;
+  p.osc[0].enabled = 1;
   p.osc[0].volume = 0.9;
   p.osc[0].semitone_offset = -12; // an octave below default A4-ish
   p.osc[0].detune_cents = 0;
@@ -80,12 +83,16 @@ function makeRtfmPatch(base: PatchParams): PatchParams {
   p.osc[0].fm_depth = 0.85;
   p.osc[0].pan = 0;
   // OSC2 modulator @ ratio 3.14, sprinkled wide.
+  p.osc[1].type = 6;
+  p.osc[1].enabled = 1;
   p.osc[1].volume = 0.4;
   p.osc[1].semitone_offset = 0;
   p.osc[1].fm_ratio = 3.14;
   p.osc[1].fm_depth = 0.95;
   p.osc[1].pan = -0.3;
   // OSC3 subharmonic shimmer.
+  p.osc[2].type = 6;
+  p.osc[2].enabled = 1;
   p.osc[2].volume = 0.25;
   p.osc[2].semitone_offset = 7; // perfect fifth
   p.osc[2].fm_ratio = 1.5;
@@ -121,23 +128,23 @@ type ReverbKey = keyof PatchParams['reverb'];
 type DelayKey = keyof PatchParams['delay'];
 
 const OSC_KEYS: ReadonlySet<OscKey> = new Set<OscKey>([
-  'volume', 'detune_cents', 'semitone_offset', 'fm_ratio',
-  'fm_depth', 'wavetable_pos', 'pulse_width', 'pan',
+  'type', 'volume', 'detune_cents', 'semitone_offset', 'wavetable_pos',
+  'fm_ratio', 'fm_depth', 'pulse_width', 'pan', 'enabled',
 ]);
 const FILTER_KEYS: ReadonlySet<FilterKey> = new Set<FilterKey>([
-  'cutoff_hz', 'resonance', 'env_mod', 'drive',
+  'type', 'cutoff_hz', 'resonance', 'env_mod', 'key_track', 'drive',
 ]);
 const ENV_KEYS: ReadonlySet<EnvKey> = new Set<EnvKey>([
   'attack_s', 'decay_s', 'sustain', 'release_s',
 ]);
 const LFO_KEYS: ReadonlySet<LfoKey> = new Set<LfoKey>([
-  'rate_hz', 'depth', 'phase_offset',
+  'waveform', 'target', 'rate_hz', 'depth', 'phase_offset', 'bpm_sync',
 ]);
 const REVERB_KEYS: ReadonlySet<ReverbKey> = new Set<ReverbKey>([
   'size', 'damping', 'width', 'mix',
 ]);
 const DELAY_KEYS: ReadonlySet<DelayKey> = new Set<DelayKey>([
-  'time_s', 'feedback', 'mix',
+  'time_s', 'feedback', 'mix', 'stereo', 'bpm_sync',
 ]);
 
 function applyParamToPatch(patch: PatchParams, param: string, value: number): PatchParams {
@@ -170,6 +177,8 @@ function applyParamToPatch(patch: PatchParams, param: string, value: number): Pa
     p.master_gain = value;
   } else if (param === 'portamento_s') {
     p.portamento_s = value;
+  } else if (param === 'voice_count') {
+    p.voice_count = value;
   }
   return p;
 }
@@ -192,6 +201,7 @@ function flattenPatch(p: PatchParams): Record<string, number> {
   for (const [k, v] of Object.entries(p.delay)) out[`delay.${k}`] = v as number;
   out['master_gain'] = p.master_gain;
   out['portamento_s'] = p.portamento_s;
+  out['voice_count'] = p.voice_count;
   return out;
 }
 
@@ -205,17 +215,12 @@ function diffPatch(prev: PatchParams, next: PatchParams): Record<string, number>
   return out;
 }
 
-// Map the chat-side PatchPreviewData shape onto the full PatchParams param keys
-// the knob grid + transport understand. Used when committing an A/B variation.
-function previewToParamMap(p: PatchPreviewData): Record<string, number> {
-  return {
-    'filter.cutoff_hz': p.cutoffHz,
-    'filter.resonance': p.resonance,
-    'amp_env.attack_s': p.attackS,
-    'amp_env.sustain': p.sustainLevel,
-    'lfo.0.depth': p.lfoDepth,
-    'reverb.mix': p.reverbMix,
-  };
+function normaliseModDestination(target: string): string {
+  return target.replace(/\[(\d+)\]/g, '.$1');
+}
+
+function macroSourceForIndex(index: number): ModSourceId {
+  return (`macro${Math.min(4, Math.max(1, index + 1))}`) as ModSourceId;
 }
 
 export function App() {
@@ -342,9 +347,9 @@ export function App() {
     [],
   );
 
-  // Macros (Phase 6 — visual + rename). Routing to params is deferred
-  // to Phase 8 (mod matrix). 0..1 normalized values; names persist via
-  // localStorage so user rename survives reloads.
+  // Macros. 0..1 normalized values; names persist via localStorage so user
+  // rename survives reloads. Agent generations may also relabel the four
+  // macros and replace their own generated matrix routes.
   const MACRO_NAMES_KEY = 'timbre:macro-names';
   const [macros, setMacros] = useState<MacroState[]>(() => {
     let names: string[] = ['Macro 1', 'Macro 2', 'Macro 3', 'Macro 4'];
@@ -359,6 +364,46 @@ export function App() {
     }
     return names.map((label) => ({ label, value: 0 }));
   });
+
+  const applyAgentModulationPlan = useCallback((plan?: AgentModulationPlan) => {
+    if (!plan) return;
+    const agentConnections: ModConnection[] = [];
+    const labels: Array<string | null> = [null, null, null, null];
+    const ts = Date.now().toString(36);
+
+    if (Array.isArray(plan.macros)) {
+      plan.macros.slice(0, 4).forEach((macro, macroIndex) => {
+        const label = (macro.name ?? macro.label ?? '').trim();
+        if (label) labels[macroIndex] = label;
+
+        macro.routes?.forEach((route, routeIndex) => {
+          const destination = normaliseModDestination(route.target);
+          if (!PARAM_RANGES[destination]) return;
+          agentConnections.push({
+            id: `${AGENT_CONNECTION_PREFIX}${ts}-${macroIndex}-${routeIndex}`,
+            source: macroSourceForIndex(macroIndex),
+            destination,
+            amount: Math.max(-1, Math.min(1, route.amount)),
+            enabled: true,
+          });
+        });
+      });
+    }
+
+    if (labels.some(Boolean)) {
+      setMacros((prev) =>
+        prev.map((macro, index) => (labels[index] ? { ...macro, label: labels[index] as string } : macro)),
+      );
+    }
+
+    if (agentConnections.length === 0) return;
+    setModMatrix((prev) => ({
+      connections: [
+        ...prev.connections.filter((c) => !c.id.startsWith(AGENT_CONNECTION_PREFIX)),
+        ...agentConnections,
+      ],
+    }));
+  }, []);
 
   // Apply theme to <html data-theme="..."> on every change so all CSS custom
   // properties switch atomically. No persistence on mount — only on explicit
@@ -499,7 +544,18 @@ export function App() {
     try {
       const msg = JSON.parse(lastMessage) as Record<string, unknown>;
 
-      if (msg.type === 'patch_update' && msg.params && typeof msg.params === 'object') {
+      if (msg.type === 'patch_update' && msg.patch && typeof msg.patch === 'object') {
+        const fullPatch = msg.patch as PatchParams;
+        const params = diffPatch(patch, fullPatch);
+        if (Object.keys(params).length === 0) {
+          applyAgentModulationPlan(msg.modulation as AgentModulationPlan | undefined);
+          return;
+        }
+        ph.push(fullPatch, 'agent');
+        setLastAgentEditBatch(new Set(Object.keys(params)));
+        bumpPatchLoad();
+        applyAgentModulationPlan(msg.modulation as AgentModulationPlan | undefined);
+      } else if (msg.type === 'patch_update' && msg.params && typeof msg.params === 'object') {
         const params = msg.params as Record<string, number>;
         let next = patch;
         for (const [p, v] of Object.entries(params)) next = applyParamToPatch(next, p, v);
@@ -507,6 +563,7 @@ export function App() {
         // Sticky: replace the batch wholesale; no timer-driven clear.
         setLastAgentEditBatch(new Set(Object.keys(params)));
         bumpPatchLoad();
+        applyAgentModulationPlan(msg.modulation as AgentModulationPlan | undefined);
       } else if (msg.type === 'transcript' && typeof msg.text === 'string') {
         setTranscript(msg.text as string);
       }
@@ -602,10 +659,11 @@ export function App() {
   // Wired into ChatInterface — "Use A" / "Use B" buttons hand the chosen
   // variation's preview data back here, where we treat it like a fresh agent batch.
   const handleSelectVariation = useCallback(
-    (preview: PatchPreviewData) => {
-      applyAgentBatch(previewToParamMap(preview), 'variation');
+    (preview: PatchPreviewData, modulation?: AgentModulationPlan) => {
+      applyAgentBatch(diffPatch(patch, preview), 'variation');
+      applyAgentModulationPlan(modulation);
     },
-    [applyAgentBatch],
+    [applyAgentBatch, applyAgentModulationPlan, patch],
   );
 
   const handleAudio = useCallback(
@@ -765,19 +823,16 @@ export function App() {
     return () => window.removeEventListener('keydown', handler);
   }, [activeSlot, switchSlot]);
 
-  // ── Macros (Phase 6) ───────────────────────────────────────────────
-  // Visual + rename only. Modulation routing lands with the mod matrix
-  // in Phase 8 (macros project onto assigned param targets via depth +
-  // polarity). Persist label changes so renames survive page reloads.
+  // ── Macros ─────────────────────────────────────────────────────────
+  // Macro values project through enabled mod-matrix routes into the
+  // effective patch above. Persist explicit label changes so renames
+  // survive page reloads.
   const handleMacroChange = useCallback((index: number, value: number) => {
     setMacros((prev) => {
       const next = prev.slice();
       next[index] = { ...next[index], value };
       return next;
     });
-    // TODO Phase 8: forward macro value to mod-matrix routing — for each
-    // (param, depth, polarity) target assigned to this macro, emit a
-    // knob_tweak frame applying the projection.
   }, []);
 
   const handleMacroRename = useCallback((index: number, label: string) => {
@@ -908,6 +963,9 @@ export function App() {
           modMatrix={modMatrix}
           onAssignMod={handleAssignMod}
           spinToken={spinToken}
+          onUpdateConnection={handleUpdateConnection}
+          onDeleteConnection={handleDeleteConnection}
+          onAddConnection={handleAddConnection}
         />
         <ResizeHandle
           ariaLabel="Resize right column"
@@ -919,10 +977,6 @@ export function App() {
           externalTranscript={transcript}
           onAudio={handleAudio}
           onSelectVariation={handleSelectVariation}
-          modMatrix={modMatrix}
-          onUpdateConnection={handleUpdateConnection}
-          onDeleteConnection={handleDeleteConnection}
-          onAddConnection={handleAddConnection}
           onRtfmEasterEgg={handleRtfmEasterEgg}
         />
       </div>

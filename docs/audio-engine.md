@@ -5,6 +5,9 @@ and its plugin-facing control path in `src/plugin`. It is source-grounded: where
 older architecture docs describe the original placeholder target shape, this
 page describes the code that currently renders audio.
 
+For a sound-design view of what this engine can produce, see
+[Timbre Profile Map](timbre-profile-map.md).
+
 ## Short Answer
 
 Agentic Synth is a hybrid polyphonic synthesizer. Its primary shape is virtual

@@ -13,6 +13,7 @@ import { useSynthBridge } from '../hooks/useSynthBridge';
 import type {
   ChatMessage,
   FeedbackKind,
+  AgentModulationPlan,
   PatchPreviewData,
   PatchVariation,
   ProactiveSuggestion,
@@ -38,7 +39,7 @@ function nanoid(): string {
 
 interface ABGridProps {
   variations: PatchVariation[];
-  onSelectVariation?: (patch: PatchPreviewData) => void;
+  onSelectVariation?: (patch: PatchPreviewData, modulation?: AgentModulationPlan) => void;
 }
 
 function ABVariationGrid({ variations, onSelectVariation }: ABGridProps) {
@@ -51,7 +52,7 @@ function ABVariationGrid({ variations, onSelectVariation }: ABGridProps) {
             <button
               type="button"
               className="ab-commit-btn"
-              onClick={() => onSelectVariation(v.patch)}
+              onClick={() => onSelectVariation(v.patch, v.modulation)}
               aria-label={`Use variation ${v.label}`}
             >
               Use {v.label}
@@ -105,7 +106,7 @@ function FeedbackBar({ messageId, feedback, onFeedback }: FeedbackBarProps) {
 interface BubbleProps {
   message: ChatMessage;
   onFeedback: (messageId: string, kind: FeedbackKind) => void;
-  onSelectVariation?: (patch: PatchPreviewData) => void;
+  onSelectVariation?: (patch: PatchPreviewData, modulation?: AgentModulationPlan) => void;
   // When provided, an AuditionKeyboard renders next to single-patch
   // previews so the producer can audition the assistant's patch without
   // a DAW attached. Wired only to the single-patch path on purpose:
@@ -356,7 +357,7 @@ const SESSION_ID = nanoid();
 interface ChatInterfaceProps {
   externalTranscript?: string;
   onAudio?: (buf: ArrayBuffer) => void;
-  onSelectVariation?: (patch: PatchPreviewData) => void;
+  onSelectVariation?: (patch: PatchPreviewData, modulation?: AgentModulationPlan) => void;
   // Phase 10 §16 — `sudo make me a sound` easter egg. The chat detects
   // the prompt locally (no bridge round-trip) and asks App to load the
   // hardcoded RTFM patch. Optional so existing callers stay unchanged.
@@ -449,10 +450,14 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation, 
               if (m.id !== sid) return m;
               if (msg.variation === 'A' || msg.variation === 'B') {
                 const existing = m.variations ?? [];
-                const typedVariation: PatchVariation = { label: msg.variation, patch: msg.data };
+                const typedVariation: PatchVariation = {
+                  label: msg.variation,
+                  patch: msg.data,
+                  modulation: msg.modulation,
+                };
                 return { ...m, variations: [...existing, typedVariation] };
               }
-              return { ...m, patch: msg.data };
+              return { ...m, patch: msg.data, modulation: msg.modulation };
             }),
           );
           break;

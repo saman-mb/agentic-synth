@@ -14,24 +14,44 @@ namespace agentic_synth::mapper {
 // ---------------------------------------------------------------------------
 
 struct PatchDelta {
-    // Oscillator 0
+    // Oscillators
     std::optional<OscType> osc0_type;
     std::optional<float> osc0_semitone; // semitones, -48..+48
     std::optional<float> osc0_detune;   // cents
-    std::optional<float> osc0_volume;   // 0..1
+    std::optional<float> osc0_wavetable_pos;
     std::optional<float> osc0_fm_ratio;
     std::optional<float> osc0_fm_depth;
+    std::optional<float> osc0_volume; // 0..1
+    std::optional<float> osc0_pan;
     std::optional<float> osc0_pulse_width;
-    // Oscillator 1 (supersaw/unison layer)
-    std::optional<bool> osc1_enabled;
+    std::optional<bool> osc0_enabled;
+    std::optional<OscType> osc1_type;
+    std::optional<float> osc1_semitone;
     std::optional<float> osc1_detune;
+    std::optional<float> osc1_wavetable_pos;
+    std::optional<float> osc1_fm_ratio;
+    std::optional<float> osc1_fm_depth;
     std::optional<float> osc1_volume;
+    std::optional<float> osc1_pan;
+    std::optional<float> osc1_pulse_width;
+    std::optional<bool> osc1_enabled;
+    std::optional<OscType> osc2_type;
+    std::optional<float> osc2_semitone;
+    std::optional<float> osc2_detune;
+    std::optional<float> osc2_wavetable_pos;
+    std::optional<float> osc2_fm_ratio;
+    std::optional<float> osc2_fm_depth;
+    std::optional<float> osc2_volume;
+    std::optional<float> osc2_pan;
+    std::optional<float> osc2_pulse_width;
+    std::optional<bool> osc2_enabled;
     // Filter
     std::optional<FilterType> filter_type;
     std::optional<float> filter_cutoff;    // Hz
     std::optional<float> filter_resonance; // 0..1
     std::optional<float> filter_drive;     // 0..1
     std::optional<float> filter_env_mod;   // -1..+1
+    std::optional<float> filter_key_track; // 0..1
     // Amp envelope
     std::optional<float> amp_attack;
     std::optional<float> amp_decay;
@@ -47,6 +67,15 @@ struct PatchDelta {
     std::optional<LfoTarget> lfo0_target;
     std::optional<float> lfo0_rate;
     std::optional<float> lfo0_depth;
+    std::optional<float> lfo0_phase_offset;
+    std::optional<bool> lfo0_bpm_sync;
+    // LFO 1
+    std::optional<LfoWaveform> lfo1_waveform;
+    std::optional<LfoTarget> lfo1_target;
+    std::optional<float> lfo1_rate;
+    std::optional<float> lfo1_depth;
+    std::optional<float> lfo1_phase_offset;
+    std::optional<bool> lfo1_bpm_sync;
     // Reverb
     std::optional<float> reverb_size;
     std::optional<float> reverb_damping;
@@ -56,6 +85,8 @@ struct PatchDelta {
     std::optional<float> delay_time;
     std::optional<float> delay_feedback;
     std::optional<float> delay_mix;
+    std::optional<float> delay_stereo;
+    std::optional<bool> delay_bpm_sync;
     // Global
     std::optional<float> master_gain;
     std::optional<float> portamento;
@@ -70,20 +101,60 @@ inline void apply_delta(PatchStruct& p, const PatchDelta& d) noexcept {
         p.osc[0].semitone_offset = *d.osc0_semitone;
     if (d.osc0_detune)
         p.osc[0].detune_cents = *d.osc0_detune;
-    if (d.osc0_volume)
-        p.osc[0].volume = *d.osc0_volume;
+    if (d.osc0_wavetable_pos)
+        p.osc[0].wavetable_pos = *d.osc0_wavetable_pos;
     if (d.osc0_fm_ratio)
         p.osc[0].fm_ratio = *d.osc0_fm_ratio;
     if (d.osc0_fm_depth)
         p.osc[0].fm_depth = *d.osc0_fm_depth;
+    if (d.osc0_volume)
+        p.osc[0].volume = *d.osc0_volume;
+    if (d.osc0_pan)
+        p.osc[0].pan = *d.osc0_pan;
     if (d.osc0_pulse_width)
         p.osc[0].pulse_width = *d.osc0_pulse_width;
-    if (d.osc1_enabled)
-        p.osc[1].enabled = *d.osc1_enabled ? 1u : 0u;
+    if (d.osc0_enabled)
+        p.osc[0].enabled = *d.osc0_enabled ? 1u : 0u;
+    if (d.osc1_type)
+        p.osc[1].type = *d.osc1_type;
+    if (d.osc1_semitone)
+        p.osc[1].semitone_offset = *d.osc1_semitone;
     if (d.osc1_detune)
         p.osc[1].detune_cents = *d.osc1_detune;
+    if (d.osc1_wavetable_pos)
+        p.osc[1].wavetable_pos = *d.osc1_wavetable_pos;
+    if (d.osc1_fm_ratio)
+        p.osc[1].fm_ratio = *d.osc1_fm_ratio;
+    if (d.osc1_fm_depth)
+        p.osc[1].fm_depth = *d.osc1_fm_depth;
     if (d.osc1_volume)
         p.osc[1].volume = *d.osc1_volume;
+    if (d.osc1_pan)
+        p.osc[1].pan = *d.osc1_pan;
+    if (d.osc1_pulse_width)
+        p.osc[1].pulse_width = *d.osc1_pulse_width;
+    if (d.osc1_enabled)
+        p.osc[1].enabled = *d.osc1_enabled ? 1u : 0u;
+    if (d.osc2_type)
+        p.osc[2].type = *d.osc2_type;
+    if (d.osc2_semitone)
+        p.osc[2].semitone_offset = *d.osc2_semitone;
+    if (d.osc2_detune)
+        p.osc[2].detune_cents = *d.osc2_detune;
+    if (d.osc2_wavetable_pos)
+        p.osc[2].wavetable_pos = *d.osc2_wavetable_pos;
+    if (d.osc2_fm_ratio)
+        p.osc[2].fm_ratio = *d.osc2_fm_ratio;
+    if (d.osc2_fm_depth)
+        p.osc[2].fm_depth = *d.osc2_fm_depth;
+    if (d.osc2_volume)
+        p.osc[2].volume = *d.osc2_volume;
+    if (d.osc2_pan)
+        p.osc[2].pan = *d.osc2_pan;
+    if (d.osc2_pulse_width)
+        p.osc[2].pulse_width = *d.osc2_pulse_width;
+    if (d.osc2_enabled)
+        p.osc[2].enabled = *d.osc2_enabled ? 1u : 0u;
     if (d.filter_type)
         p.filter.type = *d.filter_type;
     if (d.filter_cutoff)
@@ -94,6 +165,8 @@ inline void apply_delta(PatchStruct& p, const PatchDelta& d) noexcept {
         p.filter.drive = *d.filter_drive;
     if (d.filter_env_mod)
         p.filter.env_mod = *d.filter_env_mod;
+    if (d.filter_key_track)
+        p.filter.key_track = *d.filter_key_track;
     if (d.amp_attack)
         p.amp_env.attack_s = *d.amp_attack;
     if (d.amp_decay)
@@ -118,6 +191,22 @@ inline void apply_delta(PatchStruct& p, const PatchDelta& d) noexcept {
         p.lfo[0].rate_hz = *d.lfo0_rate;
     if (d.lfo0_depth)
         p.lfo[0].depth = *d.lfo0_depth;
+    if (d.lfo0_phase_offset)
+        p.lfo[0].phase_offset = *d.lfo0_phase_offset;
+    if (d.lfo0_bpm_sync)
+        p.lfo[0].bpm_sync = *d.lfo0_bpm_sync ? 1u : 0u;
+    if (d.lfo1_waveform)
+        p.lfo[1].waveform = *d.lfo1_waveform;
+    if (d.lfo1_target)
+        p.lfo[1].target = *d.lfo1_target;
+    if (d.lfo1_rate)
+        p.lfo[1].rate_hz = *d.lfo1_rate;
+    if (d.lfo1_depth)
+        p.lfo[1].depth = *d.lfo1_depth;
+    if (d.lfo1_phase_offset)
+        p.lfo[1].phase_offset = *d.lfo1_phase_offset;
+    if (d.lfo1_bpm_sync)
+        p.lfo[1].bpm_sync = *d.lfo1_bpm_sync ? 1u : 0u;
     if (d.reverb_size)
         p.reverb.size = *d.reverb_size;
     if (d.reverb_damping)
@@ -132,6 +221,10 @@ inline void apply_delta(PatchStruct& p, const PatchDelta& d) noexcept {
         p.delay.feedback = *d.delay_feedback;
     if (d.delay_mix)
         p.delay.mix = *d.delay_mix;
+    if (d.delay_stereo)
+        p.delay.stereo = *d.delay_stereo;
+    if (d.delay_bpm_sync)
+        p.delay.bpm_sync = *d.delay_bpm_sync ? 1u : 0u;
     if (d.master_gain)
         p.master_gain = *d.master_gain;
     if (d.portamento)
@@ -246,7 +339,7 @@ inline const std::array<DescriptorEntry, 74>& get_descriptor_dataset() {
         {"mid",      SoundContext::Generic,   {.filter_cutoff=1000.0f}},
 
         // ── Polyphony / Voice ─────────────────────────────────────────────────
-        {"unison",   SoundContext::Generic,   {.osc1_enabled=true, .osc1_detune=12.0f}},
+        {"unison",   SoundContext::Generic,   {.osc1_detune=12.0f, .osc1_enabled=true}},
         {"mono",     SoundContext::Generic,   {.portamento=0.05f, .voice_count=1}},
         {"poly",     SoundContext::Generic,   {.voice_count=8}},
 

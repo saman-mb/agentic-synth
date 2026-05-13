@@ -1,9 +1,12 @@
 #include "agent/AgentBridge.h"
 
 #include <algorithm>
+#include <cmath>
 #include <iostream>
+#include <initializer_list>
 #include <juce_core/juce_core.h>
 #include <juce_events/juce_events.h>
+#include <string_view>
 #include <utility>
 
 #include "mapper/EnvLoader.h"
@@ -12,22 +15,223 @@ namespace agentic_synth::agent {
 
 namespace {
 
-// Build a juce::var representation of a PatchStruct partial. Emit the shape
-// React expects (PatchPreviewData in ui/src/types/chat.ts):
-// {cutoffHz, resonance, attackS, sustainLevel, lfoDepth, reverbMix}.
-// Snake-case fields would silently render an empty patch preview in the UI.
-juce::var patchToVar(const PatchStruct& p) {
-    auto* obj = new juce::DynamicObject{};
-    obj->setProperty("cutoffHz", p.filter.cutoff_hz);
-    obj->setProperty("resonance", p.filter.resonance);
-    obj->setProperty("attackS", p.amp_env.attack_s);
-    obj->setProperty("sustainLevel", p.amp_env.sustain);
-    obj->setProperty("lfoDepth", p.lfo[0].depth);
-    obj->setProperty("reverbMix", p.reverb.mix);
-    return juce::var{obj};
+int enumIndex(float v, int lo, int hi) noexcept {
+    if (!std::isfinite(v))
+        return lo;
+    return std::clamp(static_cast<int>(std::lround(v)), lo, hi);
+}
+
+double propNumber(const juce::DynamicObject* obj, const char* name, double fallback) {
+    if (obj == nullptr || !obj->hasProperty(name))
+        return fallback;
+    return static_cast<double>(obj->getProperty(name));
+}
+
+juce::DynamicObject* propObject(const juce::DynamicObject* obj, const char* name) {
+    if (obj == nullptr || !obj->hasProperty(name))
+        return nullptr;
+    return obj->getProperty(name).getDynamicObject();
+}
+
+juce::var routeVar(const char* target, double amount) {
+    auto* route = new juce::DynamicObject{};
+    route->setProperty("target", juce::String(target));
+    route->setProperty("amount", amount);
+    return juce::var{route};
+}
+
+juce::var macroVar(const char* name, std::initializer_list<juce::var> routesIn) {
+    auto* macro = new juce::DynamicObject{};
+    macro->setProperty("name", juce::String(name));
+    juce::Array<juce::var> routes;
+    for (const auto& route : routesIn)
+        routes.add(route);
+    macro->setProperty("routes", juce::var{routes});
+    return juce::var{macro};
 }
 
 } // namespace
+
+juce::var AgentBridge::patchToVar(const PatchStruct& p) {
+    auto* obj = new juce::DynamicObject{};
+
+    juce::Array<juce::var> osc;
+    for (const auto& o : p.osc) {
+        auto* oo = new juce::DynamicObject{};
+        oo->setProperty("type", static_cast<int>(o.type));
+        oo->setProperty("semitone_offset", o.semitone_offset);
+        oo->setProperty("detune_cents", o.detune_cents);
+        oo->setProperty("wavetable_pos", o.wavetable_pos);
+        oo->setProperty("fm_ratio", o.fm_ratio);
+        oo->setProperty("fm_depth", o.fm_depth);
+        oo->setProperty("volume", o.volume);
+        oo->setProperty("pan", o.pan);
+        oo->setProperty("pulse_width", o.pulse_width);
+        oo->setProperty("enabled", static_cast<int>(o.enabled != 0));
+        osc.add(juce::var{oo});
+    }
+    obj->setProperty("osc", juce::var{osc});
+
+    auto* filter = new juce::DynamicObject{};
+    filter->setProperty("type", static_cast<int>(p.filter.type));
+    filter->setProperty("cutoff_hz", p.filter.cutoff_hz);
+    filter->setProperty("resonance", p.filter.resonance);
+    filter->setProperty("env_mod", p.filter.env_mod);
+    filter->setProperty("key_track", p.filter.key_track);
+    filter->setProperty("drive", p.filter.drive);
+    obj->setProperty("filter", juce::var{filter});
+
+    auto envToVar = [](const EnvParams& e) {
+        auto* env = new juce::DynamicObject{};
+        env->setProperty("attack_s", e.attack_s);
+        env->setProperty("decay_s", e.decay_s);
+        env->setProperty("sustain", e.sustain);
+        env->setProperty("release_s", e.release_s);
+        return juce::var{env};
+    };
+    obj->setProperty("filter_env", envToVar(p.filter_env));
+    obj->setProperty("amp_env", envToVar(p.amp_env));
+
+    juce::Array<juce::var> lfos;
+    for (const auto& l : p.lfo) {
+        auto* lo = new juce::DynamicObject{};
+        lo->setProperty("waveform", static_cast<int>(l.waveform));
+        lo->setProperty("target", static_cast<int>(l.target));
+        lo->setProperty("rate_hz", l.rate_hz);
+        lo->setProperty("depth", l.depth);
+        lo->setProperty("phase_offset", l.phase_offset);
+        lo->setProperty("bpm_sync", static_cast<int>(l.bpm_sync != 0));
+        lfos.add(juce::var{lo});
+    }
+    obj->setProperty("lfo", juce::var{lfos});
+
+    auto* reverb = new juce::DynamicObject{};
+    reverb->setProperty("size", p.reverb.size);
+    reverb->setProperty("damping", p.reverb.damping);
+    reverb->setProperty("width", p.reverb.width);
+    reverb->setProperty("mix", p.reverb.mix);
+    obj->setProperty("reverb", juce::var{reverb});
+
+    auto* delay = new juce::DynamicObject{};
+    delay->setProperty("time_s", p.delay.time_s);
+    delay->setProperty("feedback", p.delay.feedback);
+    delay->setProperty("mix", p.delay.mix);
+    delay->setProperty("stereo", p.delay.stereo);
+    delay->setProperty("bpm_sync", static_cast<int>(p.delay.bpm_sync != 0));
+    obj->setProperty("delay", juce::var{delay});
+
+    obj->setProperty("master_gain", p.master_gain);
+    obj->setProperty("portamento_s", p.portamento_s);
+    obj->setProperty("voice_count", static_cast<int>(p.voice_count));
+    return juce::var{obj};
+}
+
+PatchStruct AgentBridge::patchFromVar(const juce::var& payload) {
+    PatchStruct p = make_default_patch();
+    auto* obj = payload.getDynamicObject();
+    if (obj == nullptr)
+        return p;
+
+    const juce::var oscVar = obj->getProperty("osc");
+    if (auto* oscs = oscVar.getArray()) {
+        for (int i = 0; i < std::min(oscs->size(), kMaxOscillators); ++i) {
+            auto* o = oscs->getReference(i).getDynamicObject();
+            if (o == nullptr)
+                continue;
+            p.osc[i].type = static_cast<OscType>(enumIndex(static_cast<float>(propNumber(o, "type", static_cast<int>(p.osc[i].type))), 0, 7));
+            p.osc[i].semitone_offset = static_cast<float>(propNumber(o, "semitone_offset", p.osc[i].semitone_offset));
+            p.osc[i].detune_cents = static_cast<float>(propNumber(o, "detune_cents", p.osc[i].detune_cents));
+            p.osc[i].wavetable_pos = static_cast<float>(propNumber(o, "wavetable_pos", p.osc[i].wavetable_pos));
+            p.osc[i].fm_ratio = static_cast<float>(propNumber(o, "fm_ratio", p.osc[i].fm_ratio));
+            p.osc[i].fm_depth = static_cast<float>(propNumber(o, "fm_depth", p.osc[i].fm_depth));
+            p.osc[i].volume = static_cast<float>(propNumber(o, "volume", p.osc[i].volume));
+            p.osc[i].pan = static_cast<float>(propNumber(o, "pan", p.osc[i].pan));
+            p.osc[i].pulse_width = static_cast<float>(propNumber(o, "pulse_width", p.osc[i].pulse_width));
+            p.osc[i].enabled = propNumber(o, "enabled", p.osc[i].enabled) >= 0.5 ? 1u : 0u;
+        }
+    }
+
+    if (auto* f = propObject(obj, "filter")) {
+        p.filter.type = static_cast<FilterType>(enumIndex(static_cast<float>(propNumber(f, "type", static_cast<int>(p.filter.type))), 0, 4));
+        p.filter.cutoff_hz = static_cast<float>(propNumber(f, "cutoff_hz", p.filter.cutoff_hz));
+        p.filter.resonance = static_cast<float>(propNumber(f, "resonance", p.filter.resonance));
+        p.filter.env_mod = static_cast<float>(propNumber(f, "env_mod", p.filter.env_mod));
+        p.filter.key_track = static_cast<float>(propNumber(f, "key_track", p.filter.key_track));
+        p.filter.drive = static_cast<float>(propNumber(f, "drive", p.filter.drive));
+    }
+
+    auto readEnv = [](juce::DynamicObject* env, EnvParams& out) {
+        if (env == nullptr)
+            return;
+        out.attack_s = static_cast<float>(propNumber(env, "attack_s", out.attack_s));
+        out.decay_s = static_cast<float>(propNumber(env, "decay_s", out.decay_s));
+        out.sustain = static_cast<float>(propNumber(env, "sustain", out.sustain));
+        out.release_s = static_cast<float>(propNumber(env, "release_s", out.release_s));
+    };
+    readEnv(propObject(obj, "filter_env"), p.filter_env);
+    readEnv(propObject(obj, "amp_env"), p.amp_env);
+
+    const juce::var lfoVar = obj->getProperty("lfo");
+    if (auto* lfos = lfoVar.getArray()) {
+        for (int i = 0; i < std::min(lfos->size(), kMaxLfos); ++i) {
+            auto* l = lfos->getReference(i).getDynamicObject();
+            if (l == nullptr)
+                continue;
+            p.lfo[i].waveform = static_cast<LfoWaveform>(enumIndex(static_cast<float>(propNumber(l, "waveform", static_cast<int>(p.lfo[i].waveform))), 0, 4));
+            p.lfo[i].target = static_cast<LfoTarget>(enumIndex(static_cast<float>(propNumber(l, "target", static_cast<int>(p.lfo[i].target))), 0, 6));
+            p.lfo[i].rate_hz = static_cast<float>(propNumber(l, "rate_hz", p.lfo[i].rate_hz));
+            p.lfo[i].depth = static_cast<float>(propNumber(l, "depth", p.lfo[i].depth));
+            p.lfo[i].phase_offset = static_cast<float>(propNumber(l, "phase_offset", p.lfo[i].phase_offset));
+            p.lfo[i].bpm_sync = propNumber(l, "bpm_sync", p.lfo[i].bpm_sync) >= 0.5 ? 1u : 0u;
+        }
+    }
+
+    if (auto* rv = propObject(obj, "reverb")) {
+        p.reverb.size = static_cast<float>(propNumber(rv, "size", p.reverb.size));
+        p.reverb.damping = static_cast<float>(propNumber(rv, "damping", p.reverb.damping));
+        p.reverb.width = static_cast<float>(propNumber(rv, "width", p.reverb.width));
+        p.reverb.mix = static_cast<float>(propNumber(rv, "mix", p.reverb.mix));
+    }
+
+    if (auto* d = propObject(obj, "delay")) {
+        p.delay.time_s = static_cast<float>(propNumber(d, "time_s", p.delay.time_s));
+        p.delay.feedback = static_cast<float>(propNumber(d, "feedback", p.delay.feedback));
+        p.delay.mix = static_cast<float>(propNumber(d, "mix", p.delay.mix));
+        p.delay.stereo = static_cast<float>(propNumber(d, "stereo", p.delay.stereo));
+        p.delay.bpm_sync = propNumber(d, "bpm_sync", p.delay.bpm_sync) >= 0.5 ? 1u : 0u;
+    }
+
+    p.master_gain = static_cast<float>(propNumber(obj, "master_gain", p.master_gain));
+    p.portamento_s = static_cast<float>(propNumber(obj, "portamento_s", p.portamento_s));
+    p.voice_count = static_cast<uint8_t>(enumIndex(static_cast<float>(propNumber(obj, "voice_count", p.voice_count)), 1, 16));
+    return p;
+}
+
+juce::var AgentBridge::modulationPlanForPatch(const PatchStruct& p) {
+    juce::Array<juce::var> macros;
+    const bool dark = p.filter.cutoff_hz < 1000.0f;
+    const bool hasMotion = p.lfo[0].depth > 0.05f || p.lfo[1].depth > 0.05f;
+    const bool hasFm = p.osc[0].type == OscType::FM || p.osc[1].type == OscType::FM || p.osc[2].type == OscType::FM;
+    const bool hasWavetable = p.osc[0].type == OscType::Wavetable || p.osc[1].type == OscType::Wavetable ||
+                              p.osc[2].type == OscType::Wavetable;
+
+    macros.add(macroVar(dark ? "GRIP" : "BRIGHTNESS",
+                        {routeVar("filter.cutoff_hz", dark ? 0.65 : 0.8), routeVar("filter.resonance", 0.2)}));
+    macros.add(macroVar(hasMotion ? "WOBBLE" : "MOTION",
+                        {routeVar("lfo.0.depth", 0.65), routeVar("lfo.0.rate_hz", 0.25)}));
+    if (hasFm) {
+        macros.add(macroVar("EDGE", {routeVar("osc.0.fm_depth", 0.55), routeVar("filter.drive", 0.35)}));
+    } else if (hasWavetable) {
+        macros.add(macroVar("MORPH", {routeVar("osc.0.wavetable_pos", 0.65), routeVar("lfo.0.depth", 0.25)}));
+    } else {
+        macros.add(macroVar("WIDTH", {routeVar("osc.1.detune_cents", 0.25), routeVar("osc.2.detune_cents", -0.25)}));
+    }
+    macros.add(macroVar("SPACE", {routeVar("reverb.mix", 0.45), routeVar("delay.mix", 0.3), routeVar("delay.stereo", 0.35)}));
+
+    auto* mod = new juce::DynamicObject{};
+    mod->setProperty("macros", juce::var{macros});
+    return juce::var{mod};
+}
 
 AgentBridge::AgentBridge() {
     // Load the bundled TIMBRE sound-designer briefing (system-prompt.md)

@@ -417,6 +417,9 @@ bool parse_delay(JsonReader& r, DelayParams& d) {
     RQ(r.expect_key("mix"));
     RF(d.mix, r.read_float());
     RQ(r.comma());
+    RQ(r.expect_key("stereo"));
+    RF(d.stereo, r.read_float());
+    RQ(r.comma());
     RQ(r.expect_key("bpm_sync"));
     auto b = r.read_bool();
     if (!b)
