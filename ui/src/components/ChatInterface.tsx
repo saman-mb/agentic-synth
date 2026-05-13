@@ -334,12 +334,19 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation, 
   // Wordless head-shake on the send arrow when user submits an empty
   // prompt (Phase 9 §18c). 180ms class-toggle; auto-clears on timer.
   const [shake, setShake] = useState(false);
-  // Network failure UI (Phase 9 §18b). When set, the chat shows a calm
-  // grey countdown line below the message list with a "Retry now" link.
-  // Auto-retries after 5s; preserves the original prompt for resubmit.
+  // Network failure UI (Phase 9 §18b + Phase 13 retry wiring).
+  // When set, the chat shows a calm grey countdown line below the
+  // message list with a "Retry now" link. Auto-retries after 5s;
+  // preserves the original prompt for resubmit. After
+  // MAX_RETRY_ATTEMPTS consecutive failures we stop retrying and show
+  // a final "Try again later" line — no infinite loop on a flapping
+  // backend.
+  const MAX_RETRY_ATTEMPTS = 3;
   const [networkFailure, setNetworkFailure] = useState<{
     prompt: string;
     countdown: number;
+    attempt: number;     // 1-based: 1 = first retry, 2 = second, ...
+    exhausted: boolean;  // true after MAX_RETRY_ATTEMPTS — no auto retry
   } | null>(null);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Focus state on the prompt input — drives the shimmer/solid border
@@ -429,9 +436,26 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation, 
           // eslint-disable-next-line no-console
           console.debug('[TIMBRE] LLM error:', msg.message);
           // Schedule on a microtask so lastPrompt is set by the time we
-          // read it for the failure card.
+          // read it for the failure card. If we're already in a retry
+          // cycle for the same prompt, increment the attempt counter
+          // and either schedule the next retry or surface the
+          // exhausted final state.
           window.setTimeout(() => {
-            setNetworkFailure({ prompt: lastPrompt, countdown: 5 });
+            setNetworkFailure((prev) => {
+              if (prev && prev.prompt === lastPrompt) {
+                const nextAttempt = prev.attempt + 1;
+                if (nextAttempt > MAX_RETRY_ATTEMPTS) {
+                  return { ...prev, attempt: nextAttempt, exhausted: true, countdown: 0 };
+                }
+                return { ...prev, attempt: nextAttempt, countdown: 5 };
+              }
+              return {
+                prompt: lastPrompt,
+                countdown: 5,
+                attempt: 1,
+                exhausted: false,
+              };
+            });
           }, 0);
           break;
         }
@@ -552,48 +576,104 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation, 
         streamingIdRef.current = null;
         setIsGenerating(false);
         // Park the prompt for retry; render countdown below the list.
-        setNetworkFailure({ prompt, countdown: 5 });
+        setNetworkFailure({ prompt, countdown: 5, attempt: 1, exhausted: false });
       }, 600);
     }
   }, [inputValue, isGenerating, send, status, onRtfmEasterEgg]);
 
-  // ── Network failure countdown (Phase 9 §18b) ─────────────────────
-  // While networkFailure is non-null, tick the countdown each second.
-  // At 0, fire the retry: restore the prompt into the input and submit
-  // automatically. Manual "Retry now" calls the same handler.
+  // ── Network failure retry (Phase 9 §18b + Phase 13) ───────────────
+  // Real retry: re-call the bridge with the persisted prompt and a
+  // fresh streaming assistant bubble. We do NOT push a new user
+  // message — the user's original prompt is still visible in the
+  // conversation; we're just retrying the response.
+  //
+  // Success path: tokens arrive → the streaming bubble fills →
+  // 'done' arrives → handleWireMessage sets streaming:false. A
+  // separate effect watching streamingIdRef + isGenerating clears
+  // networkFailure on the first incoming 'token' frame.
+  //
+  // Failure path: 'error' arrives (or `status !== 'open'` again) →
+  // error-frame handler increments attempt, re-arms countdown, OR
+  // sets exhausted:true after MAX_RETRY_ATTEMPTS.
   const retryNow = useCallback(() => {
     setNetworkFailure((cur) => {
-      if (!cur) return null;
-      // Restore prompt text. Submit happens via a separate effect once
-      // inputValue has settled (avoids racing the controlled <textarea>).
-      setInputValue(cur.prompt);
-      return null;
-    });
-    // After restoring text, fire submit on the next tick.
-    window.setTimeout(() => {
-      // submit reads `inputValue` via closure; the most recent render
-      // will see the restored prompt. Guard with a tiny timeout so the
-      // state flush has landed.
-      submit();
-    }, 0);
-  }, [submit]);
+      if (!cur) return cur;
+      if (cur.exhausted) return cur; // no further retries
+      // If the bridge is still closed, surface the failure again on
+      // the next tick (same attempt counter — we never actually got
+      // to send). This keeps the retry count meaningful: it counts
+      // *attempted* sends, not optimistic UI nudges.
+      if (status !== 'open') {
+        // Park the prompt, tick attempt as a failed send, and either
+        // re-arm the countdown or mark exhausted.
+        const nextAttempt = cur.attempt + 1;
+        if (nextAttempt > MAX_RETRY_ATTEMPTS) {
+          return { ...cur, attempt: nextAttempt, exhausted: true, countdown: 0 };
+        }
+        return { ...cur, attempt: nextAttempt, countdown: 5 };
+      }
 
+      // Bridge is open — fire the retry. Inject a fresh streaming
+      // assistant bubble keyed to a new id and call send().
+      const assistantId = nanoid();
+      const assistantMsg: ChatMessage = {
+        id: assistantId,
+        role: 'assistant',
+        content: '',
+        streaming: true,
+      };
+      setMessages((prev) => [...prev, assistantMsg]);
+      setIsGenerating(true);
+      streamingIdRef.current = assistantId;
+      send({ type: 'generate', prompt: cur.prompt, sessionId: SESSION_ID });
+
+      // Pause the countdown while the retry is in flight. The failure
+      // state is cleared by the success-detection effect on first
+      // token arrival.
+      return { ...cur, countdown: 0 };
+    });
+  }, [send, status]);
+
+  // Tick the countdown each second while networkFailure is active
+  // and the retry hasn't been fired yet. countdown=0 with exhausted
+  // is a sticky terminal state (no further auto-retry). countdown=0
+  // with !exhausted means a retry is in flight — also no tick. So we
+  // only schedule the timer when countdown > 0.
   useEffect(() => {
     if (!networkFailure) return;
-    if (networkFailure.countdown <= 0) {
-      retryNow();
-      return;
+    if (networkFailure.exhausted) return;
+    if (networkFailure.countdown <= 0) return;
+    if (networkFailure.countdown === 1) {
+      retryTimerRef.current = setTimeout(() => {
+        retryNow();
+      }, 1000);
+    } else {
+      retryTimerRef.current = setTimeout(() => {
+        setNetworkFailure((cur) =>
+          cur ? { ...cur, countdown: cur.countdown - 1 } : cur,
+        );
+      }, 1000);
     }
-    retryTimerRef.current = setTimeout(() => {
-      setNetworkFailure((cur) =>
-        cur ? { ...cur, countdown: cur.countdown - 1 } : cur,
-      );
-    }, 1000);
     return () => {
       if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
       retryTimerRef.current = null;
     };
   }, [networkFailure, retryNow]);
+
+  // Success detection: if we're in a retry cycle and a token arrives
+  // (which the stream handler writes into the matching message), the
+  // bridge has answered — clear the failure state so the countdown UI
+  // disappears.
+  useEffect(() => {
+    if (!networkFailure) return;
+    if (networkFailure.exhausted) return;
+    const sid = streamingIdRef.current;
+    if (!sid) return;
+    const m = messages.find((mm) => mm.id === sid);
+    if (m && m.role === 'assistant' && m.content.length > 0) {
+      setNetworkFailure(null);
+    }
+  }, [messages, networkFailure]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -646,16 +726,37 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation, 
 
       {networkFailure && (
         <div className="chat-network-failure" role="status" aria-live="polite">
-          <span className="chat-network-failure-text">
-            Couldn't reach the agent. Trying again in {networkFailure.countdown}…
-          </span>
-          <button
-            type="button"
-            className="chat-network-failure-retry"
-            onClick={retryNow}
-          >
-            Retry now
-          </button>
+          {networkFailure.exhausted ? (
+            <>
+              <span className="chat-network-failure-text">
+                Still can't reach the agent. Please try again later.
+              </span>
+              <button
+                type="button"
+                className="chat-network-failure-retry"
+                onClick={() => setNetworkFailure(null)}
+              >
+                Dismiss
+              </button>
+            </>
+          ) : networkFailure.countdown > 0 ? (
+            <>
+              <span className="chat-network-failure-text">
+                Couldn't reach the agent. Trying again in {networkFailure.countdown}…
+              </span>
+              <button
+                type="button"
+                className="chat-network-failure-retry"
+                onClick={retryNow}
+              >
+                Retry now
+              </button>
+            </>
+          ) : (
+            <span className="chat-network-failure-text">
+              Retrying… (attempt {networkFailure.attempt} of {MAX_RETRY_ATTEMPTS})
+            </span>
+          )}
         </div>
       )}
 
