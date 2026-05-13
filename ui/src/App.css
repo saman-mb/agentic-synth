@@ -263,24 +263,52 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ── Root layout: knob grid left, chat right ──────────────────────── */
+/* ── TIMBRE app shell (Phase 4 layout) ─────────────────────────────
+   Three rows: TopBar (48px), Body (1fr — three-column grid), MIDI
+   audition keyboard (auto-height). Body splits into PresetsSidebar
+   (240px) | ModulesGrid (1fr) | RightColumn (minmax 380, 32%).
+
+   .panel-knobs / .panel-chat / .panel-tabs / .theme-toggle classes
+   below are retained as legacy selectors — no longer rendered by
+   App.tsx but referenced by stray tests/screenshots. Removing them
+   churns more diff than this phase needs. */
 
 .app-layout {
   display: grid;
-  grid-template-columns: minmax(340px, 420px) 1fr;
+  grid-template-rows: 48px 1fr auto;
   height: 100vh;
   overflow: hidden;
   background: var(--bg-void);
 }
 
-@media (max-width: 900px) {
-  .app-layout {
-    grid-template-columns: 1fr;
-    grid-template-rows: auto 1fr;
-  }
+.app-body {
+  grid-row: 2;
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr) minmax(380px, 32%);
+  overflow: hidden;
+  min-height: 0;
 }
 
-/* ── Knob panel ───────────────────────────────────────────────────── */
+.app-keyboard {
+  grid-row: 3;
+  border-top: 1px solid var(--color-border);
+  background: var(--bg-panel);
+  flex-shrink: 0;
+}
+
+/* Sub-1000px: collapse PresetsSidebar (hidden), stack right column under
+   modules. Mobile-resize is best-effort — TIMBRE targets 1280×800 default. */
+@media (max-width: 1000px) {
+  .app-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto;
+  }
+  .presets-sidebar { display: none; }
+  .modules-grid { grid-column: 1; }
+  .right-column { grid-column: 1; }
+}
+
+/* ── Legacy panel classes (retained, unused by Phase 4) ──────────── */
 
 .panel-knobs {
   overflow-y: auto;
@@ -288,8 +316,6 @@ body {
   background: var(--bg-panel);
   padding: var(--sp-3);
 }
-
-/* ── Chat panel ───────────────────────────────────────────────────── */
 
 .panel-chat {
   overflow: hidden;

@@ -1,23 +1,24 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './App.css';
+import { AuditionKeyboard } from './components/AuditionKeyboard';
 import { BootSplash } from './components/BootSplash';
-import { ChatInterface } from './components/ChatInterface';
-import { KnobGrid, makeDefaultPatch, PatchParams } from './components/KnobGrid';
+import { makeDefaultPatch, PatchParams } from './components/KnobGrid';
+import { ModulesGrid } from './components/ModulesGrid';
 import {
   BrowserEntry,
-  PatchBrowser,
   loadStarred,
   saveStarred,
 } from './components/PatchBrowser';
-import { SemanticDictionary } from './components/SemanticDictionary';
-import { TelemetryDashboard } from './components/TelemetryDashboard';
-import { UndoRedoBar } from './components/UndoRedoBar';
+import { PresetsSidebar } from './components/PresetsSidebar';
+import { RightColumn } from './components/RightColumn';
+import { ToolsDrawer } from './components/ToolsDrawer';
+import { TopBar } from './components/TopBar';
 import { useWebSocket } from './hooks/useWebSocket';
 import { usePatchHistory } from './hooks/usePatchHistory';
 import type { PatchPreviewData } from './types/chat';
 
-type LeftPanel = 'knobs' | 'dictionary' | 'telemetry' | 'history';
 type Theme = 'dark' | 'light';
+type DrawerTab = 'dictionary' | 'telemetry' | 'history';
 
 const KNOB_BRIDGE_URL = 'ws://localhost:9002';
 const THEME_KEY = 'agentic-synth.theme.v1';
@@ -131,12 +132,15 @@ export function App() {
   // Persists until the NEXT agent generation arrives (no transient flash).
   const [lastAgentEditBatch, setLastAgentEditBatch] = useState<Set<string>>(new Set());
   const [transcript, setTranscript] = useState('');
-  const [leftPanel, setLeftPanel] = useState<LeftPanel>('knobs');
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
   // Boot splash visibility — tracked in state (not a ref) so React unmounts
   // the overlay after 1.8s. Initialized true on first mount only; HMR keeps
   // state across module reloads so we don't re-trigger the splash mid-dev.
   const [splashVisible, setSplashVisible] = useState<boolean>(true);
+
+  // ToolsDrawer (Dictionary / Telemetry / History — opened via gear icon).
+  const [toolsOpen, setToolsOpen] = useState<boolean>(false);
+  const [toolsTab, setToolsTab] = useState<DrawerTab>('dictionary');
 
   // Apply theme to <html data-theme="..."> on every change so all CSS custom
   // properties switch atomically. No persistence on mount — only on explicit
@@ -178,7 +182,7 @@ export function App() {
   // resulting history push (otherwise recall would clone the entry).
   const suppressCaptureRef = useRef<boolean>(false);
 
-  const { lastMessage, sendMessage, sendBinary } = useWebSocket(KNOB_BRIDGE_URL);
+  const { lastMessage, sendMessage, sendBinary, readyState } = useWebSocket(KNOB_BRIDGE_URL);
 
   // Apply a batch of param edits as if the agent had just produced them.
   // Replaces lastAgentEditBatch so the sticky badge tracks only the latest generation.
@@ -359,141 +363,57 @@ export function App() {
     return () => window.removeEventListener('keydown', handler);
   }, [handleUndo, handleRedo]);
 
-  const tabOrder: LeftPanel[] = ['knobs', 'dictionary', 'telemetry', 'history'];
-  const tabLabel: Record<LeftPanel, string> = {
-    knobs: 'Knobs',
-    dictionary: 'Dictionary',
-    telemetry: 'Telemetry',
-    history: 'History',
-  };
-
-  const onTabKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
-    const idx = tabOrder.indexOf(leftPanel);
-    let nextIdx: number | null = null;
-    switch (e.key) {
-      case 'ArrowRight':
-        nextIdx = (idx + 1) % tabOrder.length;
-        break;
-      case 'ArrowLeft':
-        nextIdx = (idx - 1 + tabOrder.length) % tabOrder.length;
-        break;
-      case 'Home':
-        nextIdx = 0;
-        break;
-      case 'End':
-        nextIdx = tabOrder.length - 1;
-        break;
-      default:
-        return;
-    }
-    if (nextIdx !== null) {
-      e.preventDefault();
-      const nextTab = tabOrder[nextIdx];
-      setLeftPanel(nextTab);
-      const el = document.getElementById(`panel-tab-${nextTab}`);
-      el?.focus();
-    }
-  };
+  // AuditionKeyboard "ready" — true once the bridge is connected so the
+  // user knows their click will actually trigger a note. WebSocket.OPEN === 1.
+  const auditionReady = readyState === 1;
 
   return (
     <div className="app-layout">
       {splashVisible ? <BootSplash onDone={() => setSplashVisible(false)} /> : null}
-      <aside className="panel-knobs">
-        <div
-          className="panel-tabs"
-          role="tablist"
-          aria-label="Left panel"
-          onKeyDown={onTabKeyDown}
-        >
-          {tabOrder.map((key) => {
-            const selected = leftPanel === key;
-            return (
-              <button
-                key={key}
-                id={`panel-tab-${key}`}
-                role="tab"
-                aria-selected={selected}
-                aria-controls={`panel-tabpanel-${key}`}
-                tabIndex={selected ? 0 : -1}
-                className={`panel-tab${selected ? ' panel-tab-active' : ''}`}
-                onClick={() => setLeftPanel(key)}
-              >
-                {tabLabel[key]}
-              </button>
-            );
-          })}
-          <button
-            type="button"
-            className="theme-toggle"
-            onClick={toggleTheme}
-            aria-label={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
-            title={`Switch to ${theme === 'dark' ? 'light' : 'dark'} theme`}
-          >
-            {theme === 'dark' ? '☀' : '☾'}
-          </button>
-        </div>
-        {leftPanel === 'knobs' && (
-          <div
-            id="panel-tabpanel-knobs"
-            role="tabpanel"
-            aria-labelledby="panel-tab-knobs"
-            tabIndex={0}
-          >
-            <UndoRedoBar
-              onUndo={handleUndo}
-              onRedo={handleRedo}
-              canUndo={ph.canUndo}
-              canRedo={ph.canRedo}
-              cursor={ph.cursor}
-              historyLength={ph.history.length}
-            />
-            <KnobGrid patch={patch} agentKeys={lastAgentEditBatch} onKnobChange={handleKnobChange} />
-          </div>
-        )}
-        {leftPanel === 'dictionary' && (
-          <div
-            id="panel-tabpanel-dictionary"
-            role="tabpanel"
-            aria-labelledby="panel-tab-dictionary"
-            tabIndex={0}
-          >
-            <SemanticDictionary sendMessage={sendMessage} lastMessage={lastMessage} />
-          </div>
-        )}
-        {leftPanel === 'telemetry' && (
-          <div
-            id="panel-tabpanel-telemetry"
-            role="tabpanel"
-            aria-labelledby="panel-tab-telemetry"
-            tabIndex={0}
-          >
-            <TelemetryDashboard sendMessage={sendMessage} lastMessage={lastMessage} />
-          </div>
-        )}
-        {leftPanel === 'history' && (
-          <div
-            id="panel-tabpanel-history"
-            role="tabpanel"
-            aria-labelledby="panel-tab-history"
-            tabIndex={0}
-          >
-            <PatchBrowser
-              entries={browserEntries}
-              onSelect={handleBrowserSelect}
-              onStar={handleBrowserStar}
-              onRename={handleBrowserRename}
-              onClear={handleBrowserClear}
-            />
-          </div>
-        )}
-      </aside>
-      <main className="panel-chat">
-        <ChatInterface
+
+      <TopBar
+        onUndo={handleUndo}
+        onRedo={handleRedo}
+        canUndo={ph.canUndo}
+        canRedo={ph.canRedo}
+        cursor={ph.cursor}
+        historyLength={ph.history.length}
+        theme={theme}
+        onToggleTheme={toggleTheme}
+        onOpenTools={() => setToolsOpen(true)}
+      />
+
+      <div className="app-body">
+        <PresetsSidebar />
+        <ModulesGrid
+          patch={patch}
+          agentKeys={lastAgentEditBatch}
+          onKnobChange={handleKnobChange}
+        />
+        <RightColumn
           externalTranscript={transcript}
           onAudio={handleAudio}
           onSelectVariation={handleSelectVariation}
         />
-      </main>
+      </div>
+
+      <div className="app-keyboard">
+        <AuditionKeyboard sendRaw={sendMessage} ready={auditionReady} />
+      </div>
+
+      <ToolsDrawer
+        open={toolsOpen}
+        onClose={() => setToolsOpen(false)}
+        activeTab={toolsTab}
+        onTabChange={setToolsTab}
+        sendMessage={sendMessage}
+        lastMessage={lastMessage}
+        browserEntries={browserEntries}
+        onBrowserSelect={handleBrowserSelect}
+        onBrowserStar={handleBrowserStar}
+        onBrowserRename={handleBrowserRename}
+        onBrowserClear={handleBrowserClear}
+      />
     </div>
   );
 }
