@@ -151,16 +151,18 @@ TEST_CASE("AgentBridge: feedChunk emits onPatch via the streaming pipeline") {
     auto handle = bridge.onPatch([&](const juce::var& v) { patches.push_back(v); });
 
     // A single completed top-level field triggers the StreamParser callback,
-    // which is wired in the ctor to also call notifyPatch. Phase 4 patchToVar
-    // emits React-shaped PatchPreviewData fields (camelCase), so assert
-    // against the wire-shape the UI receives.
+    // which is wired in the ctor to also call notifyPatch. Phase 18+ patchToVar
+    // emits the full nested PatchStruct shape (matching React PatchParams),
+    // so cutoff lives at data.filter.cutoff_hz (snake_case nested).
     bridge.feedChunk(R"({"filter": {"cutoff_hz": 1234.0}})");
 
     REQUIRE(drainUntil([&] { return !patches.empty(); }));
     REQUIRE(patches[0].isObject());
     const auto& data = patches[0]["data"];
     REQUIRE(data.isObject());
-    CHECK(static_cast<double>(data["cutoffHz"]) == Catch::Approx(1234.0).epsilon(0.1));
+    const auto& filter = data["filter"];
+    REQUIRE(filter.isObject());
+    CHECK(static_cast<double>(filter["cutoff_hz"]) == Catch::Approx(1234.0).epsilon(0.1));
 }
 
 TEST_CASE("AgentBridge: multiple subscribers on the same event all fire") {
@@ -301,13 +303,15 @@ TEST_CASE("ParamMap: empty / malformed osc paths fall through cleanly") {
     CHECK_FALSE(agent::paramToDelta("osc.0.unknown", 1.0f).osc0_volume.has_value());
 }
 
-TEST_CASE("ParamMap: int-typed PatchDelta fields are unreachable through paramToDelta") {
-    // PatchDelta::voice_count is uint8_t. The prior if/else cascade never
-    // exposed it via a UI path, and neither does the table. This test pins
-    // that contract so a future "add voice_count row" change has to also
-    // pick a cast policy (truncate vs round) deliberately — by failing
-    // here first.
-    CHECK_FALSE(agent::paramToDelta("voice_count", 8.7f).voice_count.has_value());
+TEST_CASE("ParamMap: voice_count routes through paramToDelta with rounding cast") {
+    // Phase 18+: voice_count became reachable via the agent's wire path so
+    // generated patches can pick polyphony. Cast policy is round-to-nearest
+    // (8.7f → 9). The previous contract ("unreachable") is now obsolete.
+    const auto d = agent::paramToDelta("voice_count", 8.7f);
+    REQUIRE(d.voice_count.has_value());
+    CHECK(static_cast<int>(*d.voice_count) == 9);
+    // Dotted "global.voice_count" remains unreachable — only the bare key
+    // is wired; the dotted form is preserved as a "not in this table" canary.
     CHECK_FALSE(agent::paramToDelta("global.voice_count", 8.7f).voice_count.has_value());
 }
 
@@ -321,4 +325,148 @@ TEST_CASE("ParamMap: table is non-empty and every row has a non-null assign") {
         CHECK(slot.assign != nullptr);
         CHECK_FALSE(slot.path.empty());
     }
+}
+
+TEST_CASE("AgentBridge::patchToVar / patchFromVar round-trip preserves PatchStruct") {
+    // The UI receives the full nested PatchStruct shape on 'patch' and
+    // 'patch_update' frames. Round-trip identity (within float tolerance)
+    // is the contract that lets feedback frames and tests serialise patches
+    // through the wire and recover them exactly. Tweaks below cover every
+    // module group so future shape changes have to be reflected in both
+    // directions.
+    PatchStruct in = make_default_patch();
+    in.osc[0].type = OscType::Wavetable;
+    in.osc[0].volume = 0.73f;
+    in.osc[0].detune_cents = -12.5f;
+    in.osc[0].semitone_offset = -7.0f;
+    in.osc[0].wavetable_pos = 0.42f;
+    in.osc[0].fm_ratio = 2.5f;
+    in.osc[0].fm_depth = 0.6f;
+    in.osc[0].pulse_width = 0.31f;
+    in.osc[0].pan = -0.4f;
+    in.osc[0].enabled = 1u;
+    in.osc[1].type = OscType::FM;
+    in.osc[1].enabled = 1u;
+    in.osc[1].volume = 0.4f;
+    in.osc[2].enabled = 0u;
+    in.osc[2].volume = 0.0f;
+
+    in.filter.type = FilterType::BandPass;
+    in.filter.cutoff_hz = 1234.5f;
+    in.filter.resonance = 0.66f;
+    in.filter.env_mod = -0.4f;
+    in.filter.key_track = 0.25f;
+    in.filter.drive = 0.55f;
+
+    in.amp_env = {0.123f, 0.456f, 0.7f, 0.89f};
+    in.filter_env = {0.05f, 0.2f, 0.3f, 0.4f};
+
+    in.lfo[0].waveform = LfoWaveform::Sawtooth;
+    in.lfo[0].target = LfoTarget::FilterCutoff;
+    in.lfo[0].rate_hz = 3.14f;
+    in.lfo[0].depth = 0.42f;
+    in.lfo[0].phase_offset = 0.25f;
+    in.lfo[0].bpm_sync = 1u;
+    in.lfo[1].waveform = LfoWaveform::Triangle;
+    in.lfo[1].target = LfoTarget::Pan;
+    in.lfo[1].rate_hz = 0.5f;
+    in.lfo[1].depth = 0.15f;
+
+    in.reverb = {0.82f, 0.45f, 1.0f, 0.33f};
+    in.delay.time_s = 0.625f;
+    in.delay.feedback = 0.45f;
+    in.delay.mix = 0.22f;
+    in.delay.stereo = 0.7f;
+    in.delay.bpm_sync = 1u;
+
+    in.master_gain = 0.78f;
+    in.portamento_s = 0.18f;
+    in.voice_count = 6;
+
+    const juce::var wire = AgentBridge::patchToVar(in);
+    const PatchStruct out = AgentBridge::patchFromVar(wire);
+
+    constexpr float kTol = 1e-4f;
+    for (int i = 0; i < kMaxOscillators; ++i) {
+        CHECK(out.osc[i].type == in.osc[i].type);
+        CHECK(out.osc[i].volume == Catch::Approx(in.osc[i].volume).epsilon(kTol));
+        CHECK(out.osc[i].detune_cents == Catch::Approx(in.osc[i].detune_cents).epsilon(kTol));
+        CHECK(out.osc[i].semitone_offset == Catch::Approx(in.osc[i].semitone_offset).epsilon(kTol));
+        CHECK(out.osc[i].wavetable_pos == Catch::Approx(in.osc[i].wavetable_pos).epsilon(kTol));
+        CHECK(out.osc[i].fm_ratio == Catch::Approx(in.osc[i].fm_ratio).epsilon(kTol));
+        CHECK(out.osc[i].fm_depth == Catch::Approx(in.osc[i].fm_depth).epsilon(kTol));
+        CHECK(out.osc[i].pulse_width == Catch::Approx(in.osc[i].pulse_width).epsilon(kTol));
+        CHECK(out.osc[i].pan == Catch::Approx(in.osc[i].pan).epsilon(kTol));
+        CHECK(out.osc[i].enabled == in.osc[i].enabled);
+    }
+    CHECK(out.filter.type == in.filter.type);
+    CHECK(out.filter.cutoff_hz == Catch::Approx(in.filter.cutoff_hz).epsilon(kTol));
+    CHECK(out.filter.resonance == Catch::Approx(in.filter.resonance).epsilon(kTol));
+    CHECK(out.filter.env_mod == Catch::Approx(in.filter.env_mod).epsilon(kTol));
+    CHECK(out.filter.key_track == Catch::Approx(in.filter.key_track).epsilon(kTol));
+    CHECK(out.filter.drive == Catch::Approx(in.filter.drive).epsilon(kTol));
+    CHECK(out.amp_env.attack_s == Catch::Approx(in.amp_env.attack_s).epsilon(kTol));
+    CHECK(out.amp_env.sustain == Catch::Approx(in.amp_env.sustain).epsilon(kTol));
+    CHECK(out.filter_env.release_s == Catch::Approx(in.filter_env.release_s).epsilon(kTol));
+    for (int i = 0; i < kMaxLfos; ++i) {
+        CHECK(out.lfo[i].waveform == in.lfo[i].waveform);
+        CHECK(out.lfo[i].target == in.lfo[i].target);
+        CHECK(out.lfo[i].rate_hz == Catch::Approx(in.lfo[i].rate_hz).epsilon(kTol));
+        CHECK(out.lfo[i].depth == Catch::Approx(in.lfo[i].depth).epsilon(kTol));
+        CHECK(out.lfo[i].phase_offset == Catch::Approx(in.lfo[i].phase_offset).epsilon(kTol));
+        CHECK(out.lfo[i].bpm_sync == in.lfo[i].bpm_sync);
+    }
+    CHECK(out.reverb.mix == Catch::Approx(in.reverb.mix).epsilon(kTol));
+    CHECK(out.reverb.size == Catch::Approx(in.reverb.size).epsilon(kTol));
+    CHECK(out.delay.time_s == Catch::Approx(in.delay.time_s).epsilon(kTol));
+    CHECK(out.delay.stereo == Catch::Approx(in.delay.stereo).epsilon(kTol));
+    CHECK(out.delay.feedback == Catch::Approx(in.delay.feedback).epsilon(kTol));
+    CHECK(out.delay.bpm_sync == in.delay.bpm_sync);
+    CHECK(out.master_gain == Catch::Approx(in.master_gain).epsilon(kTol));
+    CHECK(out.portamento_s == Catch::Approx(in.portamento_s).epsilon(kTol));
+    CHECK(static_cast<int>(out.voice_count) == static_cast<int>(in.voice_count));
+}
+
+TEST_CASE("AgentBridge::modulationPlanForPatch emits four named macros with routes") {
+    // The UI relies on the host-derived modulation plan to label the four
+    // macro knobs and pre-fill the mod matrix. Contract: always four macros,
+    // each with a non-empty name and at least one route. Heuristic branches
+    // (dark/bright, motion, fm/wavetable/spread, space) are exercised via two
+    // representative patches.
+    auto checkPlan = [](const PatchStruct& patch) {
+        const juce::var plan = AgentBridge::modulationPlanForPatch(patch);
+        REQUIRE(plan.isObject());
+        const auto& macros = plan["macros"];
+        const auto* arr = macros.getArray();
+        REQUIRE(arr != nullptr);
+        REQUIRE(arr->size() == 4);
+        for (const auto& macro : *arr) {
+            REQUIRE(macro.isObject());
+            CHECK(!macro["name"].toString().isEmpty());
+            const auto* routes = macro["routes"].getArray();
+            REQUIRE(routes != nullptr);
+            REQUIRE(routes->size() >= 1);
+            for (const auto& route : *routes) {
+                CHECK(!route["target"].toString().isEmpty());
+                const double amount = static_cast<double>(route["amount"]);
+                CHECK(std::abs(amount) <= 1.0);
+            }
+        }
+    };
+
+    // Dark FM patch: should pick GRIP + EDGE branches.
+    PatchStruct dark = make_default_patch();
+    dark.filter.cutoff_hz = 500.0f;
+    dark.osc[0].type = OscType::FM;
+    dark.osc[0].fm_depth = 0.8f;
+    dark.lfo[0].depth = 0.4f;
+    checkPlan(dark);
+
+    // Bright wavetable patch: should pick BRIGHTNESS + MORPH branches.
+    PatchStruct bright = make_default_patch();
+    bright.filter.cutoff_hz = 8000.0f;
+    bright.osc[0].type = OscType::Wavetable;
+    bright.osc[0].wavetable_pos = 0.6f;
+    bright.reverb.mix = 0.4f;
+    checkPlan(bright);
 }

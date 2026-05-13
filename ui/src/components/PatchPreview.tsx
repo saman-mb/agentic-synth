@@ -31,38 +31,39 @@ function normCutoff(hz: number): number {
 }
 
 export function PatchPreview({ patch, label }: Props) {
+  const lfoDepth = Math.max(...patch.lfo.map((l) => l.depth));
   return (
     <div className="patch-preview" aria-label={label ?? 'Patch preview'}>
       {label && <span className="patch-preview-label">{label}</span>}
       <ParamBar
         label="Cutoff"
-        value={normCutoff(patch.cutoffHz)}
-        displayValue={`${Math.round(patch.cutoffHz)} Hz`}
+        value={normCutoff(patch.filter.cutoff_hz)}
+        displayValue={`${Math.round(patch.filter.cutoff_hz)} Hz`}
       />
       <ParamBar
         label="Res"
-        value={patch.resonance}
-        displayValue={patch.resonance.toFixed(2)}
+        value={patch.filter.resonance}
+        displayValue={patch.filter.resonance.toFixed(2)}
       />
       <ParamBar
         label="Attack"
-        value={Math.min(patch.attackS / 4, 1)}
-        displayValue={`${patch.attackS.toFixed(2)}s`}
+        value={Math.min(patch.amp_env.attack_s / 4, 1)}
+        displayValue={`${patch.amp_env.attack_s.toFixed(2)}s`}
       />
       <ParamBar
         label="Sustain"
-        value={patch.sustainLevel}
-        displayValue={patch.sustainLevel.toFixed(2)}
+        value={patch.amp_env.sustain}
+        displayValue={patch.amp_env.sustain.toFixed(2)}
       />
       <ParamBar
         label="LFO"
-        value={patch.lfoDepth}
-        displayValue={patch.lfoDepth.toFixed(2)}
+        value={lfoDepth}
+        displayValue={lfoDepth.toFixed(2)}
       />
       <ParamBar
         label="Reverb"
-        value={patch.reverbMix}
-        displayValue={patch.reverbMix.toFixed(2)}
+        value={patch.reverb.mix}
+        displayValue={patch.reverb.mix.toFixed(2)}
       />
     </div>
   );

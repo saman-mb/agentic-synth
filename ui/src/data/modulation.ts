@@ -158,6 +158,7 @@ function prettyParam(s: string): string {
     case 'cutoff_hz': return 'Cutoff';
     case 'resonance': return 'Reso';
     case 'env_mod': return 'EnvMod';
+    case 'key_track': return 'KeyTrk';
     case 'drive': return 'Drive';
     case 'attack_s': return 'Atk';
     case 'decay_s': return 'Dec';
@@ -172,10 +173,12 @@ function prettyParam(s: string): string {
     case 'mix': return 'Mix';
     case 'time_s': return 'Time';
     case 'feedback': return 'Feedback';
+    case 'stereo': return 'Stereo';
     case 'volume': return 'Vol';
     case 'detune_cents': return 'Detune';
     case 'semitone_offset': return 'Semi';
     case 'pan': return 'Pan';
+    case 'wavetable_pos': return 'WT';
     case 'pulse_width': return 'PW';
     case 'fm_ratio': return 'FM Rt';
     case 'fm_depth': return 'FM Dep';
@@ -203,6 +206,7 @@ export const PARAM_RANGES: Record<string, ParamRange> = (() => {
     r[`osc.${i}.volume`]          = { min: 0, max: 1 };
     r[`osc.${i}.detune_cents`]    = { min: -100, max: 100 };
     r[`osc.${i}.semitone_offset`] = { min: -48, max: 48 };
+    r[`osc.${i}.wavetable_pos`]   = { min: 0, max: 1 };
     r[`osc.${i}.pan`]             = { min: -1, max: 1 };
     r[`osc.${i}.pulse_width`]     = { min: 0.01, max: 0.99 };
     r[`osc.${i}.fm_ratio`]        = { min: 0.5, max: 16 };
@@ -211,6 +215,7 @@ export const PARAM_RANGES: Record<string, ParamRange> = (() => {
   r['filter.cutoff_hz'] = { min: 20, max: 20000 };
   r['filter.resonance'] = { min: 0, max: 1 };
   r['filter.env_mod']   = { min: -1, max: 1 };
+  r['filter.key_track'] = { min: 0, max: 1 };
   r['filter.drive']     = { min: 0, max: 1 };
   for (const env of ['amp_env', 'filter_env']) {
     r[`${env}.attack_s`]  = { min: 0, max: 10 };
@@ -229,6 +234,7 @@ export const PARAM_RANGES: Record<string, ParamRange> = (() => {
   r['reverb.mix']     = { min: 0, max: 1 };
   r['delay.time_s']   = { min: 0, max: 2 };
   r['delay.feedback'] = { min: 0, max: 0.99 };
+  r['delay.stereo']   = { min: 0, max: 1 };
   r['delay.mix']      = { min: 0, max: 1 };
   r['master_gain']    = { min: 0, max: 1 };
   r['portamento_s']   = { min: 0, max: 2 };
@@ -255,13 +261,14 @@ export const DESTINATION_CATALOG: string[] = [
     `osc.${i}.volume`,
     `osc.${i}.detune_cents`,
     `osc.${i}.semitone_offset`,
+    `osc.${i}.wavetable_pos`,
     `osc.${i}.pan`,
     `osc.${i}.pulse_width`,
     `osc.${i}.fm_ratio`,
     `osc.${i}.fm_depth`,
   ]),
   // Filter
-  'filter.cutoff_hz', 'filter.resonance', 'filter.env_mod', 'filter.drive',
+  'filter.cutoff_hz', 'filter.resonance', 'filter.env_mod', 'filter.key_track', 'filter.drive',
   // Amp env
   'amp_env.attack_s', 'amp_env.decay_s', 'amp_env.sustain', 'amp_env.release_s',
   // Filter env
@@ -275,7 +282,7 @@ export const DESTINATION_CATALOG: string[] = [
   // Reverb
   'reverb.size', 'reverb.damping', 'reverb.width', 'reverb.mix',
   // Delay
-  'delay.time_s', 'delay.feedback', 'delay.mix',
+  'delay.time_s', 'delay.feedback', 'delay.stereo', 'delay.mix',
   // Global
   'master_gain', 'portamento_s',
 ];

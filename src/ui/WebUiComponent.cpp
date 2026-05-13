@@ -397,17 +397,14 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
                                                      return;
                                                  auto* pobj = new juce::DynamicObject{};
                                                  pobj->setProperty("variation", juce::String("A"));
-                                                 pobj->setProperty("data", [&patch]() {
-                                                     auto* d = new juce::DynamicObject{};
-                                                     d->setProperty("cutoffHz", patch.filter.cutoff_hz);
-                                                     d->setProperty("resonance", patch.filter.resonance);
-                                                     d->setProperty("attackS", patch.amp_env.attack_s);
-                                                     d->setProperty("sustainLevel", patch.amp_env.sustain);
-                                                     d->setProperty("lfoDepth", patch.lfo[0].depth);
-                                                     d->setProperty("reverbMix", patch.reverb.mix);
-                                                     return juce::var{d};
-                                                 }());
+                                                 pobj->setProperty("data", agent::AgentBridge::patchToVar(patch));
+                                                 pobj->setProperty("modulation", agent::AgentBridge::modulationPlanForPatch(patch));
                                                  bridge_.notifyPatch(juce::var{pobj});
+
+                                                 auto* update = new juce::DynamicObject{};
+                                                 update->setProperty("patch", agent::AgentBridge::patchToVar(patch));
+                                                 update->setProperty("modulation", agent::AgentBridge::modulationPlanForPatch(patch));
+                                                 bridge_.notifyPatchUpdate(juce::var{update});
 
                                                  if (cancelled())
                                                      return;
@@ -447,19 +444,21 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
             else if (kindStr == "tweak")
                 kind = agent::FeedbackKind::Tweak;
 
-            // The patch payload arrives shaped like PatchPreviewData. Map
-            // the preview fields back onto PatchStruct so SessionMemory's
-            // learning signal includes the actual liked/disliked parameter
-            // values, not a default-constructed patch.
-            PatchStruct patch{};
+            // Prefer the full nested PatchParams payload. Older UI builds sent
+            // a six-field preview, so keep that fallback for feedback safety.
+            PatchStruct patch = make_default_patch();
             const auto& patchVar = argOr(args, 2, juce::var{});
             if (auto* obj = patchVar.getDynamicObject()) {
-                patch.filter.cutoff_hz = static_cast<float>(static_cast<double>(obj->getProperty("cutoffHz")));
-                patch.filter.resonance = static_cast<float>(static_cast<double>(obj->getProperty("resonance")));
-                patch.amp_env.attack_s = static_cast<float>(static_cast<double>(obj->getProperty("attackS")));
-                patch.amp_env.sustain = static_cast<float>(static_cast<double>(obj->getProperty("sustainLevel")));
-                patch.lfo[0].depth = static_cast<float>(static_cast<double>(obj->getProperty("lfoDepth")));
-                patch.reverb.mix = static_cast<float>(static_cast<double>(obj->getProperty("reverbMix")));
+                if (obj->hasProperty("osc")) {
+                    patch = agent::AgentBridge::patchFromVar(patchVar);
+                } else {
+                    patch.filter.cutoff_hz = static_cast<float>(static_cast<double>(obj->getProperty("cutoffHz")));
+                    patch.filter.resonance = static_cast<float>(static_cast<double>(obj->getProperty("resonance")));
+                    patch.amp_env.attack_s = static_cast<float>(static_cast<double>(obj->getProperty("attackS")));
+                    patch.amp_env.sustain = static_cast<float>(static_cast<double>(obj->getProperty("sustainLevel")));
+                    patch.lfo[0].depth = static_cast<float>(static_cast<double>(obj->getProperty("lfoDepth")));
+                    patch.reverb.mix = static_cast<float>(static_cast<double>(obj->getProperty("reverbMix")));
+                }
             }
             bridge_.recordFeedback(kind, /*prompt*/ "", patch);
             completion(juce::var{});

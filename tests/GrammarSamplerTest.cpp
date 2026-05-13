@@ -32,7 +32,7 @@ static std::string make_valid_json(uint32_t patch_id = 0) {
     {"waveform": "Sine", "target": "None", "rate_hz": 1.0, "depth": 0.0, "phase_offset": 0.0, "bpm_sync": false}
   ],
   "reverb": {"size": 0.0, "damping": 0.0, "width": 0.0, "mix": 0.0},
-  "delay":  {"time_s": 0.0, "feedback": 0.0, "mix": 0.0, "bpm_sync": false},
+  "delay":  {"time_s": 0.0, "feedback": 0.0, "mix": 0.0, "stereo": 0.5, "bpm_sync": false},
   "master_gain": 1.0,
   "portamento_s": 0.0,
   "voice_count": 8
@@ -50,6 +50,7 @@ TEST_CASE("parse_patch_json: valid JSON round-trips to correct PatchStruct") {
     CHECK(result->filter.type == FilterType::LowPass);
     CHECK(result->filter.cutoff_hz == Catch::Approx(18000.0f));
     CHECK(result->amp_env.sustain == Catch::Approx(1.0f));
+    CHECK(result->delay.stereo == Catch::Approx(0.5f));
     CHECK(result->voice_count == 8);
     CHECK(result->master_gain == Catch::Approx(1.0f));
 }
@@ -204,4 +205,12 @@ TEST_CASE("system-prompt.md is bundled and contains the full sound-designer brie
     CHECK(txt.find("Anti-Patterns") != std::string::npos);
     CHECK(txt.find("Worked Examples") != std::string::npos);
     CHECK(txt.find("BRIGHTNESS") != std::string::npos);
+    // The "always use three oscillators" guidance is load-bearing for patch
+    // richness — the LLM defaults to single-osc patches without it.
+    CHECK(txt.find("Three-Oscillator Layering") != std::string::npos);
+    // The Mental Reference Library is the genius-persona's internal lexicon
+    // of "X sounds like Y because Z" mappings. Without it, the LLM stops
+    // having a sensory vocabulary for translating descriptors to wiring.
+    // Guard against trim regressions silently deleting it.
+    CHECK(txt.find("Mental Reference Library") != std::string::npos);
 }

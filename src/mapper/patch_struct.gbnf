@@ -64,6 +64,7 @@ delay-params ::= "{"
   ws "\"time_s\""   ws ":" ws number ws ","
   ws "\"feedback\"" ws ":" ws number ws ","
   ws "\"mix\""      ws ":" ws number ws ","
+  ws "\"stereo\""   ws ":" ws number ws ","
   ws "\"bpm_sync\"" ws ":" ws bool
   ws "}"
 

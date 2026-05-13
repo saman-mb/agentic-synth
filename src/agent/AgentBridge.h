@@ -187,6 +187,12 @@ public:
     void notifyTranscript(const juce::var& payload);
     void notifyEnhancement(const juce::var& payload);
 
+    // Full patch wire helpers used by native UI events and tests. The shape
+    // mirrors React PatchParams: nested modules with numeric enum/bool fields.
+    [[nodiscard]] static juce::var patchToVar(const PatchStruct& patch);
+    [[nodiscard]] static PatchStruct patchFromVar(const juce::var& payload);
+    [[nodiscard]] static juce::var modulationPlanForPatch(const PatchStruct& patch);
+
 private:
     using CallbackPtr = std::shared_ptr<Callback>;
     using SlotList = std::vector<std::weak_ptr<Callback>>;

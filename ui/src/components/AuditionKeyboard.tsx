@@ -60,17 +60,44 @@ interface AuditionKeyboardProps {
   ready: boolean;
 }
 
+const OCTAVE_KEY = 'timbre:audition-octave';
+const MIN_OCTAVE_SHIFT = -3; // C0 floor (default C3 + (-3 * 12) = C0)
+const MAX_OCTAVE_SHIFT = 5;  // C8 ceiling
+
 export function AuditionKeyboard({ sendRaw, ready }: AuditionKeyboardProps) {
   const [activeNotes, setActiveNotes] = useState<Set<number>>(new Set());
-  // Track which keyboard keys are currently held to suppress autorepeat.
-  const pressedKeysRef = useRef<Set<string>>(new Set());
+  // Track which QWERTY keys are currently held → which MIDI note was actually
+  // dispatched at keydown. Needed because the user can shift octaves between
+  // keydown and keyup; without this the noteOff would carry a different MIDI
+  // than the noteOn and the engine never matches → stuck note.
+  const pressedKeysRef = useRef<Map<string, number>>(new Map());
+  // Same idea for mouse/touch: map pointerId → MIDI dispatched at pointerdown.
+  const pressedPointersRef = useRef<Map<number, number>>(new Map());
   const containerRef = useRef<HTMLDivElement>(null);
   const [globalKeysOn, setGlobalKeysOn] = useState(false);
+  const [octaveShift, setOctaveShift] = useState<number>(() => {
+    if (typeof window === 'undefined') return 0;
+    const v = parseInt(window.localStorage.getItem(OCTAVE_KEY) ?? '0', 10);
+    return Number.isFinite(v) ? Math.max(MIN_OCTAVE_SHIFT, Math.min(MAX_OCTAVE_SHIFT, v)) : 0;
+  });
+  const octaveShiftRef = useRef(octaveShift);
+  useEffect(() => { octaveShiftRef.current = octaveShift; }, [octaveShift]);
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      window.localStorage.setItem(OCTAVE_KEY, String(octaveShift));
+    }
+  }, [octaveShift]);
+
+  const transposeNote = useCallback((midi: number) => midi + octaveShiftRef.current * 12, []);
 
   const charToNote = useMemo(() => {
     const m = new Map<string, number>();
     for (const k of KEYS) m.set(k.keyChar, k.note);
     return m;
+  }, []);
+
+  const shiftOctave = useCallback((delta: number) => {
+    setOctaveShift((cur) => Math.max(MIN_OCTAVE_SHIFT, Math.min(MAX_OCTAVE_SHIFT, cur + delta)));
   }, []);
 
   // One-shot note (fixed duration). Used by "Audition C3" button.
@@ -146,22 +173,31 @@ export function AuditionKeyboard({ sendRaw, ready }: AuditionKeyboardProps) {
       if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
         return;
       }
-      const note = charToNote.get(e.key.toLowerCase());
+      const lower = e.key.toLowerCase();
+      // Octave shift hotkeys — z = down, x = up
+      if (lower === 'z') { e.preventDefault(); shiftOctave(-1); return; }
+      if (lower === 'x') { e.preventDefault(); shiftOctave(+1); return; }
+      const note = charToNote.get(lower);
       if (note === undefined) return;
-      if (pressedKeysRef.current.has(e.key.toLowerCase())) return;
-      pressedKeysRef.current.add(e.key.toLowerCase());
+      if (pressedKeysRef.current.has(lower)) return;
+      const midi = transposeNote(note);
+      pressedKeysRef.current.set(lower, midi);
       e.preventDefault();
-      noteOn(note);
+      noteOn(midi);
     },
-    [charToNote, noteOn],
+    [charToNote, noteOn, shiftOctave, transposeNote],
   );
 
   const handleGlobalKeyUp = useCallback((e: KeyboardEvent) => {
     const k = e.key.toLowerCase();
+    // Send the SAME midi we sent at keydown — not the current transposed
+    // value. The user may have shifted octaves while the key was held; if
+    // we recompute we'd noteOff a different note and the engine would
+    // leave the original one ringing.
+    const midi = pressedKeysRef.current.get(k);
     pressedKeysRef.current.delete(k);
-    const note = charToNote.get(k);
-    if (note !== undefined) noteOff(note);
-  }, [charToNote, noteOff]);
+    if (midi !== undefined) noteOff(midi);
+  }, [noteOff]);
 
   useEffect(() => {
     if (!globalKeysOn) return;
@@ -176,21 +212,28 @@ export function AuditionKeyboard({ sendRaw, ready }: AuditionKeyboardProps) {
   const onKeyDownLocal = useCallback(
     (e: ReactKeyboardEvent<HTMLDivElement>) => {
       if (e.repeat) return;
-      const note = charToNote.get(e.key.toLowerCase());
+      const lower = e.key.toLowerCase();
+      if (lower === 'z') { e.preventDefault(); shiftOctave(-1); return; }
+      if (lower === 'x') { e.preventDefault(); shiftOctave(+1); return; }
+      const note = charToNote.get(lower);
       if (note === undefined) return;
+      if (pressedKeysRef.current.has(lower)) return;
+      const midi = transposeNote(note);
+      pressedKeysRef.current.set(lower, midi);
       e.preventDefault();
-      noteOn(note);
+      noteOn(midi);
     },
-    [charToNote, noteOn],
+    [charToNote, noteOn, shiftOctave, transposeNote],
   );
 
   const onKeyUpLocal = useCallback(
     (e: ReactKeyboardEvent<HTMLDivElement>) => {
-      const note = charToNote.get(e.key.toLowerCase());
-      if (note === undefined) return;
-      noteOff(note);
+      const k = e.key.toLowerCase();
+      const midi = pressedKeysRef.current.get(k);
+      pressedKeysRef.current.delete(k);
+      if (midi !== undefined) noteOff(midi);
     },
-    [charToNote, noteOff],
+    [noteOff],
   );
 
   return (
@@ -215,8 +258,29 @@ export function AuditionKeyboard({ sendRaw, ready }: AuditionKeyboardProps) {
           />
           <span>QWERTY keys</span>
         </label>
+        <div className="audition-octave" role="group" aria-label="Octave shift">
+          <button
+            type="button"
+            className="audition-btn audition-octave-btn"
+            onClick={() => shiftOctave(-1)}
+            disabled={octaveShift <= MIN_OCTAVE_SHIFT}
+            aria-label="Octave down (Z)"
+            title="Octave down (Z)"
+          >−</button>
+          <span className="audition-octave-label" aria-live="polite">
+            Oct {octaveShift >= 0 ? '+' : ''}{octaveShift}
+          </span>
+          <button
+            type="button"
+            className="audition-btn audition-octave-btn"
+            onClick={() => shiftOctave(+1)}
+            disabled={octaveShift >= MAX_OCTAVE_SHIFT}
+            aria-label="Octave up (X)"
+            title="Octave up (X)"
+          >+</button>
+        </div>
         <span className="audition-hint">
-          {globalKeysOn ? 'Type a w s e d f t g y h u j k' : 'Click keys or focus this strip and type'}
+          {globalKeysOn ? 'a w s e d f t g y h u j k · Z/X octave' : 'Click or focus + type · Z/X octave'}
         </span>
       </div>
 
@@ -229,43 +293,65 @@ export function AuditionKeyboard({ sendRaw, ready }: AuditionKeyboardProps) {
         onKeyDown={onKeyDownLocal}
         onKeyUp={onKeyUpLocal}
       >
-        {KEYS.map((k) => (
+        {KEYS.map((k) => {
+          const midi = transposeNote(k.note);
+          const labelOct = Math.floor(midi / 12) - 1; // MIDI 60 = C4
+          const pitchClass = ['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'][midi % 12];
+          const displayLabel = `${pitchClass}${labelOct}`;
+          return (
           <button
             key={k.note}
             type="button"
             className={[
               'piano-key',
               k.isBlack ? 'piano-key-black' : 'piano-key-white',
-              activeNotes.has(k.note) ? 'piano-key-active' : '',
+              activeNotes.has(midi) ? 'piano-key-active' : '',
             ].join(' ').trim()}
             disabled={!ready}
             // Expressive hold: pointerdown → noteOn, pointerup/leave → noteOff.
             // Hold the mouse / finger to sustain. Drag across keys: leaving a
             // key releases it, entering with button held triggers next note.
+            // Capture the MIDI dispatched at pointerdown into pressedPointersRef
+            // so we release the SAME note even if octave shifts mid-hold.
             onPointerDown={(e) => {
               e.preventDefault();
               (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
-              noteOn(k.note);
+              pressedPointersRef.current.set(e.pointerId, midi);
+              noteOn(midi);
             }}
             onPointerUp={(e) => {
               try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {/* ignore */}
-              noteOff(k.note);
+              const held = pressedPointersRef.current.get(e.pointerId);
+              pressedPointersRef.current.delete(e.pointerId);
+              if (held !== undefined) noteOff(held);
             }}
             onPointerEnter={(e) => {
-              if (e.buttons === 1) noteOn(k.note);
+              if (e.buttons === 1) {
+                pressedPointersRef.current.set(e.pointerId, midi);
+                noteOn(midi);
+              }
             }}
             onPointerLeave={(e) => {
-              if (e.buttons === 1) noteOff(k.note);
+              if (e.buttons === 1) {
+                const held = pressedPointersRef.current.get(e.pointerId);
+                pressedPointersRef.current.delete(e.pointerId);
+                if (held !== undefined) noteOff(held);
+              }
             }}
-            onPointerCancel={() => noteOff(k.note)}
-            aria-label={`Play ${k.label}`}
-            aria-pressed={activeNotes.has(k.note)}
-            title={`${k.label} (${k.keyChar.toUpperCase()})`}
+            onPointerCancel={(e) => {
+              const held = pressedPointersRef.current.get(e.pointerId);
+              pressedPointersRef.current.delete(e.pointerId);
+              if (held !== undefined) noteOff(held);
+            }}
+            aria-label={`Play ${displayLabel}`}
+            aria-pressed={activeNotes.has(midi)}
+            title={`${displayLabel} (${k.keyChar.toUpperCase()})`}
           >
-            <span className="piano-key-label">{k.label}</span>
+            <span className="piano-key-label">{displayLabel}</span>
             <span className="piano-key-binding">{k.keyChar.toUpperCase()}</span>
           </button>
-        ))}
+          );
+        })}
       </div>
     </div>
   );

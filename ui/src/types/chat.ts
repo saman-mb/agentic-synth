@@ -1,15 +1,34 @@
-export interface PatchPreviewData {
-  cutoffHz: number;
-  resonance: number;
-  attackS: number;
-  sustainLevel: number;
-  lfoDepth: number;
-  reverbMix: number;
+import type { PatchParams } from '../components/KnobGrid';
+import type { ModSourceId } from '../data/modulation';
+
+export type PatchPreviewData = PatchParams;
+
+export interface AgentModRoute {
+  target: string;
+  amount: number;
+}
+
+export interface AgentModMacro {
+  name?: string;
+  label?: string;
+  routes?: AgentModRoute[];
+}
+
+export interface AgentModExtra {
+  source: ModSourceId | 'LFO1' | 'LFO2' | 'FilterEnv' | 'AmpEnv' | 'Velocity' | 'KeyTrack';
+  target: string;
+  amount: number;
+}
+
+export interface AgentModulationPlan {
+  macros?: AgentModMacro[];
+  extras?: AgentModExtra[];
 }
 
 export interface PatchVariation {
   label: 'A' | 'B';
   patch: PatchPreviewData;
+  modulation?: AgentModulationPlan;
 }
 
 export type FeedbackKind = 'like' | 'dislike';
@@ -20,6 +39,7 @@ export interface ChatMessage {
   content: string;
   streaming?: boolean;
   patch?: PatchPreviewData;
+  modulation?: AgentModulationPlan;
   variations?: PatchVariation[];
   feedback?: FeedbackKind;
   rationale?: string;
@@ -33,11 +53,13 @@ export interface ChatMessage {
 // WebSocket wire protocol
 export type WireIncoming =
   | { type: 'token'; content: string }
-  | { type: 'patch'; variation: 'A' | 'B'; data: PatchPreviewData }
+  | { type: 'patch'; variation: 'A' | 'B'; data: PatchPreviewData; modulation?: AgentModulationPlan }
   | { type: 'done' }
   | { type: 'error'; message: string }
   | { type: 'rationale'; text: string }
   | { type: 'suggest_variations'; variations: ProactiveSuggestion[] }
+  | { type: 'patch_update'; patch?: PatchPreviewData; params?: Record<string, number>; modulation?: AgentModulationPlan }
+  | { type: 'transcript'; text: string }
   // Two-step LLM flow — the ENHANCER stage emits the 9-section
   // plain-text sound-design brief that the patch generator then
   // receives instead of the raw prompt. Chat ticker swaps from
@@ -50,6 +72,7 @@ export interface ProactiveSuggestion {
   label: string;
   description: string;
   patch: PatchPreviewData;
+  modulation?: AgentModulationPlan;
 }
 
 export type WireOutgoing =

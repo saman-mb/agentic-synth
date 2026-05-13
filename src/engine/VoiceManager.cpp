@@ -198,7 +198,10 @@ void Voice::renderStereo(float portamentoAlpha, float baseCutoffHz, float resona
     float weightTotal = 0.0f;
     for (std::size_t i = 0; i < oscs.size(); ++i) {
         const auto& po = oscs[i];
-        if (!po.enabled)
+        // Producer-friendly: treat a non-trivial volume as enabled even when
+        // the explicit flag is false. Otherwise users who turn up OSC2/OSC3
+        // volume hear nothing because makeDefaultPatch ships them disabled.
+        if (!po.enabled && po.volume < 0.001f)
             continue;
         float pPan = po.pan + pan; // voice-level pan stacks with per-osc pan
         pPan += lfoPanMod;
@@ -229,7 +232,8 @@ void Voice::renderStereo(float portamentoAlpha, float baseCutoffHz, float resona
     float monoMix = 0.0f;
     for (std::size_t i = 0; i < oscs.size(); ++i) {
         auto& o = oscs[i];
-        if (!o.enabled)
+        // Match the pan-weight loop: volume > 0 implies user wants the osc.
+        if (!o.enabled && o.volume < 0.001f)
             continue;
 
         const float perOscFreq = voiceFreq * oscFrequencyMultiplier(o.semitoneOffset, o.detuneCents);

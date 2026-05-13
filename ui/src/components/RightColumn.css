@@ -138,6 +138,19 @@
   min-height: 0;
 }
 
+/* Chat-only right column variant: the prompt dock fills 100% vertically
+   because Visualiser + Mod Matrix moved into the centre ModulesGrid. */
+.right-column-chat-only {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+.rc-prompt-dock-full {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: 100%;
+}
+
 /* ── Mod matrix placeholder ──────────────────────────────────────── */
 
 .rc-modmatrix {
