@@ -1,0 +1,59 @@
+/* ── ResizeHandle ────────────────────────────────────────────────────
+   Thin vertical drag bar between columns of .app-body. The hit target
+   is 6px wide for ergonomic dragging, but the visible hairline only
+   shows on hover/active — at rest the handle is invisible so it doesn't
+   add visual clutter to the layout. */
+
+.resize-handle {
+  position: relative;
+  width: 6px;
+  flex: 0 0 6px;
+  cursor: col-resize;
+  background: transparent;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  user-select: none;
+  touch-action: none;
+  z-index: 5;
+  transition: background var(--dur-micro, 180ms) var(--ease-considered, ease);
+}
+
+.resize-handle:hover {
+  background: var(--accent-tint-12, rgba(124, 77, 255, 0.12));
+}
+
+.resize-handle.is-active {
+  background: var(--accent-tint-18, rgba(124, 77, 255, 0.18));
+}
+
+.resize-handle-line {
+  display: block;
+  width: 1px;
+  margin: 6px 0;
+  background: transparent;
+  border-radius: 1px;
+  transition: background var(--dur-micro, 180ms) var(--ease-considered, ease);
+}
+
+.resize-handle:hover .resize-handle-line,
+.resize-handle.is-active .resize-handle-line {
+  background: var(--accent-primary, #7C4DFF);
+  box-shadow: 0 0 6px var(--accent-glow, rgba(124, 77, 255, 0.45));
+}
+
+/* Accessibility: visible focus ring if the handle ever picks up keyboard
+   focus (it's tabIndex=-1 today, but role="separator" + future keyboard
+   nudge support could enable it). */
+.resize-handle:focus-visible .resize-handle-line {
+  background: var(--accent-primary, #7C4DFF);
+  outline: 2px solid var(--color-focus-ring, var(--accent-primary, #7C4DFF));
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .resize-handle,
+  .resize-handle-line {
+    transition: none;
+  }
+}

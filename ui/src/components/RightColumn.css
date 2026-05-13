@@ -8,7 +8,9 @@
    the existing component as-is. */
 
 .right-column {
-  grid-column: 3;
+  /* Track 5 in .app-body's 5-column layout
+     (sidebar | handle | modules | handle | right). */
+  grid-column: 5;
   display: flex;
   flex-direction: column;
   gap: var(--sp-2);
@@ -83,10 +85,14 @@
 
 /* ── Visualiser placeholder ──────────────────────────────────────── */
 
+/* Visualiser claims a fixed slot at the top; the chat dock below
+   flex-grows to consume the rest of the vertical space. Keep a
+   reasonable cap so the visualiser stays in proportion when the
+   right column is dragged very tall. */
 .rc-visualizer {
   flex: 0 0 auto;
-  min-height: 220px;
-  max-height: 280px;
+  min-height: 200px;
+  max-height: 260px;
 }
 
 .rc-visualizer-well {
@@ -115,9 +121,12 @@
 /* ── AI prompt dock ──────────────────────────────────────────────── */
 
 .rc-prompt-dock {
+  /* Chat dock is the dominant section of the right column — it grows
+     to fill all vertical space left over by the visualiser (above) and
+     mod matrix (below). No more 420px cap: agent bubbles + textarea
+     get all the room they can use. */
   flex: 1 1 auto;
-  min-height: 280px;
-  max-height: 420px;
+  min-height: 320px;
   overflow: hidden;
   /* ChatInterface lays itself out as a flex column; let it own its
      interior. We just need a border-radius clip so its children don't

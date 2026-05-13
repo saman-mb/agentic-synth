@@ -1,5 +1,6 @@
 #include "agent/PromptHandler.h"
 
+#include <iostream>
 #include <sstream>
 
 #include "agent/KnobBridge.h"
@@ -20,10 +21,31 @@ PatchStruct PromptHandler::submitPrompt(const std::string& prompt) {
 void PromptHandler::refinePatch(const PatchStruct& llmPatch) { pipeline_.refinePatch(llmPatch); }
 
 std::optional<PatchStruct> PromptHandler::generateLlmPatch(const std::string& prompt, uint32_t patch_id) {
+    // Try the local llama.cpp /completion server first; on failure (server
+    // not running, connect refused, malformed response) fall back to the
+    // Gemini API when a GEMINI_KEY was discovered at startup. Both paths
+    // share GrammarSampler::parse_patch_json + validate_patch so the
+    // resulting PatchStruct is uniformly safe to refine into the pipeline.
     auto result = sampler_.generate(prompt, patch_id);
-    if (result)
+    if (result) {
+        std::cerr << "[PromptHandler] LLM path=local-llama.cpp ok\n";
         refinePatch(*result);
-    return result;
+        return result;
+    }
+
+    if (gemini_.enabled()) {
+        std::cerr << "[PromptHandler] local llama.cpp unavailable; trying Gemini fallback\n";
+        result = gemini_.generate(prompt, patch_id);
+        if (result) {
+            std::cerr << "[PromptHandler] LLM path=gemini ok\n";
+            refinePatch(*result);
+            return result;
+        }
+        std::cerr << "[PromptHandler] LLM path=gemini failed; no patch produced\n";
+    } else {
+        std::cerr << "[PromptHandler] local llama.cpp unavailable and GEMINI_KEY unset; no patch produced\n";
+    }
+    return std::nullopt;
 }
 
 void PromptHandler::feedChunk(std::string_view chunk) { streamParser_.feedChunk(chunk); }

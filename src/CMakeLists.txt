@@ -3,6 +3,8 @@
 add_library(agentic_synth_mapper STATIC
     mapper/HeuristicParser.cpp
     mapper/GrammarSampler.cpp
+    mapper/GeminiSampler.cpp
+    mapper/EnvLoader.cpp
     mapper/SemanticMapper.cpp
 )
 target_include_directories(agentic_synth_mapper PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")

@@ -11,9 +11,11 @@ import {
   saveStarred,
 } from './components/PatchBrowser';
 import { PresetsSidebar } from './components/PresetsSidebar';
+import { ResizeHandle } from './components/ResizeHandle';
 import { RightColumn } from './components/RightColumn';
 import { ToolsDrawer } from './components/ToolsDrawer';
 import { TopBar, ABSlot } from './components/TopBar';
+import { useColumnLayout } from './hooks/useColumnLayout';
 import { useWebSocket } from './hooks/useWebSocket';
 import { usePatchHistory } from './hooks/usePatchHistory';
 import { useUiAudioSettings } from './hooks/useUiAudioSettings';
@@ -853,6 +855,11 @@ export function App() {
   // user knows their click will actually trigger a note. WebSocket.OPEN === 1.
   const auditionReady = readyState === 1;
 
+  // ── Column layout (Phase 14 — drag-to-resize) ─────────────────────
+  // Drives .app-body's grid template via CSS vars on the host node.
+  // Widths persist to localStorage and survive reloads.
+  const cols = useColumnLayout();
+
   return (
     <div className="app-layout">
       {splashVisible ? <BootSplash onDone={() => setSplashVisible(false)} /> : null}
@@ -879,13 +886,19 @@ export function App() {
         onMacroRename={handleMacroRename}
       />
 
-      <div className="app-body">
+      <div className="app-body" ref={cols.bindHost}>
         <PresetsSidebar
           currentPatch={patch}
           onLoadPreset={handleLoadPreset}
           onAuditionStart={auditionPreset}
           onAuditionEnd={cancelAudition}
           onAuditionCommit={commitAudition}
+        />
+        <ResizeHandle
+          ariaLabel="Resize presets sidebar"
+          side="left"
+          currentPx={cols.leftPx}
+          onResize={cols.setLeftPx}
         />
         <ModulesGrid
           patch={patch}
@@ -895,6 +908,12 @@ export function App() {
           modMatrix={modMatrix}
           onAssignMod={handleAssignMod}
           spinToken={spinToken}
+        />
+        <ResizeHandle
+          ariaLabel="Resize right column"
+          side="right"
+          currentPx={cols.rightPx}
+          onResize={cols.setRightPx}
         />
         <RightColumn
           externalTranscript={transcript}
