@@ -3,6 +3,7 @@ import './App.css';
 import { AuditionKeyboard } from './components/AuditionKeyboard';
 import { BootSplash } from './components/BootSplash';
 import { makeDefaultPatch, PatchParams } from './components/KnobGrid';
+import { MacroBar, MacroState } from './components/MacroBar';
 import { ModulesGrid } from './components/ModulesGrid';
 import {
   BrowserEntry,
@@ -12,7 +13,7 @@ import {
 import { PresetsSidebar } from './components/PresetsSidebar';
 import { RightColumn } from './components/RightColumn';
 import { ToolsDrawer } from './components/ToolsDrawer';
-import { TopBar } from './components/TopBar';
+import { TopBar, ABSlot } from './components/TopBar';
 import { useWebSocket } from './hooks/useWebSocket';
 import { usePatchHistory } from './hooks/usePatchHistory';
 import type { PatchPreviewData } from './types/chat';
@@ -141,6 +142,35 @@ export function App() {
   // ToolsDrawer (Dictionary / Telemetry / History — opened via gear icon).
   const [toolsOpen, setToolsOpen] = useState<boolean>(false);
   const [toolsTab, setToolsTab] = useState<DrawerTab>('dictionary');
+
+  // A/B compare slots (Phase 6). Both seed from the current patch. The
+  // "inactive" slot stores a frozen snapshot of what that slot looked
+  // like last time we switched away from it. Switching slots writes the
+  // current patch into the previously-active slot, then loads the newly-
+  // active slot via the standard agent-batch path (so it lands on knobs,
+  // bridge, AND history). Slots are session-local — not persisted.
+  const [activeSlot, setActiveSlot] = useState<ABSlot>('A');
+  const [inactiveSlotPatch, setInactiveSlotPatch] = useState<PatchParams>(
+    () => makeDefaultPatch(),
+  );
+
+  // Macros (Phase 6 — visual + rename). Routing to params is deferred
+  // to Phase 8 (mod matrix). 0..1 normalized values; names persist via
+  // localStorage so user rename survives reloads.
+  const MACRO_NAMES_KEY = 'timbre:macro-names';
+  const [macros, setMacros] = useState<MacroState[]>(() => {
+    let names: string[] = ['Macro 1', 'Macro 2', 'Macro 3', 'Macro 4'];
+    try {
+      const raw = window.localStorage.getItem(MACRO_NAMES_KEY);
+      if (raw) {
+        const parsed = JSON.parse(raw) as string[];
+        if (Array.isArray(parsed) && parsed.length === 4) names = parsed;
+      }
+    } catch {
+      // ignore
+    }
+    return names.map((label) => ({ label, value: 0 }));
+  });
 
   // Apply theme to <html data-theme="..."> on every change so all CSS custom
   // properties switch atomically. No persistence on mount — only on explicit
@@ -320,6 +350,107 @@ export function App() {
     [sendBinary],
   );
 
+  // ── Preset load (Phase 6) ──────────────────────────────────────────
+  // Sidebar hands us a full PatchParams. Diff against current to forward
+  // only the changed knobs over the WS bridge, then push as a 'preset'
+  // entry so undo/redo and history capture work uniformly. Suppress the
+  // browser-capture so we don't snapshot the recall itself.
+  const handleLoadPreset = useCallback(
+    (next: PatchParams) => {
+      const diff = diffPatch(patch, next);
+      if (Object.keys(diff).length === 0) return;
+      let nextPatch = patch;
+      for (const [p, v] of Object.entries(diff)) {
+        nextPatch = applyParamToPatch(nextPatch, p, v);
+      }
+      suppressCaptureRef.current = true;
+      ph.push(nextPatch, 'preset');
+      for (const [p, v] of Object.entries(diff)) {
+        sendMessage(JSON.stringify({ type: 'knob_tweak', param: p, value: v }));
+      }
+    },
+    [patch, ph, sendMessage],
+  );
+
+  // ── A/B slot switching (Phase 6) ───────────────────────────────────
+  // Pattern: when toggling, snapshot the current patch into the "leaving"
+  // slot, then load the "entering" slot via the same diff+push path. The
+  // shared history continues to track everything as a 'preset' entry
+  // (semantically: a slot recall *is* a preset recall).
+  const switchSlot = useCallback(
+    (target: ABSlot) => {
+      if (target === activeSlot) return;
+      const cur = patch;
+      const incoming = inactiveSlotPatch;
+      setInactiveSlotPatch(cur);
+      setActiveSlot(target);
+      // Load the incoming slot's patch. Diff vs current and push.
+      const diff = diffPatch(cur, incoming);
+      if (Object.keys(diff).length === 0) return;
+      let nextPatch = cur;
+      for (const [p, v] of Object.entries(diff)) {
+        nextPatch = applyParamToPatch(nextPatch, p, v);
+      }
+      suppressCaptureRef.current = true;
+      ph.push(nextPatch, 'preset');
+      for (const [p, v] of Object.entries(diff)) {
+        sendMessage(JSON.stringify({ type: 'knob_tweak', param: p, value: v }));
+      }
+    },
+    [activeSlot, inactiveSlotPatch, patch, ph, sendMessage],
+  );
+
+  // Copy active slot's patch into the inactive slot.
+  const handleCopySlot = useCallback(() => {
+    setInactiveSlotPatch(JSON.parse(JSON.stringify(patch)) as PatchParams);
+  }, [patch]);
+
+  // Spacebar toggles A/B (skip when an editable target has focus).
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.code !== 'Space' && e.key !== ' ') return;
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+      e.preventDefault();
+      switchSlot(activeSlot === 'A' ? 'B' : 'A');
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [activeSlot, switchSlot]);
+
+  // ── Macros (Phase 6) ───────────────────────────────────────────────
+  // Visual + rename only. Modulation routing lands with the mod matrix
+  // in Phase 8 (macros project onto assigned param targets via depth +
+  // polarity). Persist label changes so renames survive page reloads.
+  const handleMacroChange = useCallback((index: number, value: number) => {
+    setMacros((prev) => {
+      const next = prev.slice();
+      next[index] = { ...next[index], value };
+      return next;
+    });
+    // TODO Phase 8: forward macro value to mod-matrix routing — for each
+    // (param, depth, polarity) target assigned to this macro, emit a
+    // knob_tweak frame applying the projection.
+  }, []);
+
+  const handleMacroRename = useCallback((index: number, label: string) => {
+    setMacros((prev) => {
+      const next = prev.slice();
+      next[index] = { ...next[index], label };
+      try {
+        window.localStorage.setItem(
+          MACRO_NAMES_KEY,
+          JSON.stringify(next.map((m) => m.label)),
+        );
+      } catch {
+        // ignore
+      }
+      return next;
+    });
+  }, []);
+
   // Propagate a rolled-back patch to the C++ engine: diff against the patch
   // we were just on and forward each changed param as a knob_tweak frame.
   const propagateRollback = useCallback(
@@ -381,10 +512,22 @@ export function App() {
         theme={theme}
         onToggleTheme={toggleTheme}
         onOpenTools={() => setToolsOpen(true)}
+        activeSlot={activeSlot}
+        onSelectSlot={switchSlot}
+        onCopySlot={handleCopySlot}
+      />
+
+      <MacroBar
+        macros={macros}
+        onMacroChange={handleMacroChange}
+        onMacroRename={handleMacroRename}
       />
 
       <div className="app-body">
-        <PresetsSidebar />
+        <PresetsSidebar
+          currentPatch={patch}
+          onLoadPreset={handleLoadPreset}
+        />
         <ModulesGrid
           patch={patch}
           agentKeys={lastAgentEditBatch}

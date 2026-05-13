@@ -1,0 +1,79 @@
+/* ── MacroBar (Phase 6) ─────────────────────────────────────────────
+   Thin strip between TopBar (48px) and the body grid. Hosts four large
+   (72px) macro knobs with editable labels. */
+
+.macro-bar {
+  grid-row: 2;
+  display: flex;
+  align-items: center;
+  gap: var(--sp-6);
+  padding: var(--sp-2) var(--sp-3);
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--color-border);
+  user-select: none;
+  flex-shrink: 0;
+}
+
+.macro-bar-heading {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  padding-right: var(--sp-3);
+  border-right: 1px solid var(--color-border);
+  align-self: stretch;
+  display: flex;
+  align-items: center;
+}
+
+.macro-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+
+.macro-label {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: text;
+  padding: 2px var(--sp-1);
+  border-radius: var(--r-1);
+  transition: background var(--dur-micro) var(--ease-considered),
+              color var(--dur-micro) var(--ease-considered);
+}
+
+.macro-label:hover {
+  background: var(--fill-medium);
+  color: var(--text-accent);
+}
+
+.macro-label-input {
+  background: var(--bg-inset);
+  border: 1px solid var(--accent-tint-40);
+  border-radius: var(--r-1);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 2px var(--sp-1);
+  width: 80px;
+  text-align: center;
+  box-shadow: var(--depth-inset);
+}
+
+.macro-label-input:focus {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 8px var(--accent-glow);
+}

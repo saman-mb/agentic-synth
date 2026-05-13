@@ -1,18 +1,15 @@
 import React from 'react';
 import './TopBar.css';
 
-// ── TopBar (Phase 4) ─────────────────────────────────────────────────
+// ── TopBar (Phase 6) ─────────────────────────────────────────────────
 //
-// Fixed-height (48px) chrome strip at the top of the TIMBRE layout.
-// Hosts: wordmark, preset selector (Phase 6 placeholder), A/B compare
-// (Phase 6 placeholder), inline undo/redo (wired to usePatchHistory in
-// App.tsx), CPU/MIDI/OUT meters (Phase 5 placeholders), and the gear
-// icon that opens ToolsDrawer (Dictionary / Telemetry / History).
-//
-// Only Undo/Redo + Theme + gear are functional today; everything else
-// is presentational scaffolding the later phases will hydrate.
+// Fixed 48px chrome strip. Hosts: wordmark, preset selector (still
+// placeholder — the live preset browser lives in PresetsSidebar), A/B
+// compare (Phase 6, wired), inline undo/redo, CPU/MIDI/OUT meters
+// (Phase 5 placeholders), and the gear icon that opens ToolsDrawer.
 
 type Theme = 'dark' | 'light';
+export type ABSlot = 'A' | 'B';
 
 interface TopBarProps {
   onUndo: () => void;
@@ -24,6 +21,9 @@ interface TopBarProps {
   theme: Theme;
   onToggleTheme: () => void;
   onOpenTools: () => void;
+  activeSlot: ABSlot;
+  onSelectSlot: (slot: ABSlot) => void;
+  onCopySlot: () => void;
 }
 
 export function TopBar({
@@ -36,6 +36,9 @@ export function TopBar({
   theme,
   onToggleTheme,
   onOpenTools,
+  activeSlot,
+  onSelectSlot,
+  onCopySlot,
 }: TopBarProps) {
   return (
     <header className="topbar" role="banner">
@@ -44,7 +47,7 @@ export function TopBar({
         <span className="topbar-wordmark" aria-label="TIMBRE">TIMBRE</span>
       </div>
 
-      {/* Center-left: preset selector (placeholder — Phase 6) */}
+      {/* Center-left: preset selector (placeholder — live browser is in sidebar) */}
       <div className="topbar-section topbar-preset" aria-label="Preset selector">
         <button type="button" className="topbar-preset-arrow" aria-label="Previous preset" disabled>‹</button>
         <button type="button" className="topbar-preset-dropdown" aria-haspopup="listbox" disabled>
@@ -54,11 +57,35 @@ export function TopBar({
         <button type="button" className="topbar-preset-arrow" aria-label="Next preset" disabled>›</button>
       </div>
 
-      {/* Center: A/B compare (placeholder — Phase 6) */}
+      {/* Center: A/B compare (wired — Phase 6) */}
       <div className="topbar-section topbar-ab" role="group" aria-label="A/B compare">
-        <button type="button" className="topbar-ab-seg topbar-ab-seg-active" aria-pressed="true" disabled>A</button>
-        <button type="button" className="topbar-ab-copy" aria-label="Copy A to B" title="Copy A → B" disabled>→</button>
-        <button type="button" className="topbar-ab-seg" aria-pressed="false" disabled>B</button>
+        <button
+          type="button"
+          className={`topbar-ab-seg${activeSlot === 'A' ? ' topbar-ab-seg-active' : ''}`}
+          aria-pressed={activeSlot === 'A'}
+          onClick={() => onSelectSlot('A')}
+          title="Slot A (Space to toggle)"
+        >
+          A
+        </button>
+        <button
+          type="button"
+          className="topbar-ab-copy"
+          aria-label={`Copy slot ${activeSlot} to ${activeSlot === 'A' ? 'B' : 'A'}`}
+          title={`Copy ${activeSlot} → ${activeSlot === 'A' ? 'B' : 'A'}`}
+          onClick={onCopySlot}
+        >
+          {activeSlot === 'A' ? '→' : '←'}
+        </button>
+        <button
+          type="button"
+          className={`topbar-ab-seg${activeSlot === 'B' ? ' topbar-ab-seg-active' : ''}`}
+          aria-pressed={activeSlot === 'B'}
+          onClick={() => onSelectSlot('B')}
+          title="Slot B (Space to toggle)"
+        >
+          B
+        </button>
       </div>
 
       {/* Center-right: undo/redo (functional) */}
