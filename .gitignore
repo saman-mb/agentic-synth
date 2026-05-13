@@ -58,3 +58,8 @@ scripts/
 
 # Editor / temp backups
 *.bak
+
+# Secrets
+.env
+.env.local
+.env.*.local

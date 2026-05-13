@@ -167,6 +167,8 @@ juce_add_gui_app(AgenticSynth
     COMPANY_WEBSITE "https://nousresearch.com"
     COMPANY_EMAIL "hello@nousresearch.com"
     COMPANY_COPYRIGHT "© 2024 Nous Research"
+    ICON_BIG      "${CMAKE_SOURCE_DIR}/design/timbre.iconset/icon_512x512.png"
+    ICON_SMALL    "${CMAKE_SOURCE_DIR}/design/timbre.iconset/icon_128x128.png"
 )
 
 juce_generate_juce_header(AgenticSynth)
@@ -220,6 +222,8 @@ juce_add_plugin(AgenticSynth_Plugin
     NEEDS_MIDI_OUTPUT       FALSE
     FORMATS                 VST3 AU Standalone
     PRODUCT_NAME             "TIMBRE"
+    ICON_BIG                 "${CMAKE_SOURCE_DIR}/design/timbre.iconset/icon_512x512.png"
+    ICON_SMALL               "${CMAKE_SOURCE_DIR}/design/timbre.iconset/icon_128x128.png"
 )
 
 juce_generate_juce_header(AgenticSynth_Plugin)

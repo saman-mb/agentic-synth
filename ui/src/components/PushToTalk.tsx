@@ -27,23 +27,33 @@ const MIC_FAILURE_COPY: Record<MicFailure, string> = {
 };
 
 function openSystemSettings() {
-  // Best-effort: only macOS handles the x-apple URI scheme. On other
-  // platforms (and when running in a browser, not the plugin WebView),
-  // the navigation will silently fail. Log so devs can debug; never
-  // surface the failure to the user.
+  // Phase 15 fix: window.open(..., '_self') navigates the WKWebView itself
+  // to x-apple: which the WebView can't handle ("unsupported URL" → fallback
+  // page). Route through the native bridge so juce::URL → NSWorkspace handles
+  // the URL with the OS. Falls back silently when no bridge (browser/dev).
+  const isMac =
+    typeof navigator !== 'undefined' &&
+    /Mac/i.test(navigator.platform || navigator.userAgent || '');
+  const url = isMac
+    ? 'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone'
+    : '';
+  if (!url) {
+    // eslint-disable-next-line no-console
+    console.info('[TIMBRE] Open Settings: please enable microphone access.');
+    return;
+  }
+  const juce = (window as unknown as { __JUCE__?: { backend?: { emitEvent?: (n: string, p: unknown) => void } } }).__JUCE__;
+  if (juce?.backend?.emitEvent) {
+    juce.backend.emitEvent('__juce__invoke', {
+      name: 'open_external_url',
+      params: [url],
+      resultId: 0,
+    });
+    return;
+  }
+  // Browser/dev fallback (not in JUCE WebView): open in new tab.
   try {
-    const isMac =
-      typeof navigator !== 'undefined' &&
-      /Mac/i.test(navigator.platform || navigator.userAgent || '');
-    if (isMac) {
-      window.open(
-        'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone',
-        '_self',
-      );
-    } else {
-      // eslint-disable-next-line no-console
-      console.info('[TIMBRE] Open Settings: please enable microphone access.');
-    }
+    window.open(url, '_blank', 'noopener');
   } catch (e) {
     // eslint-disable-next-line no-console
     console.info('[TIMBRE] Open Settings failed silently:', e);
@@ -203,7 +213,7 @@ export function PushToTalk({ onData, wsReady }: PushToTalkProps) {
     : 'Hold to speak';
 
   return (
-    <>
+    <div className="ptt-host">
       <button
         type="button"
         className={`ptt-btn${state === 'recording' ? ' ptt-active' : ''}${isMicFailure ? ' ptt-mic-off' : ''}`}
@@ -240,6 +250,6 @@ export function PushToTalk({ onData, wsReady }: PushToTalkProps) {
           )}
         </div>
       )}
-    </>
+    </div>
   );
 }

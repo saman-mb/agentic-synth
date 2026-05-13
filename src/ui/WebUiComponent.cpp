@@ -474,6 +474,21 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
         });
 
     options = options.withNativeFunction(
+        juce::Identifier{"open_external_url"},
+        [](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
+            // Phase 15 fix: window.open('x-apple.systempreferences:…', '_self')
+            // navigates the WKWebView itself to a scheme it can't handle →
+            // "unsupported URL" fallback page. Route external URLs through
+            // juce::URL which uses NSWorkspace on macOS / ShellExecute on
+            // Windows / xdg-open on Linux — handles app: + custom schemes.
+            const auto urlStr = args.size() > 0 ? args.getReference(0).toString() : juce::String{};
+            if (urlStr.isNotEmpty()) {
+                juce::URL(urlStr).launchInDefaultBrowser();
+            }
+            completion(juce::var{});
+        });
+
+    options = options.withNativeFunction(
         juce::Identifier{"push_audio_pcm"}, [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
             // Perf hotspot fix: JS now sends a single base64-encoded Int16
             // PCM string instead of a juce::Array<juce::var> of doubles.
