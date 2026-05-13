@@ -161,7 +161,7 @@ juce_add_binary_data(agentic_synth_ui_assets
 add_dependencies(agentic_synth_ui_assets agentic_synth_ui)
 
 juce_add_gui_app(AgenticSynth
-    PRODUCT_NAME "Agentic Synth"
+    PRODUCT_NAME "TIMBRE"
     VERSION       ${PROJECT_VERSION}
     COMPANY_NAME  "Nous Research"
     COMPANY_WEBSITE "https://nousresearch.com"
@@ -187,7 +187,7 @@ target_compile_definitions(AgenticSynth
         JUCE_APPLICATION_NAME_STRING="$<TARGET_PROPERTY:AgenticSynth,JUCE_PRODUCT_NAME>"
         JUCE_APPLICATION_VERSION_STRING="$<TARGET_PROPERTY:AgenticSynth,JUCE_VERSION>"
         AGENTIC_SYNTH_UI_DEV=$<BOOL:${AGENTIC_SYNTH_UI_DEV}>
-        AGENTIC_SYNTH_PROJECT_NAME="Agentic Synth"
+        AGENTIC_SYNTH_PROJECT_NAME="TIMBRE"
         AGENTIC_SYNTH_VERSION_STRING="${PROJECT_VERSION}"
 )
 
@@ -205,11 +205,11 @@ target_link_libraries(AgenticSynth
 
 # ── Plugin (shared code) ─────────────────────────────────────────────────────
 juce_add_plugin(AgenticSynth_Plugin
-    PRODUCT_NAME            "Agentic Synth"
+    PRODUCT_NAME            "TIMBRE"
     VERSION                 ${PROJECT_VERSION}
     PLUGIN_MANUFACTURER_CODE Nous
     PLUGIN_CODE             AgSy
-    PLUGIN_NAME             "Agentic Synth"
+    PLUGIN_NAME             "TIMBRE"
     COMPANY_NAME            "Nous Research"
     COMPANY_WEBSITE         "https://nousresearch.com"
     COMPANY_EMAIL           "hello@nousresearch.com"
@@ -219,7 +219,7 @@ juce_add_plugin(AgenticSynth_Plugin
     NEEDS_MIDI_INPUT        TRUE
     NEEDS_MIDI_OUTPUT       FALSE
     FORMATS                 VST3 AU Standalone
-    PRODUCT_NAME             "Agentic Synth"
+    PRODUCT_NAME             "TIMBRE"
 )
 
 juce_generate_juce_header(AgenticSynth_Plugin)
@@ -240,7 +240,7 @@ target_compile_definitions(AgenticSynth_Plugin
         JUCE_USE_CURL=0
         JUCE_VST3_CAN_REPLACE_VST2=0
         AGENTIC_SYNTH_UI_DEV=$<BOOL:${AGENTIC_SYNTH_UI_DEV}>
-        AGENTIC_SYNTH_PROJECT_NAME="Agentic Synth"
+        AGENTIC_SYNTH_PROJECT_NAME="TIMBRE"
         AGENTIC_SYNTH_VERSION_STRING="${PROJECT_VERSION}"
 )
 

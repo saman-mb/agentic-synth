@@ -619,7 +619,7 @@ juce::AudioProcessorEditor* AgenticSynthPlugin::createEditor() { return new Agen
 bool AgenticSynthPlugin::hasEditor() const { return true; }
 
 //==============================================================================
-const juce::String AgenticSynthPlugin::getName() const { return "Agentic Synth"; }
+const juce::String AgenticSynthPlugin::getName() const { return "TIMBRE"; }
 
 bool AgenticSynthPlugin::acceptsMidi() const { return true; }
 bool AgenticSynthPlugin::producesMidi() const { return false; }
