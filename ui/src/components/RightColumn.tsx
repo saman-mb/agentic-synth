@@ -23,6 +23,7 @@ interface RightColumnProps {
   onUpdateConnection: (id: string, patch: Partial<ModConnection>) => void;
   onDeleteConnection: (id: string) => void;
   onAddConnection: (source: ModSourceId, destination: string) => void;
+  onRtfmEasterEgg?: () => void;
 }
 
 export function RightColumn({
@@ -33,6 +34,7 @@ export function RightColumn({
   onUpdateConnection,
   onDeleteConnection,
   onAddConnection,
+  onRtfmEasterEgg,
 }: RightColumnProps) {
   return (
     <aside className="right-column" aria-label="Visualiser, AI prompt, and modulation">
@@ -47,6 +49,7 @@ export function RightColumn({
           externalTranscript={externalTranscript}
           onAudio={onAudio}
           onSelectVariation={onSelectVariation}
+          onRtfmEasterEgg={onRtfmEasterEgg}
         />
       </section>
 

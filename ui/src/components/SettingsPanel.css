@@ -1,0 +1,107 @@
+.settings-panel {
+  padding: 1.25rem 1.5rem;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+}
+
+.settings-panel-header {
+  margin-bottom: 1.25rem;
+}
+
+.settings-panel-title {
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  margin: 0 0 0.35rem 0;
+  color: var(--text-primary);
+}
+
+.settings-panel-subtitle {
+  margin: 0;
+  font-size: 0.82rem;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+.settings-group {
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  padding-top: 1rem;
+  margin-top: 0.25rem;
+}
+
+.settings-group-title {
+  font-size: 0.72rem;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  margin: 0 0 0.75rem 0;
+  font-weight: 500;
+}
+
+.settings-row {
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  align-items: start;
+  gap: 0.85rem;
+  padding: 0.6rem 0;
+  border-top: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.settings-row:first-of-type {
+  border-top: none;
+}
+
+.settings-row input[type='checkbox'] {
+  margin-top: 0.2rem;
+  accent-color: var(--accent-primary);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.settings-row-text {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+}
+
+.settings-row-label {
+  font-size: 0.88rem;
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+.settings-row-desc {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+.settings-row-preview {
+  align-self: center;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-secondary);
+  padding: 0.3rem 0.7rem;
+  border-radius: 4px;
+  font-size: 0.72rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease;
+  font-family: var(--font-sans);
+}
+
+.settings-row-preview:hover,
+.settings-row-preview:focus-visible {
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+  outline: none;
+}
+
+.settings-row-preview:focus-visible {
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}

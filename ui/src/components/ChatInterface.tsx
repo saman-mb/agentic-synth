@@ -125,6 +125,25 @@ function MessageBubble({
 }: BubbleProps) {
   const hasContent = message.role === 'assistant';
   const bubbleTextClass = `bubble-text${submittedFlash ? ' prompt-submitted' : ''}`;
+
+  // Phase 10 §16 — `sudo make me a sound` easter egg renders as a
+  // green-on-black CRT terminal block. Bypasses feedback / patch / cursor.
+  if (message.terminal) {
+    return (
+      <article
+        className={`message-bubble ${message.role} terminal-bubble`}
+        aria-label="RTFM terminal output"
+      >
+        <div className="bubble-role">Agent</div>
+        <pre className="terminal-message" aria-live="polite">
+          {(message.terminalLines ?? []).map((line, i) => (
+            <span key={i} className="terminal-line">{line}</span>
+          ))}
+        </pre>
+      </article>
+    );
+  }
+
   return (
     <article
       className={`message-bubble ${message.role}`}
@@ -294,9 +313,13 @@ interface ChatInterfaceProps {
   externalTranscript?: string;
   onAudio?: (buf: ArrayBuffer) => void;
   onSelectVariation?: (patch: PatchPreviewData) => void;
+  // Phase 10 §16 — `sudo make me a sound` easter egg. The chat detects
+  // the prompt locally (no bridge round-trip) and asks App to load the
+  // hardcoded RTFM patch. Optional so existing callers stay unchanged.
+  onRtfmEasterEgg?: () => void;
 }
 
-export function ChatInterface({ externalTranscript, onAudio, onSelectVariation }: ChatInterfaceProps = {}) {
+export function ChatInterface({ externalTranscript, onAudio, onSelectVariation, onRtfmEasterEgg }: ChatInterfaceProps = {}) {
   const inputId = useId();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [inputValue, setInputValue] = useState('');
@@ -457,6 +480,36 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation }
       return;
     }
 
+    // Phase 10 §16 — `sudo make me a sound` easter egg. Match
+    // case-insensitively against the trimmed prompt. We do NOT round-trip
+    // through the bridge: render a terminal-styled assistant block in the
+    // chat and ask App to load the hardcoded RTFM FM patch.
+    if (prompt.toLowerCase() === 'sudo make me a sound') {
+      const userMsg: ChatMessage = { id: nanoid(), role: 'user', content: prompt };
+      const terminalMsg: ChatMessage = {
+        id: nanoid(),
+        role: 'assistant',
+        content: '',
+        terminal: true,
+        terminalLines: [
+          '> initializing FM patch...',
+          '> tuning carrier 220Hz...',
+          '> sourcing modulator at ratio 3.14...',
+          '> RTFM.',
+        ],
+      };
+      setMessages((prev) => [...prev, userMsg, terminalMsg]);
+      setInputValue('');
+      setSubmittedFlashId(userMsg.id);
+      window.setTimeout(() => {
+        setSubmittedFlashId((cur) => (cur === userMsg.id ? null : cur));
+      }, 800);
+      setSendPulse(true);
+      window.setTimeout(() => setSendPulse(false), 100);
+      if (onRtfmEasterEgg) onRtfmEasterEgg();
+      return;
+    }
+
     const userMsg: ChatMessage = {
       id: nanoid(),
       role: 'user',
@@ -502,7 +555,7 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation }
         setNetworkFailure({ prompt, countdown: 5 });
       }, 600);
     }
-  }, [inputValue, isGenerating, send, status]);
+  }, [inputValue, isGenerating, send, status, onRtfmEasterEgg]);
 
   // ── Network failure countdown (Phase 9 §18b) ─────────────────────
   // While networkFailure is non-null, tick the countdown each second.

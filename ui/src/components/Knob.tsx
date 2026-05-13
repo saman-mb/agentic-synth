@@ -48,6 +48,10 @@ export interface KnobProps {
   // progress and the cursor is over this knob, a violet halo appears.
   destinationKey?: string;
   onAssignMod?: (sourceId: string, destinationKey: string) => void;
+  // Phase 10 §16 — when this token increments, the knob runs a one-time
+  // 600ms 360° rotation of the indicator. Synchronized across all knobs
+  // by sharing the same token value from App-level state.
+  spinToken?: number;
 }
 
 // Arc geometry: 270° sweep, starting at 7 o'clock (135° in SVG coords, which
@@ -126,6 +130,7 @@ export function Knob({
   animateDelayMs = 0,
   destinationKey,
   onAssignMod,
+  spinToken,
 }: KnobProps) {
   // ---------------------------------------------------------------------
   // Patch-load lerp
@@ -336,6 +341,28 @@ export function Knob({
     };
   }, [value, agentDriven]);
 
+  // Phase 10 §16 — Option+double-click logo easter egg. When spinToken
+  // increments, run a 600ms 360° rotation on this knob's dial group.
+  // Synchronized across all knobs because they all watch the same token.
+  const [spinning, setSpinning] = useState(false);
+  const spinTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastSpinTokenRef = useRef<number | undefined>(spinToken);
+  useEffect(() => {
+    if (spinToken === undefined) return;
+    if (lastSpinTokenRef.current === spinToken) return;
+    lastSpinTokenRef.current = spinToken;
+    if (spinToken <= 0) return;
+    setSpinning(true);
+    if (spinTimerRef.current) clearTimeout(spinTimerRef.current);
+    spinTimerRef.current = setTimeout(() => setSpinning(false), 620);
+  }, [spinToken]);
+  useEffect(
+    () => () => {
+      if (spinTimerRef.current) clearTimeout(spinTimerRef.current);
+    },
+    [],
+  );
+
   const commit = useCallback(
     (next: number) => {
       onChange(clamp01(next));
@@ -468,6 +495,7 @@ export function Knob({
     modSource ? `knob-mod knob-mod-${modSource}` : '',
     modDragActive ? 'knob-mod-drop-eligible' : '',
     modDragOver ? 'knob-mod-drop-over' : '',
+    spinning ? 'knob-easter-spin' : '',
   ]
     .filter(Boolean)
     .join(' ');

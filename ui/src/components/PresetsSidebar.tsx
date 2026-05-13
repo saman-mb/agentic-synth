@@ -170,6 +170,7 @@ export function PresetsSidebar({ currentPatch, onLoadPreset }: PresetsSidebarPro
               type="button"
               className={`presets-tag${active ? ' presets-tag-active' : ''}`}
               aria-pressed={active}
+              aria-label={`Filter by tag ${t}`}
               onClick={() => toggleTag(t)}
               title={`Filter by ${t}`}
             >

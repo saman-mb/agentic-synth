@@ -24,6 +24,9 @@ interface TopBarProps {
   activeSlot: ABSlot;
   onSelectSlot: (slot: ABSlot) => void;
   onCopySlot: () => void;
+  // Phase 10 §16 — Option+double-click on the wordmark triggers the
+  // one-time synchronized 360° knob spin easter egg. Once per session.
+  onAltDoubleClickLogo?: () => void;
 }
 
 export function TopBar({
@@ -39,6 +42,7 @@ export function TopBar({
   activeSlot,
   onSelectSlot,
   onCopySlot,
+  onAltDoubleClickLogo,
 }: TopBarProps) {
   // Cyan confirmation sweep token for the A/B copy button. Bumped on
   // every copy so consecutive copies retrigger the animation. Cleared
@@ -51,9 +55,17 @@ export function TopBar({
   }, [onCopySlot]);
   return (
     <header className="topbar" role="banner">
-      {/* Left: wordmark */}
+      {/* Left: wordmark — Option+double-click triggers knob-spin easter egg */}
       <div className="topbar-section topbar-left">
-        <span className="topbar-wordmark" aria-label="TIMBRE">TIMBRE</span>
+        <span
+          className="topbar-wordmark"
+          aria-label="TIMBRE"
+          onDoubleClick={(e) => {
+            if (e.altKey && onAltDoubleClickLogo) onAltDoubleClickLogo();
+          }}
+        >
+          TIMBRE
+        </span>
       </div>
 
       {/* Center-left: preset selector (placeholder — live browser is in sidebar) */}
@@ -72,6 +84,7 @@ export function TopBar({
           type="button"
           className={`topbar-ab-seg${activeSlot === 'A' ? ' topbar-ab-seg-active' : ''}`}
           aria-pressed={activeSlot === 'A'}
+          aria-label="Select slot A"
           onClick={() => onSelectSlot('A')}
           title="Slot A (Space to toggle)"
         >
@@ -91,6 +104,7 @@ export function TopBar({
           type="button"
           className={`topbar-ab-seg${activeSlot === 'B' ? ' topbar-ab-seg-active' : ''}`}
           aria-pressed={activeSlot === 'B'}
+          aria-label="Select slot B"
           onClick={() => onSelectSlot('B')}
           title="Slot B (Space to toggle)"
         >
