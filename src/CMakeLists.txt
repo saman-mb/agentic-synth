@@ -4,6 +4,7 @@ add_library(agentic_synth_mapper STATIC
     mapper/HeuristicParser.cpp
     mapper/GrammarSampler.cpp
     mapper/GeminiSampler.cpp
+    mapper/PromptEnhancer.cpp
     mapper/EnvLoader.cpp
     mapper/SemanticMapper.cpp
 )
@@ -13,9 +14,14 @@ agentic_synth_configure_target(agentic_synth_mapper)
 # (src/mapper/system-prompt.md) into the mapper TU so GrammarSampler can
 # find it without relying on cwd. AgentBridge calls
 # GrammarSampler::loadSystemPromptFile() at startup.
+#
+# Same trick for the 2-step enhancer prompt (src/mapper/enhancer-prompt.md):
+# PromptEnhancer::loadEnhancerPromptFile() resolves the bundled translator
+# briefing via AGENTIC_SYNTH_ENHANCER_PROMPT_PATH.
 target_compile_definitions(agentic_synth_mapper
     PRIVATE
         AGENTIC_SYNTH_SYSTEM_PROMPT_PATH="${CMAKE_CURRENT_SOURCE_DIR}/mapper/system-prompt.md"
+        AGENTIC_SYNTH_ENHANCER_PROMPT_PATH="${CMAKE_CURRENT_SOURCE_DIR}/mapper/enhancer-prompt.md"
 )
 # juce::juce_core provides juce::JSON, used by SemanticMapper to replace
 # hand-rolled JSON substring scans (engineering audit; same pattern as

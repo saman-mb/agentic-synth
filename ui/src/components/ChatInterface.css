@@ -504,10 +504,29 @@
   opacity: 1;
 }
 
+/* Brand-voice phase label — HEARING IT OUT during enhancer step,
+   SHAPING once the brief arrives. Inter caps, 10px, wide letter-spacing. */
+.reasoning-label {
+  display: block;
+  font-family: var(--font-display, var(--font-mono));
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  margin-bottom: 4px;
+  opacity: 0.78;
+}
+
 .reasoning-line {
   display: block;
   opacity: 0;
   animation: ticker-line 2100ms var(--ease-considered) forwards;
+  /* Brief lines can run long; keep them on one row and ellipsise. */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 100%;
 }
 
 @keyframes ticker-line {

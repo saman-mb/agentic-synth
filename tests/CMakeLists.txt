@@ -24,6 +24,7 @@ add_executable(agentic_synth_tests
     PrePatchTest.cpp
     VariationEngineTest.cpp
     GrammarSamplerTest.cpp
+    PromptEnhancerTest.cpp
     SemanticMapperTest.cpp
     StreamParserTest.cpp
     # Phase{1,2,3}AcceptanceTest.cpp — pre-existing master breakage (stale

@@ -136,6 +136,7 @@ TEST_CASE("WebUiComponent worker pool does not regress subscriber wiring",
     GuiFixture fix;
     AgentBridge bridge;
     auto component = std::make_unique<WebUiComponent>(bridge);
-    CHECK(component->subscriberCountForTesting() == 8u);
+    // 9 = 8 legacy + 1 enhancement (2-step LLM flow).
+    CHECK(component->subscriberCountForTesting() == 9u);
     component.reset();
 }

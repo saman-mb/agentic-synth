@@ -58,6 +58,29 @@ AgentBridge::AgentBridge() {
         std::cerr << "[AgentBridge] GEMINI_KEY not set; Gemini fallback disabled\n";
     }
 
+    // ── Two-step LLM flow: ENHANCER (translator) step ────────────────────────
+    //
+    // Load the bundled TIMBRE translator briefing (enhancer-prompt.md, ~280
+    // lines, 9 fixed sections, 6 worked examples) and inject it + the same
+    // GEMINI_KEY into the PromptEnhancer. The enhancer rewrites a terse
+    // producer prompt ("dark dubstep wobbly bass") into a 200–400-word
+    // sensory brief that the patch generator (Gemini / Grammar samplers)
+    // receives instead of the raw user prompt. Without a key the enhancer
+    // stays disabled and the worker job falls back to the raw prompt — same
+    // pattern as the gemini_ fallback.
+    auto enhancerPrompt = mapper::PromptEnhancer::loadEnhancerPromptFile();
+    if (!enhancerPrompt.empty()) {
+        enhancer_.setSystemPrompt(std::move(enhancerPrompt));
+    } else {
+        std::cerr << "[AgentBridge] enhancer-prompt.md not found; enhancer will use stub fallback\n";
+    }
+    if (!geminiKey.empty()) {
+        enhancer_.setApiKey(geminiKey);
+        std::cerr << "[AgentBridge] PromptEnhancer enabled\n";
+    } else {
+        std::cerr << "[AgentBridge] PromptEnhancer disabled\n";
+    }
+
     // Wire stream parser: each completed field injects a partial patch
     // directly onto the audio SPSC queue for < 500 ms first-audible-change.
     // Parallel emission to typed subscribers (Phase 2) — used by the
@@ -170,6 +193,9 @@ AgentBridge::SubscriberHandle AgentBridge::onPatchUpdate(Callback cb) {
 AgentBridge::SubscriberHandle AgentBridge::onTranscript(Callback cb) {
     return subscribe(transcriptSlots_, std::move(cb));
 }
+AgentBridge::SubscriberHandle AgentBridge::onEnhancement(Callback cb) {
+    return subscribe(enhancementSlots_, std::move(cb));
+}
 
 void AgentBridge::notifyToken(const juce::var& payload) { dispatch(tokenSlots_, payload); }
 void AgentBridge::notifyPatch(const juce::var& payload) { dispatch(patchSlots_, payload); }
@@ -179,6 +205,9 @@ void AgentBridge::notifyRationale(const juce::var& payload) { dispatch(rationale
 void AgentBridge::notifySuggestVariations(const juce::var& payload) { dispatch(suggestVariationsSlots_, payload); }
 void AgentBridge::notifyPatchUpdate(const juce::var& payload) { dispatch(patchUpdateSlots_, payload); }
 void AgentBridge::notifyTranscript(const juce::var& payload) { dispatch(transcriptSlots_, payload); }
+void AgentBridge::notifyEnhancement(const juce::var& payload) { dispatch(enhancementSlots_, payload); }
+
+std::string AgentBridge::enhancePrompt(const std::string& userPrompt) { return enhancer_.enhance(userPrompt); }
 
 std::string AgentBridge::status() const { return "agent-bridge-v2"; }
 
@@ -300,6 +329,36 @@ void AgentBridge::postMidiNote(int note, float velocity, int durationMs) {
     // even if setMidiNoteSink swaps it before the timer fires.
     juce::Timer::callAfterDelay(durationMs,
                                 [sinkCopy, note, velocity]() { sinkCopy(note, velocity, /*isNoteOn=*/false); });
+}
+
+void AgentBridge::postMidiNoteOn(int note, float velocity) {
+    if (note < 0) note = 0;
+    if (note > 127) note = 127;
+    if (velocity < 0.0f) velocity = 0.0f;
+    if (velocity > 1.0f) velocity = 1.0f;
+    MidiNoteSink sinkCopy;
+    {
+        std::lock_guard<std::mutex> lock(midiSinkMutex_);
+        sinkCopy = midiNoteSink_;
+    }
+    if (!sinkCopy) return;
+    auto* mm = juce::MessageManager::getInstanceWithoutCreating();
+    if (mm == nullptr) { sinkCopy(note, velocity, true); return; }
+    juce::MessageManager::callAsync([sinkCopy, note, velocity]() { sinkCopy(note, velocity, true); });
+}
+
+void AgentBridge::postMidiNoteOff(int note) {
+    if (note < 0) note = 0;
+    if (note > 127) note = 127;
+    MidiNoteSink sinkCopy;
+    {
+        std::lock_guard<std::mutex> lock(midiSinkMutex_);
+        sinkCopy = midiNoteSink_;
+    }
+    if (!sinkCopy) return;
+    auto* mm = juce::MessageManager::getInstanceWithoutCreating();
+    if (mm == nullptr) { sinkCopy(note, 0.0f, false); return; }
+    juce::MessageManager::callAsync([sinkCopy, note]() { sinkCopy(note, 0.0f, false); });
 }
 
 } // namespace agentic_synth::agent
