@@ -1,0 +1,290 @@
+/* ── ModMatrixPanel (Phase 8) ───────────────────────────────────────
+   Hosts list + constellation views of the mod matrix. Sits in the
+   right column under the prompt dock. */
+
+.mod-matrix-panel {
+  flex: 0 0 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.mod-matrix-panel.is-open {
+  /* Cap height so the constellation view has room without pushing
+     the prompt off-screen. Body scrolls vertically when needed. */
+  max-height: 360px;
+}
+
+.mod-matrix-header {
+  display: flex;
+  align-items: stretch;
+  border-bottom: 1px solid var(--color-border);
+}
+
+.mod-matrix-toggle {
+  flex: 1;
+  background: transparent;
+  border: none;
+  padding: var(--sp-2) var(--sp-3);
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  cursor: pointer;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+}
+.mod-matrix-toggle:hover { background: var(--fill-medium); }
+.mod-matrix-toggle:focus { outline: none; }
+.mod-matrix-toggle:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+
+.mod-matrix-count {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-tertiary);
+  padding: 1px 6px;
+  border: 1px solid var(--color-border);
+  border-radius: 999px;
+}
+
+.mod-matrix-viewswitch {
+  display: flex;
+  align-items: center;
+  padding: 0 var(--sp-2);
+  gap: 2px;
+}
+
+.mod-matrix-viewbtn {
+  appearance: none;
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-tertiary);
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 4px 8px;
+  border-radius: var(--r-1);
+  cursor: pointer;
+  transition:
+    color var(--dur-micro) var(--ease-considered),
+    background var(--dur-micro) var(--ease-considered),
+    border-color var(--dur-micro) var(--ease-considered);
+}
+.mod-matrix-viewbtn:hover { color: var(--text-secondary); }
+.mod-matrix-viewbtn.is-active {
+  color: var(--text-primary);
+  background: var(--bg-raised);
+  border-color: var(--color-border);
+}
+
+.mod-matrix-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* ── List view ──────────────────────────────────────────────────── */
+
+.mod-matrix-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--sp-2);
+}
+
+.mod-matrix-empty {
+  padding: var(--sp-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3);
+}
+.mod-matrix-empty p {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-tertiary);
+}
+
+.mod-matrix-rowheader {
+  display: grid;
+  grid-template-columns: 16px 1fr 16px 1fr 1.2fr auto;
+  gap: var(--sp-2);
+  padding: 2px var(--sp-2);
+  font-family: var(--font-sans);
+  font-size: 9px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-tertiary);
+  border-bottom: 1px dashed var(--color-border);
+  margin-bottom: 4px;
+}
+.mod-matrix-rowheader > span:nth-child(1) { /* spacer */ }
+
+.mod-matrix-row {
+  display: grid;
+  grid-template-columns: 16px auto 16px 1fr 1fr auto auto auto;
+  gap: var(--sp-2);
+  align-items: center;
+  padding: 6px var(--sp-2);
+  border-radius: var(--r-2);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  transition: background var(--dur-micro) var(--ease-considered);
+}
+.mod-matrix-row:hover { background: var(--fill-medium); }
+.mod-matrix-row.is-highlighted {
+  background: rgba(124, 77, 255, 0.12);
+  outline: 1px solid var(--accent-tint-40);
+}
+.mod-matrix-row.is-disabled { opacity: 0.5; }
+
+.mod-matrix-srcdot {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.4),
+    0 0 6px currentColor,
+    inset 0 1px 0 rgba(255, 255, 255, 0.45);
+}
+
+.mod-matrix-srclabel,
+.mod-matrix-dstlabel {
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.mod-matrix-arrow {
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.mod-matrix-amount {
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--bg-inset);
+  outline: none;
+  --mod-color: var(--accent-primary);
+}
+.mod-matrix-amount::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--mod-color);
+  box-shadow: 0 0 6px var(--mod-color);
+  border: 1px solid rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+}
+.mod-matrix-amount::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--mod-color);
+  box-shadow: 0 0 6px var(--mod-color);
+  border: 1px solid rgba(0, 0, 0, 0.5);
+  cursor: pointer;
+}
+
+.mod-matrix-amount-readout {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+  min-width: 36px;
+  text-align: right;
+}
+
+.mod-matrix-enable {
+  appearance: none;
+  width: 28px;
+  height: 14px;
+  border-radius: 999px;
+  background: var(--bg-inset);
+  border: 1px solid var(--color-border);
+  position: relative;
+  cursor: pointer;
+  padding: 0;
+  transition: background var(--dur-micro) var(--ease-considered);
+}
+.mod-matrix-enable.is-on {
+  background: var(--accent-primary);
+  border-color: var(--accent-primary);
+}
+.mod-matrix-enable-thumb {
+  position: absolute;
+  top: 1px;
+  left: 1px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-primary);
+  transition: left var(--dur-micro) var(--ease-considered);
+}
+.mod-matrix-enable.is-on .mod-matrix-enable-thumb { left: 15px; }
+
+.mod-matrix-delete {
+  appearance: none;
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  font-size: 14px;
+  cursor: pointer;
+  padding: 0 4px;
+  line-height: 1;
+  transition: color var(--dur-micro) var(--ease-considered);
+}
+.mod-matrix-delete:hover { color: var(--state-error); }
+
+/* ── Add row ────────────────────────────────────────────────────── */
+
+.mod-matrix-addrow {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  padding: var(--sp-2);
+  margin-top: var(--sp-1);
+  border-top: 1px dashed var(--color-border);
+}
+
+.mod-matrix-select {
+  appearance: none;
+  background: var(--bg-inset);
+  color: var(--text-secondary);
+  border: 1px solid var(--color-border);
+  border-radius: var(--r-1);
+  padding: 4px 6px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  flex: 1;
+  min-width: 0;
+}
+.mod-matrix-select:focus { outline: none; border-color: var(--accent-primary); }
+
+.mod-matrix-addbtn {
+  appearance: none;
+  background: var(--accent-primary);
+  color: var(--text-primary);
+  border: none;
+  border-radius: var(--r-2);
+  padding: 4px 10px;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: filter var(--dur-micro) var(--ease-considered);
+}
+.mod-matrix-addbtn:hover { filter: brightness(1.15); }
+.mod-matrix-addbtn:active { transform: scale(0.98); }

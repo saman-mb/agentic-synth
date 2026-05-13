@@ -33,6 +33,16 @@
   flex-direction: column;
   align-items: center;
   gap: 2px;
+  position: relative;
+}
+
+/* Tiny drag-source dot under each macro — lets the user drag the
+   macro onto a knob to assign mod routing without leaving the bar. */
+.macro-drag-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: -2px;
 }
 
 .macro-label {

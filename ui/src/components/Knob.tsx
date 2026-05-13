@@ -17,7 +17,11 @@ export type ModSource =
   | 'env1'
   | 'env2'
   | 'macro1'
-  | 'macro2';
+  | 'macro2'
+  | 'macro3'
+  | 'macro4'
+  | 'velocity'
+  | 'keytrack';
 
 export interface KnobProps {
   value: number; // 0..1 normalized
@@ -37,6 +41,13 @@ export interface KnobProps {
   // orchestrated patch loads (agent / preset). Optional staggered start.
   animatePatchLoad?: boolean;
   animateDelayMs?: number;
+  // ── Modulation drop target (Phase 8) ────────────────────────────────
+  // When set, the knob becomes a valid drop target for the global mod
+  // drag (window.__timbreDragSource). On drop, fires onAssignMod with
+  // both the source id and this destination key. While a drag is in
+  // progress and the cursor is over this knob, a violet halo appears.
+  destinationKey?: string;
+  onAssignMod?: (sourceId: string, destinationKey: string) => void;
 }
 
 // Arc geometry: 270° sweep, starting at 7 o'clock (135° in SVG coords, which
@@ -113,6 +124,8 @@ export function Knob({
   agentDriven = false,
   animatePatchLoad = false,
   animateDelayMs = 0,
+  destinationKey,
+  onAssignMod,
 }: KnobProps) {
   // ---------------------------------------------------------------------
   // Patch-load lerp
@@ -268,6 +281,50 @@ export function Knob({
   const [flashing, setFlashing] = useState(false);
   const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // ── Mod-drag drop-target state ───────────────────────────────────────
+  // While ANY mod source is being dragged (window-level), show a violet
+  // halo on this knob whenever the cursor enters it. The drag source is
+  // a window-level flag set by ModSourcesStrip; we listen on document
+  // pointer events to track it without prop drilling.
+  const [modDragActive, setModDragActive] = useState(false);
+  const [modDragOver, setModDragOver] = useState(false);
+  useEffect(() => {
+    if (!destinationKey || !onAssignMod) return;
+    const onWinDragStart = () => setModDragActive(true);
+    const onWinDragEnd = () => {
+      setModDragActive(false);
+      setModDragOver(false);
+    };
+    window.addEventListener('timbre:moddrag:start', onWinDragStart);
+    window.addEventListener('timbre:moddrag:end', onWinDragEnd);
+    return () => {
+      window.removeEventListener('timbre:moddrag:start', onWinDragStart);
+      window.removeEventListener('timbre:moddrag:end', onWinDragEnd);
+    };
+  }, [destinationKey, onAssignMod]);
+
+  const handleModDragEnter = useCallback(() => {
+    if (!modDragActive) return;
+    setModDragOver(true);
+  }, [modDragActive]);
+  const handleModDragLeave = useCallback(() => {
+    setModDragOver(false);
+  }, []);
+  const handleModDrop = useCallback(
+    (e: React.PointerEvent) => {
+      if (!modDragActive) return;
+      if (!destinationKey || !onAssignMod) return;
+      // Read window flag set by the source dot's pointerdown handler.
+      const src = (window as unknown as { __timbreDragSource?: string | null })
+        .__timbreDragSource;
+      if (!src) return;
+      e.preventDefault();
+      onAssignMod(src, destinationKey);
+      setModDragOver(false);
+    },
+    [modDragActive, destinationKey, onAssignMod],
+  );
+
   // Agent-driven flash
   useEffect(() => {
     if (!agentDriven) return;
@@ -409,6 +466,8 @@ export function Knob({
     disabled ? 'knob-disabled' : '',
     flashing ? 'knob-agent-flash' : '',
     modSource ? `knob-mod knob-mod-${modSource}` : '',
+    modDragActive ? 'knob-mod-drop-eligible' : '',
+    modDragOver ? 'knob-mod-drop-over' : '',
   ]
     .filter(Boolean)
     .join(' ');
@@ -430,8 +489,9 @@ export function Knob({
       onWheel={onWheel}
       onDoubleClick={onDoubleClick}
       onContextMenu={handleContextMenu}
-      onPointerEnter={() => setIsHover(true)}
-      onPointerLeave={() => setIsHover(false)}
+      onPointerEnter={() => { setIsHover(true); handleModDragEnter(); }}
+      onPointerLeave={() => { setIsHover(false); handleModDragLeave(); }}
+      onPointerUp={handleModDrop}
       style={{ ['--knob-size' as string]: `${pxSize}px` }}
     >
       <div className="knob-dial">

@@ -1,7 +1,9 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { ChatInterface } from './ChatInterface';
 import { Visualizer } from './Visualizer';
+import { ModMatrixPanel } from './ModMatrixPanel';
 import type { PatchPreviewData } from '../types/chat';
+import type { ModConnection, ModMatrix, ModSourceId } from '../data/modulation';
 import './RightColumn.css';
 
 // ── RightColumn (Phase 4) ────────────────────────────────────────────
@@ -17,17 +19,21 @@ interface RightColumnProps {
   externalTranscript: string;
   onAudio: (buf: ArrayBuffer) => void;
   onSelectVariation: (preview: PatchPreviewData) => void;
+  modMatrix: ModMatrix;
+  onUpdateConnection: (id: string, patch: Partial<ModConnection>) => void;
+  onDeleteConnection: (id: string) => void;
+  onAddConnection: (source: ModSourceId, destination: string) => void;
 }
 
 export function RightColumn({
   externalTranscript,
   onAudio,
   onSelectVariation,
+  modMatrix,
+  onUpdateConnection,
+  onDeleteConnection,
+  onAddConnection,
 }: RightColumnProps) {
-  // Mod matrix is collapsed by default — it's a Phase 8 placeholder so
-  // we don't burn vertical space on a header users can't yet act on.
-  const [modOpen, setModOpen] = useState(false);
-
   return (
     <aside className="right-column" aria-label="Visualiser, AI prompt, and modulation">
       {/* ── Visualiser (Phase 5) ─────────────────────────────────── */}
@@ -44,27 +50,13 @@ export function RightColumn({
         />
       </section>
 
-      {/* ── Mod matrix placeholder (Phase 8) ─────────────────────── */}
-      <section className={`rc-card rc-modmatrix${modOpen ? ' rc-modmatrix-open' : ''}`}>
-        <button
-          type="button"
-          className="rc-card-header rc-modmatrix-header"
-          aria-expanded={modOpen}
-          aria-controls="rc-modmatrix-body"
-          onClick={() => setModOpen((v) => !v)}
-        >
-          <span className="rc-card-chev" aria-hidden="true">{modOpen ? '▾' : '▸'}</span>
-          <span className="rc-card-title">Modulation Matrix</span>
-          <span className="rc-card-tag">Phase 8</span>
-        </button>
-        {modOpen && (
-          <div id="rc-modmatrix-body" className="rc-modmatrix-body">
-            <span className="rc-modmatrix-hint">
-              src → dst   amt   curve   [+]
-            </span>
-          </div>
-        )}
-      </section>
+      {/* ── Mod matrix (Phase 8 — list + constellation views) ───── */}
+      <ModMatrixPanel
+        modMatrix={modMatrix}
+        onUpdateConnection={onUpdateConnection}
+        onDeleteConnection={onDeleteConnection}
+        onAddConnection={onAddConnection}
+      />
     </aside>
   );
 }

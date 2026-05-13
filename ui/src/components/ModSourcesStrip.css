@@ -1,0 +1,131 @@
+/* ── ModSourcesStrip (Phase 8) ──────────────────────────────────────
+   Compact row of colored dots representing the 10 modulation sources.
+   Lives inside the MacroBar so the user always sees the drag-source
+   palette without opening a panel.
+
+   Each dot is its own coloured CSS custom property (--mod-color) so we
+   don't have to repeat the colour table; the parent strip styles all
+   dots uniformly. */
+
+.mod-sources-strip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 var(--sp-3);
+  border-left: 1px solid var(--color-border);
+  align-self: stretch;
+}
+
+.mod-sources-heading {
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-tertiary);
+  padding-right: var(--sp-2);
+  display: flex;
+  align-items: center;
+}
+
+.mod-source-dot {
+  --mod-color: var(--accent-primary);
+  appearance: none;
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: grab;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  user-select: none;
+  touch-action: none;
+  position: relative;
+}
+
+.mod-source-dot:active,
+.mod-source-dot.is-dragging {
+  cursor: grabbing;
+}
+
+.mod-source-dot:focus { outline: none; }
+.mod-source-dot:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 3px;
+  border-radius: 50%;
+}
+
+.mod-source-glyph {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: var(--mod-color);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.35),
+    0 0 8px color-mix(in srgb, var(--mod-color) 60%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  transition:
+    transform var(--dur-micro) var(--ease-considered),
+    box-shadow var(--dur-micro) var(--ease-considered);
+}
+
+.mod-source-dot:hover .mod-source-glyph {
+  transform: scale(1.15);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.35),
+    0 0 14px color-mix(in srgb, var(--mod-color) 80%, transparent),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+}
+
+.mod-source-dot.is-dragging .mod-source-glyph {
+  opacity: 0.4;
+}
+
+.mod-source-md .mod-source-glyph {
+  width: 20px;
+  height: 20px;
+}
+
+.mod-source-label {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  font-weight: 500;
+  color: var(--text-tertiary);
+  letter-spacing: 0.05em;
+  pointer-events: none;
+}
+
+.mod-source-dot:hover .mod-source-label {
+  color: var(--text-secondary);
+}
+
+/* ── Drag ghost ─────────────────────────────────────────────────────
+   Appended to <body> at pointerdown. Position is set via inline style
+   on every pointermove (no React re-renders). */
+
+.mod-source-ghost {
+  position: fixed;
+  pointer-events: none;
+  z-index: 9999;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.5),
+    0 0 16px rgba(124, 77, 255, 0.7),
+    inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  opacity: 0.95;
+}
+
+.mod-source-ghost.mod-source-lfo1     { background: var(--mod-lfo1); }
+.mod-source-ghost.mod-source-lfo2     { background: var(--mod-lfo2); }
+.mod-source-ghost.mod-source-env1     { background: var(--mod-env1); }
+.mod-source-ghost.mod-source-env2     { background: var(--mod-env2); }
+.mod-source-ghost.mod-source-macro1   { background: var(--mod-macro1); }
+.mod-source-ghost.mod-source-macro2   { background: var(--mod-macro2); }
+.mod-source-ghost.mod-source-macro3   { background: var(--mod-macro3); }
+.mod-source-ghost.mod-source-macro4   { background: var(--mod-macro4); }
+.mod-source-ghost.mod-source-velocity { background: var(--mod-velocity); }
+.mod-source-ghost.mod-source-keytrack { background: var(--mod-keytrack); }

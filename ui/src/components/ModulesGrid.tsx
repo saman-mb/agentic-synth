@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Knob } from './Knob';
+import type { ModSource } from './Knob';
 import type { PatchParams } from './KnobGrid';
+import { dominantConnection, ModMatrix } from '../data/modulation';
 import './ModulesGrid.css';
 
 // ── ModulesGrid (Phase 4) ────────────────────────────────────────────
@@ -24,6 +26,11 @@ interface ModulesGridProps {
   // to the new value, staggered by signal-flow stage. The token value is just
   // a monotonically-increasing counter used to invalidate stale animations.
   patchLoadToken?: number;
+  // Phase 8 — full mod matrix; used here to compute the dominant
+  // source+amount per destination so the right ring + halo render on
+  // each knob.
+  modMatrix?: ModMatrix;
+  onAssignMod?: (sourceId: string, destinationKey: string) => void;
 }
 
 // Signal-flow stage index per param prefix. Drives the staggered settle when
@@ -60,6 +67,8 @@ export function ModulesGrid({
   agentKeys,
   onKnobChange,
   patchLoadToken,
+  modMatrix,
+  onAssignMod,
 }: ModulesGridProps) {
   // When a patch-load token bumps, open a brief animation window during
   // which any knob whose value changes will lerp from old → new with a
@@ -87,6 +96,12 @@ export function ModulesGrid({
       const bipolar = min < 0 && max > 0;
       const defaultNorm = bipolar ? 0.5 : 0;
       const animateDelayMs = animatePatchLoad ? stageForParam(param) * STAGE_STEP_MS : 0;
+      // Phase 8 — derive ring/halo from the dominant connection for this
+      // destination. If no mod source is wired to it, both come out
+      // undefined and the knob renders un-modulated.
+      const dom = modMatrix ? dominantConnection(modMatrix, param) : null;
+      const modSource = (dom?.source ?? undefined) as ModSource | undefined;
+      const modAmount = dom ? Math.abs(dom.amount) : 0;
       return (
         <div key={param} className={`knob-slot${edited ? ' knob-slot-agent' : ''}`}>
           {edited && (
@@ -102,11 +117,15 @@ export function ModulesGrid({
             agentDriven={edited}
             animatePatchLoad={animatePatchLoad}
             animateDelayMs={animateDelayMs}
+            modSource={modSource}
+            modAmount={modAmount}
+            destinationKey={param}
+            onAssignMod={onAssignMod}
           />
         </div>
       );
     },
-    [agentKeys, onKnobChange, animatePatchLoad],
+    [agentKeys, onKnobChange, animatePatchLoad, modMatrix, onAssignMod],
   );
 
   // Per-oscillator knob set (compact: vol/detune/semi/pan/PW + FM ratio/depth).
