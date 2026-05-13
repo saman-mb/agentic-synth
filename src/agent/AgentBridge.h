@@ -24,6 +24,7 @@
 #include "engine/VariationEngine.h"
 #include "mapper/GeminiSampler.h"
 #include "mapper/GrammarSampler.h"
+#include "mapper/PromptEnhancer.h"
 #include "mapper/SemanticMapper.h"
 
 namespace agentic_synth::agent {
@@ -77,6 +78,13 @@ public:
     // Calls GrammarSampler, validates the result, then drives refinePatch().
     // Returns nullopt when the server is unreachable or returns invalid JSON.
     [[nodiscard]] std::optional<PatchStruct> generateLlmPatch(const std::string& prompt, uint32_t patch_id = 0);
+
+    // Two-step LLM flow: ENHANCER step. Rewrites a terse user prompt into a
+    // 9-section plain-text sound-design brief that the generator (above)
+    // then receives instead of the raw prompt. Returns "" when the enhancer
+    // is disabled (no GEMINI_KEY) or the HTTPS call fails — callers fall
+    // back to the raw user prompt in that case.
+    [[nodiscard]] std::string enhancePrompt(const std::string& userPrompt);
 
     // Issue #67: streaming patch application.
     // Feed a chunk of streaming LLM JSON. Fires pipeline_.injectPatch() each
@@ -135,6 +143,11 @@ public:
     using MidiNoteSink = std::function<void(int note, float velocity, bool isNoteOn)>;
     void setMidiNoteSink(MidiNoteSink sink);
     void postMidiNote(int note, float velocity, int durationMs);
+    // Open-ended hold: noteOn fires now, no scheduled noteOff. Caller must
+    // emit postMidiNoteOff(note) when the gesture ends. Used by the audition
+    // keyboard so pointer/key hold maps to sustained note.
+    void postMidiNoteOn(int note, float velocity);
+    void postMidiNoteOff(int note);
 
     // ── Typed callback subscription API ──────────────────────────────────────
     //
@@ -155,6 +168,11 @@ public:
     [[nodiscard]] SubscriberHandle onSuggestVariations(Callback cb);
     [[nodiscard]] SubscriberHandle onPatchUpdate(Callback cb);
     [[nodiscard]] SubscriberHandle onTranscript(Callback cb);
+    // Two-step LLM flow: emits the enhanced brief produced by the
+    // PromptEnhancer step so the chat UI can show it in the live ticker
+    // (HEARING IT OUT → SHAPING) and keep it on the assistant message's
+    // rationale block after generation completes.
+    [[nodiscard]] SubscriberHandle onEnhancement(Callback cb);
 
     // Test/integration emission helpers — visible so call sites in this
     // translation unit and the test fixture can drive the subscriber fan-out
@@ -167,6 +185,7 @@ public:
     void notifySuggestVariations(const juce::var& payload);
     void notifyPatchUpdate(const juce::var& payload);
     void notifyTranscript(const juce::var& payload);
+    void notifyEnhancement(const juce::var& payload);
 
 private:
     using CallbackPtr = std::shared_ptr<Callback>;
@@ -184,6 +203,10 @@ private:
     // so the fallback degrades silently in unit-test/CI environments that
     // don't ship credentials.
     mapper::GeminiSampler gemini_{mapper::GeminiSamplerConfig{}};
+    // Step 1 of the 2-step LLM flow (translator → generator). Constructed
+    // empty; AgentBridge() injects GEMINI_KEY + the enhancer-prompt.md
+    // briefing at startup, mirroring how gemini_ is configured.
+    mapper::PromptEnhancer enhancer_{mapper::PromptEnhancerConfig{}};
     mapper::SemanticMapper semanticMapper_;
     StreamParser streamParser_;
 
@@ -214,6 +237,7 @@ private:
     SlotList suggestVariationsSlots_;
     SlotList patchUpdateSlots_;
     SlotList transcriptSlots_;
+    SlotList enhancementSlots_;
 
     // Phase 12A: midi cutoff/resonance atomics moved to KnobBridge (knob_);
     // read via knob_.midiCutoffNorm() / knob_.midiResonanceNorm().

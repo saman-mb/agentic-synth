@@ -139,6 +139,12 @@ function dispatchNative(msg: Record<string, unknown>): void {
       // duration_ms drives the C++-side scheduled note-off.
       void callNative('play_midi_note', [msg.note, msg.velocity, msg.duration_ms]);
       return;
+    case 'note_on':
+      void callNative('note_on', [msg.note, msg.velocity]);
+      return;
+    case 'note_off':
+      void callNative('note_off', [msg.note]);
+      return;
     default:
       // eslint-disable-next-line no-console
       console.warn('[bridge] unknown outgoing type:', msg.type);
@@ -157,6 +163,9 @@ function emitInbound(msg: Record<string, unknown>): void {
 const INBOUND_EVENTS = [
   'token', 'patch', 'done', 'error', 'rationale',
   'suggest_variations', 'patch_update', 'transcript',
+  // Two-step LLM flow: ENHANCER brief, emitted once per generate call
+  // between submitPrompt and generateLlmPatch.
+  'enhancement',
 ] as const;
 
 export function useWebSocket(url: string): UseWebSocketReturn {

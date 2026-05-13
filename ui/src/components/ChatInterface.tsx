@@ -4,6 +4,7 @@ import {
   useCallback,
   useEffect,
   useId,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -224,65 +225,108 @@ function ProactiveSuggestionStrip({ suggestions, onDismiss }: ProactiveSuggestio
 }
 
 // ---------------------------------------------------------------------------
-// Reasoning ticker (telegraph)
+// Reasoning ticker (telegraph) — driven by the 2-step LLM enhancement brief
 // ---------------------------------------------------------------------------
 //
-// While the agent is generating, a small monospace stack at the bottom of the
-// chat ghost-fades through short reasoning fragments. Mock content for now;
-// real reasoning streaming is a separate concern. Each line fades in 300ms,
-// holds 1.5s, fades out 300ms; lines are staggered 400ms apart and the ticker
-// loops while `active` is true.
+// Two phases, brand-voice labels:
+//   HEARING IT OUT  — the ENHANCER stage is running, no brief yet.
+//                     We show neutral sensory-language placeholders that
+//                     match the §2 vocabulary of the translator prompt
+//                     (weight / temperature / texture / motion / light)
+//                     so the ticker reads like TIMBRE listening, not like
+//                     loading dots.
+//   SHAPING         — the ENHANCER returned a brief. We split it on its
+//                     fixed-section labels and scroll two lines at a time
+//                     so the user reads the *real* translation while the
+//                     generator works.
+//
+// The brief stays visible until the `done` event fires; the parent ChatInterface
+// then folds the brief into the assistant message's `rationale` so it survives
+// in the <details>Why this patch?</details> block.
+//
+// Accessibility: ticker container is aria-live="polite" + aria-atomic="false"
+// so partial updates don't re-announce the whole list. Throttled to one
+// announcement per ~1.4s while in SHAPING (lineIndex tick rate) to avoid
+// screen-reader spam.
 
-const MOCK_TICKER_LINES = [
-  'low fundamental… 55Hz…',
-  'soft saturation…',
-  'long release…',
-  'opening filter…',
-  'shaping body…',
+const HEARING_PLACEHOLDERS = [
+  'weight…',
+  'temperature…',
+  'texture…',
+  'motion…',
+  'light…',
+  'space…',
 ];
+
+// Split an enhancer brief into compact display lines. The translator emits
+// nine fixed sections (SONIC CHARACTER, FREQUENCY FOCUS, …, ONE-LINE SUMMARY).
+// We display each section as its own scrolling line; long content is left
+// intact (CSS `text-overflow: ellipsis` truncates if needed).
+function splitBrief(brief: string): string[] {
+  const trimmed = brief.trim();
+  if (!trimmed) return [];
+  // Prefer section split — each section is `LABEL: <content>` on its own line.
+  const lines = trimmed
+    .split(/\n+/)
+    .map((l) => l.trim())
+    .filter((l) => l.length > 0);
+  return lines.length > 0 ? lines : [trimmed];
+}
 
 interface ReasoningTickerProps {
   active: boolean;
+  brief: string;
 }
 
-function ReasoningTicker({ active }: ReasoningTickerProps) {
-  // Index of which mock line currently leads the stack. Bumps on a cadence
-  // while active. When `active` flips off, the whole ticker container fades
-  // out via the CSS opacity transition and unmounts on the next tick.
+function ReasoningTicker({ active, brief }: ReasoningTickerProps) {
+  // Phase: 'hearing' while ENHANCER runs (no brief), 'shaping' once we have one.
+  const phase: 'hearing' | 'shaping' = brief.length > 0 ? 'shaping' : 'hearing';
+  const briefLines = useMemo(() => splitBrief(brief), [brief]);
+
+  // Scrolling cursor — bumps every 1.4s. Window of 2 visible lines.
   const [cursor, setCursor] = useState(0);
 
   useEffect(() => {
     if (!active) return;
     setCursor(0);
+    const sourceLen = phase === 'shaping' ? Math.max(1, briefLines.length) : HEARING_PLACEHOLDERS.length;
     const id = window.setInterval(() => {
-      setCursor((c) => (c + 1) % MOCK_TICKER_LINES.length);
-    }, 400);
+      setCursor((c) => (c + 1) % sourceLen);
+    }, phase === 'shaping' ? 1400 : 600);
     return () => window.clearInterval(id);
-  }, [active]);
+  }, [active, phase, briefLines.length]);
 
-  // Show three visible lines at any moment, each with its own fade phase
-  // offset. CSS animation on `.reasoning-line` drives the 300/1500/300 cycle.
-  // We use the cursor + offset to pick text, keying on cursor so React
-  // remounts the spans and restarts each animation on every cadence tick.
-  const lines = [0, 1, 2].map((offset) => {
-    const idx = (cursor + offset) % MOCK_TICKER_LINES.length;
+  const source = phase === 'shaping' ? briefLines : HEARING_PLACEHOLDERS;
+  const visible = [0, 1].map((offset) => {
+    if (source.length === 0) return null;
+    const idx = (cursor + offset) % source.length;
     return (
       <span
-        key={`${cursor}-${offset}`}
+        key={`${phase}-${cursor}-${offset}`}
         className="reasoning-line"
         style={{ animationDelay: `${offset * 400}ms` }}
       >
-        {MOCK_TICKER_LINES[idx]}
+        {source[idx]}
       </span>
     );
   });
 
+  const label = phase === 'shaping' ? 'SHAPING' : 'HEARING IT OUT';
+
   return (
     <div
       className={`reasoning-ticker${active ? ' is-active' : ''}`}
-      aria-hidden="true"
+      aria-live="polite"
+      aria-atomic="false"
     >
-      {active && lines}
+      {active && (
+        <>
+          <span className="reasoning-label" aria-hidden="false">
+            {label}
+          </span>
+          {visible}
+        </>
+      )}
     </div>
   );
 }
@@ -354,6 +398,12 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation, 
   const [inputFocused, setInputFocused] = useState(false);
   const listEndRef = useRef<HTMLDivElement>(null);
   const streamingIdRef = useRef<string | null>(null);
+  // Two-step LLM flow: live brief emitted by the ENHANCER stage. While the
+  // ticker is visible we show this verbatim (split by section); on `done`
+  // we fold it into the assistant message's rationale and clear it so the
+  // next generate starts clean.
+  const [currentBrief, setCurrentBrief] = useState<string>('');
+  const currentBriefRef = useRef<string>('');
 
   const { status, send, lastMessage, subscribe } = useSynthBridge();
 
@@ -410,11 +460,35 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation, 
         case 'done': {
           const sid = streamingIdRef.current;
           if (!sid) return;
+          // Two-step LLM flow: fold the live brief into the assistant
+          // message's rationale block. If a generator-emitted rationale
+          // already arrived ('rationale' frame), we prepend the brief so
+          // both are visible in <details>Why this patch?</details>. The
+          // brief itself fades from the ticker on the next tick.
+          const briefSnapshot = currentBriefRef.current;
           setMessages((prev) =>
-            prev.map((m) => (m.id === sid ? { ...m, streaming: false } : m)),
+            prev.map((m) => {
+              if (m.id !== sid) return m;
+              const merged =
+                briefSnapshot.length > 0
+                  ? (m.rationale && m.rationale.length > 0
+                      ? `${briefSnapshot}\n\n---\n\n${m.rationale}`
+                      : briefSnapshot)
+                  : m.rationale;
+              return { ...m, streaming: false, rationale: merged };
+            }),
           );
           streamingIdRef.current = null;
           setIsGenerating(false);
+          currentBriefRef.current = '';
+          setCurrentBrief('');
+          break;
+        }
+        case 'enhancement': {
+          // ENHANCER brief — drive the SHAPING phase of the ticker and
+          // stash for the eventual <details> fold-in on `done`.
+          currentBriefRef.current = msg.brief;
+          setCurrentBrief(msg.brief);
           break;
         }
         case 'error': {
@@ -556,6 +630,10 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation, 
     setInputValue('');
     setIsGenerating(true);
     streamingIdRef.current = assistantId;
+    // Two-step LLM flow: clear any stale brief from a previous generate so
+    // the ticker starts in HEARING IT OUT mode for this new prompt.
+    currentBriefRef.current = '';
+    setCurrentBrief('');
     // Theatrical reading-sweep on the just-submitted bubble — 800ms.
     setSubmittedFlashId(userMsg.id);
     window.setTimeout(() => {
@@ -764,7 +842,7 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation, 
         </div>
       )}
 
-      <ReasoningTicker active={isGenerating} />
+      <ReasoningTicker active={isGenerating} brief={currentBrief} />
 
       <form className="input-bar" onSubmit={handleSubmit} aria-label="Prompt input">
         <label htmlFor={inputId} className="visually-hidden">

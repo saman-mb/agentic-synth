@@ -162,6 +162,8 @@ export function useSynthBridge(): UseSynthBridgeReturn {
     wrap('error');
     wrap('rationale');
     wrap('suggest_variations');
+    // Two-step LLM flow: ENHANCER brief arrives once per generate call.
+    wrap('enhancement');
     juce.backend.addEventListener('patch_update', (payload) => {
       enqueueMessage({ type: 'patch_update' as unknown as WireIncoming['type'], ...(payload as object) } as unknown as WireIncoming);
     });
@@ -226,9 +228,17 @@ export function useSynthBridge(): UseSynthBridgeReturn {
           return;
         }
         case 'play_midi_note': {
-          // Audition keyboard: fire-and-forget; UI doesn't await an ack
-          // because C++-side note-off is scheduled by duration_ms.
+          // Audition keyboard one-shot: fire-and-forget; C++ schedules
+          // matched note-off via duration_ms.
           void callNative('play_midi_note', [msg.note, msg.velocity, msg.duration_ms]);
+          return;
+        }
+        case 'note_on': {
+          void callNative('note_on', [msg.note, msg.velocity]);
+          return;
+        }
+        case 'note_off': {
+          void callNative('note_off', [msg.note]);
           return;
         }
         // Spread each known WireOutgoing variant onto positional `params`

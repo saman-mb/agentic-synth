@@ -73,6 +73,7 @@ export function AuditionKeyboard({ sendRaw, ready }: AuditionKeyboardProps) {
     return m;
   }, []);
 
+  // One-shot note (fixed duration). Used by "Audition C3" button.
   const playNote = useCallback(
     (note: number, durationMs: number) => {
       if (!ready) return;
@@ -81,8 +82,6 @@ export function AuditionKeyboard({ sendRaw, ready }: AuditionKeyboardProps) {
         next.add(note);
         return next;
       });
-      // Auto-clear the highlight after duration so visual state matches
-      // the audio envelope when C++ schedules the note-off.
       window.setTimeout(() => {
         setActiveNotes((prev) => {
           if (!prev.has(note)) return prev;
@@ -92,13 +91,37 @@ export function AuditionKeyboard({ sendRaw, ready }: AuditionKeyboardProps) {
         });
       }, durationMs);
       sendRaw(
-        JSON.stringify({
-          type: 'play_midi_note',
-          note,
-          velocity: VELOCITY,
-          duration_ms: durationMs,
-        }),
+        JSON.stringify({ type: 'play_midi_note', note, velocity: VELOCITY, duration_ms: durationMs }),
       );
+    },
+    [ready, sendRaw],
+  );
+
+  // Expressive hold: separate note_on / note_off. Hold pointer/key = sustained.
+  const noteOn = useCallback(
+    (note: number) => {
+      if (!ready) return;
+      setActiveNotes((prev) => {
+        if (prev.has(note)) return prev;
+        const next = new Set(prev);
+        next.add(note);
+        return next;
+      });
+      sendRaw(JSON.stringify({ type: 'note_on', note, velocity: VELOCITY }));
+    },
+    [ready, sendRaw],
+  );
+
+  const noteOff = useCallback(
+    (note: number) => {
+      if (!ready) return;
+      setActiveNotes((prev) => {
+        if (!prev.has(note)) return prev;
+        const next = new Set(prev);
+        next.delete(note);
+        return next;
+      });
+      sendRaw(JSON.stringify({ type: 'note_off', note }));
     },
     [ready, sendRaw],
   );
@@ -128,14 +151,17 @@ export function AuditionKeyboard({ sendRaw, ready }: AuditionKeyboardProps) {
       if (pressedKeysRef.current.has(e.key.toLowerCase())) return;
       pressedKeysRef.current.add(e.key.toLowerCase());
       e.preventDefault();
-      playNote(note, HOLD_DURATION_MS);
+      noteOn(note);
     },
-    [charToNote, playNote],
+    [charToNote, noteOn],
   );
 
   const handleGlobalKeyUp = useCallback((e: KeyboardEvent) => {
-    pressedKeysRef.current.delete(e.key.toLowerCase());
-  }, []);
+    const k = e.key.toLowerCase();
+    pressedKeysRef.current.delete(k);
+    const note = charToNote.get(k);
+    if (note !== undefined) noteOff(note);
+  }, [charToNote, noteOff]);
 
   useEffect(() => {
     if (!globalKeysOn) return;
@@ -153,9 +179,18 @@ export function AuditionKeyboard({ sendRaw, ready }: AuditionKeyboardProps) {
       const note = charToNote.get(e.key.toLowerCase());
       if (note === undefined) return;
       e.preventDefault();
-      playNote(note, HOLD_DURATION_MS);
+      noteOn(note);
     },
-    [charToNote, playNote],
+    [charToNote, noteOn],
+  );
+
+  const onKeyUpLocal = useCallback(
+    (e: ReactKeyboardEvent<HTMLDivElement>) => {
+      const note = charToNote.get(e.key.toLowerCase());
+      if (note === undefined) return;
+      noteOff(note);
+    },
+    [charToNote, noteOff],
   );
 
   return (
@@ -192,6 +227,7 @@ export function AuditionKeyboard({ sendRaw, ready }: AuditionKeyboardProps) {
         aria-label="Audition keyboard, C3 to C4"
         tabIndex={0}
         onKeyDown={onKeyDownLocal}
+        onKeyUp={onKeyUpLocal}
       >
         {KEYS.map((k) => (
           <button
@@ -203,25 +239,25 @@ export function AuditionKeyboard({ sendRaw, ready }: AuditionKeyboardProps) {
               activeNotes.has(k.note) ? 'piano-key-active' : '',
             ].join(' ').trim()}
             disabled={!ready}
-            // Use onClick (not onMouseDown alone) so native <button>
-            // keyboard activation via Space/Enter also fires the note.
-            // Trade-off: ~50ms latency vs mousedown; acceptable for audition.
-            onClick={() => playNote(k.note, CLICK_DURATION_MS)}
-            // Phase 7A: drag-across-keys legato. e.buttons & 1 means the
-            // primary mouse button is currently held during the enter
-            // event, so a mousedown-then-drag plays each key it crosses.
-            // Plain hover (no button held) is a no-op.
-            onMouseEnter={(e) => {
-              if (e.buttons === 1) playNote(k.note, CLICK_DURATION_MS);
-            }}
-            // Phase 12C: minimal touch support. Fire on touchstart at
-            // CLICK_DURATION_MS — note-off is C++-side scheduled so no
-            // touchend needed. preventDefault stops the synthetic mouse
-            // click that would otherwise double-fire the note ~300ms later.
-            onTouchStart={(e) => {
+            // Expressive hold: pointerdown → noteOn, pointerup/leave → noteOff.
+            // Hold the mouse / finger to sustain. Drag across keys: leaving a
+            // key releases it, entering with button held triggers next note.
+            onPointerDown={(e) => {
               e.preventDefault();
-              playNote(k.note, CLICK_DURATION_MS);
+              (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+              noteOn(k.note);
             }}
+            onPointerUp={(e) => {
+              try { (e.currentTarget as HTMLElement).releasePointerCapture(e.pointerId); } catch {/* ignore */}
+              noteOff(k.note);
+            }}
+            onPointerEnter={(e) => {
+              if (e.buttons === 1) noteOn(k.note);
+            }}
+            onPointerLeave={(e) => {
+              if (e.buttons === 1) noteOff(k.note);
+            }}
+            onPointerCancel={() => noteOff(k.note)}
             aria-label={`Play ${k.label}`}
             aria-pressed={activeNotes.has(k.note)}
             title={`${k.label} (${k.keyChar.toUpperCase()})`}

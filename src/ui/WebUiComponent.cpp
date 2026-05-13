@@ -363,10 +363,29 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
 
                                                  if (cancelled())
                                                      return;
-                                                 // Then invoke the LLM (local llama.cpp → Gemini fallback).
-                                                 std::cerr << "[WebUI] generate prompt='" << prompt
-                                                           << "' — invoking LLM\n";
-                                                 if (auto llm = bridge_.generateLlmPatch(prompt)) {
+                                                 // ── Step 1 of the 2-step LLM flow: ENHANCER ─────────────
+                                                 // Translate the terse prompt into a 200–400-word sensory
+                                                 // brief. Empty result == disabled or HTTP fail; we then
+                                                 // fall back to the raw prompt for the generator.
+                                                 std::cerr << "[WebUI] enhancing prompt='" << prompt << "'\n";
+                                                 const std::string brief = bridge_.enhancePrompt(prompt);
+                                                 if (cancelled())
+                                                     return;
+                                                 if (!brief.empty()) {
+                                                     auto* eobj = new juce::DynamicObject{};
+                                                     eobj->setProperty("brief", juce::String(brief));
+                                                     bridge_.notifyEnhancement(juce::var{eobj});
+                                                 }
+                                                 const std::string& promptForGen = brief.empty() ? prompt : brief;
+
+                                                 if (cancelled())
+                                                     return;
+                                                 // ── Step 2 of the 2-step LLM flow: GENERATOR ────────────
+                                                 // Local llama.cpp → Gemini fallback. Feed the brief if
+                                                 // we have one; otherwise feed the raw prompt verbatim.
+                                                 std::cerr << "[WebUI] generate prompt (post-enhance, " << promptForGen.size()
+                                                           << " bytes) — invoking LLM\n";
+                                                 if (auto llm = bridge_.generateLlmPatch(promptForGen)) {
                                                      patch = *llm;
                                                  }
 
@@ -478,6 +497,23 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
                                              bridge_.setTelemetryEnabled(enabled);
                                              completion(juce::var{});
                                          });
+
+    options = options.withNativeFunction(
+        juce::Identifier{"note_on"}, [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
+            // Expressive open-ended hold path. JS calls note_on on pointerdown
+            // / keydown and note_off on release. Engine sustains until note_off.
+            const int note = static_cast<int>(argOr(args, 0, juce::var{60}));
+            const float velocity = static_cast<float>(static_cast<double>(argOr(args, 1, juce::var{0.8})));
+            bridge_.postMidiNoteOn(note, velocity);
+            completion(juce::var{});
+        });
+
+    options = options.withNativeFunction(
+        juce::Identifier{"note_off"}, [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
+            const int note = static_cast<int>(argOr(args, 0, juce::var{60}));
+            bridge_.postMidiNoteOff(note);
+            completion(juce::var{});
+        });
 
     options = options.withNativeFunction(
         juce::Identifier{"play_midi_note"}, [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
@@ -636,6 +672,13 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
     subs_.push_back(bridge_.onTranscript([this](const juce::var& v) {
         if (browser_)
             browser_->emitEventIfBrowserIsVisible(juce::Identifier{"transcript"}, v);
+    }));
+    // Two-step LLM flow: the ENHANCER stage emits its 9-section brief
+    // exactly once per generate call. React ticker swaps from HEARING IT
+    // OUT to SHAPING when this fires (see ChatInterface ReasoningTicker).
+    subs_.push_back(bridge_.onEnhancement([this](const juce::var& v) {
+        if (browser_)
+            browser_->emitEventIfBrowserIsVisible(juce::Identifier{"enhancement"}, v);
     }));
 
 #if AGENTIC_SYNTH_UI_DEV

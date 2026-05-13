@@ -37,7 +37,14 @@ export type WireIncoming =
   | { type: 'done' }
   | { type: 'error'; message: string }
   | { type: 'rationale'; text: string }
-  | { type: 'suggest_variations'; variations: ProactiveSuggestion[] };
+  | { type: 'suggest_variations'; variations: ProactiveSuggestion[] }
+  // Two-step LLM flow — the ENHANCER stage emits the 9-section
+  // plain-text sound-design brief that the patch generator then
+  // receives instead of the raw prompt. Chat ticker swaps from
+  // HEARING IT OUT to SHAPING on receipt; brief is also folded into
+  // the assistant message's rationale on `done` so it survives in
+  // the "Why this patch?" details after the generation completes.
+  | { type: 'enhancement'; brief: string };
 
 export interface ProactiveSuggestion {
   label: string;
@@ -48,4 +55,6 @@ export interface ProactiveSuggestion {
 export type WireOutgoing =
   | { type: 'generate'; prompt: string; sessionId: string }
   | { type: 'feedback'; messageId: string; kind: FeedbackKind; patch?: PatchPreviewData }
-  | { type: 'play_midi_note'; note: number; velocity: number; duration_ms: number };
+  | { type: 'play_midi_note'; note: number; velocity: number; duration_ms: number }
+  | { type: 'note_on'; note: number; velocity: number }
+  | { type: 'note_off'; note: number };
