@@ -31,6 +31,9 @@ interface ModulesGridProps {
   // each knob.
   modMatrix?: ModMatrix;
   onAssignMod?: (sourceId: string, destinationKey: string) => void;
+  // Phase 10 §16 — incremented by App on Option+double-click logo
+  // to trigger the one-time synchronized 360° knob spin easter egg.
+  spinToken?: number;
 }
 
 // Signal-flow stage index per param prefix. Drives the staggered settle when
@@ -69,6 +72,7 @@ export function ModulesGrid({
   patchLoadToken,
   modMatrix,
   onAssignMod,
+  spinToken,
 }: ModulesGridProps) {
   // When a patch-load token bumps, open a brief animation window during
   // which any knob whose value changes will lerp from old → new with a
@@ -121,11 +125,12 @@ export function ModulesGrid({
             modAmount={modAmount}
             destinationKey={param}
             onAssignMod={onAssignMod}
+            spinToken={spinToken}
           />
         </div>
       );
     },
-    [agentKeys, onKnobChange, animatePatchLoad, modMatrix, onAssignMod],
+    [agentKeys, onKnobChange, animatePatchLoad, modMatrix, onAssignMod, spinToken],
   );
 
   // Per-oscillator knob set (compact: vol/detune/semi/pan/PW + FM ratio/depth).

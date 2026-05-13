@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { SemanticDictionary } from './SemanticDictionary';
 import { TelemetryDashboard } from './TelemetryDashboard';
 import { PatchBrowser, BrowserEntry } from './PatchBrowser';
+import { SettingsPanel } from './SettingsPanel';
 import type { PatchParams } from './KnobGrid';
 import './ToolsDrawer.css';
 
@@ -12,13 +13,14 @@ import './ToolsDrawer.css';
 // existing Dictionary / Telemetry / History components without
 // rewriting them. Closing the drawer is wired to the parent.
 
-type DrawerTab = 'dictionary' | 'telemetry' | 'history';
+type DrawerTab = 'dictionary' | 'telemetry' | 'history' | 'settings';
 
-const TAB_ORDER: DrawerTab[] = ['dictionary', 'telemetry', 'history'];
+const TAB_ORDER: DrawerTab[] = ['dictionary', 'telemetry', 'history', 'settings'];
 const TAB_LABEL: Record<DrawerTab, string> = {
   dictionary: 'Dictionary',
   telemetry: 'Telemetry',
   history: 'History',
+  settings: 'Settings',
 };
 
 interface ToolsDrawerProps {
@@ -37,6 +39,12 @@ interface ToolsDrawerProps {
   onBrowserStar: (id: string) => void;
   onBrowserRename: (id: string, label: string) => void;
   onBrowserClear: () => void;
+
+  // Settings tab
+  voicePip: boolean;
+  patchThunk: boolean;
+  onVoicePipChange: (v: boolean) => void;
+  onPatchThunkChange: (v: boolean) => void;
 }
 
 export function ToolsDrawer({
@@ -51,6 +59,10 @@ export function ToolsDrawer({
   onBrowserStar,
   onBrowserRename,
   onBrowserClear,
+  voicePip,
+  patchThunk,
+  onVoicePipChange,
+  onPatchThunkChange,
 }: ToolsDrawerProps) {
   // ── Telemetry radar sweep (Phase 9) ──────────────────────────────
   // Tracks unseen telemetry events. When the drawer is closed OR the
@@ -180,6 +192,16 @@ export function ToolsDrawer({
                 onStar={onBrowserStar}
                 onRename={onBrowserRename}
                 onClear={onBrowserClear}
+              />
+            </div>
+          )}
+          {activeTab === 'settings' && (
+            <div id="tools-panel-settings" role="tabpanel" aria-labelledby="tools-tab-settings">
+              <SettingsPanel
+                voicePip={voicePip}
+                patchThunk={patchThunk}
+                onVoicePipChange={onVoicePipChange}
+                onPatchThunkChange={onPatchThunkChange}
               />
             </div>
           )}

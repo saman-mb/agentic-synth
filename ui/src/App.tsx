@@ -16,6 +16,8 @@ import { ToolsDrawer } from './components/ToolsDrawer';
 import { TopBar, ABSlot } from './components/TopBar';
 import { useWebSocket } from './hooks/useWebSocket';
 import { usePatchHistory } from './hooks/usePatchHistory';
+import { useUiAudioSettings } from './hooks/useUiAudioSettings';
+import { playTapeStop, playVoicePip } from './data/uiAudio';
 import type { PatchPreviewData } from './types/chat';
 import {
   ModMatrix,
@@ -27,7 +29,7 @@ import {
 } from './data/modulation';
 
 type Theme = 'dark' | 'light';
-type DrawerTab = 'dictionary' | 'telemetry' | 'history';
+type DrawerTab = 'dictionary' | 'telemetry' | 'history' | 'settings';
 
 const KNOB_BRIDGE_URL = 'ws://localhost:9002';
 const THEME_KEY = 'agentic-synth.theme.v1';
@@ -60,25 +62,69 @@ function makeEntryId(ts: number): string {
   return `pb-${ts.toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+// Phase 10 §16 — RTFM easter egg patch. Hardcoded gnarly FM tone:
+// carrier 220Hz (semi = 0 + detune), modulator OSC2 ratio 3.14 with
+// heavy depth, wide-open filter, slow swelling envelope. Returned as
+// a full PatchParams so we can route it through handleLoadPreset.
+function makeRtfmPatch(base: PatchParams): PatchParams {
+  const p = JSON.parse(JSON.stringify(base)) as PatchParams;
+  // OSC1 carrier — 220Hz reference.
+  p.osc[0].volume = 0.9;
+  p.osc[0].semitone_offset = -12; // an octave below default A4-ish
+  p.osc[0].detune_cents = 0;
+  p.osc[0].fm_ratio = 1;
+  p.osc[0].fm_depth = 0.85;
+  p.osc[0].pan = 0;
+  // OSC2 modulator @ ratio 3.14, sprinkled wide.
+  p.osc[1].volume = 0.4;
+  p.osc[1].semitone_offset = 0;
+  p.osc[1].fm_ratio = 3.14;
+  p.osc[1].fm_depth = 0.95;
+  p.osc[1].pan = -0.3;
+  // OSC3 subharmonic shimmer.
+  p.osc[2].volume = 0.25;
+  p.osc[2].semitone_offset = 7; // perfect fifth
+  p.osc[2].fm_ratio = 1.5;
+  p.osc[2].fm_depth = 0.5;
+  p.osc[2].pan = 0.3;
+  // Filter — open, lots of drive.
+  p.filter.cutoff_hz = 6200;
+  p.filter.resonance = 0.55;
+  p.filter.drive = 0.7;
+  p.filter.env_mod = 0.3;
+  // Amp env — slow swell.
+  p.amp_env.attack_s = 0.4;
+  p.amp_env.decay_s = 0.6;
+  p.amp_env.sustain = 0.7;
+  p.amp_env.release_s = 1.4;
+  // LFO1 wobble on FM depth.
+  p.lfo[0].rate_hz = 0.7;
+  p.lfo[0].depth = 0.4;
+  // Reverb to push it cathedral-shaped.
+  p.reverb.size = 0.85;
+  p.reverb.mix = 0.45;
+  return p;
+}
+
 function applyParamToPatch(patch: PatchParams, param: string, value: number): PatchParams {
   const p = JSON.parse(JSON.stringify(patch)) as PatchParams;
   const parts = param.split('.');
   if (parts[0] === 'osc' && parts.length === 3) {
     const i = parseInt(parts[1], 10);
-    if (i >= 0 && i < p.osc.length) (p.osc[i] as Record<string, number>)[parts[2]] = value;
+    if (i >= 0 && i < p.osc.length) (p.osc[i] as unknown as Record<string, number>)[parts[2]] = value;
   } else if (parts[0] === 'filter' && parts.length === 2) {
-    (p.filter as Record<string, number>)[parts[1]] = value;
+    (p.filter as unknown as Record<string, number>)[parts[1]] = value;
   } else if (parts[0] === 'amp_env' && parts.length === 2) {
-    (p.amp_env as Record<string, number>)[parts[1]] = value;
+    (p.amp_env as unknown as Record<string, number>)[parts[1]] = value;
   } else if (parts[0] === 'filter_env' && parts.length === 2) {
-    (p.filter_env as Record<string, number>)[parts[1]] = value;
+    (p.filter_env as unknown as Record<string, number>)[parts[1]] = value;
   } else if (parts[0] === 'lfo' && parts.length === 3) {
     const i = parseInt(parts[1], 10);
-    if (i >= 0 && i < p.lfo.length) (p.lfo[i] as Record<string, number>)[parts[2]] = value;
+    if (i >= 0 && i < p.lfo.length) (p.lfo[i] as unknown as Record<string, number>)[parts[2]] = value;
   } else if (parts[0] === 'reverb' && parts.length === 2) {
-    (p.reverb as Record<string, number>)[parts[1]] = value;
+    (p.reverb as unknown as Record<string, number>)[parts[1]] = value;
   } else if (parts[0] === 'delay' && parts.length === 2) {
-    (p.delay as Record<string, number>)[parts[1]] = value;
+    (p.delay as unknown as Record<string, number>)[parts[1]] = value;
   } else if (param === 'master_gain') {
     p.master_gain = value;
   } else if (param === 'portamento_s') {
@@ -152,9 +198,30 @@ export function App() {
   // state across module reloads so we don't re-trigger the splash mid-dev.
   const [splashVisible, setSplashVisible] = useState<boolean>(true);
 
-  // ToolsDrawer (Dictionary / Telemetry / History — opened via gear icon).
+  // ToolsDrawer (Dictionary / Telemetry / History / Settings — gear icon).
   const [toolsOpen, setToolsOpen] = useState<boolean>(false);
   const [toolsTab, setToolsTab] = useState<DrawerTab>('dictionary');
+
+  // ── UI audio settings (Phase 10 §17) ──────────────────────────────
+  // Both default OFF — TIMBRE is "mostly silent". Settings persist via
+  // localStorage. The voice pip fires after a fresh transcript arrives;
+  // the tape-stop thunk fires on any patch-load token bump.
+  const uiAudio = useUiAudioSettings();
+
+  // ── Easter egg state (Phase 10 §16) ───────────────────────────────
+  // Spin token — bumped by Option+double-click on the wordmark. Each
+  // knob watches the token and runs a 600ms synchronized 360° rotation
+  // on its indicator. Gated to once-per-session via sessionStorage.
+  const [spinToken, setSpinToken] = useState<number>(0);
+  const triggerKnobSpin = useCallback(() => {
+    try {
+      if (window.sessionStorage.getItem('timbre:knob-spin-used') === '1') return;
+      window.sessionStorage.setItem('timbre:knob-spin-used', '1');
+    } catch {
+      // session storage may throw in private modes — fall through.
+    }
+    setSpinToken((n) => n + 1);
+  }, []);
 
   // A/B compare slots (Phase 6). Both seed from the current patch. The
   // "inactive" slot stores a frozen snapshot of what that slot looked
@@ -455,6 +522,39 @@ export function App() {
     [patch, ph, sendMessage, bumpPatchLoad],
   );
 
+  // Phase 10 §16 — RTFM easter egg. ChatInterface detects the prompt
+  // locally and calls back here; we synthesise a gnarly FM patch from
+  // the current patch baseline and route it through the standard preset
+  // load path so all the normal animations + history capture run.
+  const handleRtfmEasterEgg = useCallback(() => {
+    handleLoadPreset(makeRtfmPatch(patch));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [patch]);
+
+  // ── Voice transcribe pip (Phase 10 §17) ──────────────────────────
+  // Whenever a fresh transcript arrives AND the user has opted in,
+  // play a 40ms pip. Skip the very first render (transcript = '').
+  const lastTranscriptRef = useRef<string>('');
+  useEffect(() => {
+    const prev = lastTranscriptRef.current;
+    lastTranscriptRef.current = transcript;
+    if (!transcript) return;
+    if (transcript === prev) return;
+    if (uiAudio.voicePip) playVoicePip();
+  }, [transcript, uiAudio.voicePip]);
+
+  // ── Patch-load tape-stop thunk (Phase 10 §17) ────────────────────
+  // Fires on every patchLoadToken bump (preset, agent, A/B, RTFM) when
+  // the user has opted in. Skip the initial token value of 0.
+  const lastPatchTokenRef = useRef<number>(0);
+  useEffect(() => {
+    const prev = lastPatchTokenRef.current;
+    lastPatchTokenRef.current = patchLoadToken;
+    if (patchLoadToken === prev) return;
+    if (patchLoadToken === 0) return;
+    if (uiAudio.patchThunk) playTapeStop();
+  }, [patchLoadToken, uiAudio.patchThunk]);
+
   // ── A/B slot switching (Phase 6) ───────────────────────────────────
   // Pattern: when toggling, snapshot the current patch into the "leaving"
   // slot, then load the "entering" slot via the same diff+push path. The
@@ -624,6 +724,7 @@ export function App() {
         activeSlot={activeSlot}
         onSelectSlot={switchSlot}
         onCopySlot={handleCopySlot}
+        onAltDoubleClickLogo={triggerKnobSpin}
       />
 
       <MacroBar
@@ -644,6 +745,7 @@ export function App() {
           patchLoadToken={patchLoadToken}
           modMatrix={modMatrix}
           onAssignMod={handleAssignMod}
+          spinToken={spinToken}
         />
         <RightColumn
           externalTranscript={transcript}
@@ -653,6 +755,7 @@ export function App() {
           onUpdateConnection={handleUpdateConnection}
           onDeleteConnection={handleDeleteConnection}
           onAddConnection={handleAddConnection}
+          onRtfmEasterEgg={handleRtfmEasterEgg}
         />
       </div>
 
@@ -672,6 +775,10 @@ export function App() {
         onBrowserStar={handleBrowserStar}
         onBrowserRename={handleBrowserRename}
         onBrowserClear={handleBrowserClear}
+        voicePip={uiAudio.voicePip}
+        patchThunk={uiAudio.patchThunk}
+        onVoicePipChange={uiAudio.setVoicePip}
+        onPatchThunkChange={uiAudio.setPatchThunk}
       />
     </div>
   );

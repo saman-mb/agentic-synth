@@ -63,7 +63,7 @@ export function TelemetryDashboard({ sendMessage, lastMessage }: Props) {
       const msg = JSON.parse(lastMessage) as Record<string, unknown>;
       if (msg.type === 'telemetry_data') {
         setData(msg as unknown as TelemetryData);
-        setEnabled((msg as TelemetryData).enabled);
+        setEnabled((msg as unknown as TelemetryData).enabled);
       }
     } catch { /* ignore non-telemetry frames */ }
   }, [lastMessage]);

@@ -298,3 +298,21 @@
   0%   { filter: drop-shadow(0 0 12px var(--accent-secondary)); }
   100% { filter: drop-shadow(0 0 3px var(--accent-glow)); }
 }
+
+/* ── Easter egg: Option+double-click logo knob spin (Phase 10 §16) */
+
+.knob-root.knob-easter-spin .knob-svg {
+  animation: knob-spin 600ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  transform-origin: center;
+}
+
+@keyframes knob-spin {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .knob-root.knob-easter-spin .knob-svg {
+    animation: none;
+  }
+}

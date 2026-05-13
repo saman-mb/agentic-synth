@@ -23,6 +23,11 @@ export interface ChatMessage {
   variations?: PatchVariation[];
   feedback?: FeedbackKind;
   rationale?: string;
+  // Phase 10 §16 — 'sudo make me a sound' easter egg renders as a
+  // green-on-black terminal block with `terminal: true`. Lines are
+  // shown one per row in a monospace CRT-styled card.
+  terminal?: boolean;
+  terminalLines?: string[];
 }
 
 // WebSocket wire protocol
