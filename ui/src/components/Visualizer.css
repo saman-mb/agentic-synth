@@ -1,0 +1,108 @@
+/* ── Visualizer (Phase 5) ─────────────────────────────────────────────
+   Edge-to-edge canvas inside the parent card. The card itself owns the
+   outer chrome (border, radius, depth) — we own the inset well + the
+   segmented mode control at the top.
+
+   Layout: a flex column.
+     1. .vz-toggle      — 28px segmented control, REBRAND.md §6
+     2. .vz-canvas-wrap — flex:1, holds the canvas, inset well shadow
+
+   The canvas is sized in JS to match its wrapper at devicePixelRatio
+   so retina renders crisp. CSS just gives it 100%/100%. */
+
+.visualizer {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  padding: var(--sp-2);
+  gap: var(--sp-2);
+  box-sizing: border-box;
+}
+
+/* ── Segmented control ─────────────────────────────────────────────── */
+
+.vz-toggle {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  height: 28px;
+  flex: 0 0 auto;
+  background: var(--bg-inset);
+  border: 1px solid var(--color-border);
+  border-radius: var(--r-2);
+  padding: 2px;
+  /* Inset well so it reads as a track, per §7 "Synthetic Glass". */
+  box-shadow:
+    inset 0 1px 0 rgba(0, 0, 0, 0.6),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.03);
+  gap: 2px;
+}
+
+.vz-toggle-btn {
+  appearance: none;
+  background: transparent;
+  border: none;
+  border-radius: calc(var(--r-2) - 1px);
+  color: var(--text-tertiary);
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition:
+    color 180ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    background-color 180ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    box-shadow 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.vz-toggle-btn:hover {
+  color: var(--text-secondary);
+}
+
+.vz-toggle-btn:focus {
+  outline: none;
+}
+
+.vz-toggle-btn:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+
+.vz-toggle-btn-active {
+  color: var(--text-primary);
+  background: var(--bg-raised, #1E2129);
+  /* Raised plate + violet bottom border per REBRAND.md §6 tabs. */
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.04),
+    inset 0 -2px 0 var(--accent-primary);
+}
+
+/* ── Canvas well ───────────────────────────────────────────────────── */
+
+.vz-canvas-wrap {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  background: var(--bg-inset);
+  border-radius: var(--r-2);
+  overflow: hidden;
+  /* Recessed well per §7. */
+  box-shadow:
+    inset 0 1px 0 rgba(0, 0, 0, 0.6),
+    inset 0 -1px 0 rgba(255, 255, 255, 0.03);
+}
+
+.vz-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  /* The canvas itself still animates (it's the brand signature), but we
+     drop the toggle's transition so users sensitive to motion don't get
+     a soft fade on every interaction. */
+  .vz-toggle-btn { transition: none; }
+}
