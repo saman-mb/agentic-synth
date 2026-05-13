@@ -8,6 +8,7 @@
   flex-direction: column;
   gap: 0.5rem;
   font-size: 0.7rem;
+  font-family: var(--font-sans);
 }
 
 /* Toolbar: filter radios + clear button */
@@ -21,15 +22,15 @@
   display: inline-flex;
   background: rgb(255 255 255 / 4%);
   border: 1px solid rgb(255 255 255 / 10%);
-  border-radius: 0.4rem;
+  border-radius: var(--r-2);
   overflow: hidden;
 }
 
 .pb-filter-btn {
   background: transparent;
   border: none;
-  color: #9080bb;
-  font-family: inherit;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
   font-size: 0.6rem;
   font-weight: 600;
   text-transform: uppercase;
@@ -40,17 +41,17 @@
 }
 
 .pb-filter-btn:hover {
-  color: #c8b8ff;
+  color: var(--text-accent, #B388FF);
 }
 
 .pb-filter-active {
-  background: rgb(123 92 255 / 22%);
-  color: #f4f0ff;
+  background: rgb(124 77 255 / 22%);
+  color: var(--text-primary);
 }
 
 .pb-filter-btn:focus { outline: none; }
 .pb-filter-btn:focus-visible {
-  outline: 2px solid #7b5cff;
+  outline: 2px solid var(--accent-primary);
   outline-offset: -2px;
 }
 
@@ -58,21 +59,21 @@
   margin-left: auto;
   background: rgb(255 255 255 / 4%);
   border: 1px solid rgb(255 255 255 / 10%);
-  color: #c8b8ff;
-  font-family: inherit;
+  color: var(--text-accent, #B388FF);
+  font-family: var(--font-sans);
   font-size: 0.6rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.08em;
   padding: 0.3rem 0.55rem;
-  border-radius: 0.4rem;
+  border-radius: var(--r-2);
   cursor: pointer;
   transition: background 0.12s, border-color 0.12s, opacity 0.12s;
 }
 
 .pb-clear-btn:hover:not(:disabled) {
-  background: rgb(123 92 255 / 15%);
-  border-color: rgb(123 92 255 / 40%);
+  background: rgb(124 77 255 / 15%);
+  border-color: rgb(124 77 255 / 40%);
 }
 
 .pb-clear-btn:disabled {
@@ -82,7 +83,7 @@
 
 .pb-clear-btn:focus { outline: none; }
 .pb-clear-btn:focus-visible {
-  outline: 2px solid #7b5cff;
+  outline: 2px solid var(--accent-primary);
   outline-offset: 1px;
 }
 
@@ -91,9 +92,9 @@
   padding: 1rem 0.6rem;
   text-align: center;
   font-size: 0.7rem;
-  color: #6a5fa0;
+  color: var(--text-tertiary);
   border: 1px dashed rgb(255 255 255 / 8%);
-  border-radius: 0.5rem;
+  border-radius: var(--r-2);
   line-height: 1.45;
 }
 
@@ -113,15 +114,16 @@
   display: flex;
   align-items: stretch;
   gap: 0.25rem;
-  border: 1px solid rgb(255 255 255 / 6%);
-  border-radius: 0.45rem;
-  background: rgb(255 255 255 / 2%);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: var(--r-2);
+  background: var(--bg-raised);
+  box-shadow: var(--depth-raised);
   transition: background 0.12s, border-color 0.12s;
 }
 
 .patch-browser-row:hover {
-  background: rgb(123 92 255 / 10%);
-  border-color: rgb(123 92 255 / 30%);
+  background: rgb(124 77 255 / 10%);
+  border-color: rgb(124 77 255 / 30%);
 }
 
 .pb-row-main {
@@ -134,7 +136,7 @@
   border: none;
   color: inherit;
   text-align: left;
-  font-family: inherit;
+  font-family: var(--font-sans);
   padding: 0.45rem 0.55rem;
   cursor: pointer;
   min-width: 0;
@@ -142,14 +144,14 @@
 
 .pb-row-main:focus { outline: none; }
 .pb-row-main:focus-visible {
-  outline: 2px solid #7b5cff;
+  outline: 2px solid var(--accent-primary);
   outline-offset: -2px;
-  border-radius: 0.4rem;
+  border-radius: var(--r-2);
 }
 
 .pb-row-label {
   font-size: 0.72rem;
-  color: #f4f0ff;
+  color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -159,7 +161,8 @@
 
 .pb-row-time {
   font-size: 0.58rem;
-  color: #6a5fa0;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
   text-transform: lowercase;
@@ -168,30 +171,31 @@
 
 .pb-rename-input {
   flex: 1;
-  background: rgb(17 16 24 / 80%);
-  border: 1px solid #7b5cff;
-  border-radius: 0.3rem;
-  color: #f4f0ff;
-  font-family: inherit;
+  background: var(--bg-inset);
+  border: 1px solid var(--accent-primary);
+  border-radius: var(--r-2);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
   font-size: 0.72rem;
   padding: 0.18rem 0.35rem;
   min-width: 0;
+  box-shadow: var(--depth-inset);
 }
 
 .pb-rename-input:focus {
-  outline: 2px solid #7b5cff;
+  outline: 2px solid var(--accent-primary);
   outline-offset: 1px;
 }
 
 .pb-star-btn {
   background: transparent;
   border: none;
-  color: #6a5fa0;
+  color: var(--text-tertiary);
   font-size: 1rem;
   line-height: 1;
   padding: 0 0.5rem;
   cursor: pointer;
-  border-left: 1px solid rgb(255 255 255 / 6%);
+  border-left: 1px solid rgba(255, 255, 255, 0.04);
   transition: color 0.12s;
 }
 
@@ -205,7 +209,7 @@
 
 .pb-star-btn:focus { outline: none; }
 .pb-star-btn:focus-visible {
-  outline: 2px solid #7b5cff;
+  outline: 2px solid var(--accent-primary);
   outline-offset: -2px;
-  border-radius: 0.3rem;
+  border-radius: var(--r-2);
 }

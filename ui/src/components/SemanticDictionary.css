@@ -5,6 +5,7 @@
   gap: 0.5rem;
   padding: 0.75rem;
   overflow: hidden;
+  font-family: var(--font-sans);
 }
 
 .sem-dict-header {
@@ -18,12 +19,12 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-  color: var(--color-accent-hot);
+  color: var(--accent-secondary);
 }
 
 .sem-dict-count {
   font-size: 0.6rem;
-  color: var(--color-fg-muted);
+  color: var(--text-tertiary);
 }
 
 .sem-dict-toolbar {
@@ -34,32 +35,33 @@
 
 .sem-dict-search {
   flex: 1;
-  background: var(--fill-medium);
-  border: 1px solid var(--fill-stronger);
-  border-radius: 0.4rem;
+  background: var(--bg-inset);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: var(--r-2);
   padding: 0.3rem 0.5rem;
   font-size: 0.75rem;
-  color: var(--color-fg-primary);
-  font-family: inherit;
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  box-shadow: var(--depth-inset);
 }
 
 .sem-dict-search:focus {
   outline: none;
-  border-color: var(--accent-tint-60);
+  border-color: var(--accent-tint-60, rgba(124, 77, 255, 0.60));
 }
 
 .sem-dict-search:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
+  outline: 2px solid var(--accent-primary);
   outline-offset: 2px;
 }
 
 .sem-btn {
   padding: 0.3rem 0.6rem;
-  border: 1px solid var(--color-border-strong);
-  border-radius: 0.4rem;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: var(--r-2);
   background: transparent;
-  color: var(--color-accent-soft);
-  font-family: inherit;
+  color: var(--accent-primary);
+  font-family: var(--font-sans);
   font-size: 0.72rem;
   cursor: pointer;
   white-space: nowrap;
@@ -67,7 +69,7 @@
 }
 
 .sem-btn:hover:not(:disabled) {
-  background: var(--fill-strong);
+  background: var(--bg-inset);
 }
 
 .sem-btn:disabled {
@@ -76,18 +78,18 @@
 }
 
 .sem-btn-primary {
-  border-color: var(--accent-tint-40);
-  color: var(--color-accent-strong);
+  border-color: var(--accent-tint-40, rgba(124, 77, 255, 0.40));
+  color: var(--accent-primary);
 }
 
 .sem-btn-primary:hover:not(:disabled) {
-  background: var(--accent-tint-18);
-  border-color: var(--color-accent);
+  background: var(--accent-tint-18, rgba(124, 77, 255, 0.18));
+  border-color: var(--accent-primary);
 }
 
 .sem-dict-status {
   font-size: 0.68rem;
-  color: var(--color-success-soft);
+  color: var(--state-success);
   padding: 0.2rem 0;
 }
 
@@ -100,13 +102,13 @@
 }
 
 .sem-entry {
-  border: 1px solid var(--color-border);
-  border-radius: 0.5rem;
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: var(--r-2);
   overflow: hidden;
 }
 
 .sem-entry-custom {
-  border-color: var(--accent-tint-25);
+  border-color: var(--accent-tint-25, rgba(124, 77, 255, 0.25));
 }
 
 .sem-entry-header {
@@ -117,57 +119,57 @@
   padding: 0.4rem 0.6rem;
   background: transparent;
   border: none;
-  color: var(--color-fg-primary);
+  color: var(--text-primary);
   cursor: pointer;
   text-align: left;
-  font-family: inherit;
+  font-family: var(--font-sans);
   font-size: 0.72rem;
   transition: background 0.1s;
 }
 
 .sem-entry-header:hover {
-  background: var(--fill-medium);
+  background: var(--bg-raised);
 }
 
 .sem-entry-keyword {
   font-weight: 600;
   min-width: 5rem;
-  color: var(--color-fg-primary);
+  color: var(--text-primary);
 }
 
 .sem-ctx-badge {
   font-size: 0.58rem;
   padding: 0.1rem 0.4rem;
-  border-radius: 0.3rem;
+  border-radius: var(--r-2);
   text-transform: uppercase;
   letter-spacing: 0.06em;
   font-weight: 600;
-  background: var(--fill-strong);
-  color: var(--color-accent-hot);
+  background: var(--bg-inset);
+  color: var(--accent-secondary);
 }
 
-.sem-ctx-bass     { background: var(--color-ctx-bass-bg); color: var(--color-ctx-bass-fg); }
-.sem-ctx-pad      { background: var(--color-ctx-pad-bg); color: var(--color-ctx-pad-fg); }
-.sem-ctx-lead     { background: var(--color-ctx-lead-bg); color: var(--color-ctx-lead-fg); }
-.sem-ctx-keys     { background: var(--color-ctx-keys-bg); color: var(--color-ctx-keys-fg); }
-.sem-ctx-percussion { background: var(--color-ctx-perc-bg); color: var(--color-ctx-perc-fg); }
-.sem-ctx-arp     { background: var(--color-ctx-arp-bg); color: var(--color-ctx-arp-fg); }
-.sem-ctx-texture { background: var(--color-ctx-texture-bg); color: var(--color-ctx-texture-fg); }
-.sem-ctx-generic { background: var(--color-ctx-generic-bg); color: var(--color-ctx-generic-fg); }
+.sem-ctx-bass     { background: var(--color-ctx-bass-bg, rgba(124, 77, 255, 0.18)); color: var(--color-ctx-bass-fg, var(--text-accent, #B388FF)); }
+.sem-ctx-pad      { background: var(--color-ctx-pad-bg, rgba(0, 229, 255, 0.18)); color: var(--color-ctx-pad-fg, #00E5FF); }
+.sem-ctx-lead     { background: var(--color-ctx-lead-bg, rgba(255, 61, 136, 0.18)); color: var(--color-ctx-lead-fg, #FF3D88); }
+.sem-ctx-keys     { background: var(--color-ctx-keys-bg, rgba(255, 179, 0, 0.18)); color: var(--color-ctx-keys-fg, #FFB300); }
+.sem-ctx-percussion { background: var(--color-ctx-perc-bg, rgba(255, 107, 53, 0.18)); color: var(--color-ctx-perc-fg, #FF6B35); }
+.sem-ctx-arp     { background: var(--color-ctx-arp-bg, rgba(118, 255, 3, 0.18)); color: var(--color-ctx-arp-fg, #76FF03); }
+.sem-ctx-texture { background: var(--color-ctx-texture-bg, rgba(224, 64, 251, 0.18)); color: var(--color-ctx-texture-fg, #E040FB); }
+.sem-ctx-generic { background: var(--color-ctx-generic-bg, rgba(176, 190, 197, 0.18)); color: var(--color-ctx-generic-fg, #B0BEC5); }
 
 .sem-badge-custom {
   font-size: 0.55rem;
   padding: 0.1rem 0.35rem;
-  border-radius: 0.3rem;
-  background: var(--accent-tint-25);
-  color: var(--color-accent-soft);
+  border-radius: var(--r-2);
+  background: var(--accent-tint-25, rgba(124, 77, 255, 0.25));
+  color: var(--accent-primary);
   font-weight: 600;
 }
 
 .sem-entry-preview {
   flex: 1;
   font-size: 0.6rem;
-  color: var(--color-fg-muted);
+  color: var(--text-tertiary);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -175,7 +177,7 @@
 
 .sem-entry-chevron {
   font-size: 0.55rem;
-  color: var(--color-fg-muted);
+  color: var(--text-tertiary);
 }
 
 .sem-entry-body {
@@ -183,8 +185,8 @@
   grid-template-columns: 1fr 1fr;
   gap: 0.2rem 0.5rem;
   padding: 0.5rem 0.6rem 0.6rem;
-  border-top: 1px solid var(--color-border);
-  background: var(--fill-soft);
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  background: var(--bg-panel);
 }
 
 .sem-field-row {
@@ -195,7 +197,7 @@
 
 .sem-field-label {
   font-size: 0.58rem;
-  color: var(--color-fg-muted);
+  color: var(--text-tertiary);
   flex: 1;
   min-width: 0;
   overflow: hidden;
@@ -205,7 +207,8 @@
 
 .sem-field-val {
   font-size: 0.65rem;
-  color: var(--color-fg-secondary);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   min-width: 4rem;
   text-align: right;
@@ -213,35 +216,36 @@
 
 .sem-field-input {
   width: 5rem;
-  background: var(--fill-strong);
-  border: 1px solid var(--fill-stronger);
-  border-radius: 0.3rem;
+  background: var(--bg-inset);
+  border: 1px solid rgba(255, 255, 255, 0.04);
+  border-radius: var(--r-2);
   padding: 0.15rem 0.3rem;
   font-size: 0.65rem;
-  color: var(--color-fg-primary);
-  font-family: inherit;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
   text-align: right;
+  box-shadow: var(--depth-inset);
 }
 
 .sem-field-input:focus {
   outline: none;
-  border-color: var(--accent-tint-60);
+  border-color: var(--accent-tint-60, rgba(124, 77, 255, 0.60));
 }
 
 .sem-field-input:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
+  outline: 2px solid var(--accent-primary);
   outline-offset: 2px;
 }
 
 .sem-add-panel {
-  border: 1px solid var(--accent-tint-35);
-  border-radius: 0.5rem;
+  border: 1px solid var(--accent-tint-35, rgba(124, 77, 255, 0.35));
+  border-radius: var(--r-2);
   padding: 0.6rem;
   display: flex;
   flex-direction: column;
   gap: 0.5rem;
-  background: var(--accent-tint-12);
+  background: var(--accent-tint-12, rgba(124, 77, 255, 0.12));
 }
 
 .sem-add-row {
@@ -269,11 +273,11 @@
 .sem-add-trigger {
   align-self: flex-start;
   font-size: 0.7rem;
-  color: var(--color-accent);
-  border-color: var(--accent-tint-35);
+  color: var(--accent-primary);
+  border-color: var(--accent-tint-35, rgba(124, 77, 255, 0.35));
 }
 
 .sem-add-trigger:hover {
-  background: var(--accent-tint-12);
-  color: var(--color-accent-soft);
+  background: var(--accent-tint-12, rgba(124, 77, 255, 0.12));
+  color: var(--accent-primary);
 }
