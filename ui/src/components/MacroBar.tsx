@@ -1,5 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { Knob } from './Knob';
+import { ModSourcesStrip, ModSourceDot } from './ModSourcesStrip';
+import type { ModSourceId } from '../data/modulation';
 import './MacroBar.css';
 
 // ── MacroBar (Phase 6 — visual + rename) ─────────────────────────────
@@ -46,7 +48,9 @@ export function MacroBar({ macros, onMacroChange, onMacroRename }: MacroBarProps
   return (
     <div className="macro-bar" role="group" aria-label="Macro controls">
       <span className="macro-bar-heading">MACROS</span>
-      {macros.map((m, i) => (
+      {macros.map((m, i) => {
+        const sourceId = `macro${i + 1}` as ModSourceId;
+        return (
         <div className="macro-slot" key={i}>
           <Knob
             value={m.value}
@@ -56,6 +60,9 @@ export function MacroBar({ macros, onMacroChange, onMacroRename }: MacroBarProps
             defaultValue={0}
             displayValue={`${Math.round(m.value * 100)}%`}
           />
+          <div className="macro-drag-handle">
+            <ModSourceDot id={sourceId} size="sm" />
+          </div>
           {editingIndex === i ? (
             <input
               type="text"
@@ -80,7 +87,11 @@ export function MacroBar({ macros, onMacroChange, onMacroRename }: MacroBarProps
             </button>
           )}
         </div>
-      ))}
+        );
+      })}
+      <ModSourcesStrip
+        sources={['lfo1', 'lfo2', 'env1', 'env2', 'velocity', 'keytrack']}
+      />
     </div>
   );
 }

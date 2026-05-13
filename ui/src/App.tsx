@@ -17,6 +17,14 @@ import { TopBar, ABSlot } from './components/TopBar';
 import { useWebSocket } from './hooks/useWebSocket';
 import { usePatchHistory } from './hooks/usePatchHistory';
 import type { PatchPreviewData } from './types/chat';
+import {
+  ModMatrix,
+  ModConnection,
+  ModSourceId,
+  loadModMatrix,
+  saveModMatrix,
+  makeConnectionId,
+} from './data/modulation';
 
 type Theme = 'dark' | 'light';
 type DrawerTab = 'dictionary' | 'telemetry' | 'history';
@@ -157,6 +165,73 @@ export function App() {
   const [activeSlot, setActiveSlot] = useState<ABSlot>('A');
   const [inactiveSlotPatch, setInactiveSlotPatch] = useState<PatchParams>(
     () => makeDefaultPatch(),
+  );
+
+  // ── Modulation matrix (Phase 8) ───────────────────────────────────
+  // Frontend-only routing for now: each connection ties a mod source
+  // (LFO/ENV/Macro/Velocity/Keytrack) to a destination param key, with
+  // a bipolar amount and an enable flag. Persisted to localStorage so
+  // user-created routes survive reloads. The engine continues to wire
+  // LFO/ENV via the existing `lfo.target` enum on the patch itself.
+  const [modMatrix, setModMatrix] = useState<ModMatrix>(() => loadModMatrix());
+  useEffect(() => { saveModMatrix(modMatrix); }, [modMatrix]);
+
+  const handleAssignMod = useCallback(
+    (sourceId: string, destinationKey: string) => {
+      const source = sourceId as ModSourceId;
+      setModMatrix((prev) => {
+        // If a connection from this source to this destination already
+        // exists, leave the matrix alone (avoid silently piling up
+        // duplicates from accidental re-drops). Otherwise append a new
+        // default connection at 0.5 amount, enabled.
+        const exists = prev.connections.some(
+          (c) => c.source === source && c.destination === destinationKey,
+        );
+        if (exists) return prev;
+        const next: ModConnection = {
+          id: makeConnectionId(),
+          source,
+          destination: destinationKey,
+          amount: 0.5,
+          enabled: true,
+        };
+        return { connections: [...prev.connections, next] };
+      });
+    },
+    [],
+  );
+
+  const handleUpdateConnection = useCallback(
+    (id: string, patch: Partial<ModConnection>) => {
+      setModMatrix((prev) => ({
+        connections: prev.connections.map((c) => (c.id === id ? { ...c, ...patch } : c)),
+      }));
+    },
+    [],
+  );
+
+  const handleDeleteConnection = useCallback((id: string) => {
+    setModMatrix((prev) => ({
+      connections: prev.connections.filter((c) => c.id !== id),
+    }));
+  }, []);
+
+  const handleAddConnection = useCallback(
+    (source: ModSourceId, destination: string) => {
+      setModMatrix((prev) => ({
+        connections: [
+          ...prev.connections,
+          {
+            id: makeConnectionId(),
+            source,
+            destination,
+            amount: 0.5,
+            enabled: true,
+          },
+        ],
+      }));
+    },
+    [],
   );
 
   // Macros (Phase 6 — visual + rename). Routing to params is deferred
@@ -567,11 +642,17 @@ export function App() {
           agentKeys={lastAgentEditBatch}
           onKnobChange={handleKnobChange}
           patchLoadToken={patchLoadToken}
+          modMatrix={modMatrix}
+          onAssignMod={handleAssignMod}
         />
         <RightColumn
           externalTranscript={transcript}
           onAudio={handleAudio}
           onSelectVariation={handleSelectVariation}
+          modMatrix={modMatrix}
+          onUpdateConnection={handleUpdateConnection}
+          onDeleteConnection={handleDeleteConnection}
+          onAddConnection={handleAddConnection}
         />
       </div>
 

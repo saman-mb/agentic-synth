@@ -1,0 +1,123 @@
+/* ── ModConstellation (Phase 8 — REBRAND.md §12 wow #2) ─────────────
+   SVG star-field view of the mod matrix. Sources on the left,
+   destinations on the right, threads of light between them. */
+
+.mod-constellation-wrap {
+  padding: var(--sp-2);
+  background:
+    radial-gradient(ellipse at 30% 20%, rgba(124, 77, 255, 0.06), transparent 60%),
+    radial-gradient(ellipse at 70% 80%, rgba(255, 61, 136, 0.05), transparent 60%),
+    var(--bg-inset);
+  border-radius: var(--r-2);
+  margin: var(--sp-2);
+  box-shadow: var(--depth-inset);
+}
+
+.mod-constellation {
+  width: 100%;
+  height: auto;
+  display: block;
+  overflow: visible;
+}
+
+.mod-constellation-empty {
+  padding: var(--sp-3);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+.mod-constellation-empty p {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--text-tertiary);
+}
+
+/* ── Threads ─────────────────────────────────────────────────────── */
+
+.mod-constellation-thread {
+  cursor: pointer;
+}
+
+.mod-constellation-thread-line {
+  /* Flowing dash that crawls from source → destination. The dasharray
+     matches the source color so the segment reads as "signal travel". */
+  stroke-dasharray: 4 8;
+  animation: mod-constellation-flow 1.6s linear infinite;
+  filter: drop-shadow(0 0 4px currentColor);
+  transition:
+    stroke-width var(--dur-micro) var(--ease-considered),
+    opacity var(--dur-micro) var(--ease-considered);
+}
+
+.mod-constellation-thread.is-disabled .mod-constellation-thread-line {
+  animation: none;
+  stroke-dasharray: 2 6;
+  filter: none;
+}
+
+.mod-constellation-thread.is-highlighted .mod-constellation-thread-line {
+  filter: drop-shadow(0 0 6px currentColor) drop-shadow(0 0 12px currentColor);
+}
+
+.mod-constellation-thread:hover .mod-constellation-thread-line {
+  filter: drop-shadow(0 0 6px currentColor) drop-shadow(0 0 12px currentColor);
+}
+
+@keyframes mod-constellation-flow {
+  from { stroke-dashoffset: 0; }
+  to   { stroke-dashoffset: -48; }
+}
+
+/* ── Nodes ───────────────────────────────────────────────────────── */
+
+.mod-constellation-src circle {
+  filter: drop-shadow(0 0 6px currentColor);
+}
+.mod-constellation-src.is-active circle:first-of-type {
+  filter: drop-shadow(0 0 8px currentColor) drop-shadow(0 0 14px currentColor);
+}
+
+.mod-constellation-src-pulse {
+  transform-origin: center;
+  transform-box: fill-box;
+  animation: mod-constellation-pulse 2.8s ease-in-out infinite;
+}
+@keyframes mod-constellation-pulse {
+  0%, 100% { opacity: 0.15; r: 9; }
+  50%      { opacity: 0.55; r: 12; }
+}
+
+.mod-constellation-srclabel,
+.mod-constellation-dstlabel {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  fill: var(--text-tertiary);
+  letter-spacing: 0.04em;
+  pointer-events: none;
+}
+
+.mod-constellation-dst circle {
+  fill: var(--text-secondary);
+  opacity: 0.6;
+}
+
+/* Amount badge mid-curve */
+.mod-constellation-amount rect {
+  fill: var(--bg-panel);
+  stroke: var(--color-border);
+  stroke-width: 1;
+}
+.mod-constellation-amount text {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  fill: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .mod-constellation-thread-line { animation: none; }
+  .mod-constellation-src-pulse { animation: none; opacity: 0.3; }
+}

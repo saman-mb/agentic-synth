@@ -195,6 +195,10 @@
 .knob-mod-env2 .knob-mod-halo { stroke: var(--mod-env2); }
 .knob-mod-macro1 .knob-mod-halo { stroke: var(--mod-macro1); }
 .knob-mod-macro2 .knob-mod-halo { stroke: var(--mod-macro2); }
+.knob-mod-macro3 .knob-mod-halo { stroke: var(--mod-macro3); }
+.knob-mod-macro4 .knob-mod-halo { stroke: var(--mod-macro4); }
+.knob-mod-velocity .knob-mod-halo { stroke: var(--mod-velocity); }
+.knob-mod-keytrack .knob-mod-halo { stroke: var(--mod-keytrack); }
 
 /* ── Mod source animated ring ──────────────────────────────────────── */
 
@@ -213,6 +217,33 @@
 .knob-mod-env2 .knob-mod-ring { stroke: var(--mod-env2); }
 .knob-mod-macro1 .knob-mod-ring { stroke: var(--mod-macro1); }
 .knob-mod-macro2 .knob-mod-ring { stroke: var(--mod-macro2); }
+.knob-mod-macro3 .knob-mod-ring { stroke: var(--mod-macro3); }
+.knob-mod-macro4 .knob-mod-ring { stroke: var(--mod-macro4); }
+.knob-mod-velocity .knob-mod-ring { stroke: var(--mod-velocity); }
+.knob-mod-keytrack .knob-mod-ring { stroke: var(--mod-keytrack); }
+
+/* ── Drop-target halo (Phase 8 drag-to-assign) ─────────────────────── */
+/* While any mod source is being dragged, eligible knobs gain a subtle
+   violet outer glow. When the cursor hovers over them, the glow
+   brightens decisively so the user knows their release will land. */
+
+.knob-root.knob-mod-drop-eligible .knob-plate {
+  filter:
+    drop-shadow(0 1px 0 rgba(255, 255, 255, 0.06))
+    drop-shadow(0 0 6px rgba(124, 77, 255, 0.35));
+}
+
+.knob-root.knob-mod-drop-over .knob-plate {
+  filter:
+    drop-shadow(0 1px 0 rgba(255, 255, 255, 0.10))
+    drop-shadow(0 0 14px rgba(124, 77, 255, 0.85))
+    drop-shadow(0 0 22px rgba(124, 77, 255, 0.55));
+}
+
+.knob-root.knob-mod-drop-over .knob-indicator {
+  stroke: #FFFFFF;
+  filter: drop-shadow(0 0 10px rgba(124, 77, 255, 0.9));
+}
 
 @keyframes knob-mod-flow {
   from { stroke-dashoffset: 0; }
