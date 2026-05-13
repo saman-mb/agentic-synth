@@ -105,3 +105,70 @@
 .settings-row-preview:focus-visible {
   box-shadow: 0 0 0 2px var(--accent-glow);
 }
+
+/* ── Radio rows (theme/motion) ───────────────────────────────────── */
+
+.settings-radio-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0.55rem;
+}
+
+.settings-radio {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 4px;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: border-color 120ms ease, color 120ms ease, background 120ms ease;
+}
+
+.settings-radio:hover,
+.settings-radio:focus-within {
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+}
+
+.settings-radio input[type='radio'] {
+  accent-color: var(--accent-primary);
+  width: 14px;
+  height: 14px;
+  cursor: pointer;
+}
+
+.settings-radio-label {
+  user-select: none;
+}
+
+/* ── Select (MIDI input) ─────────────────────────────────────────── */
+
+.settings-select {
+  margin-top: 0.55rem;
+  background: var(--bg-raised, rgba(0, 0, 0, 0.25));
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: var(--text-primary);
+  padding: 0.35rem 0.5rem;
+  border-radius: 4px;
+  font-size: 0.82rem;
+  font-family: var(--font-sans);
+  min-width: 12rem;
+}
+
+.settings-select:focus-visible {
+  outline: none;
+  border-color: var(--accent-primary);
+  box-shadow: 0 0 0 2px var(--accent-glow);
+}
+
+.settings-row-disabled {
+  margin-top: 0.55rem;
+  font-size: 0.8rem;
+  font-style: italic;
+  color: var(--text-tertiary);
+}

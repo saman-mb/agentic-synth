@@ -458,6 +458,19 @@ body {
   }
 }
 
+/* ── Phase 14 — Motion override (Settings → Motion → Off) ─────────
+   Set globally by SettingsPanel on document.documentElement. Strips
+   every animation + transition site-wide. Heavier than the
+   prefers-reduced-motion overrides above (which target named hot
+   spots); this is the nuclear option for users who want a fully
+   static UI. */
+[data-motion="off"] *,
+[data-motion="off"] *::before,
+[data-motion="off"] *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
 /* ── Legacy panel classes (retained, unused by Phase 4) ──────────── */
 
 .panel-knobs {
