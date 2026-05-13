@@ -129,6 +129,35 @@
   font-size: 0.95rem;
   white-space: pre-wrap;
   word-break: break-word;
+  position: relative;
+  overflow: hidden;
+}
+
+/* Reading sweep — cyan underline that scales left→right for 800ms when the
+ * user submits their prompt. Echoes the 1.8s boot signature. */
+.bubble-text.prompt-submitted::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 2px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--lfo1, #00E5FF) 30%,
+    var(--lfo1, #00E5FF) 70%,
+    transparent 100%
+  );
+  transform: scaleX(0);
+  transform-origin: left center;
+  animation: prompt-read-sweep 800ms var(--ease-considered) forwards;
+  pointer-events: none;
+}
+
+@keyframes prompt-read-sweep {
+  from { transform: scaleX(0); }
+  to   { transform: scaleX(1); }
 }
 
 .message-bubble.user .bubble-text {
@@ -249,11 +278,60 @@
   align-items: flex-end;
 }
 
-.prompt-input {
+/* Prompt input wrap — owns the idle shimmer border. The textarea sits
+ * inside on top of an inset background; the wrapper draws a gradient
+ * frame that animates while idle and snaps to solid violet on focus. */
+.prompt-input-wrap {
   flex: 1;
-  background: var(--bg-inset);
-  border: 1px solid rgba(255, 255, 255, 0.04);
+  position: relative;
   border-radius: var(--r-3);
+  padding: 1px; /* visual border thickness */
+  background:
+    linear-gradient(var(--bg-inset), var(--bg-inset)) padding-box,
+    linear-gradient(
+      90deg,
+      var(--accent-primary),
+      var(--accent-secondary),
+      var(--accent-primary),
+      var(--accent-secondary),
+      var(--accent-primary)
+    ) border-box;
+  background-size: 100% 100%, 300% 100%;
+  background-position: 0 0, 0% 50%;
+  border: 1px solid transparent;
+  transition: background-image 0.2s var(--ease-considered);
+  animation: border-sweep 8s linear infinite;
+}
+
+.prompt-input-wrap.is-focused {
+  /* Solid violet on focus — kill the shimmer entirely. */
+  animation: none;
+  background:
+    linear-gradient(var(--bg-inset), var(--bg-inset)) padding-box,
+    linear-gradient(var(--accent-primary), var(--accent-primary)) border-box;
+}
+
+.prompt-input-wrap.is-generating {
+  /* During generation, slow the shimmer for a calmer "thinking" cadence. */
+  animation-duration: 14s;
+  opacity: 0.7;
+}
+
+@keyframes border-sweep {
+  0%   { background-position: 0 0,   0%   50%; }
+  100% { background-position: 0 0, 300%  50%; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .prompt-input-wrap { animation: none; }
+}
+
+.prompt-input {
+  display: block;
+  width: 100%;
+  background: transparent;
+  border: none;
+  border-radius: calc(var(--r-3) - 1px);
   color: var(--text-primary);
   font-family: var(--font-sans);
   font-size: 0.95rem;
@@ -268,12 +346,10 @@
 
 .prompt-input:focus {
   outline: none;
-  border-color: var(--accent-tint-60, rgba(124, 77, 255, 0.60));
 }
 
 .prompt-input:focus-visible {
-  outline: 2px solid var(--accent-primary);
-  outline-offset: 2px;
+  outline: none; /* wrapper draws the focus ring via .is-focused */
 }
 
 .prompt-input:disabled {
@@ -300,6 +376,80 @@
 .send-btn:hover:not(:disabled) { opacity: 0.85; }
 .send-btn:active:not(:disabled) { transform: scale(0.95); }
 .send-btn:disabled { opacity: 0.3; cursor: default; }
+
+/* JS-triggered 100ms scale-down pulse on submit (overrides :active styles). */
+.send-btn.send-pulse { animation: send-pulse 100ms var(--ease-considered); }
+@keyframes send-pulse {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(0.92); }
+  100% { transform: scale(1); }
+}
+
+/* While generating, the send button hosts three cycling dots in place of the
+ * arrow. Each dot fades in/out staggered 160ms so the trio reads as a small
+ * idle ellipsis — not a spinner — matching the typographic mood. */
+.send-btn.is-generating { opacity: 0.75; }
+
+.send-dots {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.send-dots > span {
+  display: block;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: var(--text-primary);
+  opacity: 0.3;
+  animation: send-dot 1.05s var(--ease-considered) infinite;
+}
+.send-dots > span:nth-child(2) { animation-delay: 160ms; }
+.send-dots > span:nth-child(3) { animation-delay: 320ms; }
+@keyframes send-dot {
+  0%, 100% { opacity: 0.25; transform: translateY(0); }
+  50%      { opacity: 1;    transform: translateY(-2px); }
+}
+
+/* ── Reasoning ticker ────────────────────────────────────────────── */
+
+.reasoning-ticker {
+  height: 80px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 0 1.25rem 0.5rem;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-tertiary);
+  letter-spacing: 0.02em;
+  opacity: 0;
+  transition: opacity 240ms var(--ease-considered);
+  pointer-events: none;
+  overflow: hidden;
+}
+
+.reasoning-ticker.is-active {
+  opacity: 1;
+}
+
+.reasoning-line {
+  display: block;
+  opacity: 0;
+  animation: ticker-line 2100ms var(--ease-considered) forwards;
+}
+
+@keyframes ticker-line {
+  0%    { opacity: 0; transform: translateY(2px); }
+  14%   { opacity: 0.85; transform: translateY(0); }    /* 300ms in */
+  86%   { opacity: 0.85; transform: translateY(0); }    /* hold 1500ms */
+  100%  { opacity: 0; transform: translateY(-2px); }    /* fade out 300ms */
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reasoning-line { animation: none; opacity: 0.6; }
+}
 
 /* ── Accessibility ────────────────────────────────────────────────── */
 

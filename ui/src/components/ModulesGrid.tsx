@@ -1,4 +1,4 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Knob } from './Knob';
 import type { PatchParams } from './KnobGrid';
 import './ModulesGrid.css';
@@ -20,7 +20,30 @@ interface ModulesGridProps {
   patch: PatchParams;
   agentKeys: Set<string>;
   onKnobChange: (param: string, value: number) => void;
+  // When non-null and changes, knobs lerp from their current displayed value
+  // to the new value, staggered by signal-flow stage. The token value is just
+  // a monotonically-increasing counter used to invalidate stale animations.
+  patchLoadToken?: number;
 }
+
+// Signal-flow stage index per param prefix. Drives the staggered settle when
+// the AI lands a fresh patch: OSC1 → OSC2 → OSC3 → FILTER → AMP_ENV →
+// FILTER_ENV → LFO1 → LFO2 → REVERB → DELAY (→ GLOBAL).
+function stageForParam(param: string): number {
+  if (param.startsWith('osc.0')) return 0;
+  if (param.startsWith('osc.1')) return 1;
+  if (param.startsWith('osc.2')) return 2;
+  if (param.startsWith('filter.')) return 3;
+  if (param.startsWith('amp_env.')) return 4;
+  if (param.startsWith('filter_env.')) return 5;
+  if (param.startsWith('lfo.0')) return 6;
+  if (param.startsWith('lfo.1')) return 7;
+  if (param.startsWith('reverb.')) return 8;
+  if (param.startsWith('delay.')) return 9;
+  return 10; // master_gain, portamento_s
+}
+
+const STAGE_STEP_MS = 60;
 
 interface KnobSpec {
   param: string;
@@ -32,7 +55,27 @@ interface KnobSpec {
   decimals?: number;
 }
 
-export function ModulesGrid({ patch, agentKeys, onKnobChange }: ModulesGridProps) {
+export function ModulesGrid({
+  patch,
+  agentKeys,
+  onKnobChange,
+  patchLoadToken,
+}: ModulesGridProps) {
+  // When a patch-load token bumps, open a brief animation window during
+  // which any knob whose value changes will lerp from old → new with a
+  // stage-based delay. The window closes after the last stage finishes
+  // (max stage delay + dur-patch), after which knob value changes snap
+  // again (the user-drag default).
+  const [animateWindow, setAnimateWindow] = useState(false);
+  useEffect(() => {
+    if (patchLoadToken === undefined || patchLoadToken <= 0) return;
+    setAnimateWindow(true);
+    const MAX_STAGE = 10;
+    const t = setTimeout(() => setAnimateWindow(false), MAX_STAGE * STAGE_STEP_MS + 1100 + 50);
+    return () => clearTimeout(t);
+  }, [patchLoadToken]);
+  const animatePatchLoad = animateWindow;
+
   const renderKnob = useCallback(
     (spec: KnobSpec) => {
       const { param, value, min, max, label, unit, decimals } = spec;
@@ -43,6 +86,7 @@ export function ModulesGrid({ patch, agentKeys, onKnobChange }: ModulesGridProps
       const display = unit ? `${value.toFixed(d)}${unit}` : value.toFixed(d);
       const bipolar = min < 0 && max > 0;
       const defaultNorm = bipolar ? 0.5 : 0;
+      const animateDelayMs = animatePatchLoad ? stageForParam(param) * STAGE_STEP_MS : 0;
       return (
         <div key={param} className={`knob-slot${edited ? ' knob-slot-agent' : ''}`}>
           {edited && (
@@ -56,11 +100,13 @@ export function ModulesGrid({ patch, agentKeys, onKnobChange }: ModulesGridProps
             defaultValue={defaultNorm}
             onChange={(v) => onKnobChange(param, min + v * range)}
             agentDriven={edited}
+            animatePatchLoad={animatePatchLoad}
+            animateDelayMs={animateDelayMs}
           />
         </div>
       );
     },
-    [agentKeys, onKnobChange],
+    [agentKeys, onKnobChange, animatePatchLoad],
   );
 
   // Per-oscillator knob set (compact: vol/detune/semi/pan/PW + FM ratio/depth).

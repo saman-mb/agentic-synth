@@ -132,6 +132,11 @@ export function App() {
   // Sticky set of params edited in the most recent agent generation.
   // Persists until the NEXT agent generation arrives (no transient flash).
   const [lastAgentEditBatch, setLastAgentEditBatch] = useState<Set<string>>(new Set());
+  // Monotonically-increasing token bumped each time a patch lands from a
+  // non-user source (agent / preset / variation). ModulesGrid watches this
+  // to open a one-shot animation window for the orchestrated knob settle.
+  const [patchLoadToken, setPatchLoadToken] = useState<number>(0);
+  const bumpPatchLoad = useCallback(() => setPatchLoadToken((n) => n + 1), []);
   const [transcript, setTranscript] = useState('');
   const [theme, setTheme] = useState<Theme>(getInitialTheme);
   // Boot splash visibility — tracked in state (not a ref) so React unmounts
@@ -222,12 +227,13 @@ export function App() {
       for (const [p, v] of Object.entries(params)) next = applyParamToPatch(next, p, v);
       ph.push(next, source);
       setLastAgentEditBatch(new Set(Object.keys(params)));
+      bumpPatchLoad();
       // Forward to the audio bridge so the C++ engine sees the change too.
       for (const [p, v] of Object.entries(params)) {
         sendMessage(JSON.stringify({ type: 'knob_tweak', param: p, value: v }));
       }
     },
-    [patch, ph, sendMessage],
+    [patch, ph, sendMessage, bumpPatchLoad],
   );
 
   useEffect(() => {
@@ -242,6 +248,7 @@ export function App() {
         ph.push(next, 'agent');
         // Sticky: replace the batch wholesale; no timer-driven clear.
         setLastAgentEditBatch(new Set(Object.keys(params)));
+        bumpPatchLoad();
       } else if (msg.type === 'transcript' && typeof msg.text === 'string') {
         setTranscript(msg.text as string);
       }
@@ -365,11 +372,12 @@ export function App() {
       }
       suppressCaptureRef.current = true;
       ph.push(nextPatch, 'preset');
+      bumpPatchLoad();
       for (const [p, v] of Object.entries(diff)) {
         sendMessage(JSON.stringify({ type: 'knob_tweak', param: p, value: v }));
       }
     },
-    [patch, ph, sendMessage],
+    [patch, ph, sendMessage, bumpPatchLoad],
   );
 
   // ── A/B slot switching (Phase 6) ───────────────────────────────────
@@ -393,11 +401,12 @@ export function App() {
       }
       suppressCaptureRef.current = true;
       ph.push(nextPatch, 'preset');
+      bumpPatchLoad();
       for (const [p, v] of Object.entries(diff)) {
         sendMessage(JSON.stringify({ type: 'knob_tweak', param: p, value: v }));
       }
     },
-    [activeSlot, inactiveSlotPatch, patch, ph, sendMessage],
+    [activeSlot, inactiveSlotPatch, patch, ph, sendMessage, bumpPatchLoad],
   );
 
   // Copy active slot's patch into the inactive slot.
@@ -494,6 +503,31 @@ export function App() {
     return () => window.removeEventListener('keydown', handler);
   }, [handleUndo, handleRedo]);
 
+  // Cmd/Ctrl+K = focus the AI prompt input. Skip when an editable target
+  // already has focus (so users typing in another input aren't yanked away)
+  // and skip when the Tools drawer is open (it owns Cmd+K for its own
+  // search). The prompt input is identified by class .prompt-input — added
+  // by ChatInterface — and we focus the first match in the document.
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (!(e.metaKey || e.ctrlKey)) return;
+      if (e.key.toLowerCase() !== 'k') return;
+      if (toolsOpen) return; // let the drawer claim Cmd+K when it's open
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable)) {
+        return;
+      }
+      const promptEl = document.querySelector<HTMLTextAreaElement>('.prompt-input');
+      if (!promptEl) return;
+      e.preventDefault();
+      promptEl.focus();
+      // Scroll into view in case the chat dock is partially clipped.
+      promptEl.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [toolsOpen]);
+
   // AuditionKeyboard "ready" — true once the bridge is connected so the
   // user knows their click will actually trigger a note. WebSocket.OPEN === 1.
   const auditionReady = readyState === 1;
@@ -532,6 +566,7 @@ export function App() {
           patch={patch}
           agentKeys={lastAgentEditBatch}
           onKnobChange={handleKnobChange}
+          patchLoadToken={patchLoadToken}
         />
         <RightColumn
           externalTranscript={transcript}
