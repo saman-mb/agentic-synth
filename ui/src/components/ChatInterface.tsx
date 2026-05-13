@@ -355,7 +355,7 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation, 
   const listEndRef = useRef<HTMLDivElement>(null);
   const streamingIdRef = useRef<string | null>(null);
 
-  const { status, send, lastMessage } = useSynthBridge();
+  const { status, send, lastMessage, subscribe } = useSynthBridge();
 
   // Populate input from external transcript (Whisper STT result)
   useEffect(() => {
@@ -367,12 +367,16 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation, 
     listEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Handle incoming WebSocket frames
+  // Handle incoming WebSocket frames.
+  // Subscribe to the synchronous bridge stream so multi-event bursts
+  // (notifyPatch → notifyToken → notifyRationale → notifyDone in one
+  // C++ tick) all reach handleWireMessage. React state path (lastMessage)
+  // would batch them and only the last frame would propagate.
   useEffect(() => {
-    if (!lastMessage) return;
-    handleWireMessage(lastMessage);
+    const unsub = subscribe((msg) => handleWireMessage(msg));
+    return unsub;
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lastMessage]);
+  }, [subscribe]);
 
   const handleWireMessage = useCallback(
     (msg: WireIncoming) => {

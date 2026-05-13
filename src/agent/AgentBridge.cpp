@@ -30,6 +30,20 @@ juce::var patchToVar(const PatchStruct& p) {
 } // namespace
 
 AgentBridge::AgentBridge() {
+    // Load the bundled TIMBRE sound-designer briefing (system-prompt.md)
+    // and inject it into both samplers BEFORE wiring the Gemini key — the
+    // GeminiSampler copies the prompt at setSystemPrompt() time, so we want
+    // the rich briefing in place before that copy happens. Without this,
+    // both samplers fall back to a stub generic prompt and the LLM emits
+    // safe, characterless patches.
+    auto systemPrompt = mapper::GrammarSampler::loadSystemPromptFile();
+    if (!systemPrompt.empty()) {
+        sampler_.setSystemPrompt(systemPrompt);
+        std::cerr << "[AgentBridge] system-prompt.md loaded (" << systemPrompt.size() << " bytes)\n";
+    } else {
+        std::cerr << "[AgentBridge] system-prompt.md not found; samplers will use stub fallback\n";
+    }
+
     // Look up GEMINI_KEY (env var, falling back to a `.env` walked up from
     // cwd). When found, enable the GeminiSampler so PromptHandler can use
     // it as a cloud fallback whenever the local llama.cpp /completion

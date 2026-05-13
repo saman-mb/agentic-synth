@@ -77,6 +77,18 @@ interface UseSynthBridgeReturn {
   status: BridgeStatus;
   send: (msg: WireOutgoing) => void;
   lastMessage: WireIncoming | null;
+  // Synchronous per-message subscribe. Use instead of `lastMessage`
+  // when the C++ side fires multiple events in one tick — React state
+  // gets batched and intermediates are lost.
+  subscribe: (cb: (msg: WireIncoming) => void) => () => void;
+}
+
+// Module-scoped per-event subscriber set. Bypasses React state so every
+// event fires every subscriber synchronously in order.
+type SyncListener = (msg: WireIncoming) => void;
+const syncListeners = new Set<SyncListener>();
+function fireSync(msg: WireIncoming): void {
+  for (const cb of syncListeners) cb(msg);
 }
 
 export function useSynthBridge(): UseSynthBridgeReturn {
@@ -84,6 +96,46 @@ export function useSynthBridge(): UseSynthBridgeReturn {
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [status, setStatus] = useState<BridgeStatus>(usingJuce ? 'open' : 'connecting');
   const [lastMessage, setLastMessage] = useState<WireIncoming | null>(null);
+  // Bridge messages may arrive in bursts (notifyPatch → notifyToken →
+  // notifyRationale → notifyDone all in one C++ tick). React 18 batches
+  // setLastMessage so only the last value survives — intermediates get
+  // dropped. We buffer them in a ref-backed queue and flush ONE per
+  // microtask via setLastMessage, guaranteeing every consumer sees every
+  // message in order.
+  const queueRef = useRef<WireIncoming[]>([]);
+  const flushScheduledRef = useRef(false);
+
+  const enqueueMessage = useCallback((msg: WireIncoming) => {
+    // Fire synchronous subscribers FIRST — no batching, no loss.
+    fireSync(msg);
+    queueRef.current.push(msg);
+    if (flushScheduledRef.current) return;
+    flushScheduledRef.current = true;
+    queueMicrotask(() => {
+      flushScheduledRef.current = false;
+      const next = queueRef.current.shift();
+      if (next !== undefined) setLastMessage(next);
+      // If more remain (multi-burst), drain on subsequent microtasks so
+      // React can render between each setLastMessage call.
+      if (queueRef.current.length > 0) {
+        flushScheduledRef.current = true;
+        Promise.resolve().then(() => {
+          flushScheduledRef.current = false;
+          const m = queueRef.current.shift();
+          if (m !== undefined) setLastMessage(m);
+          // Keep draining as long as queue non-empty.
+          const tick = () => {
+            const x = queueRef.current.shift();
+            if (x !== undefined) {
+              setLastMessage(x);
+              if (queueRef.current.length > 0) Promise.resolve().then(tick);
+            }
+          };
+          if (queueRef.current.length > 0) Promise.resolve().then(tick);
+        });
+      }
+    });
+  }, []);
 
   // ── JUCE native bridge path ────────────────────────────────────────────────
   useEffect(() => {
@@ -96,9 +148,9 @@ export function useSynthBridge(): UseSynthBridgeReturn {
       const id = juce.backend.addEventListener(type, (payload) => {
         const base = { type } as unknown as WireIncoming;
         if (extract) {
-          setLastMessage({ ...base, ...extract(payload) } as WireIncoming);
+          enqueueMessage({ ...base, ...extract(payload) } as WireIncoming);
         } else {
-          setLastMessage({ ...base, ...(payload as object) } as WireIncoming);
+          enqueueMessage({ ...base, ...(payload as object) } as WireIncoming);
         }
       });
       tokens.push(id);
@@ -110,22 +162,17 @@ export function useSynthBridge(): UseSynthBridgeReturn {
     wrap('error');
     wrap('rationale');
     wrap('suggest_variations');
-    // patch_update and transcript aren't in the WireIncoming union today;
-    // App.tsx parses them via useWebSocket's raw lastMessage. To preserve
-    // observable parity we still route them through setLastMessage as
-    // best-effort generic objects (consumers will see them via their own
-    // hooks once those migrate in a follow-up).
     juce.backend.addEventListener('patch_update', (payload) => {
-      setLastMessage({ type: 'patch_update' as unknown as WireIncoming['type'], ...(payload as object) } as unknown as WireIncoming);
+      enqueueMessage({ type: 'patch_update' as unknown as WireIncoming['type'], ...(payload as object) } as unknown as WireIncoming);
     });
     juce.backend.addEventListener('transcript', (payload) => {
-      setLastMessage({ type: 'transcript' as unknown as WireIncoming['type'], ...(payload as object) } as unknown as WireIncoming);
+      enqueueMessage({ type: 'transcript' as unknown as WireIncoming['type'], ...(payload as object) } as unknown as WireIncoming);
     });
 
     return () => {
       for (const id of tokens) juce.backend.removeEventListener(id);
     };
-  }, []);
+  }, [enqueueMessage]);
 
   // ── WebSocket path (browser-only dev) ──────────────────────────────────────
   const connect = useCallback(() => {
@@ -225,5 +272,10 @@ export function useSynthBridge(): UseSynthBridgeReturn {
     }
   }, []);
 
-  return { status, send, lastMessage };
+  const subscribe = useCallback((cb: (msg: WireIncoming) => void) => {
+    syncListeners.add(cb);
+    return () => { syncListeners.delete(cb); };
+  }, []);
+
+  return { status, send, lastMessage, subscribe };
 }

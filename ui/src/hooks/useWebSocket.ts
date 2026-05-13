@@ -7,6 +7,13 @@ export interface UseWebSocketReturn {
   sendMessage: (msg: string) => void;
   sendBinary: (data: ArrayBuffer) => void;
   readyState: WSReadyState;
+  // Subscribe to EVERY inbound message synchronously. lastMessage is
+  // React state and gets batched/coalesced under React 18 automatic
+  // batching when the C++ side emits multiple events back-to-back
+  // (notifyPatch → notifyToken → notifyRationale → notifyDone) — only
+  // the final state survives, intermediates are lost. This callback
+  // fires once per message, no batching.
+  subscribe: (cb: (msg: Record<string, unknown>) => void) => () => void;
 }
 
 // Phase 5: when running inside the JUCE 8 WebBrowserComponent host,
@@ -168,7 +175,16 @@ export function useWebSocket(url: string): UseWebSocketReturn {
     const tokens: number[] = [];
     for (const name of INBOUND_EVENTS) {
       const id = juce.backend.addEventListener(name, (payload) => {
-        setLastMessage(JSON.stringify({ type: name, ...(payload as object) }));
+        // Fire BOTH React state (lastMessage) AND the inbound queue.
+        // Reason: when the C++ side emits multiple events synchronously
+        // (notifyPatch → notifyToken → notifyRationale → notifyDone all
+        // back-to-back), React 18 batches setLastMessage and only the
+        // final state propagates to effects — the intermediate events
+        // get dropped on the floor. emitInbound runs synchronously per
+        // event so all subscribers see every frame.
+        const msg = { type: name, ...(payload as object) };
+        setLastMessage(JSON.stringify(msg));
+        emitInbound(msg);
       });
       tokens.push(id);
     }
@@ -248,5 +264,10 @@ export function useWebSocket(url: string): UseWebSocketReturn {
     }
   }, []);
 
-  return { lastMessage, sendMessage, sendBinary, readyState };
+  const subscribe = useCallback((cb: (msg: Record<string, unknown>) => void) => {
+    inboundListeners.add(cb);
+    return () => { inboundListeners.delete(cb); };
+  }, []);
+
+  return { lastMessage, sendMessage, sendBinary, readyState, subscribe };
 }

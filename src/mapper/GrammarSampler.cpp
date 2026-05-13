@@ -43,6 +43,48 @@ GrammarSampler::GrammarSampler(GrammarSamplerConfig cfg) : cfg_(std::move(cfg)) 
 }
 
 // ---------------------------------------------------------------------------
+// loadSystemPromptFile — pulls the bundled TIMBRE briefing from disk.
+//
+// The system prompt lives in source control (src/mapper/system-prompt.md) so
+// it can be reviewed like code. At runtime we need an absolute path to it.
+// We try three resolution paths in order so the same call works for unit
+// tests (compile-time define resolves to repo root), local dev runs (env
+// var override or cwd-relative), and shipped builds (whoever bundles the
+// resource passes its absolute path via the override).
+//
+// On any failure we return an empty string; callers degrade to the
+// previously-embedded fallback prompt rather than crash, so an unreadable
+// prompt file does not break the LLM pipeline.
+// ---------------------------------------------------------------------------
+
+std::string GrammarSampler::loadSystemPromptFile(const std::string& override_path) {
+    auto try_read = [](const std::string& path) -> std::string {
+        if (path.empty())
+            return {};
+        std::ifstream f(path);
+        if (!f)
+            return {};
+        std::ostringstream ss;
+        ss << f.rdbuf();
+        return ss.str();
+    };
+
+    if (auto txt = try_read(override_path); !txt.empty())
+        return txt;
+
+#ifdef AGENTIC_SYNTH_SYSTEM_PROMPT_PATH
+    if (auto txt = try_read(AGENTIC_SYNTH_SYSTEM_PROMPT_PATH); !txt.empty())
+        return txt;
+#endif
+
+    // Dev fallback — run from repo root.
+    if (auto txt = try_read("src/mapper/system-prompt.md"); !txt.empty())
+        return txt;
+
+    return {};
+}
+
+// ---------------------------------------------------------------------------
 // JSON reader — sequential parser for GBNF-constrained output
 // ---------------------------------------------------------------------------
 
