@@ -247,19 +247,27 @@ export function KnobGrid({ patch, agentKeys, onKnobChange }: KnobGridProps) {
   const k = useCallback(
     (param: string, value: number, min: number, max: number, label: string, unit?: string, decimals?: number) => {
       const edited = agentKeys.has(param);
+      const range = max - min;
+      const norm = range === 0 ? 0 : Math.max(0, Math.min(1, (value - min) / range));
+      const d = decimals ?? 2;
+      const display = unit ? `${value.toFixed(d)}${unit}` : value.toFixed(d);
+      // Bipolar arc when the parameter range straddles zero (Pan, Detune,
+      // Semi, EnvMod). The visual cue helps users find true-center fast.
+      const bipolar = min < 0 && max > 0;
+      // Default to true-center for bipolar params, otherwise 0.
+      const defaultNorm = bipolar ? 0.5 : 0;
       return (
         <div key={param} className={`knob-slot${edited ? ' knob-slot-agent' : ''}`}>
           {edited && (
             <span className="knob-agent-badge" aria-label="Edited by agent" title="Edited by agent">AI</span>
           )}
           <Knob
-            value={value}
-            min={min}
-            max={max}
-            label={label}
-            unit={unit}
-            decimals={decimals}
-            onChange={(v) => onKnobChange(param, v)}
+            value={norm}
+            name={label}
+            displayValue={display}
+            bipolar={bipolar}
+            defaultValue={defaultNorm}
+            onChange={(v) => onKnobChange(param, min + v * range)}
             agentDriven={edited}
           />
         </div>

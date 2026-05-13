@@ -1,0 +1,253 @@
+/* ============================================================================
+ * TIMBRE Knob — visual + interaction styling.
+ * Tokens come from App.css (--bg-raised, --accent-primary, --mod-*, etc).
+ *
+ * Layered anatomy (outer → inner):
+ *   1. Mod amount halo            (.knob-mod-halo)
+ *   2. Mod source ring (animated) (.knob-mod-ring)
+ *   3. Track (full 270° arc)      (.knob-track)
+ *   4. Bipolar center tick        (.knob-center-tick)
+ *   5. Fill arc                   (.knob-fill)
+ *   6. Plate + plate hairline     (.knob-plate / .knob-plate-ring)
+ *   7. Indicator                  (.knob-indicator)
+ * ========================================================================= */
+
+.knob-root {
+  --knob-size: 52px;
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  user-select: none;
+  position: relative;
+  cursor: ns-resize;
+  /* The outline is drawn by the global focus-visible rules in App.css —
+     repeat here so size variants stay tidy. */
+  outline: none;
+}
+
+.knob-root.knob-disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+.knob-root:focus { outline: none; }
+.knob-root:focus-visible {
+  outline: 2px solid var(--accent-primary);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Dial wrapper holds the SVG + center-value overlay (which sits above). */
+.knob-dial {
+  position: relative;
+  width: var(--knob-size);
+  height: var(--knob-size);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.knob-svg {
+  display: block;
+  width: var(--knob-size);
+  height: var(--knob-size);
+  overflow: visible; /* mod ring + halo extend slightly outside trackR */
+}
+
+/* ── Track ─────────────────────────────────────────────────────────── */
+
+.knob-track {
+  stroke: var(--bg-raised);
+  transition: stroke 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.knob-root.knob-hover .knob-track {
+  /* Slight brighten on hover so the empty portion gains presence. */
+  stroke: #2a2e38;
+}
+
+/* ── Bipolar center tick ───────────────────────────────────────────── */
+
+.knob-center-tick {
+  stroke: var(--text-tertiary);
+  opacity: 0.7;
+}
+
+/* ── Fill arc ──────────────────────────────────────────────────────── */
+
+.knob-fill {
+  transition: filter 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.knob-root.knob-hover .knob-fill {
+  filter: drop-shadow(0 0 3px var(--accent-glow));
+}
+
+.knob-root.knob-dragging .knob-fill {
+  filter: drop-shadow(0 0 6px var(--accent-glow));
+}
+
+/* ── Plate ─────────────────────────────────────────────────────────── */
+
+.knob-plate {
+  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.06))
+          drop-shadow(0 -1px 0 rgba(0, 0, 0, 0.5));
+  transition: filter 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.knob-plate-ring {
+  stroke: rgba(255, 255, 255, 0.05);
+  /* Hairline ring atop the plate for a 1px outset highlight. */
+}
+
+.knob-root.knob-hover .knob-plate {
+  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.10))
+          drop-shadow(0 -1px 0 rgba(0, 0, 0, 0.6))
+          drop-shadow(0 0 6px rgba(124, 77, 255, 0.10));
+}
+
+.knob-root.knob-dragging .knob-plate {
+  filter: drop-shadow(0 1px 0 rgba(255, 255, 255, 0.12))
+          drop-shadow(0 0 14px var(--accent-glow));
+}
+
+/* ── Indicator (the white needle) ──────────────────────────────────── */
+
+.knob-indicator {
+  stroke: #F5F7FA;
+  filter: drop-shadow(0 0 4px var(--accent-glow));
+  transition:
+    filter 180ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    stroke 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.knob-root.knob-hover .knob-indicator {
+  filter: drop-shadow(0 0 8px var(--accent-glow));
+}
+
+.knob-root.knob-dragging .knob-indicator {
+  stroke: #FFFFFF;
+  filter: drop-shadow(0 0 12px var(--accent-glow));
+}
+
+/* ── Labels ────────────────────────────────────────────────────────── */
+
+.knob-name {
+  font-family: var(--font-sans, 'Inter', system-ui, sans-serif);
+  font-size: 10px;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary);
+  line-height: 1.2;
+  text-align: center;
+  pointer-events: none;
+  white-space: nowrap;
+  transition: opacity 180ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* When active drag is happening, name fades out and the center-value
+   replaces it visually inside the plate. */
+.knob-root.knob-dragging .knob-name {
+  opacity: 0.35;
+}
+
+.knob-center-value {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-variant-numeric: tabular-nums;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 120ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.knob-center-value.is-visible {
+  opacity: 1;
+}
+
+/* Size-specific font scaling for the center value — keep it readable
+   on small knobs without overflowing the plate. */
+.knob-root.knob-sm .knob-center-value { font-size: 10px; }
+.knob-root.knob-md .knob-center-value { font-size: 12px; }
+.knob-root.knob-lg .knob-center-value { font-size: 14px; }
+
+.knob-root.knob-sm .knob-name { font-size: 9px; }
+.knob-root.knob-lg .knob-name { font-size: 11px; }
+
+/* ── Modulation halo (outermost, faint, proportional) ──────────────── */
+
+.knob-mod-halo {
+  opacity: 0.35;
+}
+.knob-mod-lfo1 .knob-mod-halo { stroke: var(--mod-lfo1); }
+.knob-mod-lfo2 .knob-mod-halo { stroke: var(--mod-lfo2); }
+.knob-mod-env1 .knob-mod-halo { stroke: var(--mod-env1); }
+.knob-mod-env2 .knob-mod-halo { stroke: var(--mod-env2); }
+.knob-mod-macro1 .knob-mod-halo { stroke: var(--mod-macro1); }
+.knob-mod-macro2 .knob-mod-halo { stroke: var(--mod-macro2); }
+
+/* ── Mod source animated ring ──────────────────────────────────────── */
+
+.knob-mod-ring {
+  /* stroke-dasharray creates a flowing dotted segment that rotates.
+     The opacity oscillation matches a 2s sine breath. */
+  stroke-dasharray: 6 4;
+  animation:
+    knob-mod-flow 3s linear infinite,
+    knob-mod-breathe 2s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+}
+
+.knob-mod-lfo1 .knob-mod-ring { stroke: var(--mod-lfo1); }
+.knob-mod-lfo2 .knob-mod-ring { stroke: var(--mod-lfo2); }
+.knob-mod-env1 .knob-mod-ring { stroke: var(--mod-env1); }
+.knob-mod-env2 .knob-mod-ring { stroke: var(--mod-env2); }
+.knob-mod-macro1 .knob-mod-ring { stroke: var(--mod-macro1); }
+.knob-mod-macro2 .knob-mod-ring { stroke: var(--mod-macro2); }
+
+@keyframes knob-mod-flow {
+  from { stroke-dashoffset: 0; }
+  to   { stroke-dashoffset: -40; }
+}
+
+@keyframes knob-mod-breathe {
+  0%, 100% { opacity: 0.4; }
+  50%      { opacity: 0.9; }
+}
+
+/* Reduced-motion override — keep mod ring visible but stop the animation
+   so vestibular users aren't bothered by constant motion in the panel. */
+@media (prefers-reduced-motion: reduce) {
+  .knob-mod-ring {
+    animation: none;
+    opacity: 0.7;
+  }
+  .knob-name,
+  .knob-center-value,
+  .knob-fill,
+  .knob-plate,
+  .knob-indicator,
+  .knob-track {
+    transition: none;
+  }
+}
+
+/* ── Agent-driven flash ────────────────────────────────────────────── */
+
+.knob-root.knob-agent-flash .knob-fill {
+  animation: knob-agent-pulse 400ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+@keyframes knob-agent-pulse {
+  0%   { filter: drop-shadow(0 0 12px var(--accent-secondary)); }
+  100% { filter: drop-shadow(0 0 3px var(--accent-glow)); }
+}
