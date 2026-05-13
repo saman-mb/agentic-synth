@@ -26,6 +26,8 @@ import {
   loadModMatrix,
   saveModMatrix,
   makeConnectionId,
+  PARAM_RANGES,
+  macroIndexOf,
 } from './data/modulation';
 
 type Theme = 'dark' | 'light';
@@ -398,8 +400,87 @@ export function App() {
 
   const { lastMessage, sendMessage, sendBinary, readyState } = useWebSocket(KNOB_BRIDGE_URL);
 
+  // ── Macro projection (Phase 13) ───────────────────────────────────
+  // Apply the sum of all enabled macro ModConnections on top of the
+  // base patch. Each connection contributes:
+  //
+  //   delta = macro.value (0..1) * connection.amount (-1..1) * paramRange
+  //
+  // The result is clamped to the destination param's natural [min,max]
+  // range. Returns the base reference when nothing applies (so React
+  // identity stays stable and the no-op path doesn't allocate).
+  //
+  // Sums-across-macros: multiple macros into the same destination
+  // accumulate into one delta before being applied & clamped, so the
+  // ordering of connections in the matrix doesn't matter.
+  const computeEffectivePatch = useCallback(
+    (base: PatchParams, mat: ModMatrix, macs: MacroState[]): PatchParams => {
+      const deltas: Record<string, number> = {};
+      let anyApplied = false;
+      for (const c of mat.connections) {
+        if (!c.enabled) continue;
+        const idx = macroIndexOf(c.source);
+        if (idx < 0) continue;
+        const macVal = macs[idx]?.value ?? 0;
+        if (macVal === 0 || c.amount === 0) continue;
+        const range = PARAM_RANGES[c.destination];
+        if (!range) continue;
+        const span = range.max - range.min;
+        const delta = macVal * c.amount * span;
+        deltas[c.destination] = (deltas[c.destination] ?? 0) + delta;
+        anyApplied = true;
+      }
+      if (!anyApplied) return base;
+      const baseFlat = flattenPatch(base);
+      let next = base;
+      for (const [dest, d] of Object.entries(deltas)) {
+        const baseVal = baseFlat[dest];
+        if (baseVal === undefined) continue;
+        const range = PARAM_RANGES[dest];
+        const raw = baseVal + d;
+        const clamped = Math.max(range.min, Math.min(range.max, raw));
+        next = applyParamToPatch(next, dest, clamped);
+      }
+      return next;
+    },
+    [],
+  );
+
+  // Effective patch = base patch + active macro modulation. This is what
+  // the C++ engine actually hears.
+  const effectivePatch = useMemo(
+    () => computeEffectivePatch(patch, modMatrix, macros),
+    [patch, modMatrix, macros, computeEffectivePatch],
+  );
+
+  // Single-source-of-truth bridge dispatch. Every change to the
+  // effective patch — whether driven by knob move, agent batch, preset
+  // load, A/B switch, undo/redo, or a macro turning — is diffed against
+  // what we last sent to the engine and forwarded as knob_tweak frames.
+  //
+  // Macro modulation is intentionally NOT pushed into history: history
+  // tracks the base patch only, so undo reverts the committed musical
+  // state and the macro automation re-applies on top.
+  const lastSentEffectiveRef = useRef<PatchParams | null>(null);
+  useEffect(() => {
+    const prev = lastSentEffectiveRef.current;
+    if (prev === null) {
+      // First render: prime the ref but don't broadcast — the engine's
+      // own init state matches ours.
+      lastSentEffectiveRef.current = effectivePatch;
+      return;
+    }
+    if (prev === effectivePatch) return;
+    const diff = diffPatch(prev, effectivePatch);
+    lastSentEffectiveRef.current = effectivePatch;
+    for (const [p, v] of Object.entries(diff)) {
+      sendMessage(JSON.stringify({ type: 'knob_tweak', param: p, value: v }));
+    }
+  }, [effectivePatch, sendMessage]);
+
   // Apply a batch of param edits as if the agent had just produced them.
   // Replaces lastAgentEditBatch so the sticky badge tracks only the latest generation.
+  // Engine notification is handled by the effectivePatch effect.
   const applyAgentBatch = useCallback(
     (params: Record<string, number>, source: 'agent' | 'variation' = 'agent') => {
       let next = patch;
@@ -407,12 +488,8 @@ export function App() {
       ph.push(next, source);
       setLastAgentEditBatch(new Set(Object.keys(params)));
       bumpPatchLoad();
-      // Forward to the audio bridge so the C++ engine sees the change too.
-      for (const [p, v] of Object.entries(params)) {
-        sendMessage(JSON.stringify({ type: 'knob_tweak', param: p, value: v }));
-      }
     },
-    [patch, ph, sendMessage, bumpPatchLoad],
+    [patch, ph, bumpPatchLoad],
   );
 
   useEffect(() => {
@@ -515,9 +592,9 @@ export function App() {
     (param: string, value: number) => {
       const next = applyParamToPatch(patch, param, value);
       ph.push(next, 'user');
-      sendMessage(JSON.stringify({ type: 'knob_tweak', param, value }));
+      // Engine notification handled by the effectivePatch effect.
     },
-    [patch, ph, sendMessage],
+    [patch, ph],
   );
 
   // Wired into ChatInterface — "Use A" / "Use B" buttons hand the chosen
@@ -552,12 +629,59 @@ export function App() {
       suppressCaptureRef.current = true;
       ph.push(nextPatch, 'preset');
       bumpPatchLoad();
+      // Engine notification handled by the effectivePatch effect.
+    },
+    [patch, ph, bumpPatchLoad],
+  );
+
+  // ── Preset audition (Phase 13) ────────────────────────────────────
+  // Ephemerally push a preset to the engine WITHOUT touching React
+  // history/patch state. Used by PresetsSidebar's hover-preview: a
+  // 300ms timer fires after pointer-enter; on pointer-leave the prior
+  // engine state is restored via cancelAudition().
+  //
+  // We diff against `lastSentEffectiveRef` (what the engine currently
+  // hears) rather than `patch`, so subsequent macro changes or knob
+  // moves during audition don't double-overwrite.
+  const auditionRevertRef = useRef<Record<string, number> | null>(null);
+  const auditionPreset = useCallback(
+    (next: PatchParams) => {
+      const cur = lastSentEffectiveRef.current ?? patch;
+      // If a prior audition is still active, keep its revert map (we
+      // want to restore to the pre-audition state, not to the prior
+      // audition's preset).
+      if (!auditionRevertRef.current) {
+        const revert: Record<string, number> = {};
+        const curFlat = flattenPatch(cur);
+        const nextFlat = flattenPatch(next);
+        for (const k of Object.keys(nextFlat)) {
+          if (curFlat[k] !== nextFlat[k]) revert[k] = curFlat[k];
+        }
+        auditionRevertRef.current = revert;
+      }
+      // Push the preset values to the engine directly.
+      const diff = diffPatch(cur, next);
       for (const [p, v] of Object.entries(diff)) {
         sendMessage(JSON.stringify({ type: 'knob_tweak', param: p, value: v }));
       }
     },
-    [patch, ph, sendMessage, bumpPatchLoad],
+    [patch, sendMessage],
   );
+
+  const cancelAudition = useCallback(() => {
+    const revert = auditionRevertRef.current;
+    if (!revert) return;
+    auditionRevertRef.current = null;
+    for (const [p, v] of Object.entries(revert)) {
+      sendMessage(JSON.stringify({ type: 'knob_tweak', param: p, value: v }));
+    }
+  }, [sendMessage]);
+
+  // When a hover audition is confirmed (click), forget the revert map
+  // so the normal handleLoadPreset path commits cleanly.
+  const commitAudition = useCallback(() => {
+    auditionRevertRef.current = null;
+  }, []);
 
   // Phase 10 §16 — RTFM easter egg. ChatInterface detects the prompt
   // locally and calls back here; we synthesise a gnarly FM patch from
@@ -614,11 +738,9 @@ export function App() {
       suppressCaptureRef.current = true;
       ph.push(nextPatch, 'preset');
       bumpPatchLoad();
-      for (const [p, v] of Object.entries(diff)) {
-        sendMessage(JSON.stringify({ type: 'knob_tweak', param: p, value: v }));
-      }
+      // Engine notification handled by the effectivePatch effect.
     },
-    [activeSlot, inactiveSlotPatch, patch, ph, sendMessage, bumpPatchLoad],
+    [activeSlot, inactiveSlotPatch, patch, ph, bumpPatchLoad],
   );
 
   // Copy active slot's patch into the inactive slot.
@@ -672,29 +794,16 @@ export function App() {
     });
   }, []);
 
-  // Propagate a rolled-back patch to the C++ engine: diff against the patch
-  // we were just on and forward each changed param as a knob_tweak frame.
-  const propagateRollback = useCallback(
-    (rolled: PatchParams, previous: PatchParams) => {
-      const diff = diffPatch(previous, rolled);
-      for (const [p, v] of Object.entries(diff)) {
-        sendMessage(JSON.stringify({ type: 'knob_tweak', param: p, value: v }));
-      }
-    },
-    [sendMessage],
-  );
-
+  // Undo/redo just walk the history cursor — the effectivePatch effect
+  // observes the resulting base-patch change and forwards the diff to
+  // the engine.
   const handleUndo = useCallback(() => {
-    const previous = patch;
-    const rolled = ph.undo();
-    if (rolled) propagateRollback(rolled, previous);
-  }, [patch, ph, propagateRollback]);
+    ph.undo();
+  }, [ph]);
 
   const handleRedo = useCallback(() => {
-    const previous = patch;
-    const rolled = ph.redo();
-    if (rolled) propagateRollback(rolled, previous);
-  }, [patch, ph, propagateRollback]);
+    ph.redo();
+  }, [ph]);
 
   // Cmd/Ctrl+Z = undo, Cmd/Ctrl+Shift+Z = redo. Skip when an editable target
   // (INPUT/TEXTAREA/contenteditable) has focus — same pattern as
@@ -774,6 +883,9 @@ export function App() {
         <PresetsSidebar
           currentPatch={patch}
           onLoadPreset={handleLoadPreset}
+          onAuditionStart={auditionPreset}
+          onAuditionEnd={cancelAudition}
+          onAuditionCommit={commitAudition}
         />
         <ModulesGrid
           patch={patch}
