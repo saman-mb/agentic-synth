@@ -1,15 +1,15 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './Visualizer.css';
 
-// ── Visualizer (Phase 5) ─────────────────────────────────────────────
+// ── Visualizer (Phase 5 + Phase 12) ─────────────────────────────────
 //
 // Canvas-based oscilloscope / spectrum / XY / wavetable view.
 //
-// Real audio wiring is a follow-up phase. For now we synthesise a
-// convincing source (220 Hz sine + 2 Hz tremolo + tiny noise, with
-// harmonics emerging in SPECTRUM and a wavetable morph in WT) so the
-// visuals — which carry the brand identity per REBRAND.md §8 — read
-// as intended at 60 fps.
+// Phase 12 wired real audio: when running inside the JUCE WebView host the
+// component polls the `getScopeSamples` native function once per RAF, stores
+// the latest pulled buffer in a ref, and feeds it into the render loop.
+// When the bridge is absent (Vite dev / unit tests) we fall back to the
+// Phase-5 simulated source so the visuals stay alive.
 //
 // All modes share:
 //   • retina-aware canvas (window.devicePixelRatio)
@@ -19,6 +19,70 @@ import './Visualizer.css';
 const SAMPLE_COUNT = 1024;
 const SAMPLE_RATE = 44_100;           // notional — purely for nice frequencies
 const FUNDAMENTAL_HZ = 220;
+
+// JUCE bridge shapes — same wire format as useWebSocket.ts / useSynthBridge.ts.
+// We talk to the `getScopeSamples` native function by emitting __juce__invoke
+// with a positional-args params array and listening for __juce__complete
+// keyed by a numeric promiseId. ID-namespaced offset (1_000_000+) matches
+// useWebSocket.ts so we never collide with the bundled getNativeFunction
+// handler's IDs (which start from 0).
+interface JuceBackendForScope {
+  emitEvent: (name: string, payload: unknown) => void;
+  addEventListener: (name: string, cb: (payload: unknown) => void) => number;
+  removeEventListener: (id: number) => void;
+}
+interface JuceGlobalForScope {
+  backend: JuceBackendForScope;
+}
+function getJuceForScope(): JuceGlobalForScope | null {
+  const j = (window as unknown as { __JUCE__?: JuceGlobalForScope }).__JUCE__;
+  return j ?? null;
+}
+
+// Module-scope promise plumbing for the scope pull. Module-scope (not
+// component-scope) so a remount doesn't double-register the __juce__complete
+// listener. ID offset 2_000_000 keeps our IDs distinct from both JUCE's
+// bundled handler (starts at 0) and useWebSocket's pool (starts at 1_000_000).
+const SCOPE_PROMISE_ID_OFFSET = 2_000_000;
+let nextScopePromiseId = SCOPE_PROMISE_ID_OFFSET;
+const pendingScopePromises = new Map<number, (v: unknown) => void>();
+let scopeCompleteWired = false;
+
+function ensureScopeCompleteListener(juce: JuceGlobalForScope): void {
+  if (scopeCompleteWired) return;
+  scopeCompleteWired = true;
+  juce.backend.addEventListener('__juce__complete', (payload) => {
+    const p = payload as { promiseId: number; result: unknown };
+    if (typeof p.promiseId !== 'number' || p.promiseId < SCOPE_PROMISE_ID_OFFSET) return;
+    const resolver = pendingScopePromises.get(p.promiseId);
+    if (resolver) {
+      pendingScopePromises.delete(p.promiseId);
+      resolver(p.result);
+    }
+  });
+}
+
+function callGetScopeSamples(n: number): Promise<number[]> | null {
+  const juce = getJuceForScope();
+  if (!juce) return null;
+  ensureScopeCompleteListener(juce);
+  const id = nextScopePromiseId++;
+  return new Promise<number[]>((resolve) => {
+    pendingScopePromises.set(id, (result) => {
+      // Result may be Array<number> (typical) or undefined (provider unset).
+      if (Array.isArray(result)) resolve(result as number[]);
+      else resolve([]);
+    });
+    juce.backend.emitEvent('__juce__invoke', {
+      name: 'getScopeSamples',
+      params: [n],
+      resultId: id,
+    });
+  });
+}
+
+// Bridge presence is fixed for the page lifetime — cache once.
+const SCOPE_BRIDGE_AVAILABLE = getJuceForScope() !== null;
 
 type Mode = 'SCOPE' | 'SPECTRUM' | 'XY' | 'WT';
 const MODES: ReadonlyArray<Mode> = ['SCOPE', 'SPECTRUM', 'XY', 'WT'];
@@ -87,6 +151,16 @@ export function Visualizer({ sampleProvider }: VisualizerProps) {
   modeRef.current = mode;
   const providerRef = useRef<VisualizerProps['sampleProvider']>(sampleProvider);
   providerRef.current = sampleProvider;
+
+  // Phase 12: bridge-pulled audio. Each RAF kicks off an async pull (resolved
+  // by the JUCE message thread); the render loop reads scopeBufRef.current
+  // synchronously. inFlightRef gates re-entry so we never queue a second
+  // request before the first resolves — drops a frame's worth of samples
+  // rather than letting the queue back up, matching the "lose visualizer
+  // frames before blocking" contract from the C++ side.
+  const scopeBufRef = useRef<Float32Array>(new Float32Array(SAMPLE_COUNT));
+  const scopeFilledRef = useRef<boolean>(false);
+  const inFlightRef = useRef<boolean>(false);
 
   // Persistent scratch buffers — allocated once, mutated each frame.
   const bufs = useMemo(() => {
@@ -193,16 +267,51 @@ export function Visualizer({ sampleProvider }: VisualizerProps) {
       const tNow = performance.now() / 1000;
       const currentMode = modeRef.current;
 
-      // 1. Fill our sample buffers. Prefer real audio if a provider
-      //    is wired in; otherwise synthesise.
+      // 1. Fire-and-forget bridge pull once per frame. The promise resolves
+      //    on a future tick; while it does, the render loop reads the most
+      //    recent scopeBufRef.current synchronously. inFlightRef gates
+      //    re-entry so concurrent RAFs don't pile up requests.
+      if (SCOPE_BRIDGE_AVAILABLE && !inFlightRef.current) {
+        inFlightRef.current = true;
+        const p = callGetScopeSamples(SAMPLE_COUNT);
+        if (p) {
+          p.then((arr) => {
+            if (arr.length > 0) {
+              // Shift-and-append into the rolling window. If the producer
+              // delivered a full window's worth, do a direct copy; otherwise
+              // shift the existing tail left and append the new samples on
+              // the right so the trace appears to scroll continuously.
+              const buf = scopeBufRef.current;
+              if (arr.length >= SAMPLE_COUNT) {
+                for (let i = 0; i < SAMPLE_COUNT; i++) buf[i] = arr[arr.length - SAMPLE_COUNT + i];
+              } else {
+                const keep = SAMPLE_COUNT - arr.length;
+                buf.copyWithin(0, arr.length, SAMPLE_COUNT);
+                for (let i = 0; i < arr.length; i++) buf[keep + i] = arr[i];
+              }
+              scopeFilledRef.current = true;
+            }
+          }).finally(() => {
+            inFlightRef.current = false;
+          });
+        } else {
+          inFlightRef.current = false;
+        }
+      }
+
+      // 2. Fill our sample buffers. Always run synthesise() first so
+      //    sampleR (used by XY) and baseline sample are populated, then
+      //    overwrite bufs.sample with real audio when available.
+      //    Priority order for bufs.sample:
+      //      a) explicit sampleProvider prop (parent wiring / tests)
+      //      b) JUCE bridge buffer (real audio from C++)
+      //      c) simulated source (already in place from synthesise)
+      synthesise(tNow, currentMode);
       const provided = providerRef.current?.();
       if (provided && provided.length >= SAMPLE_COUNT) {
         bufs.sample.set(provided.subarray(0, SAMPLE_COUNT));
-        // XY without a real R-channel → fall back to synth so the
-        // mode still looks alive. Real wiring will replace this.
-        synthesise(tNow, currentMode);
-      } else {
-        synthesise(tNow, currentMode);
+      } else if (SCOPE_BRIDGE_AVAILABLE && scopeFilledRef.current) {
+        bufs.sample.set(scopeBufRef.current);
       }
 
       const dpr = window.devicePixelRatio || 1;

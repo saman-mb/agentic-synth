@@ -53,6 +53,24 @@ public:
     static constexpr std::size_t kAuditionQueueCapacity = 256;
     static constexpr int kAuditionDrainBudget = 64;
 
+    // Phase 12: Visualizer audio tap.
+    //
+    // Audio thread pushes mono-summed post-amp samples into scopeQueue_ at
+    // audio rate (worst case ~96 kHz × 1 push/sample). The message thread
+    // drains the queue via pullScopeSamples() in response to a JS bridge
+    // call at ~60 Hz. Capacity must be large enough that at typical sample
+    // rates, one block (max ~1024) plus a 16ms-worth-of-samples margin fits
+    // without dropping. 4096 = ~85 ms of headroom at 48 kHz, comfortable
+    // versus 60 fps polling.
+    static constexpr std::size_t kScopeQueueCapacity = 4096;
+    using ScopeQueueT = agentic_synth::SPSCQueue<float, kScopeQueueCapacity>;
+
+    // Message thread: drain up to `max` samples into `out`. Wait-free SPSC
+    // pop, no allocation, no lock. Returns the number of samples popped.
+    // `out` is cleared first via setSize. Safe to call concurrently with
+    // the audio thread (single producer / single consumer contract).
+    int pullScopeSamples(float* dest, int max) noexcept;
+
     // Phase 2 (Item #4): message-thread poll cadence for AgentBridge → APVTS.
     // 20 ms is well below the perceptual threshold for a "delayed" AI patch
     // and matches GUI refresh budget. AgentBridge::pollPatch is a wait-free
@@ -104,6 +122,13 @@ private:
     // = processBlock on the audio thread. SPSCQueue is wait-free + alloc-free
     // — satisfies the RT rule against locks and allocs.
     agentic_synth::SPSCQueue<agentic_synth::engine::RawMidiMsg, kAuditionQueueCapacity> auditionQueue_;
+
+    // Phase 12: post-amp visualizer tap. Producer = audio thread (push after
+    // master gain in processBlock). Consumer = message thread (drained from
+    // the WebView native `getScopeSamples` handler via pullScopeSamples).
+    // Drops silently when full — losing visualizer frames is preferable to
+    // blocking the audio thread.
+    ScopeQueueT scopeQueue_;
 
     // ── APVTS typed-pointer cache ───────────────────────────────────────────
     // Phase 2 follow-up (Code Fix 1): cache concrete parameter types instead

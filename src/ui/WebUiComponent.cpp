@@ -3,6 +3,7 @@
 #include "UiBinaryData.h"
 #include "agent/WhisperClient.h"
 
+#include <array>
 #include <atomic>
 #include <cstdint>
 #include <utility>
@@ -513,6 +514,45 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
                 const int numSamples = static_cast<int>(byteCount / sizeof(std::int16_t));
                 client->feedAudio(samples, numSamples);
             });
+        });
+
+    options = options.withNativeFunction(
+        juce::Identifier{"getScopeSamples"},
+        [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
+            // Phase 12: visualizer audio tap. JS asks for up to N samples
+            // (default 1024); we pull lock-free from the plugin's SPSC scope
+            // queue on the message thread, pack into a juce::var Array of
+            // numbers and resolve the JS promise. If no provider is wired
+            // (browser dev, headless tests) we resolve with an empty array so
+            // the React side cleanly falls back to its simulated synth path.
+            int maxSamples = static_cast<int>(argOr(args, 0, juce::var{1024}));
+            if (maxSamples <= 0) {
+                completion(juce::var{juce::Array<juce::var>{}});
+                return;
+            }
+            // Cap at scope queue capacity so a runaway JS request can never
+            // ask us to drain more than the audio thread could ever have
+            // produced. 4096 mirrors AgenticSynthPlugin::kScopeQueueCapacity.
+            constexpr int kHardCap = 4096;
+            if (maxSamples > kHardCap)
+                maxSamples = kHardCap;
+
+            if (!scopeProvider_) {
+                completion(juce::var{juce::Array<juce::var>{}});
+                return;
+            }
+
+            // Scratch buffer on the stack — small (≤4096 floats = 16 KB),
+            // well within the 8 MB message-thread stack budget. No heap
+            // allocation in the audio-bridge path.
+            std::array<float, kHardCap> scratch{};
+            const int n = scopeProvider_(scratch.data(), maxSamples);
+
+            juce::Array<juce::var> out;
+            out.ensureStorageAllocated(n);
+            for (int i = 0; i < n; ++i)
+                out.add(juce::var{static_cast<double>(scratch[static_cast<size_t>(i)])});
+            completion(juce::var{std::move(out)});
         });
 
     // ── Construct the WebView with the fully-built options ───────────────────

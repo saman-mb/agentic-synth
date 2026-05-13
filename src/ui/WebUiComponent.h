@@ -3,6 +3,7 @@
 #include <juce_gui_extra/juce_gui_extra.h>
 
 #include <atomic>
+#include <functional>
 #include <optional>
 #include <vector>
 
@@ -54,6 +55,16 @@ public:
     // Optional: route push_audio_pcm calls into a WhisperClient. If unset,
     // pushed PCM is logged and dropped. The component does not own the client.
     void setWhisperClient(agent::WhisperClient* client) noexcept { whisperClient_ = client; }
+
+    // Phase 12: scope sample provider hookup. Caller (typically the
+    // AudioProcessor editor) wires this to AgenticSynthPlugin::pullScopeSamples.
+    // The provider is invoked synchronously from the `getScopeSamples` native
+    // function on the JUCE message thread: it MUST be wait-free w.r.t. the
+    // audio thread (the plugin's SPSC scope queue satisfies this). When unset
+    // the native function resolves with an empty array, which lets the JS
+    // Visualizer fall back to its simulated source path.
+    using ScopeSampleProvider = std::function<int(float* dest, int max)>;
+    void setScopeSampleProvider(ScopeSampleProvider provider) { scopeProvider_ = std::move(provider); }
 
     // Pure resource lookup against the bundled UI binary data. Exposed as a
     // free static so unit tests can exercise it without instantiating the
@@ -147,6 +158,12 @@ private:
     FallbackComponent fallback_;
     std::vector<agent::AgentBridge::SubscriberHandle> subs_;
     agent::WhisperClient* whisperClient_{nullptr};
+
+    // Phase 12: scope sample provider — set by the editor (which owns the
+    // AudioProcessor reference). Invoked on the message thread from the
+    // `getScopeSamples` native function. Default-empty so the JS bridge call
+    // returns an empty array when no provider is wired (browser dev / tests).
+    ScopeSampleProvider scopeProvider_;
 
     std::atomic<bool> loadFailed_{false};
     juce::String lastLoadError_;
