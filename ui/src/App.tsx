@@ -106,25 +106,62 @@ function makeRtfmPatch(base: PatchParams): PatchParams {
   return p;
 }
 
+// Typed setters per param group. Each setter takes a literal-string
+// union of the keys it accepts, so the compiler verifies that we only
+// write known numeric fields — no `as Record<string, number>` casts.
+type OscKey = keyof PatchParams['osc'][number];
+type FilterKey = keyof PatchParams['filter'];
+type EnvKey = keyof PatchParams['amp_env'];
+type LfoKey = keyof PatchParams['lfo'][number];
+type ReverbKey = keyof PatchParams['reverb'];
+type DelayKey = keyof PatchParams['delay'];
+
+const OSC_KEYS: ReadonlySet<OscKey> = new Set<OscKey>([
+  'volume', 'detune_cents', 'semitone_offset', 'fm_ratio',
+  'fm_depth', 'wavetable_pos', 'pulse_width', 'pan',
+]);
+const FILTER_KEYS: ReadonlySet<FilterKey> = new Set<FilterKey>([
+  'cutoff_hz', 'resonance', 'env_mod', 'drive',
+]);
+const ENV_KEYS: ReadonlySet<EnvKey> = new Set<EnvKey>([
+  'attack_s', 'decay_s', 'sustain', 'release_s',
+]);
+const LFO_KEYS: ReadonlySet<LfoKey> = new Set<LfoKey>([
+  'rate_hz', 'depth', 'phase_offset',
+]);
+const REVERB_KEYS: ReadonlySet<ReverbKey> = new Set<ReverbKey>([
+  'size', 'damping', 'width', 'mix',
+]);
+const DELAY_KEYS: ReadonlySet<DelayKey> = new Set<DelayKey>([
+  'time_s', 'feedback', 'mix',
+]);
+
 function applyParamToPatch(patch: PatchParams, param: string, value: number): PatchParams {
   const p = JSON.parse(JSON.stringify(patch)) as PatchParams;
   const parts = param.split('.');
   if (parts[0] === 'osc' && parts.length === 3) {
     const i = parseInt(parts[1], 10);
-    if (i >= 0 && i < p.osc.length) (p.osc[i] as unknown as Record<string, number>)[parts[2]] = value;
+    const k = parts[2] as OscKey;
+    if (i >= 0 && i < p.osc.length && OSC_KEYS.has(k)) p.osc[i][k] = value;
   } else if (parts[0] === 'filter' && parts.length === 2) {
-    (p.filter as unknown as Record<string, number>)[parts[1]] = value;
+    const k = parts[1] as FilterKey;
+    if (FILTER_KEYS.has(k)) p.filter[k] = value;
   } else if (parts[0] === 'amp_env' && parts.length === 2) {
-    (p.amp_env as unknown as Record<string, number>)[parts[1]] = value;
+    const k = parts[1] as EnvKey;
+    if (ENV_KEYS.has(k)) p.amp_env[k] = value;
   } else if (parts[0] === 'filter_env' && parts.length === 2) {
-    (p.filter_env as unknown as Record<string, number>)[parts[1]] = value;
+    const k = parts[1] as EnvKey;
+    if (ENV_KEYS.has(k)) p.filter_env[k] = value;
   } else if (parts[0] === 'lfo' && parts.length === 3) {
     const i = parseInt(parts[1], 10);
-    if (i >= 0 && i < p.lfo.length) (p.lfo[i] as unknown as Record<string, number>)[parts[2]] = value;
+    const k = parts[2] as LfoKey;
+    if (i >= 0 && i < p.lfo.length && LFO_KEYS.has(k)) p.lfo[i][k] = value;
   } else if (parts[0] === 'reverb' && parts.length === 2) {
-    (p.reverb as unknown as Record<string, number>)[parts[1]] = value;
+    const k = parts[1] as ReverbKey;
+    if (REVERB_KEYS.has(k)) p.reverb[k] = value;
   } else if (parts[0] === 'delay' && parts.length === 2) {
-    (p.delay as unknown as Record<string, number>)[parts[1]] = value;
+    const k = parts[1] as DelayKey;
+    if (DELAY_KEYS.has(k)) p.delay[k] = value;
   } else if (param === 'master_gain') {
     p.master_gain = value;
   } else if (param === 'portamento_s') {

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { SemanticDictionary } from './SemanticDictionary';
 import { TelemetryDashboard } from './TelemetryDashboard';
 import { PatchBrowser, BrowserEntry } from './PatchBrowser';
@@ -64,30 +64,51 @@ export function ToolsDrawer({
   onVoicePipChange,
   onPatchThunkChange,
 }: ToolsDrawerProps) {
-  // ── Telemetry radar sweep (Phase 9) ──────────────────────────────
-  // Tracks unseen telemetry events. When the drawer is closed OR the
-  // active tab isn't 'telemetry', each incoming `telemetry_data` frame
-  // bumps the unseen count. Reading the tab (activating it while the
-  // drawer is open) clears the count, removing the .has-unseen modifier
-  // that drives the leftward 1px cyan underline sweep.
+  // ── Telemetry radar sweep (Phase 9 / refined Phase 11) ───────────
+  // Tracks unseen telemetry *events*, not unseen frames. Each
+  // `telemetry_data` frame is a snapshot containing the rolling
+  // `records[]` ring; the previous implementation bumped unseen on
+  // every frame, which over-counted because frames also arrive on the
+  // 10s auto-refresh poll even when no new events occurred.
+  //
+  // Strategy: track `lastSeenRecordCount` across frames; unseen grows
+  // by `max(0, current - lastSeen)`. Activating the Telemetry tab
+  // snaps lastSeen → current and zeroes the counter.
   const [unseenTelemetry, setUnseenTelemetry] = useState<number>(0);
+  const lastSeenRecordCount = useRef<number>(0);
   useEffect(() => {
     if (!lastMessage) return;
+    let recordCount: number | null = null;
     try {
       const msg = JSON.parse(lastMessage) as Record<string, unknown>;
       if (msg.type !== 'telemetry_data') return;
+      if (Array.isArray(msg.records)) recordCount = msg.records.length;
     } catch {
       return;
     }
-    // Frame is a telemetry update; count it as unseen unless the user is
-    // actively looking at the Telemetry tab (drawer open + tab selected).
-    if (!(open && activeTab === 'telemetry')) {
-      setUnseenTelemetry((n) => n + 1);
+    if (recordCount === null) return;
+    const delta = recordCount - lastSeenRecordCount.current;
+    // If the user is reading the Telemetry tab, treat everything as
+    // seen — snap the watermark forward and don't bump the counter.
+    if (open && activeTab === 'telemetry') {
+      lastSeenRecordCount.current = recordCount;
+      return;
+    }
+    if (delta > 0) {
+      setUnseenTelemetry((n) => n + delta);
+      lastSeenRecordCount.current = recordCount;
+    } else if (delta < 0) {
+      // Ring buffer rolled over or backend reset — re-baseline silently.
+      lastSeenRecordCount.current = recordCount;
     }
   }, [lastMessage, open, activeTab]);
 
   useEffect(() => {
-    if (open && activeTab === 'telemetry') setUnseenTelemetry(0);
+    if (open && activeTab === 'telemetry') {
+      setUnseenTelemetry(0);
+      // The next incoming frame will reset the watermark to its
+      // current length via the snap-forward branch above.
+    }
   }, [open, activeTab]);
 
   // Close on Escape, matching standard drawer/modal affordances.

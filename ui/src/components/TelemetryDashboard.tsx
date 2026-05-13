@@ -26,6 +26,19 @@ interface TelemetryData {
   records: TelemetryRecord[];
 }
 
+// Runtime narrow for a wire frame → TelemetryData. Avoids the
+// double-cast (`as unknown as TelemetryData`) at the read site.
+function isTelemetryFrame(msg: unknown): msg is TelemetryData & { type: 'telemetry_data' } {
+  if (typeof msg !== 'object' || msg === null) return false;
+  const m = msg as Record<string, unknown>;
+  return (
+    m.type === 'telemetry_data' &&
+    typeof m.enabled === 'boolean' &&
+    typeof m.summary === 'object' && m.summary !== null &&
+    Array.isArray(m.records)
+  );
+}
+
 interface Props {
   sendMessage: (msg: string) => void;
   lastMessage: string | null;
@@ -61,9 +74,9 @@ export function TelemetryDashboard({ sendMessage, lastMessage }: Props) {
     if (!lastMessage) return;
     try {
       const msg = JSON.parse(lastMessage) as Record<string, unknown>;
-      if (msg.type === 'telemetry_data') {
-        setData(msg as unknown as TelemetryData);
-        setEnabled((msg as unknown as TelemetryData).enabled);
+      if (isTelemetryFrame(msg)) {
+        setData(msg);
+        setEnabled(msg.enabled);
       }
     } catch { /* ignore non-telemetry frames */ }
   }, [lastMessage]);
