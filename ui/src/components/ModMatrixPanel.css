@@ -15,6 +15,21 @@
   max-height: 360px;
 }
 
+/* Phase 9: collapsing the panel folds the body via rotateX. The
+   .fold-host wrapper stays mounted; when .is-folded is applied, the
+   fold-target rotates to ~-92deg with opacity 0. The wrapper's max-
+   height collapses on a matched 220ms curve so the surrounding
+   layout reflows in lockstep with the paper-fold. */
+.mod-matrix-panel .fold-host {
+  overflow: hidden;
+  max-height: 360px;
+  transition: max-height 220ms var(--ease-considered);
+}
+
+.mod-matrix-panel .fold-host.is-folded {
+  max-height: 0;
+}
+
 .mod-matrix-header {
   display: flex;
   align-items: stretch;

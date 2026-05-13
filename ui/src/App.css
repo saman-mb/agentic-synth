@@ -310,6 +310,152 @@ body {
   .right-column { grid-column: 1; }
 }
 
+/* ── TIMBRE global utility motions (Phase 9) ───────────────────────
+   Reusable affordances: cyan confirmation sweep, paper-fold section
+   collapse, breathing badge for muted/disabled states, radar sweep
+   indicator for unseen telemetry events, and a wordless head-shake
+   on the prompt send arrow when the user submits an empty prompt.
+
+   All animations respect prefers-reduced-motion (overrides at the
+   bottom of this block). */
+
+/* Cyan underline sweep — signature confirmation flourish. Applied as
+   a 1px pseudo-element at the bottom of the host that scales in from
+   the left (600ms), holds (200ms), then fades out (200ms).
+
+   Host needs position: relative; if it doesn't already have one, the
+   class adds it. We use overflow: visible on host by default but the
+   sweep is also clipped via transform-origin so it doesn't bleed. */
+.confirm-sweep {
+  position: relative;
+}
+
+.confirm-sweep::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 1px;
+  background: var(--mod-lfo1, #00E5FF);
+  transform: scaleX(0);
+  transform-origin: left center;
+  opacity: 1;
+  pointer-events: none;
+  animation: timbre-confirm-sweep 1000ms var(--ease-considered) forwards;
+}
+
+@keyframes timbre-confirm-sweep {
+  0%   { transform: scaleX(0); opacity: 1; }
+  60%  { transform: scaleX(1); opacity: 1; }  /* 600ms sweep */
+  80%  { transform: scaleX(1); opacity: 1; }  /* 200ms hold  */
+  100% { transform: scaleX(1); opacity: 0; }  /* 200ms fade  */
+}
+
+/* Paper-fold section collapse — used by collapsible sections that opt
+   into rotateX-on-bottom-edge instead of a vanilla height crossfade.
+   Toggle .is-folded on the host (or just unmount the body); when the
+   class is present, the .fold-target inside collapses to 0deg with
+   transform-origin pinned to the bottom edge. */
+.fold-host {
+  perspective: 800px;
+}
+
+.fold-target {
+  transform-origin: bottom center;
+  transform: rotateX(0deg);
+  opacity: 1;
+  transition:
+    transform 220ms var(--ease-considered),
+    opacity 220ms var(--ease-considered);
+}
+
+.fold-host.is-folded .fold-target {
+  transform: rotateX(-92deg);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Muted badge breathing — for disabled badges/pills/labels that should
+   read as "waiting" not "switched off". Slow 4s opacity pulse. */
+.muted-breathing {
+  animation: timbre-muted-breathe 4s ease-in-out infinite;
+}
+
+@keyframes timbre-muted-breathe {
+  0%, 100% { opacity: 0.5; }
+  50%      { opacity: 0.7; }
+}
+
+/* Telemetry tab radar sweep — a 1px underline that translates from
+   100% → -100% on a 2s linear loop, drawing the eye to the tab while
+   there are unseen events. Cleared by removing the modifier class. */
+.tools-drawer-tab.has-unseen {
+  position: relative;
+  overflow: hidden;
+}
+
+.tools-drawer-tab.has-unseen::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--mod-lfo1, #00E5FF) 40%,
+    var(--mod-lfo1, #00E5FF) 60%,
+    transparent 100%
+  );
+  transform: translateX(100%);
+  animation: timbre-radar-sweep 2s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes timbre-radar-sweep {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(-100%); }
+}
+
+/* Wordless head-shake — used by the send arrow on an empty submit.
+   180ms total: -3 → 3 → -3 → 3 → 0. */
+.head-shake {
+  animation: timbre-head-shake 180ms var(--ease-considered);
+}
+
+@keyframes timbre-head-shake {
+  0%   { transform: translateX(0); }
+  20%  { transform: translateX(-3px); }
+  40%  { transform: translateX(3px); }
+  60%  { transform: translateX(-3px); }
+  80%  { transform: translateX(3px); }
+  100% { transform: translateX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .confirm-sweep::after,
+  .fold-target,
+  .muted-breathing,
+  .tools-drawer-tab.has-unseen::before,
+  .head-shake {
+    animation: none !important;
+    transition: none !important;
+  }
+  /* Keep folded sections actually hidden when motion is disabled. */
+  .fold-host.is-folded .fold-target {
+    transform: none;
+    opacity: 0;
+  }
+  /* Confirm sweep must still be momentarily visible — clamp it on
+     screen so the success cue isn't completely silent. */
+  .confirm-sweep::after {
+    transform: scaleX(1);
+    opacity: 0.6;
+  }
+}
+
 /* ── Legacy panel classes (retained, unused by Phase 4) ──────────── */
 
 .panel-knobs {
@@ -610,6 +756,91 @@ body {
 .ptt-btn:disabled {
   opacity: 0.35;
   cursor: default;
+}
+
+/* Phase 9 — failure-state mic affordance. Calm grey, never red. The
+   struck-through icon stays visible so the user knows *what* isn't
+   working (the mic), while the subtitle explains what to do next.
+   The "Open Settings" link is inline and underlined on hover only. */
+.ptt-btn.ptt-mic-off {
+  opacity: 1; /* don't fade — we want the strike-through readable */
+  color: var(--text-secondary);
+  border-color: var(--color-border-strong);
+  background: transparent;
+  cursor: default;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
+.ptt-mic-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  font-size: 12px;
+  line-height: 1;
+  filter: grayscale(1);
+  opacity: 0.6;
+}
+
+.ptt-mic-glyph {
+  display: inline-block;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.ptt-mic-strike {
+  position: absolute;
+  inset: 0;
+  display: block;
+  pointer-events: none;
+  /* 1px diagonal slash from bottom-left to top-right. Drawn via a thin
+     rotated div so we don't depend on emoji-with-overlay support. */
+}
+.ptt-mic-strike::after {
+  content: '';
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  top: 50%;
+  height: 1px;
+  background: var(--text-secondary);
+  transform: rotate(-30deg);
+  transform-origin: center;
+}
+
+.ptt-btn-label {
+  white-space: nowrap;
+}
+
+.ptt-subtitle {
+  margin-top: 6px;
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  line-height: 1.45;
+  color: var(--text-secondary); /* calm grey, NOT red */
+  text-align: left;
+}
+
+.ptt-open-settings {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--text-accent);
+  cursor: pointer;
+  text-decoration: none;
+}
+.ptt-open-settings:hover { text-decoration: underline; }
+.ptt-open-settings:focus { outline: none; }
+.ptt-open-settings:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--r-1);
 }
 
 /* ── Accessibility: focus-visible outlines ────────────────────────────

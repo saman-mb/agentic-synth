@@ -27,9 +27,17 @@
 }
 
 .knob-root.knob-disabled {
-  opacity: 0.4;
+  /* Slow 4s breath between 0.5 and 0.7 instead of static 0.4 — keeps
+     disabled knobs reading as "waiting", not "switched off". The
+     keyframes live in App.css (.muted-breathing). */
+  opacity: 0.5;
   cursor: not-allowed;
   pointer-events: none;
+  animation: timbre-muted-breathe 4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .knob-root.knob-disabled { animation: none; opacity: 0.5; }
 }
 
 .knob-root:focus { outline: none; }
@@ -167,12 +175,20 @@
   font-variant-numeric: tabular-nums;
   pointer-events: none;
   opacity: 0;
-  transition: opacity 120ms cubic-bezier(0.22, 0.61, 0.36, 1);
+  /* Phase 9 — value tooltip momentum (simplified). Idle position is
+     2px below center with 0 opacity. On reveal, settles to translateY(0)
+     with a slight cubic-bezier overshoot so the readout "lands" with
+     micro-bounce instead of snapping. */
+  transform: translateY(2px);
+  transition:
+    opacity 120ms cubic-bezier(0.22, 0.61, 0.36, 1),
+    transform 160ms cubic-bezier(0.34, 1.56, 0.64, 1);
   text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .knob-center-value.is-visible {
   opacity: 1;
+  transform: translateY(0);
 }
 
 /* Size-specific font scaling for the center value — keep it readable

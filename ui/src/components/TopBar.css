@@ -100,8 +100,15 @@
 
 .topbar-preset-arrow:disabled,
 .topbar-preset-dropdown:disabled {
-  opacity: 0.55;
+  /* Phase 9 — disabled "badge" affordance breathes 0.5↔0.7 over 4s
+     so the dim chrome reads as a waiting state rather than dead. */
   cursor: not-allowed;
+  animation: timbre-muted-breathe 4s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .topbar-preset-arrow:disabled,
+  .topbar-preset-dropdown:disabled { animation: none; opacity: 0.55; }
 }
 
 .topbar-preset-arrow:not(:disabled):hover,

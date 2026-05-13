@@ -15,9 +15,45 @@ type RecordState = 'idle' | 'recording' | 'processing';
 // bundle-inlined chunk.
 const PUBLIC_WORKLET_PATH = '/pcm-tap.js';
 
+// Failure-state copy (Phase 9 §18). The brand never apologises, never
+// blames the user, never leaks the exception class name. It states what
+// happened and what to do next, in calm grey — not red.
+type MicFailure = 'permission' | 'no-device' | 'audio-init' | 'resample';
+const MIC_FAILURE_COPY: Record<MicFailure, string> = {
+  permission: "Can't hear you — check mic permissions in System Settings.",
+  'no-device': "Can't hear you — no microphone detected.",
+  'audio-init': "Audio pipeline didn't start. Try again in a moment.",
+  resample: "Audio capture finished but couldn't be processed. Try again.",
+};
+
+function openSystemSettings() {
+  // Best-effort: only macOS handles the x-apple URI scheme. On other
+  // platforms (and when running in a browser, not the plugin WebView),
+  // the navigation will silently fail. Log so devs can debug; never
+  // surface the failure to the user.
+  try {
+    const isMac =
+      typeof navigator !== 'undefined' &&
+      /Mac/i.test(navigator.platform || navigator.userAgent || '');
+    if (isMac) {
+      window.open(
+        'x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone',
+        '_self',
+      );
+    } else {
+      // eslint-disable-next-line no-console
+      console.info('[TIMBRE] Open Settings: please enable microphone access.');
+    }
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.info('[TIMBRE] Open Settings failed silently:', e);
+  }
+}
+
 export function PushToTalk({ onData, wsReady }: PushToTalkProps) {
   const [state, setState] = useState<RecordState>('idle');
-  const [error, setError] = useState<string | null>(null);
+  // Failure flag drives the calm subtitle; null = healthy.
+  const [failure, setFailure] = useState<MicFailure | null>(null);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const workletRef = useRef<AudioWorkletNode | null>(null);
@@ -39,21 +75,23 @@ export function PushToTalk({ onData, wsReady }: PushToTalkProps) {
 
   const start = useCallback(async () => {
     if (state !== 'idle') return;
-    setError(null);
+    setFailure(null);
     let stream: MediaStream;
     try {
       stream = await navigator.mediaDevices.getUserMedia({ audio: true });
     } catch (e) {
-      // Most common: NotAllowedError (user denied) or NotFoundError (no mic).
-      // Surface to the UI instead of dropping silently.
+      // Classify into the small brand-defined failure taxonomy. We drop
+      // the original exception class name from the UI on purpose — it's
+      // a developer leak. The original error is still loggable here if
+      // anyone needs to debug.
       const name = e instanceof Error ? e.name : 'MicError';
-      const message =
-        name === 'NotAllowedError'
-          ? 'Microphone permission denied — enable in browser settings.'
-          : name === 'NotFoundError'
-            ? 'No microphone detected.'
-            : `Microphone unavailable (${name}).`;
-      setError(message);
+      // eslint-disable-next-line no-console
+      console.debug('[TIMBRE] PushToTalk getUserMedia failed:', name, e);
+      const kind: MicFailure =
+        name === 'NotAllowedError' ? 'permission'
+        : name === 'NotFoundError' ? 'no-device'
+        : 'permission';
+      setFailure(kind);
       setState('idle');
       return;
     }
@@ -82,8 +120,9 @@ export function PushToTalk({ onData, wsReady }: PushToTalkProps) {
       // strong reference and the source is connected.
       setState('recording');
     } catch (e) {
-      const message = e instanceof Error ? e.message : 'audio init failed';
-      setError(`Audio pipeline failed: ${message}`);
+      // eslint-disable-next-line no-console
+      console.debug('[TIMBRE] PushToTalk audio init failed:', e);
+      setFailure('audio-init');
       await teardown();
       setState('idle');
     }
@@ -140,8 +179,9 @@ export function PushToTalk({ onData, wsReady }: PushToTalkProps) {
       const raw = rendered.getChannelData(0);
       onData(raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength));
     } catch (e) {
-      const message = e instanceof Error ? e.message : 'render failed';
-      setError(`Audio resample failed: ${message}`);
+      // eslint-disable-next-line no-console
+      console.debug('[TIMBRE] PushToTalk resample failed:', e);
+      setFailure('resample');
     }
 
     audioCtxRef.current = null;
@@ -149,17 +189,25 @@ export function PushToTalk({ onData, wsReady }: PushToTalkProps) {
     setState('idle');
   }, [state, onData]);
 
+  // In a failure state, the button still renders so the user sees the
+  // affordance — but with a struck-through mic icon, calm grey subtitle,
+  // and an inline "Open Settings" link below. The button is disabled so
+  // clicking it isn't a no-op trap; clicking the link routes to System
+  // Settings on macOS (best-effort) or just logs.
+  const isMicFailure = failure === 'permission' || failure === 'no-device';
+
   const label =
     state === 'recording' ? 'Release to send'
     : state === 'processing' ? 'Transcribing...'
+    : isMicFailure ? "Can't hear you"
     : 'Hold to speak';
 
   return (
     <>
       <button
         type="button"
-        className={`ptt-btn${state === 'recording' ? ' ptt-active' : ''}`}
-        disabled={!wsReady || state === 'processing'}
+        className={`ptt-btn${state === 'recording' ? ' ptt-active' : ''}${isMicFailure ? ' ptt-mic-off' : ''}`}
+        disabled={!wsReady || state === 'processing' || isMicFailure}
         aria-label={label}
         onMouseDown={start}
         onMouseUp={stop}
@@ -167,11 +215,29 @@ export function PushToTalk({ onData, wsReady }: PushToTalkProps) {
         onTouchStart={(e) => { e.preventDefault(); void start(); }}
         onTouchEnd={(e) => { e.preventDefault(); void stop(); }}
       >
-        {label}
+        {isMicFailure && (
+          <span className="ptt-mic-icon" aria-hidden="true">
+            <span className="ptt-mic-glyph">🎤</span>
+            <span className="ptt-mic-strike" />
+          </span>
+        )}
+        <span className="ptt-btn-label">{label}</span>
       </button>
-      {error && (
-        <div className="ptt-error" role="alert" aria-live="assertive">
-          {error}
+      {failure && (
+        <div className="ptt-subtitle" role="status" aria-live="polite">
+          <span>{MIC_FAILURE_COPY[failure]}</span>
+          {isMicFailure && (
+            <>
+              {' '}
+              <button
+                type="button"
+                className="ptt-open-settings"
+                onClick={openSystemSettings}
+              >
+                Open Settings
+              </button>
+            </>
+          )}
         </div>
       )}
     </>

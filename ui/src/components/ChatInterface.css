@@ -411,6 +411,46 @@
   50%      { opacity: 1;    transform: translateY(-2px); }
 }
 
+/* ── Network failure card (Phase 9 §18b) ──────────────────────────
+   Calm grey line under the message list. Auto-retry countdown with
+   manual "Retry now" link. NEVER red — keeps the brand calm. */
+
+.chat-network-failure {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin: 0 1.25rem 0.5rem;
+  padding: 0.55rem 0.85rem;
+  border: 1px solid var(--color-border);
+  border-radius: var(--r-3);
+  background: var(--fill-medium);
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  font-family: var(--font-sans);
+}
+
+.chat-network-failure-text {
+  flex: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.chat-network-failure-retry {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--text-accent);
+  cursor: pointer;
+}
+.chat-network-failure-retry:hover { text-decoration: underline; }
+.chat-network-failure-retry:focus { outline: none; }
+.chat-network-failure-retry:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--r-1);
+}
+
 /* ── Reasoning ticker ────────────────────────────────────────────── */
 
 .reasoning-ticker {
