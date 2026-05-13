@@ -82,8 +82,14 @@ export function ModMatrixPanel({
         )}
       </div>
 
-      {open && (
-        <div id="mod-matrix-body" className="mod-matrix-body">
+      {/* Paper-fold collapse (Phase 9): kept mounted so the rotateX
+          transform plays both ways. When open=false, .is-folded pins
+          the .fold-target to rotateX(-92deg) with opacity 0. */}
+      <div className={`fold-host${open ? '' : ' is-folded'}`} aria-hidden={!open}>
+        <div
+          id="mod-matrix-body"
+          className="mod-matrix-body fold-target"
+        >
           {view === 'list' ? (
             <ListView
               connections={connections}
@@ -104,7 +110,7 @@ export function ModMatrixPanel({
             />
           )}
         </div>
-      )}
+      </div>
     </section>
   );
 }
@@ -278,6 +284,14 @@ function AddRow({
     () => DESTINATION_CATALOG.map((k) => ({ value: k, label: destinationLabel(k) })),
     [],
   );
+  // Cyan confirmation sweep on the "+ Add" button when a mod connection
+  // has just been committed. Token-bumped so consecutive adds re-trigger.
+  const [addSweepToken, setAddSweepToken] = useState<number>(0);
+  const handleAddClick = useCallback(() => {
+    onCommit();
+    setAddSweepToken((n) => n + 1);
+    window.setTimeout(() => setAddSweepToken(0), 1000);
+  }, [onCommit]);
   return (
     <div className="mod-matrix-addrow">
       <select
@@ -305,7 +319,12 @@ function AddRow({
           </option>
         ))}
       </select>
-      <button type="button" className="mod-matrix-addbtn" onClick={onCommit}>
+      <button
+        type="button"
+        key={`add-${addSweepToken}`}
+        className={`mod-matrix-addbtn${addSweepToken > 0 ? ' confirm-sweep' : ''}`}
+        onClick={handleAddClick}
+      >
         + Add
       </button>
     </div>

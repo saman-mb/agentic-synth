@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import './TopBar.css';
 
 // ── TopBar (Phase 6) ─────────────────────────────────────────────────
@@ -40,6 +40,15 @@ export function TopBar({
   onSelectSlot,
   onCopySlot,
 }: TopBarProps) {
+  // Cyan confirmation sweep token for the A/B copy button. Bumped on
+  // every copy so consecutive copies retrigger the animation. Cleared
+  // after the 1000ms sweep+hold+fade finishes.
+  const [copySweepToken, setCopySweepToken] = useState<number>(0);
+  const handleCopyClick = useCallback(() => {
+    onCopySlot();
+    setCopySweepToken((n) => n + 1);
+    window.setTimeout(() => setCopySweepToken(0), 1000);
+  }, [onCopySlot]);
   return (
     <header className="topbar" role="banner">
       {/* Left: wordmark */}
@@ -70,10 +79,11 @@ export function TopBar({
         </button>
         <button
           type="button"
-          className="topbar-ab-copy"
+          key={`copy-${copySweepToken}`}
+          className={`topbar-ab-copy${copySweepToken > 0 ? ' confirm-sweep' : ''}`}
           aria-label={`Copy slot ${activeSlot} to ${activeSlot === 'A' ? 'B' : 'A'}`}
           title={`Copy ${activeSlot} → ${activeSlot === 'A' ? 'B' : 'A'}`}
-          onClick={onCopySlot}
+          onClick={handleCopyClick}
         >
           {activeSlot === 'A' ? '→' : '←'}
         </button>

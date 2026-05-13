@@ -308,6 +308,17 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation }
   // Brief scale-down pulse on the send button (100ms). CSS owns the
   // animation; we just toggle the class.
   const [sendPulse, setSendPulse] = useState(false);
+  // Wordless head-shake on the send arrow when user submits an empty
+  // prompt (Phase 9 §18c). 180ms class-toggle; auto-clears on timer.
+  const [shake, setShake] = useState(false);
+  // Network failure UI (Phase 9 §18b). When set, the chat shows a calm
+  // grey countdown line below the message list with a "Retry now" link.
+  // Auto-retries after 5s; preserves the original prompt for resubmit.
+  const [networkFailure, setNetworkFailure] = useState<{
+    prompt: string;
+    countdown: number;
+  } | null>(null);
+  const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Focus state on the prompt input — drives the shimmer/solid border
   // distinction (idle = shimmer, focused = solid violet).
   const [inputFocused, setInputFocused] = useState(false);
@@ -373,18 +384,32 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation }
           break;
         }
         case 'error': {
+          // Brand-defined failure (Phase 9 §18b): drop technical detail,
+          // preserve the user's most recent prompt for one-touch retry,
+          // and surface the calm countdown under the message list.
+          // We can recover the prompt by walking back through `messages`
+          // (set via React state read through closure — fine here, the
+          // newest user bubble is always the trigger for the current
+          // streaming reply).
           const sid = streamingIdRef.current;
-          if (sid) {
-            setMessages((prev) =>
-              prev.map((m) =>
-                m.id === sid
-                  ? { ...m, content: m.content + `\n⚠ ${msg.message}`, streaming: false }
-                  : m,
-              ),
-            );
-          }
+          let lastPrompt = '';
+          setMessages((prev) => {
+            // Drop the failed assistant bubble entirely.
+            const filtered = prev.filter((m) => m.id !== sid);
+            const lastUser = [...filtered].reverse().find((m) => m.role === 'user');
+            lastPrompt = lastUser?.content ?? '';
+            return filtered;
+          });
           streamingIdRef.current = null;
           setIsGenerating(false);
+          // Log original engineering detail for devs; never to UI.
+          // eslint-disable-next-line no-console
+          console.debug('[TIMBRE] LLM error:', msg.message);
+          // Schedule on a microtask so lastPrompt is set by the time we
+          // read it for the failure card.
+          window.setTimeout(() => {
+            setNetworkFailure({ prompt: lastPrompt, countdown: 5 });
+          }, 0);
           break;
         }
         case 'rationale': {
@@ -422,7 +447,15 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation }
 
   const submit = useCallback(() => {
     const prompt = inputValue.trim();
-    if (!prompt || isGenerating) return;
+    if (isGenerating) return;
+    if (!prompt) {
+      // Wordless head-shake on the send arrow (Phase 9 §18c).
+      // No error toast, no message. Animation is 180ms; class clears
+      // after 200ms so a rapid second Enter can replay the shake.
+      setShake(true);
+      window.setTimeout(() => setShake(false), 200);
+      return;
+    }
 
     const userMsg: ChatMessage = {
       id: nanoid(),
@@ -453,25 +486,61 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation }
 
     send({ type: 'generate', prompt, sessionId: SESSION_ID });
 
-    // If bridge is offline, simulate a graceful offline state after a tick
+    // If the bridge is offline, fall into the brand-defined failure state
+    // (Phase 9 §18b): we never destroy the user's typed prompt, we never
+    // apologise, we never leak the underlying WebSocket reason. Instead
+    // we show a calm countdown line under the conversation and auto-retry
+    // after 5 seconds. The user can hit "Retry now" to fire immediately.
     if (status !== 'open') {
       setTimeout(() => {
-        setMessages((prev) =>
-          prev.map((m) =>
-            m.id === assistantId
-              ? {
-                  ...m,
-                  content: '⚡ Agent bridge is offline. Start the bridge server on ws://localhost:8765 to enable live generation.',
-                  streaming: false,
-                }
-              : m,
-          ),
-        );
+        // Drop the empty streaming assistant bubble — the failure UI
+        // lives below the conversation, not in a bubble.
+        setMessages((prev) => prev.filter((m) => m.id !== assistantId));
         streamingIdRef.current = null;
         setIsGenerating(false);
+        // Park the prompt for retry; render countdown below the list.
+        setNetworkFailure({ prompt, countdown: 5 });
       }, 600);
     }
   }, [inputValue, isGenerating, send, status]);
+
+  // ── Network failure countdown (Phase 9 §18b) ─────────────────────
+  // While networkFailure is non-null, tick the countdown each second.
+  // At 0, fire the retry: restore the prompt into the input and submit
+  // automatically. Manual "Retry now" calls the same handler.
+  const retryNow = useCallback(() => {
+    setNetworkFailure((cur) => {
+      if (!cur) return null;
+      // Restore prompt text. Submit happens via a separate effect once
+      // inputValue has settled (avoids racing the controlled <textarea>).
+      setInputValue(cur.prompt);
+      return null;
+    });
+    // After restoring text, fire submit on the next tick.
+    window.setTimeout(() => {
+      // submit reads `inputValue` via closure; the most recent render
+      // will see the restored prompt. Guard with a tiny timeout so the
+      // state flush has landed.
+      submit();
+    }, 0);
+  }, [submit]);
+
+  useEffect(() => {
+    if (!networkFailure) return;
+    if (networkFailure.countdown <= 0) {
+      retryNow();
+      return;
+    }
+    retryTimerRef.current = setTimeout(() => {
+      setNetworkFailure((cur) =>
+        cur ? { ...cur, countdown: cur.countdown - 1 } : cur,
+      );
+    }, 1000);
+    return () => {
+      if (retryTimerRef.current) clearTimeout(retryTimerRef.current);
+      retryTimerRef.current = null;
+    };
+  }, [networkFailure, retryNow]);
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -522,6 +591,21 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation }
         <div ref={listEndRef} />
       </section>
 
+      {networkFailure && (
+        <div className="chat-network-failure" role="status" aria-live="polite">
+          <span className="chat-network-failure-text">
+            Couldn't reach the agent. Trying again in {networkFailure.countdown}…
+          </span>
+          <button
+            type="button"
+            className="chat-network-failure-retry"
+            onClick={retryNow}
+          >
+            Retry now
+          </button>
+        </div>
+      )}
+
       <ReasoningTicker active={isGenerating} />
 
       <form className="input-bar" onSubmit={handleSubmit} aria-label="Prompt input">
@@ -563,7 +647,16 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation }
               <span />
             </span>
           ) : (
-            <span aria-hidden="true">→</span>
+            // Phase 9 §18c — wordless head-shake on empty submit. The
+            // `key` change forces remount so the keyframe restarts on
+            // a rapid second Enter.
+            <span
+              key={shake ? 'shake-on' : 'shake-off'}
+              className={shake ? 'head-shake' : ''}
+              aria-hidden="true"
+            >
+              →
+            </span>
           )}
         </button>
       </form>

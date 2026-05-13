@@ -39,6 +39,11 @@ export function PresetsSidebar({ currentPatch, onLoadPreset }: PresetsSidebarPro
   const [saveName, setSaveName] = useState('');
   const [saveTagsRaw, setSaveTagsRaw] = useState('');
   const [activePresetId, setActivePresetId] = useState<string | null>(null);
+  // Brief cyan underline confirmation sweep on the Save Patch button when a
+  // patch has just been committed. Cleared after 1000ms (matches the
+  // .confirm-sweep keyframe total). Keyed by an incrementing token so a
+  // rapid second save re-triggers the animation.
+  const [saveSweepToken, setSaveSweepToken] = useState<number>(0);
 
   // Persist on change.
   useEffect(() => {
@@ -133,6 +138,10 @@ export function PresetsSidebar({ currentPatch, onLoadPreset }: PresetsSidebarPro
     };
     setUserPresets((prev) => [...prev, entry]);
     setShowSaveDialog(false);
+    // Fire the cyan confirmation sweep. Bump first so re-saves restart
+    // the keyframe; clear after 1000ms (sweep + hold + fade).
+    setSaveSweepToken((n) => n + 1);
+    window.setTimeout(() => setSaveSweepToken(0), 1000);
   }, [saveName, saveTagsRaw, currentPatch]);
 
   const handleSaveCancel = useCallback(() => {
@@ -214,7 +223,11 @@ export function PresetsSidebar({ currentPatch, onLoadPreset }: PresetsSidebarPro
         </button>
         <button
           type="button"
-          className="presets-save"
+          // Cyan confirmation sweep underline runs on the Save button itself
+          // when a save has just been committed. Keyed via the token so a
+          // re-save restarts the animation by re-mounting the pseudo element.
+          key={`save-${saveSweepToken}`}
+          className={`presets-save${saveSweepToken > 0 ? ' confirm-sweep' : ''}`}
           onClick={handleSaveClick}
           title="Save current patch"
         >
