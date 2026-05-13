@@ -358,7 +358,17 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
 
                                                  if (cancelled())
                                                      return;
-                                                 const PatchStruct patch = bridge_.submitPrompt(prompt);
+                                                 // Heuristic patch first — instant local fallback.
+                                                 PatchStruct patch = bridge_.submitPrompt(prompt);
+
+                                                 if (cancelled())
+                                                     return;
+                                                 // Then invoke the LLM (local llama.cpp → Gemini fallback).
+                                                 std::cerr << "[WebUI] generate prompt='" << prompt
+                                                           << "' — invoking LLM\n";
+                                                 if (auto llm = bridge_.generateLlmPatch(prompt)) {
+                                                     patch = *llm;
+                                                 }
 
                                                  if (cancelled())
                                                      return;
@@ -379,6 +389,19 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
                                                      return juce::var{d};
                                                  }());
                                                  bridge_.notifyPatch(juce::var{pobj});
+
+                                                 if (cancelled())
+                                                     return;
+                                                 // Emit rationale as a token frame too so it appears as the
+                                                 // primary chat bubble text. Without this, the bubble stays
+                                                 // visually empty and the rationale only shows when the user
+                                                 // clicks the collapsed "Why this patch?" details element.
+                                                 // JS handler reads msg.content (not msg.text).
+                                                 {
+                                                     auto* tobj = new juce::DynamicObject{};
+                                                     tobj->setProperty("content", juce::String(rationale));
+                                                     bridge_.notifyToken(juce::var{tobj});
+                                                 }
 
                                                  if (cancelled())
                                                      return;

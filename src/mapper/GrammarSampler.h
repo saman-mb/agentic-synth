@@ -36,6 +36,24 @@ public:
     // The synth-domain system prompt text loaded at construction.
     [[nodiscard]] const std::string& systemPrompt() const noexcept { return cfg_.system_prompt; }
 
+    // Post-construction setter so AgentBridge can swap in a system prompt
+    // loaded from disk after the in-class member initializer has already run.
+    // Mirrors GeminiSampler::setSystemPrompt for symmetry.
+    void setSystemPrompt(std::string sp) noexcept { cfg_.system_prompt = std::move(sp); }
+
+    // Read the bundled TIMBRE sound-design briefing (src/mapper/system-prompt.md)
+    // from disk. Returns the file contents on success, empty string on
+    // failure (missing file, IO error). AgentBridge calls this once at
+    // startup and feeds the result into both samplers so the LLMs share
+    // the same foundational context.
+    //
+    // Resolution order:
+    //   1. Explicit `override_path` argument if non-empty.
+    //   2. AGENTIC_SYNTH_SYSTEM_PROMPT_PATH compile-time define
+    //      (set by CMake to the absolute source-tree path).
+    //   3. ./src/mapper/system-prompt.md relative to cwd (dev fallback).
+    [[nodiscard]] static std::string loadSystemPromptFile(const std::string& override_path = {});
+
 private:
     GrammarSamplerConfig cfg_;
     std::string grammar_text_; // content of the .gbnf file

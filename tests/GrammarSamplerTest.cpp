@@ -179,3 +179,29 @@ TEST_CASE("parse_patch_json: 100 structurally identical patches all parse correc
         CHECK(r->patch_id == i);
     }
 }
+
+// ─── system-prompt.md presence + non-triviality ──────────────────────────────
+//
+// The TIMBRE sound-designer briefing (src/mapper/system-prompt.md) is the
+// foundational context for both the local llama.cpp sampler and the Gemini
+// fallback. If it's missing or has shrunk to a stub, the LLM emits flat,
+// characterless patches with no DSP depth. This test guards against
+// accidental deletion or shrinkage during refactors.
+TEST_CASE("system-prompt.md is bundled and contains the full sound-designer briefing") {
+    const auto txt = GrammarSampler::loadSystemPromptFile();
+    REQUIRE_FALSE(txt.empty());
+
+    // The briefing is dense: schema + 30+ archetypes + worked examples + macro
+    // taxonomy. ~10KB is the minimum that still represents "non-trivial."
+    INFO("system prompt size: " << txt.size() << " bytes");
+    CHECK(txt.size() > 10000);
+
+    // Spot-check load-bearing landmarks so a future "trim the prompt" PR
+    // can't silently remove the archetypes or examples.
+    CHECK(txt.find("PatchStruct") != std::string::npos);
+    CHECK(txt.find("Sawtooth") != std::string::npos);
+    CHECK(txt.find("WavetablePos") != std::string::npos);
+    CHECK(txt.find("Anti-Patterns") != std::string::npos);
+    CHECK(txt.find("Worked Examples") != std::string::npos);
+    CHECK(txt.find("BRIGHTNESS") != std::string::npos);
+}

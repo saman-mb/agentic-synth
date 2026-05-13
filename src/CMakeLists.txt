@@ -9,6 +9,14 @@ add_library(agentic_synth_mapper STATIC
 )
 target_include_directories(agentic_synth_mapper PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 agentic_synth_configure_target(agentic_synth_mapper)
+# Bake the absolute path to the bundled TIMBRE sound-designer briefing
+# (src/mapper/system-prompt.md) into the mapper TU so GrammarSampler can
+# find it without relying on cwd. AgentBridge calls
+# GrammarSampler::loadSystemPromptFile() at startup.
+target_compile_definitions(agentic_synth_mapper
+    PRIVATE
+        AGENTIC_SYNTH_SYSTEM_PROMPT_PATH="${CMAKE_CURRENT_SOURCE_DIR}/mapper/system-prompt.md"
+)
 # juce::juce_core provides juce::JSON, used by SemanticMapper to replace
 # hand-rolled JSON substring scans (engineering audit; same pattern as
 # commit 91d5e4b in AgentBridge).
@@ -155,7 +163,10 @@ add_custom_target(agentic_synth_ui ALL DEPENDS "${UI_DIST_DIR}/index.html")
 
 file(GLOB_RECURSE UI_BINARY_ASSETS CONFIGURE_DEPENDS
      "${UI_DIST_DIR}/index.html"
-     "${UI_DIST_DIR}/assets/*")
+     "${UI_DIST_DIR}/assets/*"
+     "${UI_DIST_DIR}/pcm-tap.js"
+     "${UI_DIST_DIR}/favicon.png"
+     "${UI_DIST_DIR}/favicon-64.png")
 juce_add_binary_data(agentic_synth_ui_assets
     HEADER_NAME UiBinaryData.h
     NAMESPACE   UiBinaryData
