@@ -326,6 +326,10 @@ void AgenticSynthPlugin::prepareToPlay(double sampleRate, int samplesPerBlock) {
     voiceManager_.prepare(sampleRate);
     while (auditionQueue_.pop().has_value()) {
     }
+    // Drain any stale scope samples left over from a previous sample rate /
+    // block size so the visualizer never paints across a rate boundary.
+    while (scopeQueue_.pop().has_value()) {
+    }
     // Push APVTS state to the engine via the single-source-of-truth path.
     applyParameters();
     voiceManager_.primeSmoothers();
@@ -334,6 +338,8 @@ void AgenticSynthPlugin::prepareToPlay(double sampleRate, int samplesPerBlock) {
 void AgenticSynthPlugin::releaseResources() {
     voiceManager_.releaseResources();
     while (auditionQueue_.pop().has_value()) {
+    }
+    while (scopeQueue_.pop().has_value()) {
     }
 }
 
@@ -611,6 +617,41 @@ void AgenticSynthPlugin::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
     } else {
         voiceManager_.renderBlock(buffer.getWritePointer(0), numSamples);
     }
+
+    // Phase 12: post-amp visualizer tap. Master gain is already folded into
+    // the buffer by VoiceManager::renderBlock (gainSmoother applied per
+    // sample inside the voice mix). Push mono-sum (L+R)*0.5 — or just L on
+    // a mono bus — into the scope ring buffer. Push is wait-free SPSC and
+    // drops on full (no audio-thread stall). Bounded loop, no alloc, no lock.
+    if (numChannels >= 2) {
+        const float* L = buffer.getReadPointer(0);
+        const float* R = buffer.getReadPointer(1);
+        for (int n = 0; n < numSamples; ++n) {
+            const float mono = 0.5f * (L[n] + R[n]);
+            (void)scopeQueue_.push(mono);
+        }
+    } else if (numChannels == 1) {
+        const float* L = buffer.getReadPointer(0);
+        for (int n = 0; n < numSamples; ++n)
+            (void)scopeQueue_.push(L[n]);
+    }
+}
+
+//==============================================================================
+int AgenticSynthPlugin::pullScopeSamples(float* dest, int max) noexcept {
+    // Message thread: drain up to `max` samples from the SPSC scope queue
+    // into `dest`. Lock-free pop, no allocation — safe to call from the
+    // native bridge handler (WebUiComponent message-thread context).
+    if (dest == nullptr || max <= 0)
+        return 0;
+    int n = 0;
+    while (n < max) {
+        const auto popped = scopeQueue_.pop();
+        if (!popped.has_value())
+            break;
+        dest[n++] = *popped;
+    }
+    return n;
 }
 
 //==============================================================================
