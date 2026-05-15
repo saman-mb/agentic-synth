@@ -42,6 +42,11 @@ add_executable(agentic_synth_tests
     StyleTransferTest.cpp
     AgentBridgeCallbacksTest.cpp
     AgentBridgeMidiSinkTest.cpp
+    # Phase 22: refinement-context classifier (PromptHandler::isRelativePrompt).
+    RefinementContextTest.cpp
+    # Phase 23: PatchAugmenter guardrail — enforces system-prompt §0 rules
+    # 10/12 (3-osc default + noise-only ban) on LLM-emitted patches.
+    PatchAugmenterTest.cpp
     DictionaryServiceTest.cpp
     TelemetryServiceTest.cpp
     TelemetryUiEventsTest.cpp

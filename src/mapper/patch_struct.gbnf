@@ -71,6 +71,13 @@ delay-params ::= "{"
 osc-array ::= "[" ws osc-params ws "," ws osc-params ws "," ws osc-params ws "]"
 lfo-array ::= "[" ws lfo-params ws "," ws lfo-params ws "]"
 
+# Phase 21: bounded JSON string for the LLM-authored rationale field.
+# Quoted UTF-8 body, no embedded quotes for grammar simplicity (the LLM is
+# instructed in §0 to keep it to 1–2 plain sentences). Escapes covered: \"
+# \\ \/ \n \t \r. The C++ parser truncates at 255 chars + null-terminates.
+string-char ::= [^"\\] | "\\" ["\\/bfnrt]
+string      ::= "\"" string-char* "\""
+
 patch-object ::= "{"
   ws "\"version\""      ws ":" ws uint          ws ","
   ws "\"patch_id\""     ws ":" ws uint          ws ","
@@ -83,5 +90,6 @@ patch-object ::= "{"
   ws "\"delay\""        ws ":" ws delay-params  ws ","
   ws "\"master_gain\""  ws ":" ws number        ws ","
   ws "\"portamento_s\"" ws ":" ws number        ws ","
-  ws "\"voice_count\""  ws ":" ws uint
+  ws "\"voice_count\""  ws ":" ws uint          ws ","
+  ws "\"rationale\""    ws ":" ws string
   ws "}"

@@ -163,6 +163,15 @@ struct PatchStruct {
     float portamento_s;  // 0 = off, >0 = glide time
     uint8_t voice_count; // 1 .. 16
     uint8_t _pad[3];
+
+    // Phase 21: LLM-authored sensory rationale string. Populated by the
+    // grammar-sampled / Gemini path when the model emits a "rationale" field
+    // alongside the patch params. Empty for heuristic / legacy patches —
+    // PromptHandler::generateRationale falls back to the templated heuristic
+    // when this buffer is empty. POD-clean: fixed-size char array, zero-init.
+    // 256 bytes leaves room for ~1-2 prose sentences after JSON escaping
+    // without blowing the lock-free SPSC patch transfer budget.
+    char rationale[256];
 };
 
 // Ensure the struct is trivially copyable (required for lock-free queue transfer)

@@ -447,8 +447,10 @@ PatchVector AgentBridge::getParameterBias(const std::string& userPrompt) const {
     return prompt_.getParameterBias(userPrompt);
 }
 
-std::optional<PatchStruct> AgentBridge::generateLlmPatch(const std::string& prompt, uint32_t patch_id) {
-    return prompt_.generateLlmPatch(prompt, patch_id);
+std::optional<PatchStruct> AgentBridge::generateLlmPatch(const std::string& prompt, uint32_t patch_id,
+                                                         std::optional<PatchStruct> previousPatch,
+                                                         std::optional<std::string> previousPrompt) {
+    return prompt_.generateLlmPatch(prompt, patch_id, std::move(previousPatch), std::move(previousPrompt));
 }
 
 void AgentBridge::feedChunk(std::string_view chunk) { prompt_.feedChunk(chunk); }
