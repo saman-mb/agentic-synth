@@ -4,12 +4,15 @@
 
 #include <atomic>
 #include <functional>
+#include <mutex>
 #include <optional>
+#include <string>
 #include <vector>
 
 #include <juce_core/juce_core.h>
 
 #include "agent/AgentBridge.h"
+#include "engine/PatchStruct.h"
 
 namespace agentic_synth::agent {
 class WhisperClient;
@@ -167,6 +170,24 @@ private:
 
     std::atomic<bool> loadFailed_{false};
     juce::String lastLoadError_;
+
+    // Phase 22 — refinement context. The `generate` worker stores the last
+    // successful patch + the prompt that produced it so the NEXT generate
+    // call can pass them into AgentBridge::generateLlmPatch and trigger
+    // refinement mode for relative prompts ("darker", "more wobble") instead
+    // of regenerating from scratch.
+    //
+    // Mutex contract: the worker pool may run two generate jobs back-to-back
+    // (or, in theory, concurrently — workerPool_ has 2 threads). Read/write
+    // happen on worker threads; we serialise via lastPatchMutex_. Holding it
+    // across the LLM call would block a second submission; so we COPY out of
+    // the snapshot under the lock, run generation lock-free, then re-acquire
+    // the lock to write the new patch. Worst case, two simultaneous prompts
+    // race and the later writer wins — acceptable: the UI itself is gated to
+    // one inflight generate at a time, this is belt-and-braces.
+    mutable std::mutex lastPatchMutex_;
+    std::optional<PatchStruct> lastSuccessfulPatch_;
+    std::string lastPrompt_;
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(WebUiComponent)
 };

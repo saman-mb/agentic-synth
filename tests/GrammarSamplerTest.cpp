@@ -171,6 +171,49 @@ TEST_CASE("parse_patch_json: voice_count 1..16 accepted, 0 rejected") {
     CHECK_FALSE(GrammarSampler::parse_patch_json(json).has_value());
 }
 
+// ── Phase 21: LLM-authored rationale field ───────────────────────────────────
+//
+// The system prompt instructs the LLM to emit a sensory 1–2 sentence
+// "rationale" string after voice_count. PromptHandler::generateRationale
+// prefers that string when present and falls back to the templated heuristic
+// when the field is empty (legacy patches, heuristic-only path).
+
+// Build a valid patch JSON with a trailing "rationale" field. The base
+// make_valid_json closes the object with "voice_count": N\n}; we splice the
+// rationale in just before the closing brace.
+static std::string make_valid_json_with_rationale(const std::string& rationale, uint32_t patch_id = 0) {
+    std::string json = make_valid_json(patch_id);
+    auto end = json.rfind('}');
+    REQUIRE(end != std::string::npos);
+    // Append a comma after voice_count and the rationale field. We trust
+    // make_valid_json keeps voice_count as the last key before '}'.
+    json.insert(end, ",\n  \"rationale\": \"" + rationale + "\"\n");
+    return json;
+}
+
+TEST_CASE("parse_patch_json: rationale field is captured into patch.rationale") {
+    const std::string prose = "I heard: warm, evolving. Three triangles detuned wide, filter drifts slow.";
+    auto result = GrammarSampler::parse_patch_json(make_valid_json_with_rationale(prose));
+    REQUIRE(result.has_value());
+    CHECK(std::string(result->rationale) == prose);
+}
+
+TEST_CASE("parse_patch_json: rationale absent (legacy patch) leaves buffer empty") {
+    // make_valid_json emits no rationale → buffer must stay null-terminated empty.
+    auto result = GrammarSampler::parse_patch_json(make_valid_json(7));
+    REQUIRE(result.has_value());
+    CHECK(result->rationale[0] == '\0');
+}
+
+TEST_CASE("parse_patch_json: rationale longer than 255 chars is truncated + null-terminated") {
+    // 300 'a' chars — exceeds the 256-byte buffer.
+    const std::string huge(300, 'a');
+    auto result = GrammarSampler::parse_patch_json(make_valid_json_with_rationale(huge));
+    REQUIRE(result.has_value());
+    CHECK(std::strlen(result->rationale) == 255);
+    CHECK(result->rationale[255] == '\0');
+}
+
 TEST_CASE("parse_patch_json: 100 structurally identical patches all parse correctly") {
     // Validates acceptance criterion: 100/100 well-formed patches parse.
     for (uint32_t i = 0; i < 100; ++i) {
@@ -213,4 +256,14 @@ TEST_CASE("system-prompt.md is bundled and contains the full sound-designer brie
     // having a sensory vocabulary for translating descriptors to wiring.
     // Guard against trim regressions silently deleting it.
     CHECK(txt.find("Mental Reference Library") != std::string::npos);
+    // The Refinement Contract (§5.3) tells the generator to NUDGE the current
+    // patch on relative prompts ("darker", "more ominous") instead of
+    // regenerating from scratch. Without it, refinements degrade the patch
+    // instead of pushing it. Guard against trim regressions.
+    CHECK(txt.find("Refinement Contract") != std::string::npos);
+    // The "Private playbook" guard tells the generator to translate
+    // refinement multipliers into sensory language when speaking to the
+    // user, not quote knob-math. Without it, refinement replies drift back
+    // into engineer-speak.
+    CHECK(txt.find("Private playbook") != std::string::npos);
 }

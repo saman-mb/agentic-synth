@@ -77,7 +77,16 @@ public:
     // Issue #64: grammar-constrained LLM patch generation.
     // Calls GrammarSampler, validates the result, then drives refinePatch().
     // Returns nullopt when the server is unreachable or returns invalid JSON.
-    [[nodiscard]] std::optional<PatchStruct> generateLlmPatch(const std::string& prompt, uint32_t patch_id = 0);
+    //
+    // Phase 22 — refinement context. previousPatch + previousPrompt carry
+    // the last successful generation forward so that relative prompts
+    // ("darker", "more wobble") become NUDGES instead of fresh generations.
+    // The detection (PromptHandler::isRelativePrompt) and request wrapping
+    // live in the handler; this is a thin forward.
+    [[nodiscard]] std::optional<PatchStruct>
+    generateLlmPatch(const std::string& prompt, uint32_t patch_id = 0,
+                     std::optional<PatchStruct> previousPatch = std::nullopt,
+                     std::optional<std::string> previousPrompt = std::nullopt);
 
     // Two-step LLM flow: ENHANCER step. Rewrites a terse user prompt into a
     // 9-section plain-text sound-design brief that the generator (above)

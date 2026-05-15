@@ -1,6 +1,7 @@
 #include "ui/WebUiComponent.h"
 
 #include "UiBinaryData.h"
+#include "agent/PromptHandler.h"
 #include "agent/WhisperClient.h"
 
 #include <array>
@@ -363,30 +364,67 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
 
                                                  if (cancelled())
                                                      return;
-                                                 // ── Step 1 of the 2-step LLM flow: ENHANCER ─────────────
-                                                 // Translate the terse prompt into a 200–400-word sensory
-                                                 // brief. Empty result == disabled or HTTP fail; we then
-                                                 // fall back to the raw prompt for the generator.
-                                                 std::cerr << "[WebUI] enhancing prompt='" << prompt << "'\n";
-                                                 const std::string brief = bridge_.enhancePrompt(prompt);
+                                                 // ── Phase 22: snapshot prior patch + decide refinement ──
+                                                 // Pull the last successful patch + prompt under the lock,
+                                                 // then release it. We must NOT hold the mutex across the
+                                                 // LLM call (it can take seconds). isRelativePrompt is a
+                                                 // free static; no allocation on the audio thread, no
+                                                 // dependency on bridge_ state.
+                                                 std::optional<PatchStruct> priorPatch;
+                                                 std::string priorPrompt;
+                                                 {
+                                                     std::lock_guard<std::mutex> lock(lastPatchMutex_);
+                                                     priorPatch = lastSuccessfulPatch_;
+                                                     priorPrompt = lastPrompt_;
+                                                 }
+                                                 const bool isRefinement =
+                                                     agent::PromptHandler::isRelativePrompt(prompt) && priorPatch.has_value();
+
                                                  if (cancelled())
                                                      return;
-                                                 if (!brief.empty()) {
-                                                     auto* eobj = new juce::DynamicObject{};
-                                                     eobj->setProperty("brief", juce::String(brief));
-                                                     bridge_.notifyEnhancement(juce::var{eobj});
+                                                 // ── Step 1 of the 2-step LLM flow: ENHANCER ─────────────
+                                                 // Phase 22: skip the enhancer entirely for refinement
+                                                 // prompts. The enhancer rewrites a terse user prompt into
+                                                 // a 9-section sensory brief — useful for cold-start
+                                                 // ("warm pad") but actively harmful for ("darker"), where
+                                                 // the directional intent must reach §5.3 verbatim. The
+                                                 // refinement wrapper inside PromptHandler carries the
+                                                 // previous patch instead, so the brief isn't needed.
+                                                 std::string brief;
+                                                 if (!isRefinement) {
+                                                     std::cerr << "[WebUI] enhancing prompt='" << prompt << "'\n";
+                                                     brief = bridge_.enhancePrompt(prompt);
+                                                     if (cancelled())
+                                                         return;
+                                                     if (!brief.empty()) {
+                                                         auto* eobj = new juce::DynamicObject{};
+                                                         eobj->setProperty("brief", juce::String(brief));
+                                                         bridge_.notifyEnhancement(juce::var{eobj});
+                                                     }
+                                                 } else {
+                                                     std::cerr << "[WebUI] refinement prompt detected ('" << prompt
+                                                               << "') — skipping enhancer, passing raw to LLM\n";
                                                  }
                                                  const std::string& promptForGen = brief.empty() ? prompt : brief;
 
                                                  if (cancelled())
                                                      return;
                                                  // ── Step 2 of the 2-step LLM flow: GENERATOR ────────────
-                                                 // Local llama.cpp → Gemini fallback. Feed the brief if
-                                                 // we have one; otherwise feed the raw prompt verbatim.
+                                                 // Local llama.cpp → Gemini fallback. Feed the brief if we
+                                                 // have one; otherwise feed the raw prompt verbatim. For
+                                                 // refinement prompts, also forward the previous patch +
+                                                 // prompt so PromptHandler wraps the request in §5.3
+                                                 // refinement frame.
                                                  std::cerr << "[WebUI] generate prompt (post-enhance, " << promptForGen.size()
-                                                           << " bytes) — invoking LLM\n";
-                                                 if (auto llm = bridge_.generateLlmPatch(promptForGen)) {
+                                                           << " bytes) — invoking LLM"
+                                                           << (isRefinement ? " (refinement)" : "") << "\n";
+                                                 if (auto llm = bridge_.generateLlmPatch(promptForGen, /*patch_id=*/0,
+                                                                                          priorPatch, priorPrompt)) {
                                                      patch = *llm;
+                                                     // Stash the new patch as the next refinement seed.
+                                                     std::lock_guard<std::mutex> lock(lastPatchMutex_);
+                                                     lastSuccessfulPatch_ = patch;
+                                                     lastPrompt_ = prompt;
                                                  }
 
                                                  if (cancelled())

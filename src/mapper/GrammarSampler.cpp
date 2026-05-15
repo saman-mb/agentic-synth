@@ -558,6 +558,35 @@ std::optional<PatchStruct> GrammarSampler::parse_patch_json(const std::string& j
         p.voice_count = static_cast<uint8_t>(*v);
     }
 
+    // Phase 21: optional "rationale" field. Present in new LLM output, absent
+    // in legacy patches and tests. We peek for a comma followed by the
+    // "rationale" key; if missing, we leave rationale[] zero-initialised and
+    // fall through to '}'. Truncate at 255 chars + null-terminate so the
+    // fixed-size buffer is always a valid C string for downstream consumers.
+    p.rationale[0] = '\0';
+    {
+        const size_t saved = r.pos;
+        r.skip_ws();
+        if (r.pos < r.s.size() && r.s[r.pos] == ',') {
+            ++r.pos;
+            const size_t key_start = r.pos;
+            if (r.expect_key("rationale")) {
+                auto rs = r.read_string();
+                if (!rs)
+                    return std::nullopt;
+                const size_t n = std::min(rs->size(), sizeof(p.rationale) - 1);
+                std::memcpy(p.rationale, rs->data(), n);
+                p.rationale[n] = '\0';
+            } else {
+                // Comma was present but key wasn't "rationale" — schema drift.
+                r.pos = key_start;
+                return std::nullopt;
+            }
+        } else {
+            r.pos = saved; // no rationale → restore for the closing brace
+        }
+    }
+
     if (!r.expect('}'))
         return std::nullopt;
     if (!validate_patch(p))

@@ -122,6 +122,27 @@ of the feeling**. Reserve single-voice descriptions ("a pure sine
 sub", "an 8-bit chip lead") for prompts that explicitly demand
 minimalism.
 
+**Genre keywords require canonical architecture in the brief.**
+
+When the producer's prompt contains genre keywords (dubstep, wobble, reese,
+dub, neuro, growl, etc.) — your brief MUST include explicit references to
+the canonical wiring architecture for that genre. Don't summarize "heavy,
+wobbling, dark" alone. Add: "two detuned saws plus a sub-octave layer,
+filter mouth opening and closing on the eighth-note, drive shaping the
+snarl, no reverb on the low end." The generator needs the architecture
+named, not just the feeling described.
+
+Canonical architectures for common genre keywords:
+- dubstep bass: Reese (two detuned saws) + sub octave + LFO→cutoff bpm-sync 1/8 + drive + mono
+- 808: sine fundamental + sub octave sine + click transient + long decay
+- supersaw: 7-osc detuned saw stack (or 3 saws to approximate) + slight chorus
+- acid: single saw + filter envelope (high mod) + portamento + resonance 0.7+
+- pluck: triangle/saw body + short attack + filter env + low sustain
+- pad: stacked triangles/saws detuned wide + long attack + reverb + LFO drift
+
+If the keyword is present in the prompt, you MUST include the architecture
+phrase in §1 SONIC CHARACTER of the brief.
+
 ---
 
 ## 3. Banned Vocabulary (REBRAND §3 enforced)

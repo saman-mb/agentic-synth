@@ -90,6 +90,7 @@ add_library(agentic_synth_agent STATIC
     agent/DictionaryService.cpp
     agent/KnobBridge.cpp
     agent/ParamMap.cpp
+    agent/PatchAugmenter.cpp
     agent/PromptHandler.cpp
     agent/SessionMemory.cpp
     agent/PrePatchPipeline.cpp

@@ -53,7 +53,28 @@ public:
 
     // Issue #64: grammar-constrained LLM patch generation. Returns nullopt
     // when the server is unreachable or returns invalid JSON.
-    [[nodiscard]] std::optional<PatchStruct> generateLlmPatch(const std::string& prompt, uint32_t patch_id);
+    //
+    // Phase 22 — refinement context. When the user types a relative prompt
+    // ("darker", "more wobble", "a bit thicker") we MUST NOT regenerate from
+    // scratch — that's what was stripping out the wobble the user wanted to
+    // keep. Pass the last successful patch + the prompt that produced it via
+    // previousPatch/previousPrompt; PromptHandler detects relative language
+    // (isRelativePrompt) and, when both are present, wraps the LLM payload in
+    // a refinement frame so §5.3 of system-prompt.md fires and the LLM
+    // nudges instead of restarting. Both args default to nullopt for legacy
+    // call sites and for cold-start prompts where no prior patch exists.
+    [[nodiscard]] std::optional<PatchStruct>
+    generateLlmPatch(const std::string& prompt, uint32_t patch_id = 0,
+                     std::optional<PatchStruct> previousPatch = std::nullopt,
+                     std::optional<std::string> previousPrompt = std::nullopt);
+
+    // Phase 22: returns true when `prompt` contains comparative / refinement
+    // language ("darker", "more wobble", "weirder", …). Used by callers
+    // (WebUiComponent worker, AgentBridge) to skip the prompt-enhancer step
+    // — enhancing "darker" into a 9-section brief erases the directional
+    // intent that §5.3 needs to see verbatim. Word-boundary substring match
+    // against a static keyword list; no NLP, no allocation hot path.
+    [[nodiscard]] static bool isRelativePrompt(const std::string& prompt) noexcept;
 
     // Issue #67: streaming patch application — feed a JSON chunk.
     void feedChunk(std::string_view chunk);

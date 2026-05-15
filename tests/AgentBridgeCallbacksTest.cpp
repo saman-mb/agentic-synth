@@ -17,8 +17,11 @@
 #include <thread>
 #include <vector>
 
+#include <cstring>
+
 #include "agent/AgentBridge.h"
 #include "agent/ParamMap.h"
+#include "engine/PatchStruct.h"
 
 using namespace agentic_synth;
 using namespace agentic_synth::agent;
@@ -470,3 +473,39 @@ TEST_CASE("AgentBridge::modulationPlanForPatch emits four named macros with rout
     bright.reverb.mix = 0.4f;
     checkPlan(bright);
 }
+
+// ── Phase 21: LLM-authored rationale priority ────────────────────────────────
+//
+// generateRationale prefers patch.rationale (LLM-emitted prose) over the
+// heuristic template. Empty rationale → heuristic fallback fires.
+
+TEST_CASE("AgentBridge: generateRationale returns LLM-authored prose when patch.rationale is set") {
+    JuceFixture fix;
+    AgentBridge bridge;
+
+    PatchStruct patch = make_default_patch();
+    const char* prose = "I heard: warm, evolving. Three triangles detuned wide, slow filter drift, hall reverb.";
+    std::strncpy(patch.rationale, prose, sizeof(patch.rationale) - 1);
+    patch.rationale[sizeof(patch.rationale) - 1] = '\0';
+
+    const std::string out = bridge.generateRationale("warm evolving pad", patch);
+    CHECK(out == prose);
+    // Sanity: confirm the heuristic boilerplate did NOT bleed through.
+    CHECK(out.find("I chose a") == std::string::npos);
+}
+
+TEST_CASE("AgentBridge: generateRationale falls back to heuristic when patch.rationale is empty") {
+    JuceFixture fix;
+    AgentBridge bridge;
+
+    PatchStruct patch = make_default_patch();
+    // make_default_patch zero-inits the rationale buffer, so rationale[0] == 0.
+    REQUIRE(patch.rationale[0] == '\0');
+
+    const std::string out = bridge.generateRationale("warm pad", patch);
+    // The heuristic always opens with "I chose a <osc> oscillator..." — verify
+    // the template path is what fired.
+    CHECK_FALSE(out.empty());
+    CHECK(out.find("I chose a") != std::string::npos);
+}
+
