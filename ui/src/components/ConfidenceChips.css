@@ -1,0 +1,49 @@
+/* Phase 24 — Confidence chips.
+   Mono caps, violet-tinted, sit between the textarea and the helper hint.
+   No layout jump: hidden entirely when no intent is detected (component
+   returns null), so the helper hint slides up to fill the space. */
+
+.confidence-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 6px 2px 0;
+  animation: confidence-chips-fade-in 140ms var(--ease-considered, ease-out);
+}
+
+@keyframes confidence-chips-fade-in {
+  from { opacity: 0; transform: translateY(-2px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.confidence-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 8px;
+  border-radius: 99px;
+  background: var(--accent-tint-12, rgba(124, 77, 255, 0.12));
+  border: 1px solid var(--accent-tint-25, rgba(124, 77, 255, 0.25));
+  font-family: var(--font-mono);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  line-height: 1.6;
+  white-space: nowrap;
+  user-select: none;
+}
+
+.confidence-chip-cat {
+  color: var(--text-tertiary);
+  font-weight: 500;
+}
+
+.confidence-chip-sep {
+  color: var(--text-tertiary);
+  opacity: 0.55;
+}
+
+.confidence-chip-val {
+  color: var(--accent-primary, #b3a0ff);
+  font-weight: 600;
+}
