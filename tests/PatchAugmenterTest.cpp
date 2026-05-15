@@ -249,3 +249,49 @@ TEST_CASE("augmentPatch: enabled but inaudible osc (vol < 0.15) counts as silent
     REQUIRE(p.osc[1].volume >= 0.15f);
     REQUIRE(p.osc[1].detune_cents == -10.0f);
 }
+
+// Phase 26 — augmenter_actions transparency log.
+//
+// Each strategy must populate the augmenter_actions buffer so the UI can
+// render a "patch adjusted" banner. The string is user-facing (sensory-
+// first, no jargon) and pipe-separated when multiple actions stack
+// (currently the augmenter only fires one strategy per call, so the
+// buffer holds one entry).
+
+TEST_CASE("augmenter_actions: noise-only fix writes a user-facing description",
+          "[augmenter][phase26]") {
+    PatchStruct p = noiseOnlyPatch();
+    REQUIRE(augmentPatch(p, "electric storm bass"));
+    REQUIRE(p.augmenter_actions[0] != '\0');
+    const std::string actions{p.augmenter_actions};
+    REQUIRE(actions.find("noise") != std::string::npos);
+    REQUIRE(actions.find("|") == std::string::npos);
+}
+
+TEST_CASE("augmenter_actions: single-saw → Reese writes layering description",
+          "[augmenter][phase26]") {
+    PatchStruct p = singleOscPatch(OscType::Sawtooth);
+    REQUIRE(augmentPatch(p, "huge dubstep bass"));
+    REQUIRE(p.augmenter_actions[0] != '\0');
+    const std::string actions{p.augmenter_actions};
+    REQUIRE(actions.find("Reese") != std::string::npos);
+}
+
+TEST_CASE("augmenter_actions: simple prompt produces empty action buffer",
+          "[augmenter][phase26]") {
+    PatchStruct p = singleOscPatch(OscType::Sine);
+    REQUIRE_FALSE(augmentPatch(p, "pure sine sub"));
+    REQUIRE(p.augmenter_actions[0] == '\0');
+}
+
+TEST_CASE("augmenter_actions: already-3-osc patch leaves action buffer empty",
+          "[augmenter][phase26]") {
+    PatchStruct p = make_default_patch();
+    for (auto& o : p.osc) {
+        o.enabled = 1;
+        o.volume = 0.6f;
+        o.type = OscType::Sawtooth;
+    }
+    REQUIRE_FALSE(augmentPatch(p, "warm pad"));
+    REQUIRE(p.augmenter_actions[0] == '\0');
+}

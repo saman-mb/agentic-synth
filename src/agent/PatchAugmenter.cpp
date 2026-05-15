@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <cstring>
 #include <iostream>
 #include <string_view>
 #include <utility>
@@ -10,6 +11,26 @@
 namespace agentic_synth::agent {
 
 namespace {
+
+// Append one user-facing action string to PatchStruct::augmenter_actions.
+// Strings are pipe-separated and the buffer is always null-terminated so the
+// UI can split on '|' without bounds drama. Silently truncates if the buffer
+// is too full — the goal is to give the user *some* signal, not a
+// guaranteed-complete log.
+void appendAction(PatchStruct& p, const char* action) noexcept {
+    if (!action || !*action) return;
+    const std::size_t cap = sizeof(p.augmenter_actions);
+    const std::size_t used = std::strlen(p.augmenter_actions);
+    const std::size_t need = std::strlen(action) + (used > 0 ? 1 : 0);
+    if (used + need + 1 > cap) return;
+    if (used > 0) {
+        p.augmenter_actions[used] = '|';
+        std::strncpy(p.augmenter_actions + used + 1, action, cap - used - 2);
+    } else {
+        std::strncpy(p.augmenter_actions, action, cap - 1);
+    }
+    p.augmenter_actions[cap - 1] = '\0';
+}
 
 // Lower-ASCII view of `s`. Cold-path only (one call per LLM submission), so
 // the per-call allocation is acceptable. Mirrors PromptHandler.cpp's helper —
@@ -328,6 +349,10 @@ bool augmentPatch(PatchStruct& p, const std::string& prompt) noexcept {
                        : pitched == OscType::Triangle ? "Triangle"
                        : pitched == OscType::Sine ? "Sine" : "?")
                   << "): prompt='" << prompt << "'\n";
+        appendAction(p,
+            pitched == OscType::Sawtooth ? "Gave the storm a pitched body (added saw fundamental + detuned partner; noise demoted to texture layer)"
+            : pitched == OscType::Triangle ? "Gave the noise a pitched body (added triangle fundamental + detuned partner; noise demoted to texture layer)"
+            : "Gave the noise a pitched body (added sine fundamental + 4¢ partner; noise demoted to texture layer)");
         return true;
     }
 
@@ -350,6 +375,7 @@ bool augmentPatch(PatchStruct& p, const std::string& prompt) noexcept {
         addThirdLayer(p);
         std::cerr << "[PatchAugmenter] Auto-layered patch (2-osc → 3-osc, "
                      "added sub-octave sine in empty slot): prompt='" << prompt << "'\n";
+        appendAction(p, "Thickened the low end (filled empty 3rd slot with a sub-octave sine anchor)");
         return true;
     }
 
@@ -388,6 +414,12 @@ bool augmentPatch(PatchStruct& p, const std::string& prompt) noexcept {
         modified = true;
         std::cerr << "[PatchAugmenter] Auto-layered patch (single-osc → "
                   << (strategy ? strategy : "generic") << "): prompt='" << prompt << "'\n";
+        const char* userMsg =
+            seed == OscType::Sawtooth  ? "Layered the patch into a Reese (detuned saw partner + sub-octave sine for depth)"
+          : seed == OscType::Triangle ? "Layered the patch into a pad (detuned triangle partner + octave shimmer for air)"
+          : seed == OscType::FM        ? "Layered the FM tine over a clean sine fundamental (plus octave shimmer)"
+          :                              "Layered the single oscillator (detune partner + sub-octave anchor)";
+        appendAction(p, userMsg);
         return modified;
     }
 
@@ -403,6 +435,7 @@ bool augmentPatch(PatchStruct& p, const std::string& prompt) noexcept {
         applyReeseLayering(p); // re-uses osc[1]/[2] for detune + sub
         std::cerr << "[PatchAugmenter] Auto-recovered silent patch (all oscs muted) "
                      "with Reese topology: prompt='" << prompt << "'\n";
+        appendAction(p, "Rescued a silent patch with a default Reese (saw + detuned partner + sub sine)");
         return true;
     }
 

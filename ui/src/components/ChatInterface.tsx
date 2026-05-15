@@ -165,6 +165,17 @@ function MessageBubble({
         </details>
       )}
 
+      {message.augmenterActions && message.augmenterActions.length > 0 && !message.streaming && (
+        <aside className="augmenter-banner" role="status" aria-label="Patch adjustments">
+          <span className="augmenter-banner-label">Patch adjusted</span>
+          <ul className="augmenter-banner-list">
+            {message.augmenterActions.map((a, i) => (
+              <li key={`aug-${i}`}>{a}</li>
+            ))}
+          </ul>
+        </aside>
+      )}
+
       {message.variations && message.variations.length > 0 && (
         <ABVariationGrid variations={message.variations} onSelectVariation={onSelectVariation} />
       )}
@@ -458,7 +469,14 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation, 
                 };
                 return { ...m, variations: [...existing, typedVariation] };
               }
-              return { ...m, patch: msg.data, modulation: msg.modulation };
+              return {
+                ...m,
+                patch: msg.data,
+                modulation: msg.modulation,
+                augmenterActions: msg.augmenter_actions && msg.augmenter_actions.length > 0
+                  ? msg.augmenter_actions
+                  : m.augmenterActions,
+              };
             }),
           );
           break;

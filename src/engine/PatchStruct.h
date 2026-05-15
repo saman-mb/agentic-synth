@@ -172,6 +172,14 @@ struct PatchStruct {
     // 256 bytes leaves room for ~1-2 prose sentences after JSON escaping
     // without blowing the lock-free SPSC patch transfer budget.
     char rationale[256];
+
+    // Phase 26: PatchAugmenter action log. Pipe-separated short strings
+    // describing each runtime guardrail mutation (e.g.
+    // "added sub-octave sine for depth|swapped noise-only for pitched saw").
+    // Empty when augmentPatch was a no-op or skipped (refinement / simple
+    // prompt). Surfaced to the UI so users see what got auto-corrected and
+    // don't blame the LLM for the layered patch.
+    char augmenter_actions[256];
 };
 
 // Ensure the struct is trivially copyable (required for lock-free queue transfer)
