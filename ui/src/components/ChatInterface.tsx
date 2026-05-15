@@ -21,6 +21,7 @@ import type {
   WireOutgoing,
 } from '../types/chat';
 import { AuditionKeyboard } from './AuditionKeyboard';
+import { ConfidenceChips } from './ConfidenceChips';
 import { PatchPreview } from './PatchPreview';
 import { PushToTalk } from './PushToTalk';
 import './ChatInterface.css';
@@ -871,6 +872,7 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation, 
               rows={3}
             />
           </div>
+          {!isGenerating && <ConfidenceChips prompt={inputValue} />}
           {/* Tiny helper line — never wraps, mutes to tertiary so it
               reads as ambient guidance, not chrome. */}
           <span className="prompt-input-hint" aria-hidden="true">
