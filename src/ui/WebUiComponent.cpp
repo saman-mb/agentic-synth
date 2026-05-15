@@ -437,6 +437,19 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
                                                  pobj->setProperty("variation", juce::String("A"));
                                                  pobj->setProperty("data", agent::AgentBridge::patchToVar(patch));
                                                  pobj->setProperty("modulation", agent::AgentBridge::modulationPlanForPatch(patch));
+                                                 // Phase 26: surface PatchAugmenter mutations so the UI can render
+                                                 // a transparency banner ("Patch adjusted: …"). Pipe-separated
+                                                 // buffer → array of strings; empty buffer → empty array which
+                                                 // the UI treats as "no banner".
+                                                 if (patch.augmenter_actions[0] != '\0') {
+                                                     juce::Array<juce::var> actions;
+                                                     juce::String raw{patch.augmenter_actions};
+                                                     for (auto& tok : juce::StringArray::fromTokens(raw, "|", "")) {
+                                                         if (!tok.trim().isEmpty())
+                                                             actions.add(juce::var{tok.trim()});
+                                                     }
+                                                     pobj->setProperty("augmenter_actions", juce::var{actions});
+                                                 }
                                                  bridge_.notifyPatch(juce::var{pobj});
 
                                                  auto* update = new juce::DynamicObject{};

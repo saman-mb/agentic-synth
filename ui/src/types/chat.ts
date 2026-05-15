@@ -43,6 +43,11 @@ export interface ChatMessage {
   variations?: PatchVariation[];
   feedback?: FeedbackKind;
   rationale?: string;
+  // Phase 26 — PatchAugmenter actions, one per auto-fix the C++ guardrail
+  // applied to the LLM output. UI renders a small "patch adjusted" banner
+  // under the bubble so users see what was repaired post-LLM and don't
+  // blame the model for the layered result.
+  augmenterActions?: string[];
   // Phase 10 §16 — 'sudo make me a sound' easter egg renders as a
   // green-on-black terminal block with `terminal: true`. Lines are
   // shown one per row in a monospace CRT-styled card.
@@ -53,7 +58,7 @@ export interface ChatMessage {
 // WebSocket wire protocol
 export type WireIncoming =
   | { type: 'token'; content: string }
-  | { type: 'patch'; variation: 'A' | 'B'; data: PatchPreviewData; modulation?: AgentModulationPlan }
+  | { type: 'patch'; variation: 'A' | 'B'; data: PatchPreviewData; modulation?: AgentModulationPlan; augmenter_actions?: string[] }
   | { type: 'done' }
   | { type: 'error'; message: string }
   | { type: 'rationale'; text: string }
