@@ -285,6 +285,14 @@ AgentBridge::AgentBridge() {
         std::cerr << "[AgentBridge] PromptEnhancer disabled\n";
     }
 
+    // Phase 29 — same key drives the STT path.
+    if (!geminiKey.empty()) {
+        stt_.setApiKey(geminiKey);
+        std::cerr << "[AgentBridge] GeminiSTT enabled (push-to-talk transcription)\n";
+    } else {
+        std::cerr << "[AgentBridge] GeminiSTT disabled — no GEMINI_KEY\n";
+    }
+
     // Wire stream parser: each completed field injects a partial patch
     // directly onto the audio SPSC queue for < 500 ms first-audible-change.
     // Parallel emission to typed subscribers (Phase 2) — used by the
@@ -412,6 +420,10 @@ void AgentBridge::notifyTranscript(const juce::var& payload) { dispatch(transcri
 void AgentBridge::notifyEnhancement(const juce::var& payload) { dispatch(enhancementSlots_, payload); }
 
 std::string AgentBridge::enhancePrompt(const std::string& userPrompt) { return enhancer_.enhance(userPrompt); }
+
+std::string AgentBridge::transcribeAudio(const std::int16_t* samples, int numSamples, int sampleRate) const {
+    return stt_.transcribe(samples, numSamples, sampleRate);
+}
 
 std::string AgentBridge::status() const { return "agent-bridge-v2"; }
 

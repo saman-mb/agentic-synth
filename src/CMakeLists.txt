@@ -98,6 +98,7 @@ add_library(agentic_synth_agent STATIC
     agent/Telemetry.cpp
     agent/VariationRecommender.cpp
     agent/WhisperClient.cpp
+    agent/GeminiSTT.cpp
     agent/GenerationService.cpp
 )
 target_include_directories(agentic_synth_agent PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
