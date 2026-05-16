@@ -425,6 +425,21 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
                                                      std::lock_guard<std::mutex> lock(lastPatchMutex_);
                                                      lastSuccessfulPatch_ = patch;
                                                      lastPrompt_ = prompt;
+                                                 } else {
+                                                     // Phase 31 — LLM failed. The heuristic patch from
+                                                     // submitPrompt() (line above) has NOT been through the
+                                                     // PatchAugmenter, so all the Phase 23/27/30 cinematic
+                                                     // guardrails (3-osc layering, FM coercion, cinematic
+                                                     // pad recipe, noise-only fix) are bypassed exactly when
+                                                     // they're needed most. Fire the augmenter now, applying
+                                                     // the same refinement-skip rule generateLlmPatch uses
+                                                     // internally — if the user typed a relative prompt and
+                                                     // we have a prior patch, leave the heuristic patch
+                                                     // alone so the bare topology survives.
+                                                     std::cerr << "[WebUI] LLM failed — applying heuristic-patch guardrail"
+                                                               << (isRefinement ? " (skipped: refinement)" : "") << "\n";
+                                                     bridge_.applyGuardrailIfNotRefinement(patch, prompt,
+                                                                                            priorPatch.has_value());
                                                  }
 
                                                  if (cancelled())

@@ -76,6 +76,20 @@ public:
     // against a static keyword list; no NLP, no allocation hot path.
     [[nodiscard]] static bool isRelativePrompt(const std::string& prompt) noexcept;
 
+    // Phase 31 — heuristic-fallback guardrail. When the LLM call fails the
+    // worker is left holding the bare heuristic patch from submitPrompt(),
+    // bypassing the Phase 23/27/30 PatchAugmenter (3-osc layering, FM
+    // coercion, cinematic-pad recipe, noise-only fix). Call this AFTER an
+    // LLM-failure branch to fire the augmenter on the heuristic patch using
+    // the same refinement-skip rule used inside generateLlmPatch(): when
+    // isRelativePrompt(prompt) is true AND a previous patch exists the
+    // augmenter is skipped (user is nudging an existing topology). The
+    // augmenter is idempotent on already-augmented patches but should still
+    // only be invoked on the LLM-failure path so we don't double-run on
+    // success.
+    void applyGuardrailIfNotRefinement(PatchStruct& patch, const std::string& prompt,
+                                       bool hasPreviousPatch) noexcept;
+
     // Issue #67: streaming patch application — feed a JSON chunk.
     void feedChunk(std::string_view chunk);
 

@@ -22,6 +22,15 @@ struct GeminiSamplerConfig {
     float temperature{0.35f};
     // Hard ceiling on curl wall-time. Matches GrammarSampler's 15s default.
     int timeout_ms{15000};
+    // Cap on output tokens. Gemini 2.5 Flash defaults to 8192 but reasoning
+    // tokens count against the budget — with the ~80KB synth system prompt
+    // the model can burn the whole budget "thinking" and emit empty parts.
+    // 4096 leaves enough headroom for the JSON patch.
+    int max_output_tokens{4096};
+    // Safety filter threshold applied to all 4 HARM_CATEGORY_* buckets.
+    // BLOCK_ONLY_HIGH pre-empts false-positive blocks on horror / Kubrick /
+    // dread / Vangelis-style prompt keywords.
+    std::string safety_threshold{"BLOCK_ONLY_HIGH"};
 };
 
 // Cloud fallback sampler. POSTs to Google's Gemini `generateContent`

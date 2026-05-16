@@ -89,6 +89,14 @@ public:
                      std::optional<PatchStruct> previousPatch = std::nullopt,
                      std::optional<std::string> previousPrompt = std::nullopt);
 
+    // Phase 31 — heuristic-fallback guardrail forward. Worker invokes this on
+    // the LLM-failure branch so the Phase 23/27/30 PatchAugmenter still fires
+    // on the bare heuristic patch from submitPrompt(). Refinement-skip rule
+    // matches generateLlmPatch: when the prompt is relative AND a prior patch
+    // exists, the augmenter is skipped. See PromptHandler.h for full notes.
+    void applyGuardrailIfNotRefinement(PatchStruct& patch, const std::string& prompt,
+                                       bool hasPreviousPatch) noexcept;
+
     // Two-step LLM flow: ENHANCER step. Rewrites a terse user prompt into a
     // 9-section plain-text sound-design brief that the generator (above)
     // then receives instead of the raw prompt. Returns "" when the enhancer
