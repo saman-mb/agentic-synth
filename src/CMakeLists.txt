@@ -9,6 +9,11 @@ add_library(agentic_synth_mapper STATIC
     mapper/LlmTelemetry.cpp
     mapper/EnvLoader.cpp
     mapper/SemanticMapper.cpp
+    # Phase 34a — minimum-viable RAG patch system: curated archetype library
+    # + keyword retriever. Archetype JSON is embedded as C++ string literals
+    # (no disk I/O) so the library ships with the binary.
+    mapper/ArchetypeLibrary.cpp
+    mapper/ArchetypeRetriever.cpp
 )
 target_include_directories(agentic_synth_mapper PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 agentic_synth_configure_target(agentic_synth_mapper)

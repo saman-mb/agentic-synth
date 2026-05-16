@@ -9,6 +9,8 @@
 
 #include "agent/KnobBridge.h"
 #include "agent/PatchAugmenter.h"
+#include "mapper/ArchetypeLibrary.h"
+#include "mapper/ArchetypeRetriever.h"
 
 namespace agentic_synth::agent {
 
@@ -304,6 +306,35 @@ std::optional<PatchStruct> PromptHandler::generateLlmPatch(const std::string& pr
         std::cerr << "[PromptHandler] LLM path=gemini failed; no patch produced\n";
     } else {
         std::cerr << "[PromptHandler] local llama.cpp unavailable and GEMINI_KEY unset; no patch produced\n";
+    }
+
+    // ── Phase 34a: minimum-viable RAG fallback ──────────────────────────────
+    //
+    // Both LLM paths failed. Rather than hand back nullopt and let the worker
+    // ship the bare heuristic patch from PrePatchPipeline, we retrieve the
+    // best-matching archetype from the curated library (substring score over
+    // descriptor tags) and return that. The retrieved patch still flows
+    // through applyGuardrail (PatchAugmenter) so refinement-mode bypass and
+    // §0 layering rules still apply — exactly the same pipeline as a
+    // successful LLM response.
+    //
+    // The retriever NEVER returns nullptr (it falls back to the
+    // `default_init` archetype on no-match), so this branch always produces
+    // a patch when the library is non-empty.
+    if (const auto* arch = mapper::ArchetypeRetriever::retrieve(prompt)) {
+        std::string tagList;
+        for (size_t i = 0; i < arch->tags.size(); ++i) {
+            if (i > 0)
+                tagList += ", ";
+            tagList += arch->tags[i];
+        }
+        std::cerr << "[PromptHandler] LLM unavailable; using retrieved archetype '"
+                  << arch->name << "' (tags: " << tagList << ")\n";
+        PatchStruct patch = arch->patch;
+        patch.patch_id = patch_id;
+        applyGuardrail(patch);
+        refinePatch(patch);
+        return patch;
     }
     return std::nullopt;
 }

@@ -1,0 +1,23 @@
+{
+  "name": "vangelis_blade_runner_pad",
+  "tags": ["vangelis", "blade runner", "cinematic", "warm pad", "cs-80"],
+  "version": 1,
+  "patch_id": 0,
+  "osc": [
+    {"type": "Sawtooth", "semitone_offset": 0.0,   "detune_cents": -9.0, "wavetable_pos": 0.0, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.80, "pan": -0.5, "pulse_width": 0.5, "enabled": true},
+    {"type": "Sawtooth", "semitone_offset": 0.0,   "detune_cents":  9.0, "wavetable_pos": 0.0, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.75, "pan":  0.5, "pulse_width": 0.5, "enabled": true},
+    {"type": "Sine",     "semitone_offset": -12.0, "detune_cents":  0.0, "wavetable_pos": 0.0, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.45, "pan":  0.0, "pulse_width": 0.5, "enabled": true}
+  ],
+  "filter": {"type": "LowPass", "cutoff_hz": 900.0, "resonance": 0.30, "env_mod": 0.45, "key_track": 0.1, "drive": 0.25},
+  "filter_env": {"attack_s": 2.0, "decay_s": 4.0, "sustain": 0.50, "release_s": 4.0},
+  "amp_env":    {"attack_s": 2.0, "decay_s": 1.2, "sustain": 0.90, "release_s": 8.0},
+  "lfo": [
+    {"waveform": "Sine",     "target": "FilterCutoff", "rate_hz": 0.08, "depth": 0.30,  "phase_offset": 0.0,  "bpm_sync": false},
+    {"waveform": "Triangle", "target": "Pitch",        "rate_hz": 0.13, "depth": 0.025, "phase_offset": 0.25, "bpm_sync": false}
+  ],
+  "reverb": {"size": 0.95, "damping": 0.50, "width": 1.0, "mix": 0.40},
+  "delay":  {"time_s": 0.45, "feedback": 0.20, "mix": 0.08, "stereo": 0.6, "bpm_sync": false},
+  "master_gain": 0.85,
+  "portamento_s": 0.05,
+  "voice_count": 8
+}

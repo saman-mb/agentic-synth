@@ -1,0 +1,23 @@
+{
+  "name": "warm_analog_pad",
+  "tags": ["warm pad", "lush pad", "soft pad", "analog pad"],
+  "version": 1,
+  "patch_id": 0,
+  "osc": [
+    {"type": "Triangle", "semitone_offset": 0.0,  "detune_cents": -9.0, "wavetable_pos": 0.0, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.80, "pan": -0.4, "pulse_width": 0.5, "enabled": true},
+    {"type": "Triangle", "semitone_offset": 0.0,  "detune_cents":  9.0, "wavetable_pos": 0.0, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.75, "pan":  0.4, "pulse_width": 0.5, "enabled": true},
+    {"type": "Sine",     "semitone_offset": 12.0, "detune_cents":  0.0, "wavetable_pos": 0.0, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.40, "pan":  0.0, "pulse_width": 0.5, "enabled": true}
+  ],
+  "filter": {"type": "LowPass", "cutoff_hz": 2500.0, "resonance": 0.15, "env_mod": 0.25, "key_track": 0.1, "drive": 0.10},
+  "filter_env": {"attack_s": 1.5, "decay_s": 2.0, "sustain": 0.60, "release_s": 2.5},
+  "amp_env":    {"attack_s": 1.2, "decay_s": 1.0, "sustain": 0.85, "release_s": 3.0},
+  "lfo": [
+    {"waveform": "Sine", "target": "FilterCutoff", "rate_hz": 0.20, "depth": 0.20, "phase_offset": 0.0, "bpm_sync": false},
+    {"waveform": "Sine", "target": "None",         "rate_hz": 1.0,  "depth": 0.0,  "phase_offset": 0.0, "bpm_sync": false}
+  ],
+  "reverb": {"size": 0.70, "damping": 0.50, "width": 1.0, "mix": 0.35},
+  "delay":  {"time_s": 0.375, "feedback": 0.25, "mix": 0.12, "stereo": 0.6, "bpm_sync": false},
+  "master_gain": 0.85,
+  "portamento_s": 0.0,
+  "voice_count": 8
+}

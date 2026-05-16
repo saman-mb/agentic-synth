@@ -26,6 +26,8 @@ add_executable(agentic_synth_tests
     GrammarSamplerTest.cpp
     PromptEnhancerTest.cpp
     SemanticMapperTest.cpp
+    # Phase 34a — RAG fallback: curated archetype library + keyword retriever.
+    ArchetypeLibraryTest.cpp
     StreamParserTest.cpp
     # Phase{1,2,3}AcceptanceTest.cpp — pre-existing master breakage (stale
     # engine APIs / unqualified PatchStruct / dropped SynthEngine ctor).
