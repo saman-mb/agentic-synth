@@ -295,3 +295,74 @@ TEST_CASE("augmenter_actions: already-3-osc patch leaves action buffer empty",
     REQUIRE_FALSE(augmentPatch(p, "warm pad"));
     REQUIRE(p.augmenter_actions[0] == '\0');
 }
+
+// Phase 27 — FM-intent coercion.
+//
+// User explicitly named the synthesis technique (FM / DX / Rhodes / bell /
+// tine / electric piano), but the LLM shipped a non-FM oscillator. The
+// augmenter rebuilds the patch around a canonical FM topology before the
+// engine sees it.
+
+TEST_CASE("augmenter FM-intent: 'classic FM aerie sound' on Saw → osc[0] becomes FM",
+          "[augmenter][phase27]") {
+    PatchStruct p = singleOscPatch(OscType::Sawtooth);
+    REQUIRE(augmentPatch(p, "classic FM aerie sound"));
+    REQUIRE(p.osc[0].type == OscType::FM);
+    REQUIRE(p.osc[0].volume >= 0.15f);
+    REQUIRE(p.osc[1].type == OscType::Sine);   // body
+    REQUIRE(p.osc[2].type == OscType::Sine);   // shimmer
+    REQUIRE(p.osc[2].semitone_offset == 12.0f);
+}
+
+TEST_CASE("augmenter FM-intent: 'tine' / 'rhodes' → DX-tine ratio 14.0",
+          "[augmenter][phase27]") {
+    PatchStruct p = singleOscPatch(OscType::Sawtooth);
+    REQUIRE(augmentPatch(p, "rhodes tine sound"));
+    REQUIRE(p.osc[0].type == OscType::FM);
+    REQUIRE(p.osc[0].fm_ratio == 14.0f);
+}
+
+TEST_CASE("augmenter FM-intent: 'bell' / 'glass' → inharmonic ratio 3.14",
+          "[augmenter][phase27]") {
+    PatchStruct p = singleOscPatch(OscType::Sawtooth);
+    REQUIRE(augmentPatch(p, "classic bell tone with shimmer"));
+    REQUIRE(p.osc[0].type == OscType::FM);
+    REQUIRE(p.osc[0].fm_ratio == 3.14f);
+}
+
+TEST_CASE("augmenter FM-intent: filter must stay open (FM is the timbre)",
+          "[augmenter][phase27]") {
+    PatchStruct p = singleOscPatch(OscType::Sawtooth);
+    // Simulate the LLM closing the filter on top of FM (the classic mistake).
+    p.filter.cutoff_hz = 600.0f;
+    p.filter.resonance = 0.7f;
+    REQUIRE(augmentPatch(p, "DX7 bell"));
+    REQUIRE(p.filter.cutoff_hz >= 14000.0f);
+    REQUIRE(p.filter.resonance <= 0.2f);
+}
+
+TEST_CASE("augmenter FM-intent: already-FM osc[0] is left alone (no double-coerce)",
+          "[augmenter][phase27]") {
+    PatchStruct p = singleOscPatch(OscType::FM);
+    p.osc[0].fm_ratio = 7.0f;
+    p.osc[0].fm_depth = 0.6f;
+    // Other oscs disabled; single-osc layering should fire, not FM coercion.
+    REQUIRE(augmentPatch(p, "FM bell"));
+    REQUIRE(p.osc[0].fm_ratio == 7.0f);
+    REQUIRE(p.osc[0].fm_depth == 0.6f);
+}
+
+TEST_CASE("augmenter FM-intent: prompt without FM tokens does not coerce",
+          "[augmenter][phase27]") {
+    PatchStruct p = singleOscPatch(OscType::Sawtooth);
+    REQUIRE(augmentPatch(p, "warm pad"));
+    // Reese layering should have fired; osc[0] type stays Saw.
+    REQUIRE(p.osc[0].type == OscType::Sawtooth);
+}
+
+TEST_CASE("augmenter FM-intent: 'format' / 'platform' do not false-positive on 'fm'",
+          "[augmenter][phase27]") {
+    PatchStruct p = singleOscPatch(OscType::Sawtooth);
+    REQUIRE(augmentPatch(p, "warm pad platform"));
+    REQUIRE(p.osc[0].type == OscType::Sawtooth);
+}

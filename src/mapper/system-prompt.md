@@ -531,6 +531,21 @@ These are the moves that separate a stock patch from a designed one:
   "electric" / "stormy" / "chaotic", use noise as osc[2] layer
   (vol 0.2-0.3) over pitched oscs[0] and [1], not as the only voice.
 
+- **Don't ship Sawtooth when the user named FM.** If the brief or original
+  prompt mentions any of: FM, FM-style, DX, DX7, DX-style, Yamaha,
+  Operator, FM8, tine, Rhodes, electric piano, EP, bell, marimba,
+  vibraphone, glass, chime, additive, ring-mod — `osc[0].type` MUST be
+  `FM` (=6). Picking Sawtooth/Triangle/Wavetable is a fatal mismatch: the
+  user explicitly named the synthesis technique, and FM cannot be faked
+  by subtractive synthesis. The classic recipe: osc[0]=FM with
+  fm_ratio 2.01 / 3.14 / 3.5 / 14.0 (glassy/bell/bell/tine respectively)
+  and fm_depth 0.30-0.55; osc[1]=Sine fundamental at vol 0.6 for body;
+  osc[2]=Sine +12 semi at vol 0.20 for shimmer; **filter stays open
+  (cutoff 12000+ Hz)** — FM provides the timbre, not the filter. The
+  classic FM mistake is closing the filter — that strips the partials FM
+  worked to create. See §3 Plucks & Keys archetypes #14, #19 and §6
+  Worked Example D.
+
 **Range guardrails (DSP audit):**
 - Dubstep wobble cutoff: 250-650 Hz.
 - Reese detune: ±7-12 cents (tighter than generic supersaw).
