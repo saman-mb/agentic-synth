@@ -244,6 +244,8 @@ juce_add_plugin(AgenticSynth_Plugin
     PRODUCT_NAME             "TIMBRE"
     ICON_BIG                 "${CMAKE_SOURCE_DIR}/design/timbre.iconset/icon_512x512.png"
     ICON_SMALL               "${CMAKE_SOURCE_DIR}/design/timbre.iconset/icon_128x128.png"
+    MICROPHONE_PERMISSION_ENABLED TRUE
+    MICROPHONE_PERMISSION_TEXT    "TIMBRE uses the microphone for push-to-talk prompting — you press a button, speak a sound description, and the agent generates a patch. Audio is processed on-device by the LLM pipeline; no recording is stored."
 )
 
 juce_generate_juce_header(AgenticSynth_Plugin)
