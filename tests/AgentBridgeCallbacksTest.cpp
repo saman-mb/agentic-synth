@@ -503,9 +503,13 @@ TEST_CASE("AgentBridge: generateRationale falls back to heuristic when patch.rat
     REQUIRE(patch.rationale[0] == '\0');
 
     const std::string out = bridge.generateRationale("warm pad", patch);
-    // The heuristic always opens with "I chose a <osc> oscillator..." — verify
-    // the template path is what fired.
+    // Phase 30: heuristic was rewritten to lead with the sonic result, not
+    // engineer-first "I chose a [type] oscillator" claims. The Phase 30
+    // brand-guardian audit named "I chose a" as a banned opener because it
+    // (a) leaks parameter-naming into rationale and (b) describes osc[0]
+    // only, lying about the full layered topology. Verify the new heuristic
+    // produces output AND does NOT use that opener.
     CHECK_FALSE(out.empty());
-    CHECK(out.find("I chose a") != std::string::npos);
+    CHECK(out.find("I chose a") == std::string::npos);
 }
 

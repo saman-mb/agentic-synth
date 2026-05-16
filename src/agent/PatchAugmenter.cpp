@@ -17,6 +17,14 @@ namespace {
 // UI can split on '|' without bounds drama. Silently truncates if the buffer
 // is too full — the goal is to give the user *some* signal, not a
 // guaranteed-complete log.
+//
+// Phase 30: also clears patch.rationale[]. Any augmenter mutation that
+// produces an action string by definition changes the topology the LLM had
+// in mind when it wrote its rationale, so the LLM's prose is now stale and
+// would lie ("I chose a sawtooth oscillator" while the patch is now 3-osc
+// cinematic). Clearing the buffer makes PromptHandler::generateRationale
+// fall through to the post-augment heuristic, which reads what's actually
+// audible. The audit log in augmenter_actions retains the user-facing trail.
 void appendAction(PatchStruct& p, const char* action) noexcept {
     if (!action || !*action) return;
     const std::size_t cap = sizeof(p.augmenter_actions);
@@ -30,6 +38,9 @@ void appendAction(PatchStruct& p, const char* action) noexcept {
         std::strncpy(p.augmenter_actions, action, cap - 1);
     }
     p.augmenter_actions[cap - 1] = '\0';
+
+    // Invalidate stale LLM rationale — heuristic will regenerate truthfully.
+    p.rationale[0] = '\0';
 }
 
 // Lower-ASCII view of `s`. Cold-path only (one call per LLM submission), so
@@ -128,6 +139,25 @@ bool isNoiseOnly(const PatchStruct& p) noexcept {
     return audible > 0 && audible == noiseAudible;
 }
 
+// Phase 30 — detect cinematic / Kubrick / spooky / drone / ambient pad
+// prompts. These should NOT route to Reese (bass topology) when the LLM
+// ships a single Saw — they need an octave-spread layered pad with two
+// LFOs at coprime rates on different targets. The Reese recipe is wrong
+// for these prompts even though it produces 3 oscs.
+bool containsCinematicIntent(const std::string& lowerPrompt) noexcept {
+    static constexpr std::array<std::string_view, 18> kCinematicTokens{
+        "cinematic", "kubrick", "spooky", "ever-changing", "ever changing",
+        "evolving", "drone", "ominous pad", "horror", "dread", "foreboding",
+        "eldritch", "ambient pad", "ethereal", "atmospheric", "ambient",
+        "soundscape", "vangelis",
+    };
+    for (auto kw : kCinematicTokens) {
+        if (containsWord(lowerPrompt, kw))
+            return true;
+    }
+    return false;
+}
+
 // Phase 27 — detect when the user named FM-style synthesis explicitly. When
 // these tokens are present, osc[0].type MUST be FM. The enhancer-prompt + §5
 // anti-pattern tell the LLM the same rule, but the augmenter is the
@@ -181,6 +211,25 @@ void resetOsc(OscParams& o) noexcept {
     o.enabled = 0;
 }
 
+// Phase 30 — minimum cutoff guard for layered patches.
+//
+// When the LLM picks a closed filter for "dark / sub / heavy", then the
+// augmenter layers detuned partners on top, the partners are filtered to
+// inaudibility — the user hears osc[0]'s fundamental + a tiny bit of beating
+// and reports "single oscillator with vibrato". Every saw/pad layering path
+// must raise the cutoff into a band where the harmonic content of the
+// added partners actually survives. Reese / Pad need 1000-1500 Hz minimum;
+// bass-coded patches keep their darker cutoff if the LLM picked one that
+// already exceeds the floor.
+void enforceLayeringCutoff(PatchStruct& p, float floorHz) noexcept {
+    if (p.filter.cutoff_hz < floorHz)
+        p.filter.cutoff_hz = floorHz;
+    // High resonance on a wider-open cutoff sounds piercing; cap it so the
+    // patch stays musical after we open the filter.
+    if (p.filter.resonance > 0.6f)
+        p.filter.resonance = 0.6f;
+}
+
 // Auto-layer strategy for a single-saw mainosc. Builds the brand's preferred
 // Reese topology (system-prompt.md §1.1, §1.4): detuned saw pair across
 // ±10¢ for the chorus beating, sine sub an octave down for low-end weight.
@@ -209,6 +258,100 @@ void applyReeseLayering(PatchStruct& p) noexcept {
     sub.semitone_offset = mainOsc.semitone_offset - 12.0f;
     sub.volume = 0.5f;
     sub.enabled = 1;
+
+    // Reese is bass-y by default, but the detune partner's harmonics still
+    // need room above ~800 Hz to read as "chorus" rather than "muffled".
+    enforceLayeringCutoff(p, 800.0f);
+}
+
+// Phase 30 — cinematic / Kubrick / spooky / drone pad topology.
+//
+// Distinct from Reese (parallel detuned saws at unison, bass-coded) and
+// Pad (detuned triangles + octave shimmer). Cinematic uses:
+//   • octave-spread oscillators (osc[0] −12, osc[1] unison, osc[2] sub)
+//   • hard stereo via panned detuned pair (osc[0] -0.6, osc[1] +0.6)
+//   • slow filter env_mod NEGATIVE (filter closes on attack, blooms on tail)
+//   • long amp + filter envelopes (A≥2s, R≥6s)
+//   • LFO1 at ~0.06 Hz on filter cutoff (breathing)
+//   • LFO2 at ~0.10 Hz on pitch micro-drift (Kubrick monolith move)
+//   • cathedral reverb (size≥0.85, mix≥0.45)
+//
+// The two LFOs are coprime so the patch never repeats — that's what makes
+// "ever-changing" actually change.
+void applyCinematicPadLayering(PatchStruct& p) noexcept {
+    const auto& mainOsc = p.osc[0];
+
+    // osc[0] — keep the LLM's choice but seat it an octave lower (or where
+    // it sits if already pitched-down) and pan slightly left.
+    auto& body = p.osc[0];
+    body.semitone_offset = mainOsc.semitone_offset - 12.0f;
+    body.detune_cents = -7.0f;
+    body.volume = 0.75f;
+    body.pan = -0.6f;
+    body.enabled = 1;
+
+    // osc[1] — partner at +7c detune, opposite pan, slightly quieter so the
+    // pair reads as a stereo wash, not two voices.
+    auto& partner = p.osc[1];
+    resetOsc(partner);
+    partner.type = mainOsc.type == OscType::Wavetable ? OscType::Wavetable : OscType::Sawtooth;
+    partner.semitone_offset = mainOsc.semitone_offset;
+    partner.detune_cents = 7.0f;
+    partner.wavetable_pos = 0.30f;
+    partner.volume = 0.70f;
+    partner.pan = 0.6f;
+    partner.enabled = 1;
+
+    // osc[2] — sub anchor (sine an octave below the body), centered.
+    auto& sub = p.osc[2];
+    resetOsc(sub);
+    sub.type = OscType::Sine;
+    sub.semitone_offset = body.semitone_offset - 12.0f;
+    sub.volume = 0.45f;
+    sub.pan = 0.0f;
+    sub.enabled = 1;
+
+    // Filter — moderate cutoff with NEGATIVE env_mod (the Kubrick bloom on
+    // tail, not on attack). Drive nudged up for unease.
+    p.filter.type = FilterType::LowPass;
+    p.filter.cutoff_hz = 1400.0f;
+    p.filter.resonance = 0.35f;
+    p.filter.env_mod = -0.30f; // negative: closes on attack, opens on tail
+    p.filter.drive = std::max(p.filter.drive, 0.20f);
+
+    // Envelopes — long swell, long tail.
+    p.amp_env.attack_s = std::max(p.amp_env.attack_s, 2.2f);
+    p.amp_env.decay_s = std::max(p.amp_env.decay_s, 1.5f);
+    p.amp_env.sustain = std::max(p.amp_env.sustain, 0.85f);
+    p.amp_env.release_s = std::max(p.amp_env.release_s, 6.0f);
+    p.filter_env.attack_s = std::max(p.filter_env.attack_s, 3.5f);
+    p.filter_env.decay_s = std::max(p.filter_env.decay_s, 3.0f);
+    p.filter_env.sustain = std::max(p.filter_env.sustain, 0.55f);
+    p.filter_env.release_s = std::max(p.filter_env.release_s, 5.0f);
+
+    // Two LFOs at coprime rates on different targets. Without this the
+    // patch "loops" audibly within seconds.
+    auto& lfo1 = p.lfo[0];
+    lfo1.waveform = LfoWaveform::Sine;
+    lfo1.target = LfoTarget::FilterCutoff;
+    lfo1.rate_hz = 0.06f;
+    lfo1.depth = 0.55f;
+    lfo1.bpm_sync = 0;
+
+    auto& lfo2 = p.lfo[1];
+    lfo2.waveform = LfoWaveform::Triangle;
+    lfo2.target = LfoTarget::Pitch;
+    lfo2.rate_hz = 0.10f;
+    lfo2.depth = 0.04f; // micro-detune drift, not vibrato
+    lfo2.bpm_sync = 0;
+
+    // Cathedral reverb. The "deep dark spooky" prompt almost always wants
+    // long tails — even if the LLM picked a small space, cinematic owns
+    // this aesthetic.
+    p.reverb.size = std::max(p.reverb.size, 0.85f);
+    p.reverb.damping = 0.55f;
+    p.reverb.width = 1.0f;
+    p.reverb.mix = std::max(p.reverb.mix, 0.45f);
 }
 
 // Auto-layer strategy for a single-triangle mainosc (pad archetype). Detuned
@@ -231,6 +374,10 @@ void applyPadLayering(PatchStruct& p) noexcept {
     shimmer.semitone_offset = mainOsc.semitone_offset + 12.0f;
     shimmer.volume = 0.4f;
     shimmer.enabled = 1;
+
+    // Pad needs the upper partials to read as "air" — push the floor higher
+    // than Reese so the +12 shimmer actually shimmers.
+    enforceLayeringCutoff(p, 1500.0f);
 }
 
 // Auto-layer strategy for a single-FM mainosc (bell / e-piano archetype).
@@ -275,6 +422,9 @@ void applyGenericLayering(PatchStruct& p) noexcept {
     sub.semitone_offset = mainOsc.semitone_offset - 12.0f;
     sub.volume = 0.45f;
     sub.enabled = 1;
+
+    // Same reasoning as Reese — the layered partners need cutoff headroom.
+    enforceLayeringCutoff(p, 1000.0f);
 }
 
 // Add ONE complementary osc to a 2-osc patch — preserves the LLM's existing
@@ -434,6 +584,30 @@ bool augmentPatch(PatchStruct& p, const std::string& prompt) noexcept {
             : pitched == OscType::Triangle ? "Gave the noise a pitched body (added triangle fundamental + detuned partner; noise demoted to texture layer)"
             : "Gave the noise a pitched body (added sine fundamental + 4¢ partner; noise demoted to texture layer)");
         return true;
+    }
+
+    // --- Cinematic-pad coercion (priority 1.5). Runs AFTER noise-only fix
+    // so a noise-only patch with a cinematic prompt still gets a pitched
+    // fundamental first. When the LLM ships a non-FM, non-noise-only patch
+    // for a cinematic-keyword prompt, and the result is structurally bass-
+    // coded (closed filter < 1000 Hz or fewer than 3 audible oscs), we
+    // rebuild around the cinematic-pad recipe (octave-spread, panned
+    // detune pair, sub anchor, NEGATIVE filter env_mod, two coprime LFOs,
+    // cathedral reverb).
+    if (containsCinematicIntent(lower) && !containsFmIntent(lower)) {
+        const int audibleCount = countAudibleOscs(p);
+        const bool closedFilter = p.filter.cutoff_hz < 1000.0f;
+        const bool underLayered = audibleCount < 3;
+        if (closedFilter || underLayered) {
+            applyCinematicPadLayering(p);
+            std::cerr << "[PatchAugmenter] Cinematic-pad coercion: prompt names "
+                         "cinematic/spooky/Kubrick/drone but patch was "
+                      << (underLayered ? "under-layered" : "bass-coded")
+                      << ". Rebuilt with octave-spread + panned detune + sub anchor "
+                         "+ coprime LFOs + cathedral reverb. prompt='" << prompt << "'\n";
+            appendAction(p, "Reshaped into a cinematic pad (two saws breathing wide around a sub-sine anchor; the filter blooms open on the tail; two slow LFOs at different speeds keep it ever-changing)");
+            return true;
+        }
     }
 
     // --- Under-layered fix (priority 2). The §0 rule 12 contract demands
