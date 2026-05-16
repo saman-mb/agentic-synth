@@ -21,6 +21,9 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <cmath>
+#include <cstring>
+
 #include "agent/PatchAugmenter.h"
 #include "engine/PatchStruct.h"
 
@@ -397,8 +400,8 @@ TEST_CASE("augmenter cinematic: 'deep dark cinematic Kubrick pad' on single Saw 
     REQUIRE(p.osc[1].pan > 0.3f);
     // filter opened past bass territory
     REQUIRE(p.filter.cutoff_hz >= 1200.0f);
-    // negative env_mod (bloom on tail)
-    REQUIRE(p.filter.env_mod < 0.0f);
+    // Phase 32 — POSITIVE env_mod (bloom OPENS on attack — cinematic reveal)
+    REQUIRE(p.filter.env_mod > 0.0f);
     // two LFOs on DIFFERENT targets
     REQUIRE(p.lfo[0].target != LfoTarget::None);
     REQUIRE(p.lfo[1].target != LfoTarget::None);
@@ -408,8 +411,9 @@ TEST_CASE("augmenter cinematic: 'deep dark cinematic Kubrick pad' on single Saw 
     // long envelope
     REQUIRE(p.amp_env.attack_s >= 2.0f);
     REQUIRE(p.amp_env.release_s >= 5.0f);
-    // cathedral reverb
-    REQUIRE(p.reverb.mix >= 0.4f);
+    // Phase 32 — cathedral reverb floor 0.30, capped at 0.45 (above is mud)
+    REQUIRE(p.reverb.mix >= 0.3f);
+    REQUIRE(p.reverb.mix <= 0.45f);
 }
 
 TEST_CASE("augmenter cinematic: 'spooky drone ever-changing soundscape' routes to cinematic",
@@ -417,7 +421,8 @@ TEST_CASE("augmenter cinematic: 'spooky drone ever-changing soundscape' routes t
     PatchStruct p = singleOscPatch(OscType::Sawtooth);
     p.filter.cutoff_hz = 350.0f;
     REQUIRE(augmentPatch(p, "spooky drone ever-changing soundscape"));
-    REQUIRE(p.filter.env_mod < 0.0f);
+    // Phase 32 — POSITIVE env_mod (cinematic reveal blooms OPEN on attack)
+    REQUIRE(p.filter.env_mod > 0.0f);
     REQUIRE(p.lfo[0].rate_hz < 0.5f);
     REQUIRE(p.lfo[1].rate_hz < 0.5f);
 }
@@ -472,7 +477,90 @@ TEST_CASE("augmenter cinematic: already-good cinematic patch passes through",
         o.type = OscType::Sawtooth;
     }
     p.filter.cutoff_hz = 1800.0f;
-    p.filter.env_mod = -0.25f;
+    p.filter.env_mod = 0.35f; // Phase 32 — positive env_mod is now correct
     REQUIRE_FALSE(augmentPatch(p, "cinematic dark pad"));
     REQUIRE(p.augmenter_actions[0] == '\0');
+}
+
+// Phase 32 — augmenter-only DSP refresh on the cinematic pad recipe.
+//
+// The Phase 30 recipe shipped with three audible-but-thin choices that the
+// Audio Engineer panel flagged: (a) NEGATIVE filter env_mod (filter closes
+// on attack — wrong direction for the cinematic "reveal" effect),
+// (b) plain sine sub at -24 (too low to be heard, too generic to be
+// interesting), (c) symmetric ±7c detune (beating centers, patch reads as
+// a single tone). The DSP changes flip env_mod positive, swap sub for
+// inharmonic FM (2.73 ratio at low index — Vangelis monolith move), and
+// shift to asymmetric -11c/+13c so the beating never resolves.
+
+TEST_CASE("augmenter cinematic phase32: filter env_mod is POSITIVE (bloom opens on attack)",
+          "[augmenter][phase32]") {
+    PatchStruct p = singleOscPatch(OscType::Sawtooth);
+    p.filter.cutoff_hz = 400.0f;
+    REQUIRE(augmentPatch(p, "deep dark cinematic Kubrick pad"));
+    REQUIRE(p.filter.env_mod > 0.0f);
+    REQUIRE(p.filter.env_mod >= 0.3f); // meaningful depth, not a token positive
+}
+
+TEST_CASE("augmenter cinematic phase32: osc[2] is inharmonic FM, not plain sine",
+          "[augmenter][phase32]") {
+    PatchStruct p = singleOscPatch(OscType::Sawtooth);
+    p.filter.cutoff_hz = 400.0f;
+    REQUIRE(augmentPatch(p, "ominous cinematic drone"));
+    REQUIRE(p.osc[2].type == OscType::FM);
+    REQUIRE(p.osc[2].fm_ratio == 2.73f);
+    REQUIRE(p.osc[2].fm_depth > 0.0f);
+    REQUIRE(p.osc[2].semitone_offset == -12.0f); // not -24
+    REQUIRE(p.osc[2].volume >= 0.15f);
+}
+
+TEST_CASE("augmenter cinematic phase32: detune is asymmetric (beating never centers)",
+          "[augmenter][phase32]") {
+    PatchStruct p = singleOscPatch(OscType::Sawtooth);
+    p.filter.cutoff_hz = 400.0f;
+    REQUIRE(augmentPatch(p, "evolving cinematic pad"));
+    // osc[0] and osc[1] detune are NOT mirror images.
+    REQUIRE(p.osc[0].detune_cents != -p.osc[1].detune_cents);
+    // Both nontrivial detunes (>= 10c each side for the Vangelis width).
+    REQUIRE(std::abs(p.osc[0].detune_cents) >= 10.0f);
+    REQUIRE(std::abs(p.osc[1].detune_cents) >= 10.0f);
+}
+
+TEST_CASE("augmenter cinematic phase32: reverb mix is capped at 0.45 (no mud)",
+          "[augmenter][phase32]") {
+    PatchStruct p = singleOscPatch(OscType::Sawtooth);
+    p.filter.cutoff_hz = 400.0f;
+    // Simulate the LLM picking an over-wet reverb.
+    p.reverb.mix = 0.85f;
+    REQUIRE(augmentPatch(p, "vangelis cinematic pad"));
+    REQUIRE(p.reverb.mix <= 0.45f);
+    REQUIRE(p.reverb.mix >= 0.30f);
+}
+
+TEST_CASE("augmenter cinematic phase32: filter drive bumped to >= 0.35 (Vangelis glue)",
+          "[augmenter][phase32]") {
+    PatchStruct p = singleOscPatch(OscType::Sawtooth);
+    p.filter.cutoff_hz = 400.0f;
+    p.filter.drive = 0.05f; // low LLM value
+    REQUIRE(augmentPatch(p, "cinematic kubrick pad"));
+    REQUIRE(p.filter.drive >= 0.35f);
+}
+
+TEST_CASE("augmenter cinematic phase32: filter env attack shortened to ~1.8s for bloom",
+          "[augmenter][phase32]") {
+    PatchStruct p = singleOscPatch(OscType::Sawtooth);
+    p.filter.cutoff_hz = 400.0f;
+    p.filter_env.attack_s = 0.1f;
+    REQUIRE(augmentPatch(p, "atmospheric cinematic pad"));
+    REQUIRE(p.filter_env.attack_s >= 1.8f);
+    REQUIRE(p.filter_env.decay_s >= 5.0f);
+}
+
+TEST_CASE("augmenter cinematic phase32: wavetable mainosc retargets LFO1 to WavetablePos",
+          "[augmenter][phase32]") {
+    PatchStruct p = singleOscPatch(OscType::Wavetable);
+    p.filter.cutoff_hz = 400.0f;
+    REQUIRE(augmentPatch(p, "ever-changing cinematic soundscape"));
+    REQUIRE(p.lfo[0].target == LfoTarget::WavetablePos);
+    REQUIRE(p.lfo[1].target == LfoTarget::Pitch);
 }

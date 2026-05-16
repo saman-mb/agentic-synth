@@ -265,75 +265,90 @@ void applyReeseLayering(PatchStruct& p) noexcept {
 }
 
 // Phase 30 — cinematic / Kubrick / spooky / drone pad topology.
+// Phase 32 DSP refresh — corrected against Reverb Machine Vangelis breakdown,
+// MusicRadar cinematic tips, and SonicScoop pads guide.
 //
 // Distinct from Reese (parallel detuned saws at unison, bass-coded) and
 // Pad (detuned triangles + octave shimmer). Cinematic uses:
-//   • octave-spread oscillators (osc[0] −12, osc[1] unison, osc[2] sub)
+//   • octave-spread oscillators (osc[0] −12 panned, osc[1] unison panned,
+//     osc[2] inharmonic FM at -12 for unsettling buzz — NOT a plain sine sub)
+//   • asymmetric detune (-11c / +13c) so beating never centers
 //   • hard stereo via panned detuned pair (osc[0] -0.6, osc[1] +0.6)
-//   • slow filter env_mod NEGATIVE (filter closes on attack, blooms on tail)
+//   • POSITIVE filter env_mod (bloom OPENS on attack — the cinematic reveal)
+//   • slow filter-env attack (~1.8s) so the bloom is felt, not snapped
 //   • long amp + filter envelopes (A≥2s, R≥6s)
-//   • LFO1 at ~0.06 Hz on filter cutoff (breathing)
+//   • pre-filter drive (0.35) for the Vangelis CS-80 harmonic glue
+//   • LFO1 at ~0.06 Hz on filter cutoff (breathing) — OR WavetablePos when
+//     osc[1] is wavetable (spectral motion beats filter sweep there)
 //   • LFO2 at ~0.10 Hz on pitch micro-drift (Kubrick monolith move)
-//   • cathedral reverb (size≥0.85, mix≥0.45)
+//   • cathedral reverb size 0.92, mix CAPPED at 0.45 (above that is mud)
 //
 // The two LFOs are coprime so the patch never repeats — that's what makes
 // "ever-changing" actually change.
 void applyCinematicPadLayering(PatchStruct& p) noexcept {
     const auto& mainOsc = p.osc[0];
+    const bool partnerIsWavetable = mainOsc.type == OscType::Wavetable;
 
-    // osc[0] — keep the LLM's choice but seat it an octave lower (or where
-    // it sits if already pitched-down) and pan slightly left.
+    // osc[0] — keep the LLM's choice but seat it an octave lower and pan
+    // slightly left. Asymmetric -11c detune.
     auto& body = p.osc[0];
     body.semitone_offset = mainOsc.semitone_offset - 12.0f;
-    body.detune_cents = -7.0f;
+    body.detune_cents = -11.0f;
     body.volume = 0.75f;
     body.pan = -0.6f;
     body.enabled = 1;
 
-    // osc[1] — partner at +7c detune, opposite pan, slightly quieter so the
-    // pair reads as a stereo wash, not two voices.
+    // osc[1] — partner at +13c detune (asymmetric vs osc[0]'s -11c so the
+    // beating never centers), opposite pan, slightly quieter.
     auto& partner = p.osc[1];
     resetOsc(partner);
-    partner.type = mainOsc.type == OscType::Wavetable ? OscType::Wavetable : OscType::Sawtooth;
+    partner.type = partnerIsWavetable ? OscType::Wavetable : OscType::Sawtooth;
     partner.semitone_offset = mainOsc.semitone_offset;
-    partner.detune_cents = 7.0f;
+    partner.detune_cents = 13.0f;
     partner.wavetable_pos = 0.30f;
     partner.volume = 0.70f;
     partner.pan = 0.6f;
     partner.enabled = 1;
 
-    // osc[2] — sub anchor (sine an octave below the body), centered.
+    // osc[2] — INHARMONIC FM at -12 (NOT plain sine sub). Non-integer
+    // modulator ratio at low index creates non-octave partials that buzz
+    // unsettlingly — the Kubrick / Vangelis monolith move.
     auto& sub = p.osc[2];
     resetOsc(sub);
-    sub.type = OscType::Sine;
-    sub.semitone_offset = body.semitone_offset - 12.0f;
-    sub.volume = 0.45f;
+    sub.type = OscType::FM;
+    sub.semitone_offset = -12.0f; // audible, not -24 sub-cellar
+    sub.fm_ratio = 2.73f;          // inharmonic
+    sub.fm_depth = 0.35f;          // low index — buzz, not bell
+    sub.volume = 0.40f;
     sub.pan = 0.0f;
     sub.enabled = 1;
 
-    // Filter — moderate cutoff with NEGATIVE env_mod (the Kubrick bloom on
-    // tail, not on attack). Drive nudged up for unease.
+    // Filter — moderate cutoff with POSITIVE env_mod (bloom OPENS on attack
+    // — the cinematic reveal). Drive bumped to 0.35 for Vangelis pre-filter
+    // saturation glue.
     p.filter.type = FilterType::LowPass;
     p.filter.cutoff_hz = 1400.0f;
     p.filter.resonance = 0.35f;
-    p.filter.env_mod = -0.30f; // negative: closes on attack, opens on tail
-    p.filter.drive = std::max(p.filter.drive, 0.20f);
+    p.filter.env_mod = 0.40f; // POSITIVE: opens on attack, sustains brightness
+    p.filter.drive = std::max(p.filter.drive, 0.35f);
 
-    // Envelopes — long swell, long tail.
+    // Envelopes — long swell, long tail. Filter-env attack 1.8s so the
+    // bloom is felt as a slow reveal, then decay sustains the brightness.
     p.amp_env.attack_s = std::max(p.amp_env.attack_s, 2.2f);
     p.amp_env.decay_s = std::max(p.amp_env.decay_s, 1.5f);
     p.amp_env.sustain = std::max(p.amp_env.sustain, 0.85f);
     p.amp_env.release_s = std::max(p.amp_env.release_s, 6.0f);
-    p.filter_env.attack_s = std::max(p.filter_env.attack_s, 3.5f);
-    p.filter_env.decay_s = std::max(p.filter_env.decay_s, 3.0f);
+    p.filter_env.attack_s = std::max(p.filter_env.attack_s, 1.8f);
+    p.filter_env.decay_s = std::max(p.filter_env.decay_s, 5.0f);
     p.filter_env.sustain = std::max(p.filter_env.sustain, 0.55f);
     p.filter_env.release_s = std::max(p.filter_env.release_s, 5.0f);
 
     // Two LFOs at coprime rates on different targets. Without this the
-    // patch "loops" audibly within seconds.
+    // patch "loops" audibly within seconds. When osc[1] is wavetable,
+    // LFO1 targets WavetablePos (more spectral motion than filter sweep).
     auto& lfo1 = p.lfo[0];
     lfo1.waveform = LfoWaveform::Sine;
-    lfo1.target = LfoTarget::FilterCutoff;
+    lfo1.target = partnerIsWavetable ? LfoTarget::WavetablePos : LfoTarget::FilterCutoff;
     lfo1.rate_hz = 0.06f;
     lfo1.depth = 0.55f;
     lfo1.bpm_sync = 0;
@@ -345,13 +360,12 @@ void applyCinematicPadLayering(PatchStruct& p) noexcept {
     lfo2.depth = 0.04f; // micro-detune drift, not vibrato
     lfo2.bpm_sync = 0;
 
-    // Cathedral reverb. The "deep dark spooky" prompt almost always wants
-    // long tails — even if the LLM picked a small space, cinematic owns
-    // this aesthetic.
-    p.reverb.size = std::max(p.reverb.size, 0.85f);
+    // Cathedral reverb — large room (size 0.92) but mix CAPPED at 0.45.
+    // Above 0.45 at this size produces mud, not space.
+    p.reverb.size = std::max(p.reverb.size, 0.92f);
     p.reverb.damping = 0.55f;
     p.reverb.width = 1.0f;
-    p.reverb.mix = std::max(p.reverb.mix, 0.45f);
+    p.reverb.mix = std::clamp(p.reverb.mix, 0.30f, 0.45f);
 }
 
 // Auto-layer strategy for a single-triangle mainosc (pad archetype). Detuned
@@ -605,7 +619,7 @@ bool augmentPatch(PatchStruct& p, const std::string& prompt) noexcept {
                       << (underLayered ? "under-layered" : "bass-coded")
                       << ". Rebuilt with octave-spread + panned detune + sub anchor "
                          "+ coprime LFOs + cathedral reverb. prompt='" << prompt << "'\n";
-            appendAction(p, "Reshaped into a cinematic pad (two saws breathing wide around a sub-sine anchor; the filter blooms open on the tail; two slow LFOs at different speeds keep it ever-changing)");
+            appendAction(p, "Reshaped into a cinematic pad (two saws breathing wide with asymmetric detune over an inharmonic FM anchor that buzzes unsettlingly; the filter blooms open on the attack as a slow cinematic reveal; two coprime LFOs keep it ever-changing)");
             return true;
         }
     }
