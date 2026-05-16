@@ -4,6 +4,8 @@
 #include <optional>
 #include <string>
 #include <string_view>
+#include <utility>
+#include <vector>
 
 #include "agent/PrePatchPipeline.h"
 #include "agent/SessionMemory.h"
@@ -97,6 +99,38 @@ public:
     // context (filter open/closed, resonance) and recent session recap.
     [[nodiscard]] std::string buildSystemPrompt(const std::string& userPrompt) const;
 
+    // Phase 33 — strategic split of the ~80KB system prompt.
+    // splitSystemPrompt() partitions the source markdown into:
+    //   * `rails`     — everything OUTSIDE §3 (~10KB). Output contract,
+    //                   schema, anti-patterns, refinement contract,
+    //                   modulation plan, examples — the load-bearing rules
+    //                   the model must always see.
+    //   * `archetypes`— map of normalized keyword → recipe block text from
+    //                   §3.0..3.N. Loaded lazily and appended to the rails
+    //                   when the user prompt mentions a matching keyword.
+    //
+    // PURE function: callers pass the original system prompt text in.
+    // Behaviour-neutral for this commit — the production wiring still uses
+    // the full prompt (see useRailsOnlyPrompt below); the helper is here so
+    // a follow-up phase can flip the flag once the keyword-match harness is
+    // in place.
+    struct SplitPrompt {
+        std::string rails;
+        // Keyword (lower-cased, single token) → recipe block (the markdown
+        // text between the recipe's leading "N. **Name**" line and the
+        // start of the next list item). One keyword may map to one recipe.
+        std::vector<std::pair<std::string, std::string>> archetypes;
+    };
+    [[nodiscard]] static SplitPrompt splitSystemPrompt(const std::string& full);
+
+    // Flag (default OFF) that selects between the legacy full-prompt path
+    // and the rails-only + lazy-archetype path. Wired but not yet flipped —
+    // flipping the default ON is a follow-up phase after the keyword-match
+    // harness lands. Test seam: setUseRailsOnlyPrompt(true) in unit tests
+    // can validate the split path end-to-end.
+    void setUseRailsOnlyPrompt(bool on) noexcept { use_rails_only_ = on; }
+    [[nodiscard]] bool useRailsOnlyPrompt() const noexcept { return use_rails_only_; }
+
     // Per-dimension parameter bias derived from session memory.
     [[nodiscard]] PatchVector getParameterBias(const std::string& userPrompt) const;
 
@@ -112,6 +146,10 @@ private:
     StreamParser& streamParser_;
     SessionMemory& memory_;
     const KnobBridge& knob_;
+    // Phase 33 — rails-only system prompt flag. OFF by default; flip ON in
+    // a follow-up phase after telemetry confirms the §3 split doesn't
+    // erode patch quality.
+    bool use_rails_only_{false};
 };
 
 } // namespace agentic_synth::agent

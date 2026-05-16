@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <array>
 #include <cctype>
+#include <chrono>
 #include <cstdio>
 #include <cstdlib>
 #include <fstream>
@@ -10,6 +11,10 @@
 #include <random>
 #include <sstream>
 #include <string>
+#include <thread>
+
+#include "mapper/LlmTelemetry.h"
+#include "mapper/PromptSanitizer.h"
 
 namespace agentic_synth::mapper {
 
@@ -186,6 +191,12 @@ std::string PromptEnhancer::cache_get_locked(const std::string& key) const {
 }
 
 std::string PromptEnhancer::http_post(const std::string& url, const std::string& json_body) const {
+    int unused = 0;
+    return http_post_ex(url, json_body, unused);
+}
+
+std::string PromptEnhancer::http_post_ex(const std::string& url, const std::string& json_body,
+                                         int& exit_code) const {
     TempFile req(json_body);
 
     std::ostringstream cmd;
@@ -202,18 +213,56 @@ std::string PromptEnhancer::http_post(const std::string& url, const std::string&
 #else
     FILE* p = popen(cmd.str().c_str(), "r");
 #endif
-    if (!p)
+    if (!p) {
+        exit_code = -1;
         return {};
+    }
     size_t n;
     while ((n = std::fread(buf.data(), 1, buf.size(), p)) > 0)
         out.append(buf.data(), n);
 #ifdef _WIN32
-    _pclose(p);
+    const int rc = _pclose(p);
 #else
-    pclose(p);
+    const int rc = pclose(p);
 #endif
+    exit_code = rc;
     return out;
 }
+
+namespace {
+
+// Cheap probe: find "key":"value" — quotes-included key — and return value.
+// Mirrors GeminiSampler's find_string_field but kept local to avoid
+// cross-TU header gymnastics. Used by the retry loop to peek at
+// finishReason / blockReason without invoking the full extractor.
+std::string find_string_field(const std::string& resp, const std::string& key) {
+    auto pos = resp.find(key);
+    if (pos == std::string::npos)
+        return {};
+    pos += key.size();
+    while (pos < resp.size() && (resp[pos] == ' ' || resp[pos] == ':'))
+        ++pos;
+    if (pos >= resp.size() || resp[pos] != '"')
+        return {};
+    ++pos;
+    std::string raw;
+    while (pos < resp.size()) {
+        if (resp[pos] == '\\') {
+            if (pos + 1 >= resp.size())
+                break;
+            raw += resp[pos];
+            raw += resp[pos + 1];
+            pos += 2;
+            continue;
+        }
+        if (resp[pos] == '"')
+            break;
+        raw += resp[pos++];
+    }
+    return raw;
+}
+
+} // namespace
 
 std::string PromptEnhancer::extract_text(const std::string& resp) {
     // {"candidates":[{"content":{"parts":[{"text":"...brief..."}]}}]}
@@ -267,13 +316,22 @@ std::string PromptEnhancer::enhance(const std::string& userPrompt) const {
         }
     }
 
+    // Phase 33 — soften safety triggers before sending. Cache key is the
+    // canonicalised ORIGINAL prompt (so the user gets the same brief for
+    // "horror pad" twice in a row even after sanitisation), but the wire
+    // payload uses the rewritten form.
+    const std::string sanitized = sanitizePromptForSafety(userPrompt);
+    if (sanitized != userPrompt) {
+        std::cerr << "[PromptEnhancer] sanitized prompt for safety filters (trigger words rewritten)\n";
+    }
+
     const std::string base_prompt =
         cfg_.system_prompt.empty()
             ? std::string("You are TIMBRE, a translator that rewrites a terse sound description into a 9-section "
                           "plain-text sound-design brief. No JSON, no markdown.")
             : cfg_.system_prompt;
 
-    const std::string composed = base_prompt + "\n\nProducer prompt: " + userPrompt +
+    const std::string composed = base_prompt + "\n\nProducer prompt: " + sanitized +
                                  "\n\nEmit the brief now, starting at SONIC CHARACTER:";
 
     std::ostringstream body;
@@ -286,18 +344,112 @@ std::string PromptEnhancer::enhance(const std::string& userPrompt) const {
          // the model wrap the brief in a quoted string and fight us.
          << "}"
          << "}";
+    const std::string bodyStr = body.str();
 
     const std::string url = "https://generativelanguage.googleapis.com/v1beta/models/" + cfg_.model +
                             ":generateContent?key=" + cfg_.api_key;
-    const std::string resp = http_post(url, body.str());
+
+    // Phase 33 — retry with exponential backoff (200 / 600 / 1800 ms).
+    // Same retry policy as GeminiSampler::generate; the translator path
+    // hits the same backend and benefits from the same transient-failure
+    // recovery. NEVER retry on SAFETY / non-5xx error.
+    constexpr int kMaxAttempts = 3;
+    constexpr std::array<int, kMaxAttempts - 1> kBackoffMs{200, 600};
+    const auto t0 = std::chrono::steady_clock::now();
+
+    std::string resp;
+    int curl_rc = 0;
+    int attempts = 0;
+    std::string finish_reason;
+    std::string block_reason;
+    std::string outcome;
+    const char* retry_reason = nullptr;
+    bool give_up = false;
+
+    for (int attempt = 1; attempt <= kMaxAttempts; ++attempt) {
+        attempts = attempt;
+        curl_rc = 0;
+        resp = http_post_ex(url, bodyStr, curl_rc);
+        finish_reason.clear();
+        block_reason.clear();
+        retry_reason = nullptr;
+
+        if (curl_rc != 0) {
+            retry_reason = "curl exit non-zero";
+            outcome = "curl_error";
+        } else if (resp.empty()) {
+            retry_reason = "empty body";
+            outcome = "empty";
+        } else {
+            block_reason = find_string_field(resp, "\"blockReason\"");
+            finish_reason = find_string_field(resp, "\"finishReason\"");
+            const bool has_error_envelope = resp.find("\"error\"") != std::string::npos;
+
+            if (!block_reason.empty() || finish_reason == "SAFETY") {
+                outcome = "blocked";
+                give_up = true;
+            } else if (finish_reason == "MAX_TOKENS") {
+                retry_reason = "finishReason=MAX_TOKENS";
+                outcome = "truncated";
+            } else if (has_error_envelope) {
+                const std::string status = find_string_field(resp, "\"status\"");
+                const bool transient_5xx = resp.find("\"code\": 5") != std::string::npos ||
+                                           resp.find("\"code\":5")  != std::string::npos ||
+                                           status == "UNAVAILABLE" || status == "INTERNAL" ||
+                                           status == "DEADLINE_EXCEEDED";
+                if (transient_5xx) {
+                    retry_reason = "transient 5xx in body";
+                    outcome = "curl_error";
+                } else {
+                    outcome = "blocked";
+                    give_up = true;
+                }
+            } else {
+                outcome = "success";
+            }
+        }
+
+        if (give_up || retry_reason == nullptr)
+            break;
+
+        if (attempt < kMaxAttempts) {
+            const int delay = kBackoffMs[static_cast<std::size_t>(attempt - 1)];
+            std::cerr << "[PromptEnhancer] retry " << attempt << "/" << kMaxAttempts
+                      << " after " << delay << "ms (reason: " << retry_reason << ")\n";
+            std::this_thread::sleep_for(std::chrono::milliseconds(delay));
+        } else {
+            std::cerr << "[PromptEnhancer] giving up after " << kMaxAttempts
+                      << " attempts (final reason: " << retry_reason << ")\n";
+        }
+    }
+
+    auto emit_telemetry = [&](const std::string& final_outcome) {
+        const auto t1 = std::chrono::steady_clock::now();
+        const double latency_ms =
+            std::chrono::duration<double, std::milli>(t1 - t0).count();
+        LlmCall rec;
+        rec.caller = "PromptEnhancer";
+        rec.model = cfg_.model;
+        rec.attempts = attempts;
+        rec.latency_ms = latency_ms;
+        rec.body_size_bytes = resp.size();
+        rec.prompt_size_bytes = bodyStr.size();
+        rec.finish_reason = finish_reason;
+        rec.block_reason = block_reason;
+        rec.outcome = final_outcome;
+        LlmTelemetry::instance().log(rec);
+    };
+
     if (resp.empty()) {
         std::cerr << "[PromptEnhancer] empty response from " << cfg_.model << "\n";
+        emit_telemetry("empty");
         return {};
     }
 
     std::string text = extract_text(resp);
     if (text.empty()) {
         std::cerr << "[PromptEnhancer] could not extract candidates[0].content.parts[0].text\n";
+        emit_telemetry(outcome.empty() ? "empty" : outcome);
         return {};
     }
 
@@ -316,6 +468,7 @@ std::string PromptEnhancer::enhance(const std::string& userPrompt) const {
         std::lock_guard<std::mutex> lock(cache_mu_);
         cache_put_locked(cacheKey, text);
     }
+    emit_telemetry("success");
     return text;
 }
 

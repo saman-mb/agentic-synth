@@ -70,6 +70,13 @@ private:
     // Issue the HTTPS POST. Returns response body or "" on error.
     [[nodiscard]] std::string http_post(const std::string& url, const std::string& json_body) const;
 
+    // Variant exposing the curl exit code so the Phase 33 retry loop can
+    // distinguish network failures from API error envelopes. Same body
+    // returned as http_post(); exit_code == 0 on success, non-zero when
+    // curl itself failed.
+    [[nodiscard]] std::string http_post_ex(const std::string& url, const std::string& json_body,
+                                           int& exit_code) const;
+
     // Extract candidates[0].content.parts[0].text from the Gemini response.
     [[nodiscard]] static std::string extract_text(const std::string& response_json);
 

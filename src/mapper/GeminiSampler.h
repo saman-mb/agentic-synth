@@ -70,6 +70,13 @@ private:
     // empty string on error.
     [[nodiscard]] std::string http_post(const std::string& url, const std::string& json_body) const;
 
+    // Variant exposing the curl exit code so the retry loop can distinguish
+    // network-level failures from API-side error envelopes returned in the
+    // body. `exit_code` is 0 on success, non-zero when curl itself failed
+    // (DNS, timeout, SSL, transport error). The body is still surfaced when
+    // present (curl --fail-with-body keeps the response on 4xx/5xx).
+    [[nodiscard]] std::string http_post_ex(const std::string& url, const std::string& json_body, int& exit_code) const;
+
     // Extract the first candidate's text payload from the Gemini response.
     [[nodiscard]] static std::string extract_text(const std::string& response_json);
 };
