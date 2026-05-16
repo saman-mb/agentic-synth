@@ -320,13 +320,145 @@ void PromptHandler::applyGuardrailIfNotRefinement(PatchStruct& patch, const std:
 
 void PromptHandler::feedChunk(std::string_view chunk) { streamParser_.feedChunk(chunk); }
 
+PromptHandler::SplitPrompt PromptHandler::splitSystemPrompt(const std::string& full) {
+    SplitPrompt out;
+    if (full.empty())
+        return out;
+
+    // Locate §3 ("## 3. DSP Archetypes ...") and §4 ("## 4. ...") header
+    // anchors. If either is missing the file isn't shaped like our
+    // system-prompt.md — fall back to "rails = full, no archetypes".
+    const std::string kHdr3 = "\n## 3.";
+    const std::string kHdr4 = "\n## 4.";
+    const auto pos3 = full.find(kHdr3);
+    const auto pos4 = full.find(kHdr4, pos3 == std::string::npos ? 0 : pos3);
+    if (pos3 == std::string::npos || pos4 == std::string::npos || pos4 <= pos3) {
+        out.rails = full;
+        return out;
+    }
+
+    // Rails = pre-§3 + post-§3 (skip the leading newline so we don't dup
+    // blank lines).
+    out.rails.reserve(full.size());
+    out.rails.append(full, 0, pos3);
+    out.rails.append("\n"); // single separator between the slice halves
+    out.rails.append(full, pos4 + 1, std::string::npos);
+
+    // Walk §3 looking for "<N>. **<Name>** —" recipe entries. The §3.0
+    // keyword-lock preamble is kept as one synthetic "keyword-lock" entry
+    // so a future caller can choose to always append it.
+    const std::string body = full.substr(pos3, pos4 - pos3);
+
+    auto lower = [](std::string s) {
+        for (auto& c : s)
+            c = static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+        return s;
+    };
+
+    // Find each numbered recipe header. Regex would be cleaner but we want
+    // zero new deps — a manual scan over "\nN. **" is enough.
+    std::size_t i = 0;
+    while (i < body.size()) {
+        // Look for newline followed by digit(s) + ". **".
+        const auto nl = body.find('\n', i);
+        if (nl == std::string::npos)
+            break;
+        std::size_t j = nl + 1;
+        // Must start with at least one digit.
+        if (j >= body.size() || !std::isdigit(static_cast<unsigned char>(body[j]))) {
+            i = nl + 1;
+            continue;
+        }
+        std::size_t k = j;
+        while (k < body.size() && std::isdigit(static_cast<unsigned char>(body[k])))
+            ++k;
+        if (k + 4 >= body.size() || body[k] != '.' || body[k + 1] != ' ' ||
+            body[k + 2] != '*' || body[k + 3] != '*') {
+            i = nl + 1;
+            continue;
+        }
+        // Extract the name between the `**...**` delimiters.
+        const std::size_t name_start = k + 4;
+        const auto name_end = body.find("**", name_start);
+        if (name_end == std::string::npos)
+            break;
+        const std::string name = body.substr(name_start, name_end - name_start);
+
+        // Recipe text runs until the next newline-then-digit-then-period
+        // header, or end of §3.
+        std::size_t recipe_end = body.size();
+        std::size_t scan = name_end;
+        while (scan < body.size()) {
+            const auto nnl = body.find('\n', scan + 1);
+            if (nnl == std::string::npos)
+                break;
+            std::size_t m = nnl + 1;
+            if (m < body.size() && std::isdigit(static_cast<unsigned char>(body[m]))) {
+                // Confirm the "N. **" shape before treating it as a header.
+                std::size_t mm = m;
+                while (mm < body.size() && std::isdigit(static_cast<unsigned char>(body[mm])))
+                    ++mm;
+                if (mm + 4 < body.size() && body[mm] == '.' && body[mm + 1] == ' ' &&
+                    body[mm + 2] == '*' && body[mm + 3] == '*') {
+                    recipe_end = nnl;
+                    break;
+                }
+            }
+            scan = nnl;
+        }
+
+        const std::string recipe = body.substr(j, recipe_end - j);
+        // Keyword = lowercased first word of the name (e.g. "Sub bass" → "sub").
+        // Cheap, and matches the keyword-lock dictionary's vocabulary. A
+        // follow-up phase can swap in multi-keyword matching once we wire
+        // the keyword harness.
+        std::string keyword;
+        for (char c : name) {
+            if (std::isspace(static_cast<unsigned char>(c)) || c == '(' || c == ',')
+                break;
+            keyword += c;
+        }
+        if (!keyword.empty())
+            out.archetypes.emplace_back(lower(keyword), recipe);
+
+        i = recipe_end;
+    }
+    return out;
+}
+
 std::string PromptHandler::buildSystemPrompt(const std::string& userPrompt) const {
     const std::string& base =
         sampler_.systemPrompt().empty()
             ? std::string("You are a synthesizer patch designer. Generate synth parameters as structured JSON.\n")
             : sampler_.systemPrompt();
 
-    std::string prompt = base;
+    // Phase 33 — rails-only path is wired but OFF by default (the flag
+    // `use_rails_only_` is set false on construction). When flipped, we
+    // strip §3 and rely on keyword-matched archetype injection. For this
+    // commit the legacy full-prompt path stays authoritative; the helper
+    // is exercised by unit tests via splitSystemPrompt().
+    std::string prompt;
+    if (use_rails_only_) {
+        const auto split = splitSystemPrompt(base);
+        prompt = split.rails;
+        // Lazy archetype injection: scan the user prompt for archetype
+        // keywords and append the matching recipe blocks. Conservative —
+        // empty user prompt means no archetypes added.
+        if (!userPrompt.empty()) {
+            std::string lowerPrompt;
+            lowerPrompt.reserve(userPrompt.size());
+            for (char c : userPrompt)
+                lowerPrompt += static_cast<char>(std::tolower(static_cast<unsigned char>(c)));
+            for (const auto& [kw, recipe] : split.archetypes) {
+                if (lowerPrompt.find(kw) != std::string::npos) {
+                    prompt += "\n";
+                    prompt += recipe;
+                }
+            }
+        }
+    } else {
+        prompt = base;
+    }
 
     // Append MIDI CC context so the AI respects the user's current performance state.
     const float cutoff = knob_.midiCutoffNorm();

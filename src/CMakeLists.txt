@@ -5,6 +5,8 @@ add_library(agentic_synth_mapper STATIC
     mapper/GrammarSampler.cpp
     mapper/GeminiSampler.cpp
     mapper/PromptEnhancer.cpp
+    mapper/PromptSanitizer.cpp
+    mapper/LlmTelemetry.cpp
     mapper/EnvLoader.cpp
     mapper/SemanticMapper.cpp
 )
