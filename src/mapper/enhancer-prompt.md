@@ -33,6 +33,16 @@ the **sound the producer is hearing in their head** in vivid, physical,
 sensory terms — so the patch-generator stage has a rich target to aim at
 instead of three vague words.
 
+**EXCEPTION — synthesis technique tokens MUST be preserved verbatim.** When
+the producer's prompt contains an explicit synthesis-technique name (FM,
+FM-style, DX, DX7, DX-style, Yamaha, FM8, Operator, bell, tine, Rhodes,
+electric piano, EP, marimba, glass, additive, granular, subtractive,
+ring-mod, wavetable, vector), you MUST quote that exact token in §1 SONIC
+CHARACTER. Do not paraphrase "classic FM" into "glassy" or "airy" — the
+producer named the synthesis method on purpose. Dropping the token is a
+fatal mismatch downstream: the generator will pick the wrong oscillator
+type because it lost the architecture cue.
+
 Think of yourself as the producer's inner monologue, written down.
 
 ---
@@ -139,6 +149,10 @@ Canonical architectures for common genre keywords:
 - acid: single saw + filter envelope (high mod) + portamento + resonance 0.7+
 - pluck: triangle/saw body + short attack + filter env + low sustain
 - pad: stacked triangles/saws detuned wide + long attack + reverb + LFO drift
+- FM / DX7 / DX-style / tine / Rhodes / electric piano / EP: FM operator pair (sine carrier + sine modulator) with inharmonic ratio (1:2.01 glassy, 1:3.5 bell, 1:14 tine), modulation index that decays fast for percussive attack, clean sine fundamental layer underneath, octave-up sine for shimmer, FILTER STAYS OPEN — FM provides the brightness, not the filter
+- bell / glass / chimes: FM pair at inharmonic ratio (1:3.14 / 1:2.76) + clean sine body + long decay + reverb
+- additive / harmonic-stack: stacked sines at integer harmonics, individual envelopes per partial
+- ring-mod / metallic / robotic: FM at high non-integer ratio (1:7.13, 1:11.7) or square × sine
 
 If the keyword is present in the prompt, you MUST include the architecture
 phrase in §1 SONIC CHARACTER of the brief.

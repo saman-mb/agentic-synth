@@ -128,12 +128,32 @@ bool isNoiseOnly(const PatchStruct& p) noexcept {
     return audible > 0 && audible == noiseAudible;
 }
 
+// Phase 27 — detect when the user named FM-style synthesis explicitly. When
+// these tokens are present, osc[0].type MUST be FM. The enhancer-prompt + §5
+// anti-pattern tell the LLM the same rule, but the augmenter is the
+// runtime floor: even if both LLMs whiff, we coerce the type here so the
+// shipped patch matches the named synthesis technique.
+bool containsFmIntent(const std::string& lowerPrompt) noexcept {
+    static constexpr std::array<std::string_view, 16> kFmTokens{
+        "fm", "fm-style", "fm style", "dx", "dx7", "dx-style", "yamaha",
+        "operator", "fm8", "tine", "rhodes", "electric piano",
+        "bell", "marimba", "vibraphone", "ring mod",
+    };
+    for (auto kw : kFmTokens) {
+        if (containsWord(lowerPrompt, kw))
+            return true;
+    }
+    return false;
+}
+
 // Map a prompt's genre cue to the most musical pitched-osc replacement for a
 // noise-only patch. Matches the §1.1 oscillator-to-archetype mapping in
 // system-prompt.md: bass / lead → saw (toothy, harmonic-rich), pad / ambient
 // → triangle or sine (hollow, weightless), default triangle for textures
-// that aren't otherwise tagged.
+// that aren't otherwise tagged. FM intent takes priority over everything.
 OscType pickPitchedTypeForNoiseFix(const std::string& lowerPrompt) noexcept {
+    if (containsFmIntent(lowerPrompt))
+        return OscType::FM;
     if (containsWord(lowerPrompt, "bass"))
         return OscType::Sawtooth;
     if (containsWord(lowerPrompt, "lead"))
@@ -304,6 +324,66 @@ bool augmentPatch(PatchStruct& p, const std::string& prompt) noexcept {
 
     const std::string lower = toLowerAscii(prompt);
     bool modified = false;
+
+    // --- FM-intent fix (priority 0). When the producer explicitly named the
+    // synthesis technique (FM / DX / Rhodes / bell / tine / etc.) but the LLM
+    // shipped a non-FM oscillator, we rebuild the patch around the canonical
+    // FM topology described in §5 anti-patterns. This catches the case where
+    // both the enhancer dropped the "FM" token AND the generator picked
+    // Saw/Triangle/Wavetable instead. The classic mistake of closing the
+    // filter on top of FM is also corrected here: FM provides the timbre,
+    // the filter stays open.
+    if (containsFmIntent(lower) && p.osc[0].type != OscType::FM) {
+        auto& main = p.osc[0];
+        resetOsc(main);
+        main.type = OscType::FM;
+        // Ratio chosen by sub-intent: "bell" / "glass" → 3.14 (inharmonic
+        // bell); "tine" / "rhodes" / "electric piano" → 14.0 (classic DX
+        // tine); default 2.01 (glassy carrier). Modulation index = depth.
+        if (containsWord(lower, "tine") || containsWord(lower, "rhodes")
+            || containsWord(lower, "electric piano") || containsWord(lower, "ep")) {
+            main.fm_ratio = 14.0f;
+            main.fm_depth = 0.55f;
+        } else if (containsWord(lower, "bell") || containsWord(lower, "glass")
+                   || containsWord(lower, "chime")) {
+            main.fm_ratio = 3.14f;
+            main.fm_depth = 0.45f;
+        } else {
+            main.fm_ratio = 2.01f;
+            main.fm_depth = 0.40f;
+        }
+        main.volume = 0.85f;
+        main.enabled = 1;
+
+        // Clean sine fundamental for body weight.
+        auto& body = p.osc[1];
+        resetOsc(body);
+        body.type = OscType::Sine;
+        body.volume = 0.55f;
+        body.enabled = 1;
+
+        // Octave-up sine for "airy" shimmer.
+        auto& shimmer = p.osc[2];
+        resetOsc(shimmer);
+        shimmer.type = OscType::Sine;
+        shimmer.semitone_offset = 12.0f;
+        shimmer.volume = 0.20f;
+        shimmer.enabled = 1;
+
+        // FM is the timbre — keep the filter wide open. Closed LP on top of
+        // FM removes the very partials the modulator generated.
+        p.filter.type = FilterType::LowPass;
+        p.filter.cutoff_hz = std::max(p.filter.cutoff_hz, 14000.0f);
+        p.filter.resonance = std::min(p.filter.resonance, 0.2f);
+        p.filter.env_mod = 0.0f;
+
+        std::cerr << "[PatchAugmenter] FM-intent coercion: prompt names FM but LLM "
+                     "shipped a non-FM oscillator. Rebuilt patch with FM topology "
+                     "(ratio=" << main.fm_ratio << ", depth=" << main.fm_depth
+                  << "). prompt='" << prompt << "'\n";
+        appendAction(p, "Matched the named synthesis technique (rebuilt around an FM operator + sine body + octave shimmer; filter opened so the FM partials survive)");
+        return true;
+    }
 
     // --- Noise-only fix (priority 1). White-noise-only patches are read by
     // the listener as "static, not sound" (§4.2 anti-pattern). We force osc[0]
