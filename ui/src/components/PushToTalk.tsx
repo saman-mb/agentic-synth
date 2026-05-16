@@ -1,4 +1,4 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 
 interface PushToTalkProps {
   onData: (buf: ArrayBuffer) => void;
@@ -69,6 +69,37 @@ export function PushToTalk({ onData, wsReady }: PushToTalkProps) {
   const workletRef = useRef<AudioWorkletNode | null>(null);
   const chunksRef = useRef<Float32Array[]>([]);
   const streamRef = useRef<MediaStream | null>(null);
+
+  // Phase 28 — pre-press permission probe. Without this the user only
+  // discovers "mic denied" after holding the button, hits silence, and has
+  // no idea why. Permissions API on WebKit/JUCE WebView is partial: the
+  // 'microphone' PermissionName isn't in all builds — wrap in try/catch and
+  // silently no-op when unsupported, leaving the post-press path as the
+  // fallback discovery route.
+  useEffect(() => {
+    type PermsLike = { query: (d: { name: string }) => Promise<PermissionStatus> };
+    const perms = (navigator as unknown as { permissions?: PermsLike }).permissions;
+    if (!perms?.query) return;
+    let status: PermissionStatus | null = null;
+    const apply = (s: PermissionState) => {
+      if (s === 'denied') setFailure('permission');
+      else if (s === 'granted') setFailure((prev) => (prev === 'permission' ? null : prev));
+    };
+    perms
+      .query({ name: 'microphone' })
+      .then((s) => {
+        status = s;
+        apply(s.state);
+        s.onchange = () => apply(s.state);
+      })
+      .catch(() => {
+        // WebKit without 'microphone' PermissionName — fall back to
+        // post-press discovery. Not an error path; intentional silence.
+      });
+    return () => {
+      if (status) status.onchange = null;
+    };
+  }, []);
 
   const teardown = useCallback(async () => {
     workletRef.current?.port.close();
