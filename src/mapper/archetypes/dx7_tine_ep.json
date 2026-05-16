@@ -1,0 +1,23 @@
+{
+  "name": "dx7_tine_ep",
+  "tags": ["fm", "dx", "dx7", "tine", "rhodes", "electric piano", "ep"],
+  "version": 1,
+  "patch_id": 0,
+  "osc": [
+    {"type": "FM",   "semitone_offset": 0.0,  "detune_cents": 0.0, "wavetable_pos": 0.0, "fm_ratio": 14.0, "fm_depth": 0.55, "volume": 0.85, "pan": 0.0, "pulse_width": 0.5, "enabled": true},
+    {"type": "Sine", "semitone_offset": 0.0,  "detune_cents": 0.0, "wavetable_pos": 0.0, "fm_ratio": 1.0,  "fm_depth": 0.0,  "volume": 0.55, "pan": 0.0, "pulse_width": 0.5, "enabled": true},
+    {"type": "Sine", "semitone_offset": 12.0, "detune_cents": 0.0, "wavetable_pos": 0.0, "fm_ratio": 1.0,  "fm_depth": 0.0,  "volume": 0.20, "pan": 0.0, "pulse_width": 0.5, "enabled": true}
+  ],
+  "filter": {"type": "LowPass", "cutoff_hz": 14000.0, "resonance": 0.10, "env_mod": 0.10, "key_track": 0.2, "drive": 0.0},
+  "filter_env": {"attack_s": 0.001, "decay_s": 0.30, "sustain": 0.10, "release_s": 0.20},
+  "amp_env":    {"attack_s": 0.001, "decay_s": 0.40, "sustain": 0.40, "release_s": 0.50},
+  "lfo": [
+    {"waveform": "Sine", "target": "None", "rate_hz": 1.0, "depth": 0.0, "phase_offset": 0.0, "bpm_sync": false},
+    {"waveform": "Sine", "target": "None", "rate_hz": 1.0, "depth": 0.0, "phase_offset": 0.0, "bpm_sync": false}
+  ],
+  "reverb": {"size": 0.55, "damping": 0.50, "width": 1.0, "mix": 0.25},
+  "delay":  {"time_s": 0.25, "feedback": 0.20, "mix": 0.08, "stereo": 0.5, "bpm_sync": false},
+  "master_gain": 0.85,
+  "portamento_s": 0.0,
+  "voice_count": 8
+}

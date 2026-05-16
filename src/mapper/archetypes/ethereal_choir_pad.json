@@ -1,0 +1,23 @@
+{
+  "name": "ethereal_choir_pad",
+  "tags": ["choir", "vocal", "angelic", "ethereal", "heavenly"],
+  "version": 1,
+  "patch_id": 0,
+  "osc": [
+    {"type": "Wavetable", "semitone_offset": 0.0,  "detune_cents": -5.0, "wavetable_pos": 0.55, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.80, "pan": -0.4, "pulse_width": 0.5, "enabled": true},
+    {"type": "Sine",      "semitone_offset": 12.0, "detune_cents":  0.0, "wavetable_pos": 0.0,  "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.45, "pan":  0.4, "pulse_width": 0.5, "enabled": true},
+    {"type": "Noise",     "semitone_offset": 0.0,  "detune_cents":  0.0, "wavetable_pos": 0.0,  "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.18, "pan":  0.0, "pulse_width": 0.5, "enabled": true}
+  ],
+  "filter": {"type": "LowPass", "cutoff_hz": 3500.0, "resonance": 0.20, "env_mod": 0.30, "key_track": 0.1, "drive": 0.05},
+  "filter_env": {"attack_s": 2.0, "decay_s": 3.0, "sustain": 0.70, "release_s": 4.0},
+  "amp_env":    {"attack_s": 2.5, "decay_s": 1.5, "sustain": 0.90, "release_s": 5.0},
+  "lfo": [
+    {"waveform": "Sine",     "target": "WavetablePos", "rate_hz": 0.12, "depth": 0.40, "phase_offset": 0.0, "bpm_sync": false},
+    {"waveform": "Triangle", "target": "Pitch",        "rate_hz": 0.18, "depth": 0.02, "phase_offset": 0.5, "bpm_sync": false}
+  ],
+  "reverb": {"size": 0.90, "damping": 0.45, "width": 1.0, "mix": 0.50},
+  "delay":  {"time_s": 0.5, "feedback": 0.30, "mix": 0.15, "stereo": 0.7, "bpm_sync": false},
+  "master_gain": 0.80,
+  "portamento_s": 0.0,
+  "voice_count": 8
+}

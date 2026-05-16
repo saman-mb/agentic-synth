@@ -1,0 +1,23 @@
+{
+  "name": "gritty_lead",
+  "tags": ["gritty", "snarl", "growl", "aggressive lead", "neuro"],
+  "version": 1,
+  "patch_id": 0,
+  "osc": [
+    {"type": "Sawtooth", "semitone_offset": 0.0,   "detune_cents":  -8.0, "wavetable_pos": 0.0, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.85, "pan": -0.3, "pulse_width": 0.5, "enabled": true},
+    {"type": "Square",   "semitone_offset": 0.0,   "detune_cents":   8.0, "wavetable_pos": 0.0, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.55, "pan":  0.3, "pulse_width": 0.45, "enabled": true},
+    {"type": "Sine",     "semitone_offset": -12.0, "detune_cents":   0.0, "wavetable_pos": 0.0, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.45, "pan":  0.0, "pulse_width": 0.5,  "enabled": true}
+  ],
+  "filter": {"type": "LowPass", "cutoff_hz": 1200.0, "resonance": 0.55, "env_mod": 0.55, "key_track": 0.2, "drive": 0.50},
+  "filter_env": {"attack_s": 0.005, "decay_s": 0.25, "sustain": 0.40, "release_s": 0.20},
+  "amp_env":    {"attack_s": 0.005, "decay_s": 0.20, "sustain": 0.80, "release_s": 0.25},
+  "lfo": [
+    {"waveform": "Triangle", "target": "FilterCutoff", "rate_hz": 0.25, "depth": 0.30, "phase_offset": 0.0, "bpm_sync": true},
+    {"waveform": "Sine",     "target": "Pitch",        "rate_hz": 5.0,  "depth": 0.02, "phase_offset": 0.0, "bpm_sync": false}
+  ],
+  "reverb": {"size": 0.40, "damping": 0.55, "width": 0.7, "mix": 0.15},
+  "delay":  {"time_s": 0.375, "feedback": 0.35, "mix": 0.20, "stereo": 0.6, "bpm_sync": true},
+  "master_gain": 0.88,
+  "portamento_s": 0.03,
+  "voice_count": 1
+}

@@ -1,0 +1,23 @@
+{
+  "name": "cinematic_kubrick_pad",
+  "tags": ["cinematic", "kubrick", "spooky", "evolving", "dark pad", "drone-pad", "2001", "vangelis", "horror"],
+  "version": 1,
+  "patch_id": 0,
+  "osc": [
+    {"type": "Sawtooth", "semitone_offset": -12.0, "detune_cents": -11.0, "wavetable_pos": 0.0, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.75, "pan": -0.6, "pulse_width": 0.5, "enabled": true},
+    {"type": "Sawtooth", "semitone_offset": 0.0,   "detune_cents":  13.0, "wavetable_pos": 0.30, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.70, "pan": 0.6, "pulse_width": 0.5, "enabled": true},
+    {"type": "FM",       "semitone_offset": -12.0, "detune_cents": 0.0, "wavetable_pos": 0.0, "fm_ratio": 2.73, "fm_depth": 0.35, "volume": 0.40, "pan": 0.0, "pulse_width": 0.5, "enabled": true}
+  ],
+  "filter": {"type": "LowPass", "cutoff_hz": 1400.0, "resonance": 0.35, "env_mod": 0.40, "key_track": 0.0, "drive": 0.35},
+  "filter_env": {"attack_s": 1.8, "decay_s": 5.0, "sustain": 0.55, "release_s": 5.0},
+  "amp_env":    {"attack_s": 2.2, "decay_s": 1.5, "sustain": 0.85, "release_s": 6.0},
+  "lfo": [
+    {"waveform": "Sine",     "target": "FilterCutoff", "rate_hz": 0.06, "depth": 0.55, "phase_offset": 0.0,  "bpm_sync": false},
+    {"waveform": "Triangle", "target": "Pitch",        "rate_hz": 0.10, "depth": 0.04, "phase_offset": 0.25, "bpm_sync": false}
+  ],
+  "reverb": {"size": 0.92, "damping": 0.55, "width": 1.0, "mix": 0.42},
+  "delay":  {"time_s": 0.5, "feedback": 0.25, "mix": 0.10, "stereo": 0.6, "bpm_sync": false},
+  "master_gain": 0.85,
+  "portamento_s": 0.0,
+  "voice_count": 8
+}

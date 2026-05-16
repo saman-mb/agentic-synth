@@ -1,0 +1,23 @@
+{
+  "name": "riser_swell",
+  "tags": ["riser", "swell", "build-up", "transition"],
+  "version": 1,
+  "patch_id": 0,
+  "osc": [
+    {"type": "Sawtooth", "semitone_offset": 0.0,   "detune_cents":  0.0, "wavetable_pos": 0.0, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.85, "pan": 0.0, "pulse_width": 0.5, "enabled": true},
+    {"type": "Sawtooth", "semitone_offset": 12.0,  "detune_cents":  7.0, "wavetable_pos": 0.0, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.60, "pan": -0.3, "pulse_width": 0.5, "enabled": true},
+    {"type": "Noise",    "semitone_offset": 0.0,   "detune_cents":  0.0, "wavetable_pos": 0.0, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.30, "pan": 0.3,  "pulse_width": 0.5, "enabled": true}
+  ],
+  "filter": {"type": "LowPass", "cutoff_hz": 80.0, "resonance": 0.40, "env_mod": 1.0, "key_track": 0.0, "drive": 0.20},
+  "filter_env": {"attack_s": 4.0, "decay_s": 0.10, "sustain": 1.0, "release_s": 0.50},
+  "amp_env":    {"attack_s": 4.0, "decay_s": 0.10, "sustain": 1.0, "release_s": 0.50},
+  "lfo": [
+    {"waveform": "Sine", "target": "Pitch", "rate_hz": 0.20, "depth": 0.10, "phase_offset": 0.0, "bpm_sync": false},
+    {"waveform": "Sine", "target": "None",  "rate_hz": 1.0,  "depth": 0.0,  "phase_offset": 0.0, "bpm_sync": false}
+  ],
+  "reverb": {"size": 0.65, "damping": 0.50, "width": 1.0, "mix": 0.30},
+  "delay":  {"time_s": 0.5, "feedback": 0.50, "mix": 0.30, "stereo": 0.7, "bpm_sync": true},
+  "master_gain": 0.85,
+  "portamento_s": 0.0,
+  "voice_count": 1
+}
