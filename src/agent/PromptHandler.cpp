@@ -308,6 +308,16 @@ std::optional<PatchStruct> PromptHandler::generateLlmPatch(const std::string& pr
     return std::nullopt;
 }
 
+void PromptHandler::applyGuardrailIfNotRefinement(PatchStruct& patch, const std::string& prompt,
+                                                  bool hasPreviousPatch) noexcept {
+    // Phase 31 — same refinement-skip rule as generateLlmPatch::applyGuardrail.
+    // Caller passes hasPreviousPatch so we don't have to plumb the optional
+    // through (WebUiComponent already snapshots priorPatch under its mutex).
+    if (isRelativePrompt(prompt) && hasPreviousPatch)
+        return;
+    augmentPatch(patch, prompt);
+}
+
 void PromptHandler::feedChunk(std::string_view chunk) { streamParser_.feedChunk(chunk); }
 
 std::string PromptHandler::buildSystemPrompt(const std::string& userPrompt) const {

@@ -465,6 +465,11 @@ std::optional<PatchStruct> AgentBridge::generateLlmPatch(const std::string& prom
     return prompt_.generateLlmPatch(prompt, patch_id, std::move(previousPatch), std::move(previousPrompt));
 }
 
+void AgentBridge::applyGuardrailIfNotRefinement(PatchStruct& patch, const std::string& prompt,
+                                                bool hasPreviousPatch) noexcept {
+    prompt_.applyGuardrailIfNotRefinement(patch, prompt, hasPreviousPatch);
+}
+
 void AgentBridge::feedChunk(std::string_view chunk) { prompt_.feedChunk(chunk); }
 
 void AgentBridge::onMidiCC(int controller, int value) noexcept { knob_.onMidiCC(controller, value); }
