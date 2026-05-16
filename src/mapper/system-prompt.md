@@ -356,6 +356,20 @@ LFOs add motion. A patch without an LFO is usually static-feeling unless it's a 
 
 Every recipe below is a starting point, not a destination. Vary cutoffs ±20%, vary detune by ±5¢, vary envelope times by ±30% to keep patches alive. The recipes assume the not-shown fields take the schema defaults (oscillators not listed are disabled with volume 0).
 
+### 3.0 PROMPT-KEYWORD → ARCHETYPE LOCK (consult this BEFORE choosing a recipe)
+
+When the producer's prompt contains any of these tokens, the matching archetype is MANDATORY. Do not fall through to "Sub bass" semantics because the prompt mentions "deep" or "dark" — pads and bass are different objects.
+
+- `cinematic` / `ever-changing` / `evolving` / `spooky` / `dark pad` / `deep dark pad` / `ominous pad` / `Kubrick` / `2001` / `Vangelis` / `drone pad` / `horror` / `dread` / `foreboding` / `eldritch` → **archetype 17b: Cinematic dark pad**. 3 oscillators MANDATORY. Cutoff in the 1200–2500 Hz mid-band (NOT 400 — that's bass). NEGATIVE filter env_mod (filter blooms open on the tail, not the attack). Two LFOs at coprime rates on DIFFERENT targets. Cathedral reverb mix ≥ 0.45.
+
+- `ambient pad` / `lush pad` / `atmospheric` / `evolving pad` / `texture` → archetype 15 (Wavetable evolving pad) or 17b. 3 oscillators MANDATORY.
+
+- `FM` / `DX` / `DX7` / `bell` / `tine` / `Rhodes` / `electric piano` / `glass` → **§5 anti-pattern: FM topology**. osc[0].type = FM. Filter open ≥ 14000 Hz.
+
+- `deep dark sub` / `808` / `trap sub` / `pure sub` → archetype 1 (Sub bass) IS allowed to be single-osc. **This is the only single-oscillator exception.** Without one of these literal tokens, three oscillators is mandatory per §0 rule 12.
+
+The keyword lock OVERRIDES sensation-only inference. "Deep dark" alone routes to the matching archetype based on the OTHER tokens in the prompt: `deep dark pad / cinematic / Kubrick` → 17b cinematic pad; `deep dark sub / 808` → 1 sub bass.
+
 ### Bass
 
 1. **Sub bass** — `Sine` osc1 only. Filter `LowPass` cutoff 200 Hz, resonance 0.05, drive 0.0. Amp env: attack 0.005, decay 0.1, sustain 0.95, release 0.15. No reverb. No delay. `voice_count: 1`, `portamento_s: 0.05`. Mono.
@@ -395,6 +409,19 @@ Every recipe below is a starting point, not a destination. Vary cutoffs ±20%, v
 16. **Air pad** — `Triangle` osc1 unity + `Noise` osc2 vol 0.15. Filter `HighPass` cutoff 1200 Hz, resonance 0.1. Amp env: attack 1.5, sustain 0.7, release 4.0. Reverb size 0.8, mix 0.5. Stereo via osc panning ±0.4. Voice 8.
 
 17. **Drone** — `Sawtooth` osc1 unity + `Sawtooth` osc2 detuned 30¢ + `Sine` osc3 at −24 semitones vol 0.4. Filter `LowPass` cutoff 1500 Hz, resonance 0.4, drive 0.4. Amp env: attack 2.0, sustain 1.0, release 6.0. LFO1: sine on `FilterCutoff` rate 0.04 Hz depth 0.7 (very slow breath). LFO2: triangle on `Pan` rate 0.1 Hz depth 0.5. Reverb size 0.95, mix 0.6. Voice 4 (legato).
+
+17b. **Cinematic dark pad (Kubrick / 2001 / Vangelis / horror)** — the canonical answer for `cinematic` / `Kubrick` / `spooky` / `ever-changing` / `deep dark pad` / `ominous pad` prompts. THREE OSCILLATORS, octave-spread, panned wide:
+   - `Sawtooth` osc1 at `semitone_offset −12`, `detune_cents −7`, vol 0.75, pan −0.6
+   - `Sawtooth` osc2 unison, `detune_cents +7`, vol 0.70, pan +0.6 (or `Wavetable` `wavetable_pos 0.3` if the prompt mentions "evolving" / "morphing")
+   - `Sine` osc3 at `semitone_offset −24`, vol 0.45, pan 0 (sub anchor)
+   - Filter `LowPass` cutoff **1400 Hz** (NOT 400 — that's bass territory), resonance 0.35, `env_mod −0.30` (NEGATIVE — filter closes on attack, blooms open on the tail; this is the dread bloom)
+   - Amp env: attack 2.2, decay 1.5, sustain 0.85, release 6.0+
+   - Filter env: attack 3.5, decay 3.0, sustain 0.55, release 5.0
+   - **LFO1: sine on `FilterCutoff`, rate 0.06 Hz, depth 0.55** (slow breath)
+   - **LFO2: triangle on `Pitch`, rate 0.10 Hz, depth 0.04** (micro-detune drift — the Kubrick monolith move; the harmonic series wobbles microtonally and never settles)
+   - The two LFOs MUST be at coprime rates (0.06 + 0.10 → cycle is many minutes long) so the patch never repeats audibly. Single-LFO pads feel looped within seconds.
+   - Reverb size 0.92, damping 0.5, width 1.0, mix 0.55. Cathedral.
+   - Voice 8, portamento 0.0.
 
 ### Plucks & Keys
 
@@ -530,6 +557,15 @@ These are the moves that separate a stock patch from a designed one:
   patch has a fundamental to play melodically. If a prompt sounds
   "electric" / "stormy" / "chaotic", use noise as osc[2] layer
   (vol 0.2-0.3) over pitched oscs[0] and [1], not as the only voice.
+
+- **Don't ship a cinematic / dark pad / ominous pad / Kubrick / drone / spooky pad as a single oscillator with a closed filter.** This is the most common cinematic-prompt failure. A cinematic pad is THREE voices stratified across octaves through a HALF-OPEN filter, not one saw under a closed LP. The mandatory recipe (also at §3 17b):
+  - osc[0]=`Sawtooth` semi −12 detune −7¢ vol 0.75 pan −0.6
+  - osc[1]=`Sawtooth` unison detune +7¢ vol 0.70 pan +0.6 (or `Wavetable` if "evolving")
+  - osc[2]=`Sine` semi −24 vol 0.45 (sub anchor)
+  - Filter `LowPass` cutoff 1200–2500 Hz (NEVER below 1000 — that's bass), resonance 0.3–0.4, env_mod −0.20 to −0.40 (NEGATIVE: filter blooms open on the tail).
+  - Two LFOs at coprime rates on DIFFERENT targets — one on FilterCutoff (~0.06 Hz), one on Pitch (~0.10 Hz, depth 0.04 for micro-drift). Single-LFO patches feel looped.
+  - Reverb size ≥ 0.85, mix ≥ 0.45.
+  Recognising the prompt: any of `cinematic` / `Kubrick` / `2001` / `Vangelis` / `spooky` / `ever-changing` / `evolving` / `dark pad` / `deep dark pad` / `ominous pad` / `drone-pad` / `horror` / `dread` / `foreboding` MUST route here.
 
 - **Don't ship Sawtooth when the user named FM.** If the brief or original
   prompt mentions any of: FM, FM-style, DX, DX7, DX-style, Yamaha,

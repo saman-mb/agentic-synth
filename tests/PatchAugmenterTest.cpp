@@ -102,10 +102,14 @@ TEST_CASE("augmentPatch: single Sawtooth + 'warm pad' → Reese topology", "[aug
     REQUIRE(p.osc[2].volume >= 0.15f);
 }
 
-TEST_CASE("augmentPatch: noise-only + 'atmospheric dark texture' → Triangle + Noise@2",
+TEST_CASE("augmentPatch: noise-only + 'dark texture' → Triangle + Noise@2",
           "[augmenter][phase23]") {
+    // Phase 30: avoid cinematic-trigger tokens here so the noise-only path
+    // is what we're exercising. "atmospheric" was reclassified as cinematic
+    // intent in Phase 30; a separate test (Phase 30 noise-only-then-
+    // cinematic) covers the combined path.
     PatchStruct p = noiseOnlyPatch(0.6f);
-    REQUIRE(augmentPatch(p, "atmospheric dark texture"));
+    REQUIRE(augmentPatch(p, "dark gritty texture"));
 
     // osc[0] became a pitched fundamental — Triangle is the default for
     // textures that aren't tagged bass/pad/lead/ambient.
@@ -126,9 +130,12 @@ TEST_CASE("augmentPatch: noise-only + 'bass' → Sawtooth fundamental", "[augmen
     REQUIRE(p.osc[2].type == OscType::Noise);
 }
 
-TEST_CASE("augmentPatch: noise-only + 'ambient drone' → Sine fundamental", "[augmenter][phase23]") {
+TEST_CASE("augmentPatch: noise-only + 'ambient warm' → Sine fundamental", "[augmenter][phase23]") {
+    // Phase 30: dropped "drone" from this test prompt — "drone" is now a
+    // cinematic-intent token that takes precedence over noise-only,
+    // routing to the cinematic-pad recipe instead.
     PatchStruct p = noiseOnlyPatch();
-    REQUIRE(augmentPatch(p, "ambient drone"));
+    REQUIRE(augmentPatch(p, "ambient warm wash"));
     REQUIRE(p.osc[0].type == OscType::Sine);
     REQUIRE(p.osc[2].type == OscType::Noise);
 }
@@ -207,8 +214,12 @@ TEST_CASE("augmentPatch: already 2-osc patch + non-simple prompt → osc[2] adde
 }
 
 TEST_CASE("augmentPatch: single Triangle + 'lush pad' → Pad topology", "[augmenter][phase23]") {
+    // Phase 30: removed "evolving" — that keyword now routes to the
+    // cinematic-pad path which uses a different topology (Sawtooth
+    // partner, octave-spread). A plain "lush pad" without cinematic-
+    // intent keywords still hits the original Pad layering path.
     PatchStruct p = singleOscPatch(OscType::Triangle);
-    REQUIRE(augmentPatch(p, "lush evolving pad"));
+    REQUIRE(augmentPatch(p, "lush warm pad"));
     REQUIRE(p.osc[0].type == OscType::Triangle);
     REQUIRE(p.osc[1].type == OscType::Triangle);
     REQUIRE(p.osc[1].detune_cents == 9.0f);
@@ -365,4 +376,103 @@ TEST_CASE("augmenter FM-intent: 'format' / 'platform' do not false-positive on '
     PatchStruct p = singleOscPatch(OscType::Sawtooth);
     REQUIRE(augmentPatch(p, "warm pad platform"));
     REQUIRE(p.osc[0].type == OscType::Sawtooth);
+}
+
+// Phase 30 — cinematic pad coercion + cutoff guards + rationale invalidation.
+
+TEST_CASE("augmenter cinematic: 'deep dark cinematic Kubrick pad' on single Saw → cinematic topology",
+          "[augmenter][phase30]") {
+    PatchStruct p = singleOscPatch(OscType::Sawtooth);
+    p.filter.cutoff_hz = 400.0f; // LLM picked closed filter for "dark"
+    REQUIRE(augmentPatch(p, "deep dark cinematic Kubrick pad"));
+    // 3 audible oscs
+    REQUIRE(p.osc[0].enabled);
+    REQUIRE(p.osc[1].enabled);
+    REQUIRE(p.osc[2].enabled);
+    REQUIRE(p.osc[0].volume >= 0.15f);
+    REQUIRE(p.osc[1].volume >= 0.15f);
+    REQUIRE(p.osc[2].volume >= 0.15f);
+    // panned wide
+    REQUIRE(p.osc[0].pan < -0.3f);
+    REQUIRE(p.osc[1].pan > 0.3f);
+    // filter opened past bass territory
+    REQUIRE(p.filter.cutoff_hz >= 1200.0f);
+    // negative env_mod (bloom on tail)
+    REQUIRE(p.filter.env_mod < 0.0f);
+    // two LFOs on DIFFERENT targets
+    REQUIRE(p.lfo[0].target != LfoTarget::None);
+    REQUIRE(p.lfo[1].target != LfoTarget::None);
+    REQUIRE(p.lfo[0].target != p.lfo[1].target);
+    REQUIRE(p.lfo[0].depth > 0.2f);
+    REQUIRE(p.lfo[1].depth > 0.0f);
+    // long envelope
+    REQUIRE(p.amp_env.attack_s >= 2.0f);
+    REQUIRE(p.amp_env.release_s >= 5.0f);
+    // cathedral reverb
+    REQUIRE(p.reverb.mix >= 0.4f);
+}
+
+TEST_CASE("augmenter cinematic: 'spooky drone ever-changing soundscape' routes to cinematic",
+          "[augmenter][phase30]") {
+    PatchStruct p = singleOscPatch(OscType::Sawtooth);
+    p.filter.cutoff_hz = 350.0f;
+    REQUIRE(augmentPatch(p, "spooky drone ever-changing soundscape"));
+    REQUIRE(p.filter.env_mod < 0.0f);
+    REQUIRE(p.lfo[0].rate_hz < 0.5f);
+    REQUIRE(p.lfo[1].rate_hz < 0.5f);
+}
+
+TEST_CASE("augmenter cinematic: bass prompt does NOT trigger cinematic path",
+          "[augmenter][phase30]") {
+    PatchStruct p = singleOscPatch(OscType::Sawtooth);
+    p.filter.cutoff_hz = 250.0f;
+    REQUIRE(augmentPatch(p, "deep dark dubstep bass"));
+    // Reese path — osc[1] detune partner at -10c, NOT panned wide
+    REQUIRE(p.osc[1].detune_cents == -10.0f);
+    REQUIRE(p.filter.env_mod >= 0.0f); // Reese doesn't set negative env_mod
+}
+
+TEST_CASE("augmenter Reese cutoff guard: closed filter is opened to 800+ Hz",
+          "[augmenter][phase30]") {
+    PatchStruct p = singleOscPatch(OscType::Sawtooth);
+    p.filter.cutoff_hz = 200.0f; // would silence layers
+    REQUIRE(augmentPatch(p, "thick bass"));
+    REQUIRE(p.filter.cutoff_hz >= 800.0f);
+}
+
+TEST_CASE("augmenter Pad cutoff guard: closed filter is opened to 1500+ Hz",
+          "[augmenter][phase30]") {
+    PatchStruct p = singleOscPatch(OscType::Triangle);
+    p.filter.cutoff_hz = 400.0f;
+    REQUIRE(augmentPatch(p, "lush warm pad"));
+    REQUIRE(p.filter.cutoff_hz >= 1500.0f);
+}
+
+TEST_CASE("augmenter rationale invalidation: stale LLM rationale cleared on mutation",
+          "[augmenter][phase30]") {
+    PatchStruct p = singleOscPatch(OscType::Sawtooth);
+    // Simulate LLM having written a rationale that talks about a single saw.
+    std::strncpy(p.rationale, "I chose a sawtooth oscillator with a closed filter.", sizeof(p.rationale) - 1);
+    p.rationale[sizeof(p.rationale) - 1] = '\0';
+    REQUIRE(augmentPatch(p, "huge cinematic kubrick pad"));
+    // Augmenter must have cleared the lying rationale so the heuristic
+    // regenerates from the post-augment topology.
+    REQUIRE(p.rationale[0] == '\0');
+    // Audit trail still present in augmenter_actions.
+    REQUIRE(p.augmenter_actions[0] != '\0');
+}
+
+TEST_CASE("augmenter cinematic: already-good cinematic patch passes through",
+          "[augmenter][phase30]") {
+    // 3-osc patch with cinematic structure already in place.
+    PatchStruct p = make_default_patch();
+    for (auto& o : p.osc) {
+        o.enabled = 1;
+        o.volume = 0.5f;
+        o.type = OscType::Sawtooth;
+    }
+    p.filter.cutoff_hz = 1800.0f;
+    p.filter.env_mod = -0.25f;
+    REQUIRE_FALSE(augmentPatch(p, "cinematic dark pad"));
+    REQUIRE(p.augmenter_actions[0] == '\0');
 }

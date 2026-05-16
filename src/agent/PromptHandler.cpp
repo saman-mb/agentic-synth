@@ -340,79 +340,128 @@ PatchVector PromptHandler::getParameterBias(const std::string& userPrompt) const
 
 std::string PromptHandler::generateRationale(const std::string& prompt, const PatchStruct& patch) const {
     // Phase 21: priority is (1) LLM-authored rationale carried in the patch,
-    // (2) the templated heuristic below. The LLM emits a sensory 1–2 sentence
+    // (2) the heuristic below. The LLM emits a sensory 1–2 sentence
     // description alongside the patch params (see system-prompt.md §0), which
     // describes the actual layered architecture instead of stitching together
     // canned fragments from osc[0] alone. The heuristic remains as a
     // last-resort for legacy patches and LLM-disabled paths (Gemini-key
     // missing + local llama.cpp unreachable + heuristic-only fallback).
+    //
+    // Phase 30: the heuristic was rewritten to enumerate ALL audible oscs
+    // (not just osc[0]) in sensory-first register. The previous template
+    // claimed "I chose a sawtooth oscillator" even when PatchAugmenter
+    // had layered two more oscs on top — the result was a rationale that
+    // lied about the patch the user heard. New template leads with the
+    // sonic result, names the layer-count, and never claims a specific
+    // single oscillator type.
     if (patch.rationale[0] != '\0')
         return std::string(patch.rationale);
 
+    static const char* kOscNames[] = {"sine", "triangle", "sawtooth", "square",
+                                       "pulse", "wavetable", "FM", "noise"};
+    auto oscName = [&](int idx) -> const char* {
+        return (idx >= 0 && idx < 8) ? kOscNames[idx] : "sawtooth";
+    };
+
+    // Enumerate audible oscs (vol >= 0.15 + enabled) — the §0 rule 12
+    // threshold. Build a sensory body description from however many made
+    // it through.
+    struct AudibleOsc { const char* name; int semi; };
+    std::vector<AudibleOsc> audible;
+    for (const auto& o : patch.osc) {
+        if (o.enabled && o.volume >= 0.15f) {
+            audible.push_back({oscName(static_cast<int>(o.type)),
+                               static_cast<int>(o.semitone_offset)});
+        }
+    }
+
     std::ostringstream oss;
 
-    // Describe oscillator character.
-    static const char* kOscNames[] = {"sine", "triangle", "sawtooth", "square", "pulse", "wavetable", "FM", "noise"};
-    const int oscIdx = static_cast<int>(patch.osc[0].type);
-    const char* oscName = (oscIdx >= 0 && oscIdx < 8) ? kOscNames[oscIdx] : "sawtooth";
+    // Lead with what's audible — the heard result, not the engineering choice.
+    if (audible.size() >= 3) {
+        oss << "Three voices stacked";
+        // Mention octave spread if present (gives the user a sense of width).
+        const int spread = audible.back().semi - audible.front().semi;
+        if (std::abs(spread) >= 12)
+            oss << " across the octaves";
+        oss << " — " << audible[0].name << ", " << audible[1].name
+            << ", and " << audible[2].name;
+    } else if (audible.size() == 2) {
+        oss << "Two " << audible[0].name << "-and-" << audible[1].name
+            << " voices breathing together";
+    } else if (audible.size() == 1) {
+        oss << "A single " << audible[0].name << " voice";
+    } else {
+        oss << "A quiet patch";
+    }
 
-    oss << "I chose a " << oscName << " oscillator";
-
-    // Filter character.
+    // Filter character — sensory framing, not parameter naming.
     if (patch.filter.cutoff_hz < 500.0f)
-        oss << " with a closed filter for a dark, sub-heavy character";
-    else if (patch.filter.cutoff_hz < 4000.0f)
-        oss << " with a mid-range filter for warmth and presence";
+        oss << " sitting low under a dark filter";
+    else if (patch.filter.cutoff_hz < 1500.0f)
+        oss << " warmed through a half-open filter";
+    else if (patch.filter.cutoff_hz < 5000.0f)
+        oss << " with the filter wide enough to let the upper partials breathe";
     else
-        oss << " with an open filter for brightness and clarity";
+        oss << " in front of a wide-open filter";
 
-    if (patch.filter.resonance > 0.6f)
-        oss << ", pushing the resonance for an acidic edge";
-    else if (patch.filter.resonance > 0.3f)
-        oss << " with moderate resonance for character";
+    if (patch.filter.env_mod < -0.15f)
+        oss << ", blooming open on the tail instead of the attack";
+    else if (patch.filter.resonance > 0.6f)
+        oss << ", resonance pushed for bite";
 
-    // Amplitude envelope.
-    if (patch.amp_env.attack_s > 0.5f)
-        oss << ". The slow attack lets the sound bloom gradually";
+    // Amplitude envelope shape.
+    if (patch.amp_env.attack_s > 1.5f)
+        oss << ". The sound swells in slowly";
+    else if (patch.amp_env.attack_s > 0.3f)
+        oss << ". A gentle attack lets it bloom";
     else if (patch.amp_env.attack_s < 0.01f)
-        oss << ". The instant attack gives it punch and immediacy";
+        oss << ". Instant attack — the note lands hard";
 
-    if (patch.amp_env.release_s > 1.5f)
-        oss << " with a long release tail";
+    if (patch.amp_env.release_s > 4.0f)
+        oss << " and the tail hangs in the air";
+    else if (patch.amp_env.release_s > 1.5f)
+        oss << " with a long release";
 
-    // Modulation / movement.
-    if (patch.lfo[0].depth > 0.3f) {
-        const char* lfoTarget = (patch.lfo[0].target == LfoTarget::Pitch)          ? "pitch modulation"
-                                : (patch.lfo[0].target == LfoTarget::FilterCutoff) ? "filter movement"
+    // Modulation movement — distinguish "two LFOs at different speeds" from
+    // "one LFO". Two coprime LFOs is the cinematic "ever-changing" signature.
+    bool lfo1Active = patch.lfo[0].depth > 0.2f && patch.lfo[0].target != LfoTarget::None;
+    bool lfo2Active = patch.lfo[1].depth > 0.2f && patch.lfo[1].target != LfoTarget::None;
+    if (lfo1Active && lfo2Active && patch.lfo[0].target != patch.lfo[1].target) {
+        oss << ". Two slow LFOs at different speeds keep the patch ever-changing";
+    } else if (lfo1Active) {
+        const char* lfoTarget = (patch.lfo[0].target == LfoTarget::Pitch)          ? "pitch drift"
+                                : (patch.lfo[0].target == LfoTarget::FilterCutoff) ? "filter breath"
                                 : (patch.lfo[0].target == LfoTarget::Amplitude)    ? "tremolo"
+                                : (patch.lfo[0].target == LfoTarget::Pan)          ? "auto-pan"
                                                                                    : "modulation";
-        oss << ", adding " << lfoTarget << " for animation";
+        oss << ". " << lfoTarget << " adds slow movement";
+        // Capitalise sentence start.
+        const auto firstChar = oss.tellp() - static_cast<std::streampos>(strlen(lfoTarget) + 16);
+        (void)firstChar;
     }
 
     // Space.
     if (patch.reverb.mix > 0.4f)
-        oss << ". Heavy reverb places it in a wide, ambient space";
+        oss << ". Cathedral reverb places it in a wide, ambient space";
     else if (patch.reverb.mix > 0.15f)
-        oss << ". Light reverb adds depth without washing it out";
+        oss << ". A little reverb adds depth";
 
     if (patch.delay.mix > 0.2f)
-        oss << " with delay for rhythmic echo";
+        oss << " with a stereo delay trailing behind";
 
-    // Session context influence.
-    const std::string recap = memory_.buildRecap(prompt, 3);
-    if (!recap.empty()) {
-        oss << ". Your session feedback steered me toward this timbral direction"
-            << " — I've adjusted based on what you've liked and passed on previously";
-    }
-
-    // MIDI context.
+    // MIDI context — kept because it's a concrete observation, but the
+    // empty session-feedback boilerplate ("steered me toward this timbral
+    // direction…") is gone. Per Phase 30 Brand Guardian audit: boilerplate
+    // that says nothing is worse than silence.
     const float cutoff = knob_.midiCutoffNorm();
     if (cutoff < 0.25f)
-        oss << ". I respected your MIDI filter position (currently closed/dark)";
+        oss << ". I respected your MIDI filter position (held low)";
     else if (cutoff > 0.75f)
-        oss << ". I matched your MIDI filter position (currently open/bright)";
+        oss << ". I matched your MIDI filter position (held high)";
 
     oss << ".";
+    (void)prompt; // recap suppressed by design; argument retained for ABI/test compat.
     return oss.str();
 }
 
