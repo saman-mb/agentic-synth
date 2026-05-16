@@ -22,6 +22,7 @@
 #include "agent/TelemetryService.h"
 #include "engine/PatchStruct.h"
 #include "engine/VariationEngine.h"
+#include "agent/GeminiSTT.h"
 #include "mapper/GeminiSampler.h"
 #include "mapper/GrammarSampler.h"
 #include "mapper/PromptEnhancer.h"
@@ -94,6 +95,15 @@ public:
     // is disabled (no GEMINI_KEY) or the HTTPS call fails — callers fall
     // back to the raw user prompt in that case.
     [[nodiscard]] std::string enhancePrompt(const std::string& userPrompt);
+
+    // Phase 29 — speech-to-text via Gemini. Called from the WebUiComponent
+    // push_audio_pcm worker after PCM decode. Returns the transcript or
+    // empty string on failure / disabled state. Safe to call from a worker
+    // thread; performs a synchronous HTTPS round-trip internally.
+    [[nodiscard]] std::string transcribeAudio(const std::int16_t* samples, int numSamples,
+                                              int sampleRate = 16000) const;
+
+    [[nodiscard]] bool sttEnabled() const noexcept { return stt_.enabled(); }
 
     // Issue #67: streaming patch application.
     // Feed a chunk of streaming LLM JSON. Fires pipeline_.injectPatch() each
@@ -222,6 +232,10 @@ private:
     // empty; AgentBridge() injects GEMINI_KEY + the enhancer-prompt.md
     // briefing at startup, mirroring how gemini_ is configured.
     mapper::PromptEnhancer enhancer_{mapper::PromptEnhancerConfig{}};
+    // Phase 29 — Gemini STT for push-to-talk. Wired from GEMINI_KEY at
+    // construction the same way enhancer_ / gemini_ are. Stays disabled
+    // (transcribe returns empty string) when no key is set.
+    agent::GeminiSTT stt_;
     mapper::SemanticMapper semanticMapper_;
     StreamParser streamParser_;
 

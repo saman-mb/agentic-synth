@@ -599,31 +599,28 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
 
     options = options.withNativeFunction(
         juce::Identifier{"push_audio_pcm"}, [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
-            // Perf hotspot fix: JS now sends a single base64-encoded Int16
-            // PCM string instead of a juce::Array<juce::var> of doubles.
-            // Old path was ~24 B/sample × 1600 samples = ~38 KB of boxed
-            // juce::var per 100 ms chunk plus JSON serialization on the
-            // message thread. New path: 1 string arg (~4.3 KB base64 for
-            // 1600 samples), decode + forward on a worker so the message
-            // thread returns immediately.
-            if (whisperClient_ == nullptr) {
-                DBG("push_audio_pcm received but no WhisperClient wired");
-                completion(juce::var{});
+            // Phase 29 — replaces the stub WhisperClient path with Gemini
+            // audio understanding. The JS side sends the full utterance as
+            // base64 Int16 PCM at 16 kHz mono on release; we decode on a
+            // worker, transcribe via Gemini, then emit the transcript via
+            // the existing notifyTranscript event so the chat UI fills its
+            // textarea with the parsed words.
+            const auto b64 = argOr(args, 0, juce::var{""}).toString();
+            // Resolve the JS promise immediately so the message thread is
+            // free to drain other events. Decode + transcribe runs on a
+            // JUCE worker.
+            completion(juce::var{});
+
+            if (!bridge_.sttEnabled()) {
+                DBG("push_audio_pcm received but GeminiSTT disabled (no GEMINI_KEY)");
+                auto* err = new juce::DynamicObject{};
+                err->setProperty("text", juce::String("[mic ready but speech-to-text disabled — GEMINI_KEY not configured]"));
+                bridge_.notifyTranscript(juce::var{err});
                 return;
             }
-            const auto b64 = argOr(args, 0, juce::var{""}).toString();
-            // Snapshot the WhisperClient pointer — never capture `this`.
-            // If WebUiComponent is destroyed mid-decode the worker still
-            // touches only `client` (whose lifetime is owned externally per
-            // setWhisperClient contract) and the b64 string (ref-counted COW).
-            auto* const client = whisperClient_;
-            // Resolve the JS promise before doing any work so the message
-            // thread is free to drain other events. Decoding + forwarding
-            // happens on a JUCE worker thread (Whisper STT tolerates
-            // ~100-200 ms latency, easily within budget for base64 +
-            // worker hop).
-            completion(juce::var{});
-            juce::Thread::launch([client, b64]() {
+
+            auto& bridge = bridge_;
+            juce::Thread::launch([&bridge, b64]() {
                 juce::MemoryOutputStream raw;
                 if (!juce::Base64::convertFromBase64(raw, b64)) {
                     DBG("push_audio_pcm: base64 decode failed");
@@ -636,7 +633,14 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
                 }
                 const auto* samples = reinterpret_cast<const std::int16_t*>(raw.getData());
                 const int numSamples = static_cast<int>(byteCount / sizeof(std::int16_t));
-                client->feedAudio(samples, numSamples);
+                const std::string transcript = bridge.transcribeAudio(samples, numSamples, 16000);
+                if (transcript.empty()) {
+                    DBG("push_audio_pcm: empty transcript from GeminiSTT");
+                    return;
+                }
+                auto* obj = new juce::DynamicObject{};
+                obj->setProperty("text", juce::String(transcript));
+                bridge.notifyTranscript(juce::var{obj});
             });
         });
 
