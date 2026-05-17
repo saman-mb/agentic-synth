@@ -35,6 +35,35 @@ function nanoid(): string {
   return Math.random().toString(36).slice(2, 11);
 }
 
+// Phase D commit + export (#260 / #268) — name helpers. Auto-suggest a
+// preset name from a fragment of the originating prompt + a session counter;
+// bounce names use the same fragment but get a timestamp suffix so each
+// re-render produces a fresh file when the user keeps clicking.
+const KEEP_COUNTER_KEY = 'timbre:keep-counter';
+function pickCounter(): number {
+  try {
+    const raw = window.localStorage.getItem(KEEP_COUNTER_KEY);
+    const n = raw ? parseInt(raw, 10) : 0;
+    const next = Number.isFinite(n) ? n + 1 : 1;
+    window.localStorage.setItem(KEEP_COUNTER_KEY, String(next));
+    return next;
+  } catch {
+    return Math.floor(Math.random() * 1000) + 1;
+  }
+}
+function fragmentSlug(prompt: string | undefined, words: number): string {
+  return (prompt ?? '').trim().split(/\s+/).filter(Boolean).slice(0, words).join(' ');
+}
+function defaultKeepName(prompt: string | undefined): string {
+  const frag = fragmentSlug(prompt, 4);
+  return `${frag.length > 0 ? frag : 'sound'} #${pickCounter()}`;
+}
+function defaultBounceName(prompt: string | undefined): string {
+  const frag = fragmentSlug(prompt, 4).replace(/[^a-zA-Z0-9_-]+/g, '_');
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  return `TIMBRE_${frag.length > 0 ? frag : 'sound'}_${stamp}`;
+}
+
 // ---------------------------------------------------------------------------
 // A/B Variation Grid
 // ---------------------------------------------------------------------------
@@ -55,6 +84,10 @@ interface ABGridProps {
   // tiles restart their staggered fade-in keyframes on each new family
   // instead of resolving to "no change" and skipping the animation.
   revealKey?: number;
+  // Phase D commit-UX (#260). When provided, "Keep this sound" + "Bounce
+  // to wav" render alongside the dominant tile's primary action row.
+  onKeep?: (patch: PatchPreviewData) => void;
+  onBounce?: (patch: PatchPreviewData) => void;
 }
 
 // Per the spec: 1 dominant tile at full message width, the remaining
@@ -69,6 +102,8 @@ function ABVariationGrid({
   onSelectVariation,
   onMoreVariations,
   revealKey,
+  onKeep,
+  onBounce,
 }: ABGridProps) {
   const [dominantIndex, setDominantIndex] = useState(0);
   // Reset dominance when the variation list itself changes identity
@@ -131,6 +166,26 @@ function ABVariationGrid({
               aria-label="Generate more variations"
             >
               More variations
+            </button>
+          )}
+          {onKeep && (
+            <button
+              type="button"
+              className="keep-this"
+              onClick={() => onKeep(dominant.patch)}
+              aria-label="Keep this sound"
+            >
+              Keep this sound
+            </button>
+          )}
+          {onBounce && (
+            <button
+              type="button"
+              className="bounce-wav"
+              onClick={() => onBounce(dominant.patch)}
+              aria-label="Bounce to wav"
+            >
+              Bounce to wav
             </button>
           )}
         </div>
@@ -230,6 +285,12 @@ interface BubbleProps {
   // Phase B reveal (#263) — bumped on every variations_ready landing for
   // the message so the grid restarts its staggered fade-in keyframes.
   revealKey?: number;
+  // Phase D commit-UX (#260). When set, "Keep this sound" + "Bounce to
+  // wav" are rendered on the bubble.  The patch passed up is whichever
+  // tile is currently dominant (for the variation grid) or the single
+  // bubble patch (for non-variation paths).
+  onKeep?: (patch: PatchPreviewData) => void;
+  onBounce?: (patch: PatchPreviewData) => void;
 }
 
 function MessageBubble({
@@ -242,6 +303,8 @@ function MessageBubble({
   submittedFlash,
   onMoreVariations,
   revealKey,
+  onKeep,
+  onBounce,
 }: BubbleProps) {
   const hasContent = message.role === 'assistant';
   const bubbleTextClass = `bubble-text${submittedFlash ? ' prompt-submitted' : ''}`;
@@ -300,12 +363,38 @@ function MessageBubble({
           onSelectVariation={onSelectVariation}
           onMoreVariations={onMoreVariations}
           revealKey={revealKey}
+          onKeep={onKeep}
+          onBounce={onBounce}
         />
       )}
 
       {!message.variations && message.patch && (
         <>
           <PatchPreview patch={message.patch} label="Generated patch" />
+          {(onKeep || onBounce) && (
+            <div className="ab-grid-dominant-actions" style={{ marginTop: 'var(--sp-2)' }}>
+              {onKeep && (
+                <button
+                  type="button"
+                  className="keep-this"
+                  onClick={() => onKeep(message.patch as PatchPreviewData)}
+                  aria-label="Keep this sound"
+                >
+                  Keep this sound
+                </button>
+              )}
+              {onBounce && (
+                <button
+                  type="button"
+                  className="bounce-wav"
+                  onClick={() => onBounce(message.patch as PatchPreviewData)}
+                  aria-label="Bounce to wav"
+                >
+                  Bounce to wav
+                </button>
+              )}
+            </div>
+          )}
           {auditionSend && (
             <AuditionKeyboard
               sendRaw={(json) => {
@@ -574,6 +663,17 @@ export function ChatInterface({
   const [currentFailure, setCurrentFailure] = useState<
     { kind: FailureKind; detail?: string } | null
   >(null);
+  // Phase D commit / export (#260 / #268) — single transient toast for
+  // confirmation of "Saved this sound" / "Saved to <path>". Cleared after
+  // ~3s via a timer.
+  const [commitToast, setCommitToast] = useState<string | null>(null);
+  const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showToast = useCallback((text: string) => {
+    setCommitToast(text);
+    if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+    toastTimerRef.current = setTimeout(() => setCommitToast(null), 3200);
+  }, []);
+  useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
   const lastPromptRef = useRef<string>('');
   // Phase C onboarding (#256) — fires the parent callback exactly once
   // on the FIRST patch wire event of the session. Subsequent patches
@@ -777,10 +877,25 @@ export function ChatInterface({
           setCurrentFailure({ kind: msg.kind, detail: msg.detail });
           break;
         }
+        case 'preset_committed': {
+          // Phase D / #260 — quiet ceremony: small toast, no modal.
+          showToast(`Saved “${msg.name}”`);
+          break;
+        }
+        case 'bounce_complete': {
+          // Phase D / #268 — render result toast. ok=false with error="cancelled"
+          // is intentional (user closed the save dialog) so we stay silent.
+          if (msg.ok && msg.path) {
+            showToast(`Saved to ${msg.path}`);
+          } else if (msg.error && msg.error !== 'cancelled') {
+            showToast(`Bounce failed: ${msg.error}`);
+          }
+          break;
+        }
       }
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [onFirstPatchLanded],
+    [onFirstPatchLanded, showToast],
   );
 
   const handleFeedback = useCallback(
@@ -1003,6 +1118,11 @@ export function ChatInterface({
 
   return (
     <div className="chat-shell">
+      {commitToast && (
+        <div className="commit-toast" role="status" aria-live="polite">
+          {commitToast}
+        </div>
+      )}
       <header className="chat-header">
         <div className="chat-wordmark">
           <span className="chat-title">TIMBRE</span>
@@ -1045,6 +1165,22 @@ export function ChatInterface({
                 send({ type: 'morph_request' });
               }
             : undefined;
+          // Phase D commit + export (#260 / #268) — only show the buttons
+          // on assistant bubbles that carry a patch (single or via the
+          // dominant variation tile) and only while the bridge is connected.
+          const canKeepOrBounce =
+            msg.role === 'assistant' && status === 'open' &&
+            ((msg.patch !== undefined) || (msg.variations?.length ?? 0) > 0);
+          const handleKeep = canKeepOrBounce
+            ? (patch: PatchPreviewData) => {
+                send({ type: 'commit_preset', name: defaultKeepName(promptFragment), prompt: promptFragment ?? '', patch });
+              }
+            : undefined;
+          const handleBounce = canKeepOrBounce
+            ? (patch: PatchPreviewData) => {
+                send({ type: 'bounce_patch', patch, suggestedName: defaultBounceName(promptFragment) });
+              }
+            : undefined;
           return (
             <MessageBubble
               key={msg.id}
@@ -1057,6 +1193,8 @@ export function ChatInterface({
               submittedFlash={submittedFlashId === msg.id}
               onMoreVariations={handleMoreVariations}
               revealKey={revealCount[msg.id]}
+              onKeep={handleKeep}
+              onBounce={handleBounce}
             />
           );
         })}

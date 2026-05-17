@@ -9,6 +9,8 @@
 #include <string_view>
 #include <utility>
 
+#include "agent/PresetStore.h"
+#include "engine/OfflineRenderer.h"
 #include "mapper/EnvLoader.h"
 
 namespace agentic_synth::agent {
@@ -427,6 +429,12 @@ AgentBridge::SubscriberHandle AgentBridge::onVariationsReady(Callback cb) {
 AgentBridge::SubscriberHandle AgentBridge::onFailure(Callback cb) {
     return subscribe(failureSlots_, std::move(cb));
 }
+AgentBridge::SubscriberHandle AgentBridge::onPresetCommitted(Callback cb) {
+    return subscribe(presetCommittedSlots_, std::move(cb));
+}
+AgentBridge::SubscriberHandle AgentBridge::onBounceComplete(Callback cb) {
+    return subscribe(bounceCompleteSlots_, std::move(cb));
+}
 
 void AgentBridge::notifyToken(const juce::var& payload) { dispatch(tokenSlots_, payload); }
 void AgentBridge::notifyPatch(const juce::var& payload) { dispatch(patchSlots_, payload); }
@@ -439,6 +447,61 @@ void AgentBridge::notifyTranscript(const juce::var& payload) { dispatch(transcri
 void AgentBridge::notifyEnhancement(const juce::var& payload) { dispatch(enhancementSlots_, payload); }
 void AgentBridge::notifyVariationsReady(const juce::var& payload) { dispatch(variationsReadySlots_, payload); }
 void AgentBridge::notifyFailure(const juce::var& payload) { dispatch(failureSlots_, payload); }
+void AgentBridge::notifyPresetCommitted(const juce::var& payload) { dispatch(presetCommittedSlots_, payload); }
+void AgentBridge::notifyBounceComplete(const juce::var& payload) { dispatch(bounceCompleteSlots_, payload); }
+
+// ── Phase D / #260 — preset commit + persistence ─────────────────────────────
+
+void AgentBridge::commitPreset(const std::string& name, const std::string& prompt, const PatchStruct& patch) {
+    if (name.empty())
+        return;
+    PresetStore::instance().save(name, prompt, patch);
+    const auto stored = PresetStore::instance().getByName(name);
+    auto* obj = new juce::DynamicObject{};
+    obj->setProperty("name", juce::String(name));
+    obj->setProperty("prompt", juce::String(prompt));
+    if (stored) {
+        obj->setProperty("created_ms", static_cast<double>(stored->created_ms));
+    }
+    obj->setProperty("patch", patchToVar(patch));
+    notifyPresetCommitted(juce::var{obj});
+}
+
+std::string AgentBridge::getPresetsJson() const {
+    const auto all = PresetStore::instance().all();
+    juce::Array<juce::var> arr;
+    arr.ensureStorageAllocated(static_cast<int>(all.size()));
+    for (const auto& sp : all) {
+        auto* obj = new juce::DynamicObject{};
+        obj->setProperty("name", juce::String(sp.name));
+        obj->setProperty("prompt", juce::String(sp.prompt));
+        obj->setProperty("created_ms", static_cast<double>(sp.created_ms));
+        obj->setProperty("patch", patchToVar(sp.patch));
+        arr.add(juce::var{obj});
+    }
+    auto* root = new juce::DynamicObject{};
+    root->setProperty("presets", juce::var{arr});
+    return juce::JSON::toString(juce::var{root}).toStdString();
+}
+
+void AgentBridge::deletePreset(const std::string& name) {
+    PresetStore::instance().deleteByName(name);
+}
+
+// ── Phase D / #268 (partial) — audio bounce ──────────────────────────────────
+
+void AgentBridge::bouncePatchToFile(const PatchStruct& patch, const juce::File& dest) {
+    engine::BounceConfig cfg;  // defaults: 4s @ 48k/24-bit stereo, C3, hold 3s
+    const bool ok = engine::renderPatchToWav(patch, dest, cfg);
+    auto* obj = new juce::DynamicObject{};
+    obj->setProperty("ok", ok);
+    if (ok) {
+        obj->setProperty("path", dest.getFullPathName());
+    } else {
+        obj->setProperty("error", juce::String("offline render or write failed"));
+    }
+    notifyBounceComplete(juce::var{obj});
+}
 
 std::string AgentBridge::enhancePrompt(const std::string& userPrompt) { return enhancer_.enhance(userPrompt); }
 

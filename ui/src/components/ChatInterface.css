@@ -317,6 +317,123 @@
   outline-offset: 2px;
 }
 
+/* ──────────────────────────────────────────────────────────────────────
+   Phase D / #260 — Keep this sound (commit ceremony)
+   ────────────────────────────────────────────────────────────────────── */
+
+.keep-this {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--r-3);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.45rem 0.75rem;
+  cursor: pointer;
+  transition:
+    border-color var(--dur-state) var(--ease-considered),
+    background var(--dur-state) var(--ease-considered),
+    transform 0.1s;
+}
+.keep-this:hover {
+  border-color: var(--accent-tint-40);
+  background: var(--accent-tint-12);
+}
+.keep-this:active { transform: scale(0.97); }
+.keep-this:focus { outline: none; }
+.keep-this:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.keep-this--editing {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-1);
+  padding: 0;
+  border: none;
+  background: transparent;
+}
+
+.keep-this-input {
+  background: var(--bg-elevated, rgba(255,255,255,0.04));
+  color: var(--text-primary);
+  border: 1px solid var(--accent-tint-40);
+  border-radius: var(--r-3);
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  padding: 0.4rem 0.6rem;
+  min-width: 12rem;
+  outline: none;
+}
+.keep-this-input:focus {
+  border-color: var(--accent-primary);
+}
+
+.keep-this-confirm {
+  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
+  border: none;
+  border-radius: var(--r-3);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.45rem 0.65rem;
+  cursor: pointer;
+}
+
+.bounce-wav {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--r-3);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.45rem 0.75rem;
+  cursor: pointer;
+  transition:
+    border-color var(--dur-state) var(--ease-considered),
+    background var(--dur-state) var(--ease-considered),
+    transform 0.1s;
+}
+.bounce-wav:hover {
+  border-color: var(--accent-tint-40);
+  background: var(--accent-tint-12);
+}
+.bounce-wav:active { transform: scale(0.97); }
+
+/* Toast-style banner shown when a commit ceremony or bounce finishes. */
+.commit-toast {
+  position: fixed;
+  bottom: 1.5rem;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--bg-elevated, rgba(20,20,28,0.92));
+  color: var(--text-primary);
+  border: 1px solid var(--accent-tint-40);
+  border-radius: var(--r-3);
+  padding: 0.6rem 1rem;
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  z-index: 8000;
+  pointer-events: none;
+  animation: commitToastIn 0.32s var(--ease-considered, ease-out);
+}
+
+@keyframes commitToastIn {
+  from { opacity: 0; transform: translate(-50%, 8px); }
+  to   { opacity: 1; transform: translate(-50%, 0);   }
+}
+
 /* ── Reveal animation (#263) ──────────────────────────────────────────
    When a fresh variation family lands the dominant tile cross-fades and
    scales up over 1100ms, then the thumbnails follow with an 80ms-per-tile

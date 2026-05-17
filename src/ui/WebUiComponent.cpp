@@ -739,6 +739,101 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
             });
         });
 
+    // ── Phase D / #260 — preset commit + persistence ─────────────────────────
+    options = options.withNativeFunction(
+        juce::Identifier{"commit_preset"}, [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
+            // Args: [name (string), prompt (string), patch (object|null)].
+            // When patch is null we fall back to the last successful patch
+            // we have on record so the user can "Keep this sound" without
+            // the UI having to re-serialise it.
+            const auto name = argOr(args, 0, juce::var{""}).toString().toStdString();
+            const auto prompt = argOr(args, 1, juce::var{""}).toString().toStdString();
+            const auto& patchVar = argOr(args, 2, juce::var{});
+
+            PatchStruct patch = make_default_patch();
+            bool gotPatch = false;
+            if (auto* obj = patchVar.getDynamicObject(); obj != nullptr && obj->hasProperty("osc")) {
+                patch = agent::AgentBridge::patchFromVar(patchVar);
+                gotPatch = true;
+            }
+            if (!gotPatch) {
+                std::lock_guard<std::mutex> lock(lastPatchMutex_);
+                if (lastSuccessfulPatch_)
+                    patch = *lastSuccessfulPatch_;
+            }
+            bridge_.commitPreset(name, prompt, patch);
+            completion(juce::var{});
+        });
+
+    options = options.withNativeFunction(
+        juce::Identifier{"get_presets"}, [this](const juce::Array<juce::var>& /*args*/, NativeFnCompletion completion) {
+            const auto json = bridge_.getPresetsJson();
+            completion(juce::JSON::parse(juce::String(json)));
+        });
+
+    options = options.withNativeFunction(
+        juce::Identifier{"delete_preset"}, [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
+            const auto name = argOr(args, 0, juce::var{""}).toString().toStdString();
+            bridge_.deletePreset(name);
+            completion(juce::var{});
+        });
+
+    // ── Phase D / #268 (partial) — audio bounce ──────────────────────────────
+    options = options.withNativeFunction(
+        juce::Identifier{"bounce_patch"}, [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
+            // Args: [patch (object|null), suggestedName (string?)]. Patch null
+            // → fall back to lastSuccessfulPatch_ (same fallback as
+            // commit_preset). Promise resolves immediately; the actual render
+            // emits `bounce_complete` when the wav is on disk.
+            const auto& patchVar = argOr(args, 0, juce::var{});
+            const auto suggested = argOr(args, 1, juce::var{"timbre-bounce"}).toString();
+            completion(juce::var{});
+
+            PatchStruct patch = make_default_patch();
+            bool gotPatch = false;
+            if (auto* obj = patchVar.getDynamicObject(); obj != nullptr && obj->hasProperty("osc")) {
+                patch = agent::AgentBridge::patchFromVar(patchVar);
+                gotPatch = true;
+            }
+            if (!gotPatch) {
+                std::lock_guard<std::mutex> lock(lastPatchMutex_);
+                if (lastSuccessfulPatch_)
+                    patch = *lastSuccessfulPatch_;
+            }
+
+            // FileChooser must run on the message thread; we're already there.
+            auto safeName = suggested.replaceCharacters(" /\\:?*\"<>|", "__________");
+            if (safeName.isEmpty())
+                safeName = "timbre-bounce";
+            auto defaultLoc = juce::File::getSpecialLocation(juce::File::userMusicDirectory)
+                                  .getChildFile(safeName + ".wav");
+            auto chooser = std::make_shared<juce::FileChooser>(
+                juce::String("Save TIMBRE bounce"), defaultLoc, juce::String("*.wav"));
+            chooser->launchAsync(
+                juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles |
+                    juce::FileBrowserComponent::warnAboutOverwriting,
+                [this, chooser, patch](const juce::FileChooser& fc) {
+                    const auto result = fc.getResult();
+                    if (result == juce::File{}) {
+                        // User cancelled — emit a non-error, non-ok frame so
+                        // the UI can clear any spinner without showing a
+                        // success toast.
+                        auto* obj = new juce::DynamicObject{};
+                        obj->setProperty("ok", false);
+                        obj->setProperty("error", juce::String("cancelled"));
+                        bridge_.notifyBounceComplete(juce::var{obj});
+                        return;
+                    }
+                    auto dest = result.hasFileExtension("wav") ? result : result.withFileExtension("wav");
+                    workerPool_.addJob([this, dest, patch]() {
+                        auto* self = juce::ThreadPoolJob::getCurrentThreadPoolJob();
+                        if (self != nullptr && self->shouldExit())
+                            return;
+                        bridge_.bouncePatchToFile(patch, dest);
+                    });
+                });
+        });
+
     options = options.withNativeFunction(
         juce::Identifier{"getScopeSamples"},
         [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
@@ -841,6 +936,18 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
     subs_.push_back(bridge_.onFailure([this](const juce::var& v) {
         if (browser_)
             browser_->emitEventIfBrowserIsVisible(juce::Identifier{"failure"}, v);
+    }));
+    // Phase D / #260 — fires after a successful PresetStore.save() so the
+    // UI's "Saved sounds" panel can re-fetch and the chat bubble can flash
+    // the cyan-sweep commit ceremony.
+    subs_.push_back(bridge_.onPresetCommitted([this](const juce::var& v) {
+        if (browser_)
+            browser_->emitEventIfBrowserIsVisible(juce::Identifier{"preset_committed"}, v);
+    }));
+    // Phase D / #268 — fires when the offline render lands on disk (or fails).
+    subs_.push_back(bridge_.onBounceComplete([this](const juce::var& v) {
+        if (browser_)
+            browser_->emitEventIfBrowserIsVisible(juce::Identifier{"bounce_complete"}, v);
     }));
 
 #if AGENTIC_SYNTH_UI_DEV

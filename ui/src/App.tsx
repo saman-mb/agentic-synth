@@ -13,12 +13,14 @@ import {
 } from './components/PatchBrowser';
 import { PlaySurface } from './components/PlaySurface';
 import { HoodSlideOver, loadHoodOpen, saveHoodOpen } from './components/HoodSlideOver';
+import { PresetList } from './components/PresetList';
 import { PresetsSidebar } from './components/PresetsSidebar';
 import { ResizeHandle } from './components/ResizeHandle';
 import { RightColumn } from './components/RightColumn';
 import { ToolsDrawer } from './components/ToolsDrawer';
 import { TopBar, ABSlot } from './components/TopBar';
 import { useColumnLayout } from './hooks/useColumnLayout';
+import { useSynthBridge } from './hooks/useSynthBridge';
 import { useWebSocket } from './hooks/useWebSocket';
 import { usePatchHistory } from './hooks/usePatchHistory';
 import { useUiAudioSettings } from './hooks/useUiAudioSettings';
@@ -512,6 +514,12 @@ export function App() {
   const suppressCaptureRef = useRef<boolean>(false);
 
   const { lastMessage, sendMessage, sendBinary, readyState } = useWebSocket(KNOB_BRIDGE_URL);
+  // Phase D / #260 — JUCE native bridge for the "Saved sounds" panel +
+  // preset commit / wav bounce. Independent of the WebSocket connection
+  // so the panel still works when the standalone-bridge is offline.
+  const synthBridge = useSynthBridge();
+
+  const [presetListOpen, setPresetListOpen] = useState<boolean>(false);
 
   // ── Macro projection (Phase 13) ───────────────────────────────────
   // Apply the sum of all enabled macro ModConnections on top of the
@@ -1104,6 +1112,23 @@ export function App() {
           }}
         />
       )}
+
+      {/* Phase D commit-UX (#260) — "Saved sounds" floating affordance. */}
+      <button
+        type="button"
+        className="saved-sounds-fab"
+        onClick={() => setPresetListOpen((v) => !v)}
+        aria-label="Open saved sounds"
+      >
+        Saved sounds
+      </button>
+      <PresetList
+        open={presetListOpen}
+        onClose={() => setPresetListOpen(false)}
+        onPlay={(p) => handleLoadPreset(p as PatchParams)}
+        send={synthBridge.send}
+        subscribe={synthBridge.subscribe}
+      />
     </div>
   );
 }

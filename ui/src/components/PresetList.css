@@ -1,0 +1,149 @@
+/* Phase D commit-UX (#260) — "Saved sounds" slide-out panel.
+   Anchored to the right edge so it doesn't displace the play surface.
+   Honors light/dark themes via the existing CSS vars. */
+
+.preset-list {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(28rem, 92vw);
+  background: var(--bg-elevated, rgba(18,18,24,0.96));
+  border-left: 1px solid var(--color-border, rgba(255,255,255,0.08));
+  backdrop-filter: blur(20px) saturate(180%);
+  box-shadow: -20px 0 60px rgba(0,0,0,0.45);
+  display: flex;
+  flex-direction: column;
+  z-index: 7000;
+  animation: presetListIn 0.22s var(--ease-considered, ease-out);
+}
+
+@keyframes presetListIn {
+  from { transform: translateX(8%); opacity: 0; }
+  to   { transform: translateX(0);   opacity: 1; }
+}
+
+.preset-list-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--sp-3, 0.9rem) var(--sp-4, 1.2rem);
+  border-bottom: 1px solid var(--color-border, rgba(255,255,255,0.08));
+}
+
+.preset-list-title {
+  color: var(--text-primary, #f3f3f8);
+  font-family: var(--font-sans);
+  font-weight: 700;
+  font-size: 0.92rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+.preset-list-close {
+  background: transparent;
+  border: none;
+  color: var(--text-secondary, #c0c0c8);
+  font-size: 1.3rem;
+  cursor: pointer;
+  line-height: 1;
+  padding: 0.2rem 0.4rem;
+  border-radius: var(--r-2, 6px);
+}
+.preset-list-close:hover {
+  background: var(--accent-tint-12, rgba(120,120,200,0.12));
+}
+
+.preset-list-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--sp-3, 0.9rem) var(--sp-4, 1.2rem);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-3, 0.9rem);
+}
+
+.preset-list-empty {
+  color: var(--text-secondary, #b0b0b8);
+  font-size: 0.85rem;
+  line-height: 1.4;
+}
+.preset-list-empty em {
+  color: var(--text-primary, #f3f3f8);
+  font-style: italic;
+}
+
+.preset-row {
+  background: var(--bg-surface, rgba(255,255,255,0.03));
+  border: 1px solid var(--color-border, rgba(255,255,255,0.08));
+  border-radius: var(--r-3, 10px);
+  padding: var(--sp-3, 0.9rem);
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2, 0.5rem);
+}
+
+.preset-row-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--sp-2);
+}
+.preset-row-name {
+  color: var(--text-primary);
+  font-weight: 600;
+  font-size: 0.92rem;
+  letter-spacing: 0.01em;
+}
+.preset-row-stamp {
+  color: var(--text-secondary);
+  font-size: 0.74rem;
+  font-variant-numeric: tabular-nums;
+}
+.preset-row-prompt {
+  color: var(--text-secondary);
+  font-size: 0.82rem;
+  line-height: 1.35;
+  margin: 0;
+}
+
+.preset-row-actions {
+  display: flex;
+  gap: var(--sp-2);
+  margin-top: var(--sp-1);
+}
+
+.preset-row-play,
+.preset-row-bounce,
+.preset-row-delete {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--r-3, 8px);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.45rem 0.75rem;
+  cursor: pointer;
+  transition:
+    border-color var(--dur-state) var(--ease-considered),
+    background var(--dur-state) var(--ease-considered),
+    transform 0.1s;
+}
+.preset-row-play:hover,
+.preset-row-bounce:hover {
+  border-color: var(--accent-tint-40);
+  background: var(--accent-tint-12);
+}
+.preset-row-delete:hover {
+  border-color: rgba(220, 80, 80, 0.55);
+  background: rgba(220, 80, 80, 0.12);
+  color: rgba(255, 200, 200, 1);
+}
+.preset-row-play:active,
+.preset-row-bounce:active,
+.preset-row-delete:active {
+  transform: scale(0.97);
+}
