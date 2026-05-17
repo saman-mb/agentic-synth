@@ -1,12 +1,15 @@
 #include "ui/WebUiComponent.h"
 
 #include "UiBinaryData.h"
+#include "agent/MorphLoop.h"
 #include "agent/PromptHandler.h"
 #include "agent/WhisperClient.h"
 
 #include <array>
 #include <atomic>
 #include <cstdint>
+#include <deque>
+#include <mutex>
 #include <utility>
 #include <vector>
 
@@ -497,6 +500,74 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
                                              });
                                          });
 
+    // Phase B / simple-view #249 — "more variations" inbound. UI clicks the
+    // "More variations" affordance on the dominant tile; we snapshot the
+    // current patch (lastSuccessfulPatch_ if set, else make_default_patch),
+    // pull recent history + liked from morphState_, run agent::morph() on a
+    // worker, then emit a single `variations_ready` event with the 5-tile
+    // payload. Deterministic per (base, history, liked, prompt, seed) — the
+    // seed advances per call so successive clicks generate a fresh family.
+    options = options.withNativeFunction(
+        juce::Identifier{"morph_request"}, [this](const juce::Array<juce::var>& /*args*/, NativeFnCompletion completion) {
+            // Resolve the JS promise immediately; the worker fires the
+            // variations_ready event when the morph is ready.
+            completion(juce::var{});
+            workerPool_.addJob([this]() {
+                auto* const self = juce::ThreadPoolJob::getCurrentThreadPoolJob();
+                const auto cancelled = [self]() noexcept { return self != nullptr && self->shouldExit(); };
+                if (cancelled())
+                    return;
+
+                PatchStruct base = make_default_patch();
+                std::string promptSnapshot;
+                {
+                    std::lock_guard<std::mutex> lock(lastPatchMutex_);
+                    if (lastSuccessfulPatch_)
+                        base = *lastSuccessfulPatch_;
+                    promptSnapshot = lastPrompt_;
+                }
+                std::vector<PatchStruct> history;
+                std::vector<PatchStruct> liked;
+                uint32_t seed = 0;
+                {
+                    std::lock_guard<std::mutex> lock(morphMutex_);
+                    history.assign(morphHistory_.begin(), morphHistory_.end());
+                    liked.assign(morphLiked_.begin(), morphLiked_.end());
+                    seed = ++morphSeedCounter_;
+                }
+
+                if (cancelled())
+                    return;
+
+                const auto result = agent::morph(base, history, liked, promptSnapshot, seed);
+
+                if (cancelled())
+                    return;
+
+                juce::Array<juce::var> variations;
+                for (int i = 0; i < 5; ++i) {
+                    auto* obj = new juce::DynamicObject{};
+                    obj->setProperty("label", juce::String(result.labels[i]));
+                    obj->setProperty("patch", agent::AgentBridge::patchToVar(result.variations[i]));
+                    obj->setProperty("modulation", agent::AgentBridge::modulationPlanForPatch(result.variations[i]));
+                    variations.add(juce::var{obj});
+                }
+                auto* envelope = new juce::DynamicObject{};
+                envelope->setProperty("variations", juce::var{variations});
+                bridge_.notifyVariationsReady(juce::var{envelope});
+
+                // Stash the requested base in history so the next morph_request
+                // crosses against it (and prior morph outputs accumulate). Cap
+                // at 8 to keep the rolling window cheap.
+                {
+                    std::lock_guard<std::mutex> lock(morphMutex_);
+                    morphHistory_.push_back(base);
+                    while (morphHistory_.size() > 8)
+                        morphHistory_.pop_front();
+                }
+            });
+        });
+
     options = options.withNativeFunction(
         juce::Identifier{"feedback"}, [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
             // args: [messageId, kind, patch?]. We only need kind + patch
@@ -527,6 +598,15 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
                 }
             }
             bridge_.recordFeedback(kind, /*prompt*/ "", patch);
+            // Phase B simple-view #249 — wire likes into the morph loop's
+            // crossover pool so the next "more variations" click can lerp
+            // toward something the user already endorsed.
+            if (kind == agent::FeedbackKind::Like) {
+                std::lock_guard<std::mutex> lock(morphMutex_);
+                morphLiked_.push_back(patch);
+                while (morphLiked_.size() > 8)
+                    morphLiked_.pop_front();
+            }
             completion(juce::var{});
         });
 
@@ -748,6 +828,11 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
     subs_.push_back(bridge_.onEnhancement([this](const juce::var& v) {
         if (browser_)
             browser_->emitEventIfBrowserIsVisible(juce::Identifier{"enhancement"}, v);
+    }));
+    // Phase B simple-view #249 — fan-out for explicit "more variations".
+    subs_.push_back(bridge_.onVariationsReady([this](const juce::var& v) {
+        if (browser_)
+            browser_->emitEventIfBrowserIsVisible(juce::Identifier{"variations_ready"}, v);
     }));
 
 #if AGENTIC_SYNTH_UI_DEV

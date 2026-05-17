@@ -101,6 +101,10 @@ add_library(agentic_synth_agent STATIC
     agent/PromptHandler.cpp
     agent/SessionMemory.cpp
     agent/PrePatchPipeline.cpp
+    # Phase B / TIMBRE simple-view (#249/#250/#263) — morph loop. Distinct
+    # from engine::MorphEngine (live MIDI-CC morph) — generates 5 candidate
+    # variations from base + history + liked + archetype RAG.
+    agent/MorphLoop.cpp
     agent/StreamParser.cpp
     agent/Telemetry.cpp
     agent/VariationRecommender.cpp

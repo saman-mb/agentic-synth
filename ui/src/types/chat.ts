@@ -25,8 +25,20 @@ export interface AgentModulationPlan {
   extras?: AgentModExtra[];
 }
 
+// Sensory descriptors emitted by the morph loop (#249). Legacy 'A'/'B' kept
+// alongside so existing 2-tile bubbles keep rendering; the morph loop hands
+// us musician-register words ("brighter", "warmer", "wider", …) plus stable
+// A–E fallbacks when no perceptual axis dominates.
+export type PatchVariationLabel =
+  | 'A' | 'B' | 'C' | 'D' | 'E'
+  | 'brighter' | 'warmer'
+  | 'longer' | 'snappier'
+  | 'wider' | 'drier'
+  | 'spread' | 'tighter'
+  | string;
+
 export interface PatchVariation {
-  label: 'A' | 'B';
+  label: PatchVariationLabel;
   patch: PatchPreviewData;
   modulation?: AgentModulationPlan;
 }
@@ -71,7 +83,11 @@ export type WireIncoming =
   // HEARING IT OUT to SHAPING on receipt; brief is also folded into
   // the assistant message's rationale on `done` so it survives in
   // the "Why this patch?" details after the generation completes.
-  | { type: 'enhancement'; brief: string };
+  | { type: 'enhancement'; brief: string }
+  // Phase B simple-view (#249/#263) — explicit "more variations" reply.
+  // Distinct from `suggest_variations` (proactive 3-suggestion stream);
+  // this fires once per `morph_request` user gesture and carries 5 tiles.
+  | { type: 'variations_ready'; variations: PatchVariation[] };
 
 export interface ProactiveSuggestion {
   label: string;
@@ -85,4 +101,7 @@ export type WireOutgoing =
   | { type: 'feedback'; messageId: string; kind: FeedbackKind; patch?: PatchPreviewData }
   | { type: 'play_midi_note'; note: number; velocity: number; duration_ms: number }
   | { type: 'note_on'; note: number; velocity: number }
-  | { type: 'note_off'; note: number };
+  | { type: 'note_off'; note: number }
+  // Phase B simple-view (#249) — request 5 fresh variations from the morph
+  // loop. C++ replies asynchronously with `variations_ready`.
+  | { type: 'morph_request' };
