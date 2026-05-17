@@ -211,6 +211,13 @@ public:
     // the user can choose to expand. mic_denied stays handled inline by
     // PushToTalk; emitting it here is reserved for future routing.
     [[nodiscard]] SubscriberHandle onFailure(Callback cb);
+    // Phase D commit-UX (#260) — fires after a successful PresetStore.save().
+    // Payload: { name, prompt, created_ms, patch }. UI uses this to confirm
+    // the commit ceremony and refresh any "Saved sounds" list it's showing.
+    [[nodiscard]] SubscriberHandle onPresetCommitted(Callback cb);
+    // Phase D export-to-track (#268) — fires after renderPatchToWav completes.
+    // Payload: { ok, path?, error? }. UI surfaces a "Saved to <path>" toast.
+    [[nodiscard]] SubscriberHandle onBounceComplete(Callback cb);
 
     // Test/integration emission helpers — visible so call sites in this
     // translation unit and the test fixture can drive the subscriber fan-out
@@ -226,6 +233,26 @@ public:
     void notifyEnhancement(const juce::var& payload);
     void notifyVariationsReady(const juce::var& payload);
     void notifyFailure(const juce::var& payload);
+    void notifyPresetCommitted(const juce::var& payload);
+    void notifyBounceComplete(const juce::var& payload);
+
+    // ── Phase D / #260 / #268 — preset commit + offline render ───────────────
+    //
+    // commitPreset persists the patch to PresetStore and emits
+    // `preset_committed` so the UI can refresh its "Saved sounds" panel.
+    // Called from the WebUiComponent `commit_preset` native function.
+    void commitPreset(const std::string& name, const std::string& prompt, const PatchStruct& patch);
+
+    // Serialised list of every committed preset (for the UI panel).
+    [[nodiscard]] std::string getPresetsJson() const;
+
+    // Remove a committed preset by display name. No-op when absent.
+    void deletePreset(const std::string& name);
+
+    // Render the patch to a 48k/24-bit stereo WAV at the chosen path.
+    // Emits `bounce_complete { ok, path?, error? }` on completion.
+    // Synchronous render — call from a worker thread.
+    void bouncePatchToFile(const PatchStruct& patch, const juce::File& dest);
 
     // Full patch wire helpers used by native UI events and tests. The shape
     // mirrors React PatchParams: nested modules with numeric enum/bool fields.
@@ -290,6 +317,8 @@ private:
     SlotList enhancementSlots_;
     SlotList variationsReadySlots_;
     SlotList failureSlots_;
+    SlotList presetCommittedSlots_;
+    SlotList bounceCompleteSlots_;
 
     // Phase 12A: midi cutoff/resonance atomics moved to KnobBridge (knob_);
     // read via knob_.midiCutoffNorm() / knob_.midiResonanceNorm().

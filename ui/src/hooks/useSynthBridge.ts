@@ -73,6 +73,14 @@ function callNative(name: string, args: unknown[]): Promise<unknown> {
   });
 }
 
+// Phase D / #260 — promise-returning wrapper for `get_presets`. Consumers
+// that want the saved-sounds list call this directly rather than going
+// through `send({ type: 'get_presets' })` which drops the result.
+export async function fetchPresets(): Promise<unknown> {
+  if (!usingJuce) return { presets: [] };
+  return callNative('get_presets', []);
+}
+
 interface UseSynthBridgeReturn {
   status: BridgeStatus;
   send: (msg: WireOutgoing) => void;
@@ -169,6 +177,11 @@ export function useSynthBridge(): UseSynthBridgeReturn {
     // Phase C failure-state UX (#269) — calm banner for LLM-offline /
     // prompt-unclear / safety-block / mic-denied.
     wrap('failure');
+    // Phase D commit-UX (#260) — fired after a successful PresetStore.save.
+    wrap('preset_committed');
+    // Phase D export-to-track (#268) — fired after the offline bounce
+    // finishes (or fails / cancels). UI shows the "Saved to <path>" toast.
+    wrap('bounce_complete');
     juce.backend.addEventListener('patch_update', (payload) => {
       enqueueMessage({ type: 'patch_update' as unknown as WireIncoming['type'], ...(payload as object) } as unknown as WireIncoming);
     });
@@ -250,6 +263,28 @@ export function useSynthBridge(): UseSynthBridgeReturn {
           // Phase B simple-view (#249) — fire-and-forget. C++ replies via
           // the `variations_ready` event listener wired above.
           void callNative('morph_request', []);
+          return;
+        }
+        case 'commit_preset': {
+          // Phase D / #260 — persist this patch. C++ resolves the promise
+          // immediately and fires `preset_committed` on success.
+          void callNative('commit_preset', [msg.name, msg.prompt ?? '', msg.patch ?? null]);
+          return;
+        }
+        case 'get_presets': {
+          // Promise resolution carries the payload; callers wanting the
+          // result use callNativePresets() below instead of the bus.
+          void callNative('get_presets', []);
+          return;
+        }
+        case 'delete_preset': {
+          void callNative('delete_preset', [msg.name]);
+          return;
+        }
+        case 'bounce_patch': {
+          // Phase D / #268 — fire-and-forget; C++ opens FileChooser then
+          // emits `bounce_complete`.
+          void callNative('bounce_patch', [msg.patch ?? null, msg.suggestedName ?? 'timbre-bounce']);
           return;
         }
         // Spread each known WireOutgoing variant onto positional `params`

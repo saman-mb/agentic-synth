@@ -65,6 +65,10 @@ add_library(agentic_synth_engine_core STATIC
     engine/PresetExporter.cpp
     engine/MultiModalInput.cpp
     engine/Reverb.cpp
+    # Phase D / #268 (partial) — synchronous off-thread offline bounce of a
+    # patch through a fresh VoiceManager into a 24-bit stereo .wav. Powers
+    # the "Bounce to wav" affordance on committed presets.
+    engine/OfflineRenderer.cpp
 )
 target_include_directories(agentic_synth_engine_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 agentic_synth_configure_target(agentic_synth_engine_core)
@@ -78,6 +82,11 @@ agentic_synth_configure_target(agentic_synth_engine_core)
 target_link_libraries(agentic_synth_engine_core
     PUBLIC
         agentic_synth_mapper
+        # Phase D / #268 — juce_audio_formats supplies juce::WavAudioFormat
+        # for the offline render → .wav writer. PUBLIC so callers
+        # (agent_lib, tests, plugin) inherit the include path without
+        # duplicating the link.
+        juce::juce_audio_formats
 )
 
 # ── Backward-compat alias ────────────────────────────────────────────────────
@@ -101,6 +110,8 @@ add_library(agentic_synth_agent STATIC
     agent/PromptHandler.cpp
     agent/SessionMemory.cpp
     agent/PrePatchPipeline.cpp
+    # Phase D / #260 — JSON-backed preset store + commit ceremony.
+    agent/PresetStore.cpp
     # Phase B / TIMBRE simple-view (#249/#250/#263) — morph loop. Distinct
     # from engine::MorphEngine (live MIDI-CC morph) — generates 5 candidate
     # variations from base + history + liked + archetype RAG.

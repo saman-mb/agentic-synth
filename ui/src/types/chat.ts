@@ -95,7 +95,13 @@ export type WireIncoming =
       type: 'failure';
       kind: 'llm_offline' | 'prompt_unclear' | 'safety_block' | 'mic_denied';
       detail?: string;
-    };
+    }
+  // Phase D commit-UX (#260). Fires once per successful PresetStore.save
+  // so the UI can re-fetch the saved-sounds list and play the ceremony.
+  | { type: 'preset_committed'; name: string; prompt?: string; created_ms?: number; patch?: PatchPreviewData }
+  // Phase D export-to-track (#268). Fires once per offline bounce. ok=false
+  // covers both user cancel and write failure; UI distinguishes via `error`.
+  | { type: 'bounce_complete'; ok: boolean; path?: string; error?: string };
 
 export interface ProactiveSuggestion {
   label: string;
@@ -112,4 +118,15 @@ export type WireOutgoing =
   | { type: 'note_off'; note: number }
   // Phase B simple-view (#249) — request 5 fresh variations from the morph
   // loop. C++ replies asynchronously with `variations_ready`.
-  | { type: 'morph_request' };
+  | { type: 'morph_request' }
+  // Phase D / #260 — persist the current patch as a named "saved sound".
+  | { type: 'commit_preset'; name: string; prompt?: string; patch?: PatchPreviewData }
+  // Phase D / #260 — fetch the saved-sounds list. Resolves with the JSON
+  // returned by the native handler (not through subscribe events).
+  | { type: 'get_presets' }
+  // Phase D / #260 — drop a saved sound by name.
+  | { type: 'delete_preset'; name: string }
+  // Phase D / #268 — bounce the current patch (or a passed-in one) to a
+  // .wav. JUCE opens a save-as FileChooser, then renders on a worker; the
+  // UI listens for the `bounce_complete` event for the result.
+  | { type: 'bounce_patch'; patch?: PatchPreviewData; suggestedName?: string };

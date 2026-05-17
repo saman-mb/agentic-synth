@@ -942,3 +942,31 @@ body {
   outline-offset: 2px;
   border-radius: var(--r-2);
 }
+
+/* Phase D commit-UX (#260) — Saved sounds floating affordance. Anchored
+   bottom-right so it never obscures the audition keyboard. */
+.saved-sounds-fab {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  background: var(--bg-elevated, rgba(20,20,28,0.92));
+  color: var(--text-primary, #f3f3f8);
+  border: 1px solid var(--accent-tint-40, rgba(120,120,200,0.4));
+  border-radius: 999px;
+  font-family: var(--font-sans);
+  font-weight: 600;
+  font-size: 0.78rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.55rem 1rem;
+  cursor: pointer;
+  z-index: 6500;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.32);
+  transition: transform 0.1s, border-color 0.18s ease;
+}
+.saved-sounds-fab:hover {
+  border-color: var(--accent-primary, #8a8aff);
+}
+.saved-sounds-fab:active {
+  transform: scale(0.97);
+}

@@ -44,6 +44,10 @@ add_executable(agentic_synth_tests
     VariationRecommenderTest.cpp
     MultiModalInputTest.cpp
     PresetExporterTest.cpp
+    # Phase D / #260 — preset commit + persistence (PresetStore).
+    PresetStoreTest.cpp
+    # Phase D / #268 (partial) — synchronous offline render.
+    OfflineRendererTest.cpp
     StyleTransferTest.cpp
     AgentBridgeCallbacksTest.cpp
     AgentBridgeMidiSinkTest.cpp
