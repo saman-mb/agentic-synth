@@ -1,0 +1,120 @@
+/* ── HoodSlideOver (#271) ────────────────────────────────────────────
+   480px-wide slide-over from the left edge of the play surface column.
+   The backdrop dims only the play surface — chat stays interactive
+   because the dialog is absolutely positioned within its containing
+   grid track, not over the whole viewport.                            */
+
+.hood-slide-over {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  pointer-events: none;          /* children opt back in */
+  overflow: hidden;
+}
+
+/* Backdrop is a button so it's keyboard-actionable (Tab to it, Enter to
+   close) without needing an extra handler. tabIndex=-1 keeps it out of
+   the natural tab order — Esc + the explicit Close button are the
+   intended dismiss paths. */
+.hood-slide-over-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(10, 11, 15, 0.6);   /* var(--bg-void) @ 60% */
+  border: none;
+  padding: 0;
+  margin: 0;
+  cursor: pointer;
+  pointer-events: auto;
+  animation: hood-backdrop-in var(--dur-state) var(--ease-considered);
+}
+
+@keyframes hood-backdrop-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.hood-slide-over-panel {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 480px;
+  max-width: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--bg-panel);
+  border-right: 1px solid var(--color-border);
+  box-shadow: var(--depth-raised);
+  pointer-events: auto;
+  animation: hood-panel-in 320ms var(--ease-considered);
+  will-change: transform;
+}
+
+@keyframes hood-panel-in {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(0); }
+}
+
+.hood-slide-over-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  padding: var(--sp-3) var(--sp-4);
+  border-bottom: 1px solid var(--color-border);
+  background: var(--bg-panel);
+}
+
+.hood-slide-over-close {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 6px 14px;
+  border-radius: var(--r-2);
+  cursor: pointer;
+  transition:
+    border-color var(--dur-state) var(--ease-considered),
+    color var(--dur-state) var(--ease-considered);
+}
+
+.hood-slide-over-close:hover {
+  border-color: var(--accent-tint-40);
+  color: var(--accent-primary);
+}
+
+.hood-slide-over-close:focus { outline: none; }
+.hood-slide-over-close:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.hood-slide-over-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Reduced motion — strip the slide-in animation so the panel snaps in
+   place. Backdrop fade also disabled (no opacity from/to interp). */
+@media (prefers-reduced-motion: reduce) {
+  .hood-slide-over-panel,
+  .hood-slide-over-backdrop {
+    animation: none !important;
+  }
+}
+
+/* Below 720px viewport: full-screen modal instead of side-by-side. The
+   slide-over still anchors to its container; we let the panel grow to
+   100% width and the backdrop covers everything. */
+@media (max-width: 720px) {
+  .hood-slide-over-panel {
+    width: 100%;
+    border-right: none;
+  }
+}

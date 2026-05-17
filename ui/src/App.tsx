@@ -10,6 +10,8 @@ import {
   loadStarred,
   saveStarred,
 } from './components/PatchBrowser';
+import { PlaySurface } from './components/PlaySurface';
+import { HoodSlideOver, loadHoodOpen, saveHoodOpen } from './components/HoodSlideOver';
 import { PresetsSidebar } from './components/PresetsSidebar';
 import { ResizeHandle } from './components/ResizeHandle';
 import { RightColumn } from './components/RightColumn';
@@ -247,6 +249,14 @@ export function App() {
   // ToolsDrawer (Dictionary / Telemetry / History / Settings — gear icon).
   const [toolsOpen, setToolsOpen] = useState<boolean>(false);
   const [toolsTab, setToolsTab] = useState<DrawerTab>('dictionary');
+
+  // Hood-open state (Phase A / #271). Session-persisted only — fresh
+  // launches always show the simple play surface first per the brand's
+  // first-impression contract.
+  const [hoodOpen, setHoodOpen] = useState<boolean>(() => loadHoodOpen());
+  useEffect(() => { saveHoodOpen(hoodOpen); }, [hoodOpen]);
+  const openHood = useCallback(() => setHoodOpen(true), []);
+  const closeHood = useCallback(() => setHoodOpen(false), []);
 
   // ── UI audio settings (Phase 10 §17) ──────────────────────────────
   // Both default OFF — TIMBRE is "mostly silent". Settings persist via
@@ -955,18 +965,32 @@ export function App() {
           currentPx={cols.leftPx}
           onResize={cols.setLeftPx}
         />
-        <ModulesGrid
-          patch={patch}
-          agentKeys={lastAgentEditBatch}
-          onKnobChange={handleKnobChange}
-          patchLoadToken={patchLoadToken}
-          modMatrix={modMatrix}
-          onAssignMod={handleAssignMod}
-          spinToken={spinToken}
-          onUpdateConnection={handleUpdateConnection}
-          onDeleteConnection={handleDeleteConnection}
-          onAddConnection={handleAddConnection}
-        />
+        <div className="app-center-column">
+          <PlaySurface
+            macros={macros}
+            onMacroChange={handleMacroChange}
+            patch={patch}
+            onKnobChange={handleKnobChange}
+            onOpenHood={openHood}
+            activeSlot={activeSlot}
+            onSelectSlot={switchSlot}
+            onToggleSlot={() => switchSlot(activeSlot === 'A' ? 'B' : 'A')}
+          />
+          <HoodSlideOver open={hoodOpen} onClose={closeHood}>
+            <ModulesGrid
+              patch={patch}
+              agentKeys={lastAgentEditBatch}
+              onKnobChange={handleKnobChange}
+              patchLoadToken={patchLoadToken}
+              modMatrix={modMatrix}
+              onAssignMod={handleAssignMod}
+              spinToken={spinToken}
+              onUpdateConnection={handleUpdateConnection}
+              onDeleteConnection={handleDeleteConnection}
+              onAddConnection={handleAddConnection}
+            />
+          </HoodSlideOver>
+        </div>
         <ResizeHandle
           ariaLabel="Resize right column"
           side="right"

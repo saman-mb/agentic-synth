@@ -40,27 +40,79 @@ function nanoid(): string {
 
 interface ABGridProps {
   variations: PatchVariation[];
+  // Optional fragment of the prompt that produced these variations —
+  // used as a fallback label when sensory descriptors aren't supplied.
+  promptFragment?: string;
   onSelectVariation?: (patch: PatchPreviewData, modulation?: AgentModulationPlan) => void;
 }
 
-function ABVariationGrid({ variations, onSelectVariation }: ABGridProps) {
+// Per the spec: 1 dominant tile at full message width, the remaining
+// variations as thumbnails below. Click a thumbnail to promote it into
+// the dominant slot. Tiles label with sensory descriptors when present
+// (PatchVariation.label can be 'A' / 'B' today; future-proof for any
+// string), fall back to a prompt fragment, then to letters as last
+// resort. Empty variation grid renders nothing — silence is on-brand.
+function ABVariationGrid({ variations, promptFragment, onSelectVariation }: ABGridProps) {
+  const [dominantIndex, setDominantIndex] = useState(0);
+  // Reset dominance when the variation list itself changes identity
+  // (new generation streamed in). Keep within bounds defensively.
+  useEffect(() => {
+    setDominantIndex((cur) => (cur < variations.length ? cur : 0));
+  }, [variations.length]);
+
+  if (variations.length === 0) return null;
+  const safeIndex = Math.min(dominantIndex, variations.length - 1);
+  const dominant = variations[safeIndex];
+  const others = variations.filter((_, i) => i !== safeIndex);
+
+  const tileLabel = (v: PatchVariation, fallbackIndex: number): string => {
+    // Hooks for future sensory labels — today PatchVariation.label is
+    // 'A' | 'B'. When the backend ships descriptors like "warmer" or
+    // "brighter" they'll come through here verbatim.
+    const raw = String(v.label ?? '').trim();
+    if (raw && raw !== 'A' && raw !== 'B') return raw;
+    if (promptFragment && promptFragment.length > 0) {
+      const trimmed = promptFragment.length > 28
+        ? `${promptFragment.slice(0, 26)}…`
+        : promptFragment;
+      return raw ? `${trimmed} · ${raw}` : trimmed;
+    }
+    return raw || String.fromCharCode(65 + fallbackIndex);
+  };
+
   return (
-    <div className="ab-grid" role="region" aria-label="A/B patch variations">
-      {variations.map((v) => (
-        <div key={v.label} className="ab-variation">
-          <PatchPreview patch={v.patch} label={`Variation ${v.label}`} />
-          {onSelectVariation && (
-            <button
-              type="button"
-              className="ab-commit-btn"
-              onClick={() => onSelectVariation(v.patch, v.modulation)}
-              aria-label={`Use variation ${v.label}`}
-            >
-              Use {v.label}
-            </button>
-          )}
+    <div className="ab-grid ab-grid--inline" role="region" aria-label="Patch variations">
+      <div className="ab-grid-dominant">
+        <PatchPreview patch={dominant.patch} label={tileLabel(dominant, safeIndex)} />
+        {onSelectVariation && (
+          <button
+            type="button"
+            className="ab-commit-btn"
+            onClick={() => onSelectVariation(dominant.patch, dominant.modulation)}
+            aria-label={`Use ${tileLabel(dominant, safeIndex)}`}
+          >
+            Use {tileLabel(dominant, safeIndex)}
+          </button>
+        )}
+      </div>
+      {others.length > 0 && (
+        <div className="ab-grid-thumbs" role="group" aria-label="Other variations">
+          {variations.map((v, i) => {
+            if (i === safeIndex) return null;
+            return (
+              <button
+                key={`${v.label}-${i}`}
+                type="button"
+                className="ab-grid-thumb"
+                onClick={() => setDominantIndex(i)}
+                aria-label={`Promote ${tileLabel(v, i)} to dominant`}
+              >
+                <PatchPreview patch={v.patch} label={tileLabel(v, i)} />
+              </button>
+            );
+          })}
         </div>
-      ))}
+      )}
     </div>
   );
 }
@@ -106,6 +158,10 @@ function FeedbackBar({ messageId, feedback, onFeedback }: FeedbackBarProps) {
 
 interface BubbleProps {
   message: ChatMessage;
+  // The user prompt that produced this assistant reply (if any). Used
+  // as fallback label text on variation tiles when the backend hasn't
+  // emitted sensory descriptors yet.
+  promptFragment?: string;
   onFeedback: (messageId: string, kind: FeedbackKind) => void;
   onSelectVariation?: (patch: PatchPreviewData, modulation?: AgentModulationPlan) => void;
   // When provided, an AuditionKeyboard renders next to single-patch
@@ -120,6 +176,7 @@ interface BubbleProps {
 
 function MessageBubble({
   message,
+  promptFragment,
   onFeedback,
   onSelectVariation,
   auditionSend,
@@ -177,7 +234,11 @@ function MessageBubble({
       )}
 
       {message.variations && message.variations.length > 0 && (
-        <ABVariationGrid variations={message.variations} onSelectVariation={onSelectVariation} />
+        <ABVariationGrid
+          variations={message.variations}
+          promptFragment={promptFragment}
+          onSelectVariation={onSelectVariation}
+        />
       )}
 
       {!message.variations && message.patch && (
@@ -810,17 +871,32 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation, 
             <p className="empty-examples">Try: <em>"dark sub bass"</em>, <em>"bright evolving pad"</em>, <em>"plucky acid lead"</em></p>
           </div>
         )}
-        {messages.map((msg) => (
-          <MessageBubble
-            key={msg.id}
-            message={msg}
-            onFeedback={handleFeedback}
-            onSelectVariation={onSelectVariation}
-            auditionSend={send}
-            auditionReady={status === 'open'}
-            submittedFlash={submittedFlashId === msg.id}
-          />
-        ))}
+        {messages.map((msg, idx) => {
+          // Look up the most-recent preceding user message — its content
+          // becomes the fallback label fragment for any variations on
+          // this assistant bubble.
+          let promptFragment: string | undefined;
+          if (msg.role === 'assistant') {
+            for (let i = idx - 1; i >= 0; i--) {
+              if (messages[i].role === 'user') {
+                promptFragment = messages[i].content;
+                break;
+              }
+            }
+          }
+          return (
+            <MessageBubble
+              key={msg.id}
+              message={msg}
+              promptFragment={promptFragment}
+              onFeedback={handleFeedback}
+              onSelectVariation={onSelectVariation}
+              auditionSend={send}
+              auditionReady={status === 'open'}
+              submittedFlash={submittedFlashId === msg.id}
+            />
+          );
+        })}
         {proactiveSuggestions.length > 0 && (
           <ProactiveSuggestionStrip
             suggestions={proactiveSuggestions}

@@ -1,0 +1,196 @@
+/* ── PlaySurface (#270) ─────────────────────────────────────────────
+   Default left-column mount. No header label — silence is on-brand.
+
+   Layout: stacked sections, generous vertical rhythm, hairline dividers
+   so the hero macros read as the centre of gravity vs the trio + A/B
+   + reveal affordance.                                                */
+
+.play-surface {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--sp-6);
+  min-height: 0;
+  height: 100%;
+  padding: var(--sp-8) var(--sp-6) var(--sp-6);
+  overflow-y: auto;
+  background: var(--bg-panel);
+  border-right: 1px solid var(--color-border);
+}
+
+.play-surface-divider {
+  height: 1px;
+  width: 100%;
+  background: var(--color-border);
+  opacity: 0.6;
+}
+
+/* ── Hero row: 4 macros ─────────────────────────────────────────── */
+.play-surface-macros {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: var(--sp-4);
+  align-items: end;
+  justify-items: center;
+  padding-bottom: var(--sp-2);
+}
+
+.play-surface-macro-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+  min-width: 0;
+}
+
+.play-surface-macro-label {
+  font-family: var(--font-display);
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-primary);
+  white-space: nowrap;
+  text-align: center;
+}
+
+.play-surface-macro-value {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.04em;
+}
+
+/* ── Trio: cutoff / space / volume ──────────────────────────────── */
+.play-surface-trio {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--sp-4);
+  align-items: end;
+  justify-items: center;
+  padding: var(--sp-2) 0 var(--sp-3);
+}
+
+.play-surface-trio-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--sp-2);
+}
+
+.play-surface-trio-label {
+  font-family: var(--font-display);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+/* ── Knob size overrides ────────────────────────────────────────── */
+/* The Knob component normally caps at 72px (size="lg"). For the hero
+   macros we scale the dial to 96px; for the trio we settle around 64px.
+   Setting `--knob-size` on the knob root and on the svg via descendant
+   selector wins because the Knob component sets the CSS variable
+   inline — descendant CSS for the .knob-svg width/height overrides. */
+
+.play-surface-knob .knob-root {
+  /* React inline-style sets --knob-size; CSS var redeclaration here is
+     overridden by the inline value, so we directly size the dial below
+     and rely on the Knob's relative geometry (viewBox stays 100). */
+}
+
+.play-surface-knob--hero .knob-dial,
+.play-surface-knob--hero .knob-svg {
+  width: 96px !important;
+  height: 96px !important;
+}
+
+.play-surface-knob--trio .knob-dial,
+.play-surface-knob--trio .knob-svg {
+  width: 64px !important;
+  height: 64px !important;
+}
+
+/* Hide the Knob component's own bottom label — PlaySurface renders its
+   own typographic label per spec (font-display 13px uppercase). */
+.play-surface-knob .knob-name {
+  display: none;
+}
+
+/* Drag glow — extends the existing knob-editing rule with the spec's
+   12px halo at accent-tint-60. */
+.play-surface-knob .knob-root.knob-dragging .knob-svg {
+  filter: drop-shadow(0 0 12px var(--accent-tint-60));
+}
+
+/* ── A/B pill — center-bottom slot ──────────────────────────────── */
+.play-surface-ab {
+  display: flex;
+  justify-content: center;
+  padding: var(--sp-2) 0 0;
+}
+
+/* ── Foot: open the hood button ─────────────────────────────────── */
+.play-surface-foot {
+  margin-top: auto;
+  display: flex;
+  justify-content: center;
+  padding-top: var(--sp-4);
+}
+
+.play-surface-hood-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--sp-2);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: 8px 16px;
+  border-radius: var(--r-2);
+  cursor: pointer;
+  transition:
+    border-color var(--dur-state) var(--ease-considered),
+    color var(--dur-state) var(--ease-considered),
+    background var(--dur-state) var(--ease-considered);
+}
+
+.play-surface-hood-btn:hover {
+  border-color: var(--accent-tint-40);
+  color: var(--accent-primary);
+}
+
+.play-surface-hood-btn:focus { outline: none; }
+.play-surface-hood-btn:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.play-surface-gear {
+  display: block;
+  color: currentColor;
+}
+
+/* ── Narrow viewport: trim padding, keep stacking ───────────────── */
+@media (max-width: 720px) {
+  .play-surface {
+    padding: var(--sp-4);
+    gap: var(--sp-4);
+  }
+  .play-surface-knob--hero .knob-dial,
+  .play-surface-knob--hero .knob-svg {
+    width: 72px !important;
+    height: 72px !important;
+  }
+  .play-surface-knob--trio .knob-dial,
+  .play-surface-knob--trio .knob-svg {
+    width: 52px !important;
+    height: 52px !important;
+  }
+}

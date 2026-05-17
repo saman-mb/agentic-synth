@@ -1,0 +1,71 @@
+/* ── ABToggle (#267) ─────────────────────────────────────────────────
+   Hardware-style pill: 60×24px, monospace, two halves with a hairline
+   divider. Active half = accent foreground; inactive = tertiary. No
+   shadows, no gradients — wants to read as a producer console A/B.   */
+
+.ab-toggle {
+  display: inline-flex;
+  align-items: stretch;
+  width: 60px;
+  height: 24px;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--r-2);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  overflow: hidden;
+  transition:
+    border-color var(--dur-state) var(--ease-considered);
+}
+
+.ab-toggle:hover {
+  border-color: var(--accent-tint-40);
+}
+
+.ab-toggle--muted {
+  opacity: 0.65;
+}
+
+.ab-toggle-half {
+  flex: 1 1 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin: 0;
+  background: transparent;
+  border: none;
+  color: var(--text-tertiary);
+  font: inherit;
+  letter-spacing: inherit;
+  text-transform: inherit;
+  cursor: pointer;
+  transition:
+    color var(--dur-state) var(--ease-considered),
+    background var(--dur-state) var(--ease-considered);
+  font-variant-numeric: tabular-nums;
+}
+
+.ab-toggle-half:hover {
+  color: var(--text-secondary);
+}
+
+.ab-toggle-half.is-active {
+  color: var(--accent-primary);
+  background: var(--accent-tint-12);
+}
+
+.ab-toggle-half:focus { outline: none; }
+.ab-toggle-half:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--r-1);
+}
+
+.ab-toggle-divider {
+  width: 1px;
+  background: var(--color-border);
+  flex: 0 0 1px;
+}
