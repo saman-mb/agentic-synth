@@ -10,6 +10,7 @@
 #include <utility>
 
 #include "agent/MidiLearnStore.h"
+#include "agent/MorphTelemetry.h"
 #include "agent/PresetStore.h"
 #include "engine/OfflineRenderer.h"
 #include "mapper/EnvLoader.h"
@@ -513,6 +514,8 @@ void AgentBridge::commitPreset(const std::string& name, const std::string& promp
     }
     obj->setProperty("patch", patchToVar(patch));
     notifyPresetCommitted(juce::var{obj});
+    // Phase H / #261 — log anonymised commit event (name_length + prompt_hash).
+    recordPresetCommit(static_cast<int>(name.size()), prompt);
 }
 
 std::string AgentBridge::getPresetsJson() const {
@@ -549,6 +552,61 @@ void AgentBridge::bouncePatchToFile(const PatchStruct& patch, const juce::File& 
         obj->setProperty("error", juce::String("offline render or write failed"));
     }
     notifyBounceComplete(juce::var{obj});
+    // Phase H / #261 — duration_s is always cfg.duration_s today (4.0); pull
+    // from cfg so it tracks if the bounce length changes.
+    recordBounceToWav(static_cast<float>(cfg.duration_s));
+}
+
+// ── Phase H / #261 — morph telemetry passthroughs ────────────────────────────
+
+void AgentBridge::recordMorphRequest(const std::string& prompt, int historySize, int likedSize) noexcept {
+    MorphEvent ev;
+    ev.kind = MorphEventKind::MorphRequested;
+    ev.prompt_hash = MorphTelemetry::hashPrompt(prompt);
+    ev.history_size = historySize;
+    ev.liked_size = likedSize;
+    MorphTelemetry::instance().log(ev);
+}
+
+void AgentBridge::recordVariationPicked(int strategyId, const std::string& label, int timeSinceArrivalMs) noexcept {
+    MorphEvent ev;
+    ev.kind = MorphEventKind::VariationPicked;
+    ev.strategy_id = strategyId;
+    ev.label = label;
+    ev.time_since_arrival_ms = timeSinceArrivalMs;
+    MorphTelemetry::instance().log(ev);
+}
+
+void AgentBridge::recordMacroTweak(int macroIndex, float value, int dwellMs) noexcept {
+    MorphEvent ev;
+    ev.kind = MorphEventKind::MacroTweaked;
+    ev.macro_index = macroIndex;
+    ev.value = value;
+    ev.dwell_ms = dwellMs;
+    MorphTelemetry::instance().log(ev);
+}
+
+void AgentBridge::recordABToggle(int fromSlot, int toSlot) noexcept {
+    MorphEvent ev;
+    ev.kind = MorphEventKind::ABToggled;
+    ev.from_slot = fromSlot;
+    ev.to_slot = toSlot;
+    MorphTelemetry::instance().log(ev);
+}
+
+void AgentBridge::recordPresetCommit(int nameLength, const std::string& prompt) noexcept {
+    MorphEvent ev;
+    ev.kind = MorphEventKind::PresetCommitted;
+    ev.name_length = nameLength;
+    ev.prompt_hash = MorphTelemetry::hashPrompt(prompt);
+    MorphTelemetry::instance().log(ev);
+}
+
+void AgentBridge::recordBounceToWav(float durationS) noexcept {
+    MorphEvent ev;
+    ev.kind = MorphEventKind::BounceToWav;
+    ev.duration_s = durationS;
+    MorphTelemetry::instance().log(ev);
 }
 
 std::string AgentBridge::enhancePrompt(const std::string& userPrompt) { return enhancer_.enhance(userPrompt); }

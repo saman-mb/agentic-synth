@@ -150,6 +150,22 @@ public:
 
     [[nodiscard]] Telemetry& telemetry() noexcept { return telemetry_.telemetry(); }
 
+    // ── Phase H / #261 — morph telemetry ──────────────────────────────────────
+    //
+    // Thin passthroughs to MorphTelemetry::instance(). All six are no-throw,
+    // no-op when the singleton is disabled. The UI-triggered events
+    // (variation_picked, macro_tweaked, ab_toggled) come in via
+    // WebUiComponent native functions; the backend-triggered ones
+    // (morph_request, preset_committed, bounce_to_wav) fire inside the
+    // corresponding AgentBridge / WebUiComponent handlers.
+
+    void recordMorphRequest(const std::string& prompt, int historySize, int likedSize) noexcept;
+    void recordVariationPicked(int strategyId, const std::string& label, int timeSinceArrivalMs) noexcept;
+    void recordMacroTweak(int macroIndex, float value, int dwellMs) noexcept;
+    void recordABToggle(int fromSlot, int toSlot) noexcept;
+    void recordPresetCommit(int nameLength, const std::string& prompt) noexcept;
+    void recordBounceToWav(float durationS) noexcept;
+
     // ── Issue #85: Session-aware narrative generation ─────────────────────────
 
     // Generate natural-language rationale explaining parameter choices for

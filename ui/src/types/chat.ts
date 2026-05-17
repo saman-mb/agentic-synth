@@ -144,4 +144,10 @@ export type WireOutgoing =
   | { type: 'start_midi_learn'; knob_id: string }
   | { type: 'cancel_midi_learn' }
   | { type: 'clear_midi_mapping'; knob_id: string }
-  | { type: 'get_midi_mappings' };
+  | { type: 'get_midi_mappings' }
+  // Phase H / #261 — morph telemetry. Fire-and-forget; C++ appends one
+  // JSONL line per event. UI-triggered events only — the backend records
+  // morph_requested / preset_committed / bounce_to_wav internally.
+  | { type: 'record_variation_picked'; strategy_id: number; label: string; time_since_arrival_ms: number }
+  | { type: 'record_macro_tweak'; macro_index: number; value: number; dwell_ms: number }
+  | { type: 'record_ab_toggle'; from_slot: number; to_slot: number };

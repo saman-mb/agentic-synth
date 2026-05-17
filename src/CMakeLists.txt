@@ -131,6 +131,10 @@ add_library(agentic_synth_agent STATIC
     # from engine::MorphEngine (live MIDI-CC morph) — generates 5 candidate
     # variations from base + history + liked + archetype RAG.
     agent/MorphLoop.cpp
+    # Phase H / #261 — append-only JSONL morph telemetry. Lives below the
+    # AgentBridge layer; mirrors mapper::LlmTelemetry's singleton/lazy-path
+    # pattern (Phase 33). Records six UI-instrumented events.
+    agent/MorphTelemetry.cpp
     agent/StreamParser.cpp
     agent/Telemetry.cpp
     agent/VariationRecommender.cpp

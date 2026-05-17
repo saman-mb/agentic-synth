@@ -88,6 +88,11 @@ interface ABGridProps {
   // to wav" render alongside the dominant tile's primary action row.
   onKeep?: (patch: PatchPreviewData) => void;
   onBounce?: (patch: PatchPreviewData) => void;
+  // Phase H / #261 — telemetry hook. Fires on each thumbnail promotion
+  // (strategyId = grid index 0..4, label = tile label, dt_ms = time
+  // since the grid was last refreshed). ChatInterface wires this to
+  // `record_variation_picked` via the synthBridge.
+  onPickVariation?: (strategyId: number, label: string, timeSinceArrivalMs: number) => void;
 }
 
 // Per the spec: 1 dominant tile at full message width, the remaining
@@ -104,8 +109,15 @@ function ABVariationGrid({
   revealKey,
   onKeep,
   onBounce,
+  onPickVariation,
 }: ABGridProps) {
   const [dominantIndex, setDominantIndex] = useState(0);
+  // Phase H / #261 — arrival timestamp for `time_since_arrival_ms`. Reset
+  // whenever the variations list identity changes (new family landed).
+  const arrivalRef = useRef<number>(performance.now());
+  useEffect(() => {
+    arrivalRef.current = performance.now();
+  }, [revealKey, variations.length]);
   // Reset dominance when the variation list itself changes identity
   // (new generation streamed in). Keep within bounds defensively.
   useEffect(() => {
@@ -209,7 +221,13 @@ function ABVariationGrid({
                 type="button"
                 className="ab-grid-thumb"
                 style={{ ['--thumb-index' as string]: thumbIndex }}
-                onClick={() => setDominantIndex(i)}
+                onClick={() => {
+                  if (onPickVariation) {
+                    const dt = Math.max(0, Math.round(performance.now() - arrivalRef.current));
+                    onPickVariation(i, tileLabel(v, i), dt);
+                  }
+                  setDominantIndex(i);
+                }}
                 aria-label={`Promote ${tileLabel(v, i)} to dominant`}
               >
                 <PatchPreview patch={v.patch} label={tileLabel(v, i)} />
@@ -291,6 +309,9 @@ interface BubbleProps {
   // bubble patch (for non-variation paths).
   onKeep?: (patch: PatchPreviewData) => void;
   onBounce?: (patch: PatchPreviewData) => void;
+  // Phase H / #261 — variation_picked telemetry hook. Fires when the
+  // user promotes a thumbnail in the A/B grid.
+  onPickVariation?: (strategyId: number, label: string, timeSinceArrivalMs: number) => void;
 }
 
 function MessageBubble({
@@ -305,6 +326,7 @@ function MessageBubble({
   revealKey,
   onKeep,
   onBounce,
+  onPickVariation,
 }: BubbleProps) {
   const hasContent = message.role === 'assistant';
   const bubbleTextClass = `bubble-text${submittedFlash ? ' prompt-submitted' : ''}`;
@@ -365,6 +387,7 @@ function MessageBubble({
           revealKey={revealKey}
           onKeep={onKeep}
           onBounce={onBounce}
+          onPickVariation={onPickVariation}
         />
       )}
 
@@ -1252,6 +1275,17 @@ export function ChatInterface({
               revealKey={revealCount[msg.id]}
               onKeep={handleKeep}
               onBounce={handleBounce}
+              onPickVariation={(strategyId, label, dtMs) => {
+                // Phase H / #261 — fire-and-forget telemetry on thumbnail
+                // promotion. The strategy index maps directly onto
+                // MorphLoop's 0..4 strategy array.
+                send({
+                  type: 'record_variation_picked',
+                  strategy_id: strategyId,
+                  label,
+                  time_since_arrival_ms: dtMs,
+                });
+              }}
             />
           );
         })}

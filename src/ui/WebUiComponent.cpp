@@ -538,6 +538,13 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
                     seed = ++morphSeedCounter_;
                 }
 
+                // Phase H / #261 — log "More variations" click before kicking
+                // off the morph. Capture history/liked sizes pre-morph so the
+                // event reflects what the loop actually saw.
+                bridge_.recordMorphRequest(promptSnapshot,
+                                           static_cast<int>(history.size()),
+                                           static_cast<int>(liked.size()));
+
                 if (cancelled())
                     return;
 
@@ -568,6 +575,44 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
                         morphHistory_.pop_front();
                 }
             });
+        });
+
+    // ── Phase H / #261 — morph telemetry UI hooks ────────────────────────────
+    // Three fire-and-forget native functions matching the UI-triggered
+    // MorphEvent kinds. All resolve their promise immediately; the actual
+    // JSONL append is no-throw on the calling thread (cheap — one file
+    // append under a mutex, mirrors mapper::LlmTelemetry).
+    options = options.withNativeFunction(
+        juce::Identifier{"record_variation_picked"},
+        [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
+            // Args: [strategy_id (int 0..4), label (string), time_since_arrival_ms (int)].
+            const int strategyId = static_cast<int>(argOr(args, 0, juce::var{-1}));
+            const auto label = argOr(args, 1, juce::var{""}).toString().toStdString();
+            const int dtMs = static_cast<int>(argOr(args, 2, juce::var{0}));
+            bridge_.recordVariationPicked(strategyId, label, dtMs);
+            completion(juce::var{});
+        });
+
+    options = options.withNativeFunction(
+        juce::Identifier{"record_macro_tweak"},
+        [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
+            // Args: [macro_index (0..3), value (0..1 float), dwell_ms (int)].
+            const int macroIndex = static_cast<int>(argOr(args, 0, juce::var{-1}));
+            const float value = static_cast<float>(static_cast<double>(argOr(args, 1, juce::var{0.0})));
+            const int dwellMs = static_cast<int>(argOr(args, 2, juce::var{0}));
+            bridge_.recordMacroTweak(macroIndex, value, dwellMs);
+            completion(juce::var{});
+        });
+
+    options = options.withNativeFunction(
+        juce::Identifier{"record_ab_toggle"},
+        [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
+            // Args: [from_slot (int), to_slot (int)]. Slot codes are
+            // UI-defined (0/1 for A/B today); we pass through opaquely.
+            const int fromSlot = static_cast<int>(argOr(args, 0, juce::var{-1}));
+            const int toSlot = static_cast<int>(argOr(args, 1, juce::var{-1}));
+            bridge_.recordABToggle(fromSlot, toSlot);
+            completion(juce::var{});
         });
 
     options = options.withNativeFunction(
