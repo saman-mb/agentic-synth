@@ -201,6 +201,56 @@
   min-width: 200px;
 }
 
+/* Inline variant — used beneath a chat bubble. One dominant tile at
+   full width, the remaining variations as a row of clickable thumbnails
+   below. Per #253 partial: tiles labeled with sensory descriptors when
+   available, falling back to prompt fragment then to letters. */
+.ab-grid--inline {
+  flex-direction: column;
+  width: 100%;
+  gap: var(--sp-3);
+}
+
+.ab-grid-dominant {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  width: 100%;
+}
+
+.ab-grid-thumbs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
+  gap: var(--sp-2);
+}
+
+.ab-grid-thumb {
+  display: block;
+  width: 100%;
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--r-2);
+  padding: var(--sp-2);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  transition:
+    border-color var(--dur-state) var(--ease-considered),
+    background var(--dur-state) var(--ease-considered);
+}
+
+.ab-grid-thumb:hover {
+  border-color: var(--accent-tint-40);
+  background: var(--accent-tint-12);
+}
+
+.ab-grid-thumb:focus { outline: none; }
+.ab-grid-thumb:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
 .ab-commit-btn {
   background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
   border: none;
