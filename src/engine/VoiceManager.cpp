@@ -122,6 +122,13 @@ void Voice::prepare(double sampleRate) {
     if (svFilter)
         svFilter->reset();
     driveSmoother.setSampleRate(sampleRate);
+    // Phase E (#265): per-voice pre-filter saturation + post-filter chorus.
+    // prepare() allocates both modules' state ONCE (chorus delay buffer,
+    // tubesat HPF coefficient) so per-sample processing is allocation-free.
+    tubeSat.prepare(sampleRate, /*channels*/ 2);
+    chorus.prepare(sampleRate, /*channels*/ 2);
+    tubeSat.reset();
+    chorus.reset();
 }
 
 void Voice::renderStereo(float portamentoAlpha, float baseCutoffHz, float resonance,
@@ -317,6 +324,21 @@ void Voice::renderStereo(float portamentoAlpha, float baseCutoffHz, float resona
         monoMix += oscSample * o.volume;
     }
 
+    // ── Phase E (#265): pre-filter tube saturation ────────────────────────
+    // Memoryless asymmetric tanh + 20 Hz DC blocker. Runs on the MONO osc
+    // sum before the filter so saw-stack harmonics get fused before the LP
+    // attenuates them. Bypassed when drive == 0 (engine-side guard inside
+    // processStereo — the call is cheap when off). We treat the mono sum
+    // as both L and R so the stereo TubeSat API still works; output L and
+    // R are identical post-tanh, which is correct because we're still in
+    // mono-processing territory at this point.
+    {
+        float satL = monoMix;
+        float satR = monoMix;
+        tubeSat.processStereo(&satL, &satR, 1);
+        monoMix = satL; // L == R for mono path
+    }
+
     // ── Filter modulation ────────────────────────────────────────────────
     const float filterEnvOut = filterEnv.process();
     float effectiveCutoff = baseCutoffHz * (1.0f + lfoCutoffMod);
@@ -365,6 +387,13 @@ void Voice::renderStereo(float portamentoAlpha, float baseCutoffHz, float resona
     // (osc 0 hard L, osc 1 hard R) the weights pull apart.
     float stereoL = filteredMono * panWeightL;
     float stereoR = filteredMono * panWeightR;
+
+    // ── Phase E (#265): post-filter chorus ───────────────────────────────
+    // Stereo 3-tap modulated delay line. Runs on the stereo pan-split so the
+    // wet width is preserved (each tap's per-channel LFO is offset by π →
+    // L and R get different modulation arrivals → ensemble width). Mix==0
+    // is a bit-exact bypass inside processStereo.
+    chorus.processStereo(&stereoL, &stereoR, 1);
 
     // ── Amp envelope × velocity × LFO amp mod ────────────────────────────
     // Phase 4: clamp (1 + lfoAmpMod) at 0 so two LFOs both targeting Amplitude
@@ -483,6 +512,9 @@ void VoiceManager::prepare(double sampleRate) {
         s.setSampleRate(sampleRate);
     delay_.prepare(sampleRate);
     reverb_.prepare(sampleRate);
+    // Phase E (#265): reverb-send HPF — runs on the auxiliary reverb feed
+    // ONLY, never on the dry path. Bypassed when reverb_send_hpf_hz == 0.
+    reverbSendHpf_.prepare(sampleRate);
     recomputePortamentoAlpha();
 }
 
@@ -715,10 +747,33 @@ void VoiceManager::applyPatch(const PatchStruct& patch) noexcept {
     // FX bus parameters (stereo path only).
     reverb_.setSize(std::clamp(safe(patch.reverb.size, 0.5f), 0.0f, 1.0f));
     reverb_.setDamp(std::clamp(safe(patch.reverb.damping, 0.5f), 0.0f, 1.0f));
-    reverb_.setMix(std::clamp(safe(patch.reverb.mix, 0.0f), 0.0f, 1.0f));
+    const float rvMixClamped = std::clamp(safe(patch.reverb.mix, 0.0f), 0.0f, 1.0f);
+    reverb_.setMix(rvMixClamped);
+    reverbMixCurrent_ = rvMixClamped; // cached for the send-HPF wet recovery
     delay_.setFeedback(std::clamp(safe(patch.delay.feedback, 0.3f), 0.0f, 0.99f));
     delay_.setMix(std::clamp(safe(patch.delay.mix, 0.0f), 0.0f, 1.0f));
     delay_.setStereo(std::clamp(safe(patch.delay.stereo, 0.5f), 0.0f, 1.0f));
+
+    // Phase E (#265): chorus + tubesat + reverb-send HPF.
+    // Per-voice setters are cheap stores; chorus/tubesat have explicit
+    // bypass at mix==0 / drive==0 so an "off" patch incurs no DSP cost.
+    const float chorusRate = std::clamp(safe(patch.chorus.rate_hz, 0.4f), 0.05f, 8.0f);
+    const float chorusDepth = std::clamp(safe(patch.chorus.depth, 0.35f), 0.0f, 1.0f);
+    const float chorusMix = std::clamp(safe(patch.chorus.mix, 0.0f), 0.0f, 1.0f);
+    const float tubeDrive = std::clamp(safe(patch.tubesat.drive, 0.0f), 0.0f, 0.5f);
+    const float tubeMix = std::clamp(safe(patch.tubesat.mix, 1.0f), 0.0f, 1.0f);
+    for (auto& v : voices_) {
+        v.chorus.setRate(chorusRate);
+        v.chorus.setDepth(chorusDepth);
+        v.chorus.setMix(chorusMix);
+        v.tubeSat.setDrive(tubeDrive);
+        v.tubeSat.setMix(tubeMix);
+    }
+    // Reverb-send HPF. 0 == bypass; otherwise clamp into a reasonable
+    // sub-cleaning range. Above ~500 Hz the HPF starts removing midrange
+    // body that producers do want in the reverb tail.
+    const float hpfHz = safe(patch.reverb_send_hpf_hz, 0.0f);
+    reverbSendHpf_.setCutoff(hpfHz <= 0.0f ? 0.0f : std::clamp(hpfHz, 20.0f, 1000.0f));
 
     // Delay time: when bpm_sync is on, `patch.delay.time_s` is reinterpreted
     // as a fraction of a beat (sixteenth=0.25, eighth=0.5, quarter=1.0,
@@ -927,6 +982,14 @@ void VoiceManager::releaseResources() noexcept {
     }
     delay_.reset();
     reverb_.reset();
+    reverbSendHpf_.reset();
+    // Phase E (#265): per-voice chorus + tubesat state hard-stop alongside
+    // the per-voice filter / DC blocker reset above. Done in a separate
+    // pass to keep the original block's diff small.
+    for (auto& v : voices_) {
+        v.tubeSat.reset();
+        v.chorus.reset();
+    }
 }
 
 float VoiceManager::advanceSmoothersAndRender() noexcept {
@@ -982,9 +1045,36 @@ void VoiceManager::renderBlock(float* left, float* right, int numSamples) noexce
         float postDelayL = lSum * gain;
         float postDelayR = rSum * gain;
         delay_.process(postDelayL, postDelayR, postDelayL, postDelayR);
-        float wetL = postDelayL;
-        float wetR = postDelayR;
+        // Phase E (#265): HPF the reverb SEND (the input we feed into the
+        // reverb network) without touching the dry path the user hears.
+        // Reverb internally re-blends dry+wet via its own mix knob, but
+        // its "dry" is whatever we pass in — so to keep the user-visible
+        // low end intact we run reverb in WET-ONLY contribution mode:
+        //   1) HPF the send to strip sub before the combs
+        //   2) Pass it through reverb_; the resulting (wetL,wetR) is the
+        //      internal dry+wet blend at the patched mix
+        //   3) Recover the pure-wet contribution by subtracting the HPF'd
+        //      dry input scaled by (1 - reverbMix)
+        //   4) Sum the pure wet with the ORIGINAL (non-HPF) dry signal at
+        //      the same patched mix ratio
+        // This makes reverb_send_hpf_hz strictly an aux-send move: low end
+        // stays in the dry path; only the reverb tail loses sub.
+        float sendL = postDelayL;
+        float sendR = postDelayR;
+        reverbSendHpf_.processStereo(&sendL, &sendR, 1);
+        float wetL = sendL;
+        float wetR = sendR;
         reverb_.process(wetL, wetR, wetL, wetR);
+        const float rvMix = reverbMixCurrent_;
+        // Pure-wet contribution = mixed_output - (1 - mix) * (HPF'd dry input).
+        // Reverb's process(): out = mix*wetTail + (1-mix)*in. So
+        //   pureWet = (out - (1-mix)*in) / mix  (when mix > 0)
+        // We don't divide; we re-blend: out_final = mix * pureWetTail + (1-mix) * originalDry
+        // which expands to: out_final = (out - (1-mix)*HPFDry) + (1-mix)*originalDry
+        // = out + (1-mix) * (originalDry - HPFDry).
+        const float oneMinusMix = 1.0f - rvMix;
+        wetL = wetL + oneMinusMix * (postDelayL - sendL);
+        wetR = wetR + oneMinusMix * (postDelayR - sendR);
         // Item 1g: M/S width blend on reverb output. width=1 leaves the
         // signal untouched (mid+side*1 / mid-side*1 reconstructs L/R);
         // width=0 yields mono (mid only). Reverb mix internally folds

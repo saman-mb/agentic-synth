@@ -122,6 +122,20 @@ juce::var AgentBridge::patchToVar(const PatchStruct& p) {
     delay->setProperty("bpm_sync", static_cast<int>(p.delay.bpm_sync != 0));
     obj->setProperty("delay", juce::var{delay});
 
+    // Phase E (#265): chorus + tubesat + reverb-send HPF.
+    auto* chorus = new juce::DynamicObject{};
+    chorus->setProperty("rate_hz", p.chorus.rate_hz);
+    chorus->setProperty("depth", p.chorus.depth);
+    chorus->setProperty("mix", p.chorus.mix);
+    obj->setProperty("chorus", juce::var{chorus});
+
+    auto* tubesat = new juce::DynamicObject{};
+    tubesat->setProperty("drive", p.tubesat.drive);
+    tubesat->setProperty("mix", p.tubesat.mix);
+    obj->setProperty("tubesat", juce::var{tubesat});
+
+    obj->setProperty("reverb_send_hpf_hz", p.reverb_send_hpf_hz);
+
     obj->setProperty("master_gain", p.master_gain);
     obj->setProperty("portamento_s", p.portamento_s);
     obj->setProperty("voice_count", static_cast<int>(p.voice_count));
@@ -202,6 +216,20 @@ PatchStruct AgentBridge::patchFromVar(const juce::var& payload) {
         p.delay.stereo = static_cast<float>(propNumber(d, "stereo", p.delay.stereo));
         p.delay.bpm_sync = propNumber(d, "bpm_sync", p.delay.bpm_sync) >= 0.5 ? 1u : 0u;
     }
+
+    // Phase E (#265): chorus + tubesat + reverb-send HPF. Missing fields
+    // default to make_default_patch() values (chorus.mix=0, tubesat.drive=0,
+    // reverb_send_hpf_hz=0) — pre-Phase-E patches round-trip silently.
+    if (auto* c = propObject(obj, "chorus")) {
+        p.chorus.rate_hz = static_cast<float>(propNumber(c, "rate_hz", p.chorus.rate_hz));
+        p.chorus.depth = static_cast<float>(propNumber(c, "depth", p.chorus.depth));
+        p.chorus.mix = static_cast<float>(propNumber(c, "mix", p.chorus.mix));
+    }
+    if (auto* t = propObject(obj, "tubesat")) {
+        p.tubesat.drive = static_cast<float>(propNumber(t, "drive", p.tubesat.drive));
+        p.tubesat.mix = static_cast<float>(propNumber(t, "mix", p.tubesat.mix));
+    }
+    p.reverb_send_hpf_hz = static_cast<float>(propNumber(obj, "reverb_send_hpf_hz", p.reverb_send_hpf_hz));
 
     p.master_gain = static_cast<float>(propNumber(obj, "master_gain", p.master_gain));
     p.portamento_s = static_cast<float>(propNumber(obj, "portamento_s", p.portamento_s));

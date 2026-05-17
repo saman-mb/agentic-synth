@@ -564,3 +564,44 @@ TEST_CASE("augmenter cinematic phase32: wavetable mainosc retargets LFO1 to Wave
     REQUIRE(p.lfo[0].target == LfoTarget::WavetablePos);
     REQUIRE(p.lfo[1].target == LfoTarget::Pitch);
 }
+
+// Phase E (#265) — new DSP modules participate in the cinematic recipe.
+//
+// The Audio Engineer panel flagged that 80% of Vangelis lushness lives in
+// chorus + tube saturation pre-filter, not in reverb. The cinematic
+// augmenter recipe now sets:
+//   • tubesat.drive >= 0.30 (harmonic glue)
+//   • chorus.mix >= 0.40 (Juno-ensemble)
+//   • reverb_send_hpf_hz == 100 (cathedral tail loses sub energy)
+
+TEST_CASE("augmenter cinematic phaseE: tubesat.drive set to >= 0.30 for harmonic glue",
+          "[augmenter][phaseE]") {
+    PatchStruct p = singleOscPatch(OscType::Sawtooth);
+    p.filter.cutoff_hz = 400.0f;
+    p.tubesat.drive = 0.0f;
+    REQUIRE(augmentPatch(p, "deep dark cinematic Kubrick pad"));
+    REQUIRE(p.tubesat.drive >= 0.30f);
+    REQUIRE(p.tubesat.mix > 0.0f);
+}
+
+TEST_CASE("augmenter cinematic phaseE: chorus.mix set to >= 0.40 for Juno ensemble",
+          "[augmenter][phaseE]") {
+    PatchStruct p = singleOscPatch(OscType::Sawtooth);
+    p.filter.cutoff_hz = 400.0f;
+    p.chorus.mix = 0.0f;
+    REQUIRE(augmentPatch(p, "vangelis cinematic pad"));
+    REQUIRE(p.chorus.mix >= 0.40f);
+    REQUIRE(p.chorus.rate_hz > 0.0f);
+    REQUIRE(p.chorus.depth > 0.0f);
+}
+
+TEST_CASE("augmenter cinematic phaseE: reverb_send_hpf_hz set to 100 (no sub smear)",
+          "[augmenter][phaseE]") {
+    PatchStruct p = singleOscPatch(OscType::Sawtooth);
+    p.filter.cutoff_hz = 400.0f;
+    p.reverb_send_hpf_hz = 0.0f;
+    REQUIRE(augmentPatch(p, "ominous cinematic drone"));
+    REQUIRE(p.reverb_send_hpf_hz > 0.0f);
+    REQUIRE(p.reverb_send_hpf_hz >= 60.0f);
+    REQUIRE(p.reverb_send_hpf_hz <= 200.0f);
+}

@@ -1,13 +1,16 @@
 #pragma once
 
 #include "engine/ADSREnvelope.h"
+#include "engine/Chorus.h"
 #include "engine/Delay.h"
 #include "engine/Filter.h"
+#include "engine/HighPassFilter.h"
 #include "engine/LFO.h"
 #include "engine/ParamSmoother.h"
 #include "engine/PatchStruct.h"
 #include "engine/PatchValidator.h"
 #include "engine/Reverb.h"
+#include "engine/TubeSat.h"
 #include "engine/VAOscillator.h"
 #include "engine/WavetableOscillator.h"
 
@@ -101,6 +104,15 @@ struct Voice {
     // Smoothed filter drive — block-rate writer (applyPatch), per-sample reader
     // (render). Kills zipper noise on knob-driven drive moves.
     ParamSmoother driveSmoother;
+
+    // Phase E (#265): per-voice pre-filter saturation + post-filter chorus.
+    // TubeSat is mono (memoryless waveshape — runs on the mono osc sum before
+    // the filter so saw stack harmonics get glued before LP attenuation).
+    // Chorus is stereo (runs on the post-filter pan-split L/R so the wet
+    // width is preserved). Both default to bypass (no allocations either way
+    // — prepare() sized their buffers once in VoiceManager::prepare).
+    TubeSat tubeSat;
+    Chorus chorus;
 
     // Voice-steal fade-out: when > 0, voice output is multiplied by a linear
     // ramp from fadeOutSamplesRemaining_/fadeOutSamplesTotal_ → 0.
@@ -255,6 +267,12 @@ private:
     // These are written by applyPatch (no atomics — single writer, audio thread)
     // and read in renderBlock to keep the inner loop branch-free.
     float reverbWidthTarget_{1.0f};
+    // Phase E (#265): the renderBlock loop needs the patched reverb.mix
+    // value to recover the pure-wet contribution after the send HPF. The
+    // Reverb class doesn't expose its own mix_ getter so we cache the value
+    // here every applyPatch tick (block-rate writer, sample-rate reader —
+    // same pattern as reverbWidthTarget_ above).
+    float reverbMixCurrent_{0.0f};
     bool delayBpmSync_{false};
     double hostBpm_{120.0};
 
@@ -267,6 +285,10 @@ private:
     // no per-voice ownership; FX run once on the summed stereo signal.
     Delay delay_;
     Reverb reverb_;
+    // Phase E (#265): HPF on the reverb auxiliary send only — cleans sub
+    // energy off the reverb feed so cathedral tails do not smear the low
+    // end. Bypassed when patch.reverb_send_hpf_hz == 0.
+    HighPassFilter reverbSendHpf_;
 };
 
 } // namespace agentic_synth::engine

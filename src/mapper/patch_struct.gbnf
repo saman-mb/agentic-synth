@@ -68,6 +68,20 @@ delay-params ::= "{"
   ws "\"bpm_sync\"" ws ":" ws bool
   ws "}"
 
+# Phase E (#265): pre-filter chorus + tube saturation + reverb-send HPF.
+# All three are optional in the grammar — older patches don't emit them.
+# When emitted they appear after delay/voice_count and before rationale.
+chorus-params ::= "{"
+  ws "\"rate_hz\"" ws ":" ws number ws ","
+  ws "\"depth\""   ws ":" ws number ws ","
+  ws "\"mix\""     ws ":" ws number
+  ws "}"
+
+tubesat-params ::= "{"
+  ws "\"drive\"" ws ":" ws number ws ","
+  ws "\"mix\""   ws ":" ws number
+  ws "}"
+
 osc-array ::= "[" ws osc-params ws "," ws osc-params ws "," ws osc-params ws "]"
 lfo-array ::= "[" ws lfo-params ws "," ws lfo-params ws "]"
 
@@ -79,17 +93,20 @@ string-char ::= [^"\\] | "\\" ["\\/bfnrt]
 string      ::= "\"" string-char* "\""
 
 patch-object ::= "{"
-  ws "\"version\""      ws ":" ws uint          ws ","
-  ws "\"patch_id\""     ws ":" ws uint          ws ","
-  ws "\"osc\""          ws ":" ws osc-array     ws ","
-  ws "\"filter\""       ws ":" ws filter-params ws ","
-  ws "\"filter_env\""   ws ":" ws env-params    ws ","
-  ws "\"amp_env\""      ws ":" ws env-params    ws ","
-  ws "\"lfo\""          ws ":" ws lfo-array     ws ","
-  ws "\"reverb\""       ws ":" ws reverb-params ws ","
-  ws "\"delay\""        ws ":" ws delay-params  ws ","
-  ws "\"master_gain\""  ws ":" ws number        ws ","
-  ws "\"portamento_s\"" ws ":" ws number        ws ","
-  ws "\"voice_count\""  ws ":" ws uint          ws ","
-  ws "\"rationale\""    ws ":" ws string
+  ws "\"version\""      ws ":" ws uint           ws ","
+  ws "\"patch_id\""     ws ":" ws uint           ws ","
+  ws "\"osc\""          ws ":" ws osc-array      ws ","
+  ws "\"filter\""       ws ":" ws filter-params  ws ","
+  ws "\"filter_env\""   ws ":" ws env-params     ws ","
+  ws "\"amp_env\""      ws ":" ws env-params     ws ","
+  ws "\"lfo\""          ws ":" ws lfo-array      ws ","
+  ws "\"reverb\""       ws ":" ws reverb-params  ws ","
+  ws "\"delay\""        ws ":" ws delay-params   ws ","
+  ws "\"master_gain\""  ws ":" ws number         ws ","
+  ws "\"portamento_s\"" ws ":" ws number         ws ","
+  ws "\"voice_count\""  ws ":" ws uint           ws ","
+  ws "\"chorus\""              ws ":" ws chorus-params  ws ","
+  ws "\"tubesat\""             ws ":" ws tubesat-params ws ","
+  ws "\"reverb_send_hpf_hz\""  ws ":" ws number         ws ","
+  ws "\"rationale\""           ws ":" ws string
   ws "}"

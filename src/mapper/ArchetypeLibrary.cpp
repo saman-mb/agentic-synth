@@ -47,7 +47,10 @@ constexpr const char* kCinematicKubrickPad = R"json(
   "delay":  {"time_s": 0.5, "feedback": 0.25, "mix": 0.10, "stereo": 0.6, "bpm_sync": false},
   "master_gain": 0.85,
   "portamento_s": 0.0,
-  "voice_count": 8
+  "voice_count": 8,
+  "chorus": {"rate_hz": 0.4, "depth": 0.35, "mix": 0.40},
+  "tubesat": {"drive": 0.30, "mix": 1.0},
+  "reverb_send_hpf_hz": 100.0
 }
 )json";
 
@@ -73,7 +76,10 @@ constexpr const char* kVangelisBladeRunnerPad = R"json(
   "delay":  {"time_s": 0.45, "feedback": 0.20, "mix": 0.08, "stereo": 0.6, "bpm_sync": false},
   "master_gain": 0.85,
   "portamento_s": 0.05,
-  "voice_count": 8
+  "voice_count": 8,
+  "chorus": {"rate_hz": 0.4, "depth": 0.35, "mix": 0.40},
+  "tubesat": {"drive": 0.30, "mix": 1.0},
+  "reverb_send_hpf_hz": 100.0
 }
 )json";
 

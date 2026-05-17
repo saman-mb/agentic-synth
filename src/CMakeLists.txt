@@ -65,6 +65,12 @@ add_library(agentic_synth_engine_core STATIC
     engine/PresetExporter.cpp
     engine/MultiModalInput.cpp
     engine/Reverb.cpp
+    # Phase E (#265) — pre-filter DSP modules for Vangelis-class cinematic
+    # lushness: 3-tap Juno chorus, asymmetric tanh tube saturation, 1-pole
+    # HPF on the reverb auxiliary send.
+    engine/Chorus.cpp
+    engine/TubeSat.cpp
+    engine/HighPassFilter.cpp
     # Phase D / #268 (partial) — synchronous off-thread offline bounce of a
     # patch through a fresh VoiceManager into a 24-bit stereo .wav. Powers
     # the "Bounce to wav" affordance on committed presets.
