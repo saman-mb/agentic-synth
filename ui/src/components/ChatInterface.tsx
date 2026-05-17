@@ -44,6 +44,16 @@ interface ABGridProps {
   // used as a fallback label when sensory descriptors aren't supplied.
   promptFragment?: string;
   onSelectVariation?: (patch: PatchPreviewData, modulation?: AgentModulationPlan) => void;
+  // Phase B simple-view (#249) — fires the `morph_request` wire frame so
+  // the C++ side can generate 5 fresh tiles. Caller decides whether to
+  // wire it (omit on bubbles where morphing makes no sense, e.g. when the
+  // bridge is offline).
+  onMoreVariations?: () => void;
+  // Phase B reveal animation (#263) — bumped every time the variations
+  // array is replaced. We use this as a key seed so dominant + thumb
+  // tiles restart their staggered fade-in keyframes on each new family
+  // instead of resolving to "no change" and skipping the animation.
+  revealKey?: number;
 }
 
 // Per the spec: 1 dominant tile at full message width, the remaining
@@ -52,7 +62,13 @@ interface ABGridProps {
 // (PatchVariation.label can be 'A' / 'B' today; future-proof for any
 // string), fall back to a prompt fragment, then to letters as last
 // resort. Empty variation grid renders nothing — silence is on-brand.
-function ABVariationGrid({ variations, promptFragment, onSelectVariation }: ABGridProps) {
+function ABVariationGrid({
+  variations,
+  promptFragment,
+  onSelectVariation,
+  onMoreVariations,
+  revealKey,
+}: ABGridProps) {
   const [dominantIndex, setDominantIndex] = useState(0);
   // Reset dominance when the variation list itself changes identity
   // (new generation streamed in). Keep within bounds defensively.
@@ -80,30 +96,63 @@ function ABVariationGrid({ variations, promptFragment, onSelectVariation }: ABGr
     return raw || String.fromCharCode(65 + fallbackIndex);
   };
 
+  // Phase B reveal (#263) — key the dominant tile + thumb wrapper by revealKey
+  // so the staggered fade-in restarts each time a fresh family of variations
+  // lands. We rely on CSS keyframes (defined in ChatInterface.css) keyed on
+  // `.ab-grid-revealing` for the animation; the key prop forces React to
+  // remount so the animation actually replays instead of being skipped as
+  // "already applied".
+  const revealClass = revealKey !== undefined ? ' ab-grid-revealing' : '';
+
   return (
     <div className="ab-grid ab-grid--inline" role="region" aria-label="Patch variations">
-      <div className="ab-grid-dominant">
+      <div
+        key={`dominant-${revealKey ?? 0}`}
+        className={`ab-grid-dominant${revealClass}`}
+      >
         <PatchPreview patch={dominant.patch} label={tileLabel(dominant, safeIndex)} />
-        {onSelectVariation && (
-          <button
-            type="button"
-            className="ab-commit-btn"
-            onClick={() => onSelectVariation(dominant.patch, dominant.modulation)}
-            aria-label={`Use ${tileLabel(dominant, safeIndex)}`}
-          >
-            Use {tileLabel(dominant, safeIndex)}
-          </button>
-        )}
+        <div className="ab-grid-dominant-actions">
+          {onSelectVariation && (
+            <button
+              type="button"
+              className="ab-commit-btn"
+              onClick={() => onSelectVariation(dominant.patch, dominant.modulation)}
+              aria-label={`Use ${tileLabel(dominant, safeIndex)}`}
+            >
+              Use {tileLabel(dominant, safeIndex)}
+            </button>
+          )}
+          {onMoreVariations && (
+            <button
+              type="button"
+              className="ab-more-btn"
+              onClick={onMoreVariations}
+              aria-label="Generate more variations"
+            >
+              More variations
+            </button>
+          )}
+        </div>
       </div>
       {others.length > 0 && (
-        <div className="ab-grid-thumbs" role="group" aria-label="Other variations">
+        <div
+          key={`thumbs-${revealKey ?? 0}`}
+          className={`ab-grid-thumbs${revealClass}`}
+          role="group"
+          aria-label="Other variations"
+        >
           {variations.map((v, i) => {
             if (i === safeIndex) return null;
+            // Thumb index sequence (0..N-1) skipping the dominant slot so the
+            // stagger reads left-to-right regardless of which tile is currently
+            // promoted. CSS reads `--thumb-index` for the per-tile delay.
+            const thumbIndex = i < safeIndex ? i : i - 1;
             return (
               <button
-                key={`${v.label}-${i}`}
+                key={`${v.label}-${i}-${revealKey ?? 0}`}
                 type="button"
                 className="ab-grid-thumb"
+                style={{ ['--thumb-index' as string]: thumbIndex }}
                 onClick={() => setDominantIndex(i)}
                 aria-label={`Promote ${tileLabel(v, i)} to dominant`}
               >
@@ -172,6 +221,14 @@ interface BubbleProps {
   auditionReady?: boolean;
   // When true, the bubble text shows the cyan reading-sweep underline.
   submittedFlash?: boolean;
+  // Phase B simple-view (#249) — wired through to the variation grid when
+  // the bubble's message owns the active variation set. ChatInterface
+  // resolves which message can fire morph_request (most recent assistant
+  // with variations) before forwarding.
+  onMoreVariations?: () => void;
+  // Phase B reveal (#263) — bumped on every variations_ready landing for
+  // the message so the grid restarts its staggered fade-in keyframes.
+  revealKey?: number;
 }
 
 function MessageBubble({
@@ -182,6 +239,8 @@ function MessageBubble({
   auditionSend,
   auditionReady,
   submittedFlash,
+  onMoreVariations,
+  revealKey,
 }: BubbleProps) {
   const hasContent = message.role === 'assistant';
   const bubbleTextClass = `bubble-text${submittedFlash ? ' prompt-submitted' : ''}`;
@@ -238,6 +297,8 @@ function MessageBubble({
           variations={message.variations}
           promptFragment={promptFragment}
           onSelectVariation={onSelectVariation}
+          onMoreVariations={onMoreVariations}
+          revealKey={revealKey}
         />
       )}
 
@@ -478,6 +539,13 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation, 
   // next generate starts clean.
   const [currentBrief, setCurrentBrief] = useState<string>('');
   const currentBriefRef = useRef<string>('');
+  // Phase B simple-view (#249) — track which assistant message owns the
+  // "more variations" replacement target. Whichever message most recently
+  // produced a variation grid is the receiver for the next
+  // variations_ready event. Bumped on every replacement so the reveal
+  // animation actually restarts (revealKey is wired to ABVariationGrid).
+  const morphTargetIdRef = useRef<string | null>(null);
+  const [revealCount, setRevealCount] = useState<Record<string, number>>({});
 
   const { status, send, lastMessage, subscribe } = useSynthBridge();
 
@@ -528,6 +596,10 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation, 
                   patch: msg.data,
                   modulation: msg.modulation,
                 };
+                // Phase B (#249) — this bubble now owns variations; it
+                // becomes the receiver for subsequent variations_ready
+                // replacements.
+                morphTargetIdRef.current = sid;
                 return { ...m, variations: [...existing, typedVariation] };
               }
               return {
@@ -632,6 +704,19 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation, 
         }
         case 'suggest_variations': {
           setProactiveSuggestions(msg.variations);
+          break;
+        }
+        case 'variations_ready': {
+          // Phase B simple-view (#249) — replace the current message's
+          // variations with the 5-tile morph result. Bump the per-message
+          // reveal counter so ABVariationGrid restarts its staggered
+          // fade-in keyframes via `revealKey`.
+          const tid = morphTargetIdRef.current;
+          if (!tid) return;
+          setMessages((prev) =>
+            prev.map((m) => (m.id === tid ? { ...m, variations: msg.variations } : m)),
+          );
+          setRevealCount((prev) => ({ ...prev, [tid]: (prev[tid] ?? 0) + 1 }));
           break;
         }
       }
@@ -884,6 +969,20 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation, 
               }
             }
           }
+          // Phase B simple-view (#249) — only the assistant bubble that
+          // currently owns the variation grid gets the "More variations"
+          // button. Targeting is one-bubble-at-a-time: clicking the button
+          // updates morphTargetIdRef so the C++ reply lands on the same
+          // bubble. Hidden when offline so we never queue a request the
+          // bridge can't deliver.
+          const isMorphTarget =
+            msg.role === 'assistant' && (msg.variations?.length ?? 0) > 0;
+          const handleMoreVariations = isMorphTarget && status === 'open'
+            ? () => {
+                morphTargetIdRef.current = msg.id;
+                send({ type: 'morph_request' });
+              }
+            : undefined;
           return (
             <MessageBubble
               key={msg.id}
@@ -894,6 +993,8 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation, 
               auditionSend={send}
               auditionReady={status === 'open'}
               submittedFlash={submittedFlashId === msg.id}
+              onMoreVariations={handleMoreVariations}
+              revealKey={revealCount[msg.id]}
             />
           );
         })}

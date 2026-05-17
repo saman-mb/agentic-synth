@@ -408,6 +408,9 @@ AgentBridge::SubscriberHandle AgentBridge::onTranscript(Callback cb) {
 AgentBridge::SubscriberHandle AgentBridge::onEnhancement(Callback cb) {
     return subscribe(enhancementSlots_, std::move(cb));
 }
+AgentBridge::SubscriberHandle AgentBridge::onVariationsReady(Callback cb) {
+    return subscribe(variationsReadySlots_, std::move(cb));
+}
 
 void AgentBridge::notifyToken(const juce::var& payload) { dispatch(tokenSlots_, payload); }
 void AgentBridge::notifyPatch(const juce::var& payload) { dispatch(patchSlots_, payload); }
@@ -418,6 +421,7 @@ void AgentBridge::notifySuggestVariations(const juce::var& payload) { dispatch(s
 void AgentBridge::notifyPatchUpdate(const juce::var& payload) { dispatch(patchUpdateSlots_, payload); }
 void AgentBridge::notifyTranscript(const juce::var& payload) { dispatch(transcriptSlots_, payload); }
 void AgentBridge::notifyEnhancement(const juce::var& payload) { dispatch(enhancementSlots_, payload); }
+void AgentBridge::notifyVariationsReady(const juce::var& payload) { dispatch(variationsReadySlots_, payload); }
 
 std::string AgentBridge::enhancePrompt(const std::string& userPrompt) { return enhancer_.enhance(userPrompt); }
 

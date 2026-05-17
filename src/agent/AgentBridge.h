@@ -200,6 +200,11 @@ public:
     // (HEARING IT OUT → SHAPING) and keep it on the assistant message's
     // rationale block after generation completes.
     [[nodiscard]] SubscriberHandle onEnhancement(Callback cb);
+    // Phase B simple-view (#249) — fan-out for the 5-variation morph result.
+    // Payload shape: { variations: [{label, patch, modulation}, ...] }.
+    // Distinct from `suggest_variations` (proactive 3-suggestion stream) — this
+    // fires once per explicit user "more variations" request.
+    [[nodiscard]] SubscriberHandle onVariationsReady(Callback cb);
 
     // Test/integration emission helpers — visible so call sites in this
     // translation unit and the test fixture can drive the subscriber fan-out
@@ -213,6 +218,7 @@ public:
     void notifyPatchUpdate(const juce::var& payload);
     void notifyTranscript(const juce::var& payload);
     void notifyEnhancement(const juce::var& payload);
+    void notifyVariationsReady(const juce::var& payload);
 
     // Full patch wire helpers used by native UI events and tests. The shape
     // mirrors React PatchParams: nested modules with numeric enum/bool fields.
@@ -275,6 +281,7 @@ private:
     SlotList patchUpdateSlots_;
     SlotList transcriptSlots_;
     SlotList enhancementSlots_;
+    SlotList variationsReadySlots_;
 
     // Phase 12A: midi cutoff/resonance atomics moved to KnobBridge (knob_);
     // read via knob_.midiCutoffNorm() / knob_.midiResonanceNorm().

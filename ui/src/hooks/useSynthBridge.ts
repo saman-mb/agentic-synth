@@ -164,6 +164,8 @@ export function useSynthBridge(): UseSynthBridgeReturn {
     wrap('suggest_variations');
     // Two-step LLM flow: ENHANCER brief arrives once per generate call.
     wrap('enhancement');
+    // Phase B simple-view (#249) — explicit morph reply from C++.
+    wrap('variations_ready');
     juce.backend.addEventListener('patch_update', (payload) => {
       enqueueMessage({ type: 'patch_update' as unknown as WireIncoming['type'], ...(payload as object) } as unknown as WireIncoming);
     });
@@ -239,6 +241,12 @@ export function useSynthBridge(): UseSynthBridgeReturn {
         }
         case 'note_off': {
           void callNative('note_off', [msg.note]);
+          return;
+        }
+        case 'morph_request': {
+          // Phase B simple-view (#249) — fire-and-forget. C++ replies via
+          // the `variations_ready` event listener wired above.
+          void callNative('morph_request', []);
           return;
         }
         // Spread each known WireOutgoing variant onto positional `params`

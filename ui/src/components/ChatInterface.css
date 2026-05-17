@@ -275,6 +275,101 @@
   outline-offset: 2px;
 }
 
+/* Row hosting the dominant tile's commit + "More variations" actions.
+   Wraps so the row collapses to a single column on narrow message
+   widths instead of squeezing the labels. */
+.ab-grid-dominant-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  align-items: center;
+}
+
+/* "More variations" — secondary affordance next to the dominant tile.
+   Reads as ghost-on-glass next to the gradient commit button so the
+   primary action stays clearly dominant. No new color tokens; reuses
+   the existing border/accent tints. */
+.ab-more-btn {
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--r-3);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 0.45rem 0.75rem;
+  cursor: pointer;
+  transition:
+    border-color var(--dur-state) var(--ease-considered),
+    background var(--dur-state) var(--ease-considered),
+    transform 0.1s;
+}
+.ab-more-btn:hover {
+  border-color: var(--accent-tint-40);
+  background: var(--accent-tint-12);
+}
+.ab-more-btn:active { transform: scale(0.97); }
+.ab-more-btn:focus { outline: none; }
+.ab-more-btn:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* ── Reveal animation (#263) ──────────────────────────────────────────
+   When a fresh variation family lands the dominant tile cross-fades and
+   scales up over 1100ms, then the thumbnails follow with an 80ms-per-tile
+   stagger driven by the `--thumb-index` CSS variable set inline on each
+   thumb. Spectrum bars inside the tiles slide up bottom-anchored over
+   600ms. All keyframes are short-lived; we use `animation` (one-shot)
+   rather than `transition` so the effect replays cleanly when the React
+   tree remounts the tile via `key={revealKey}` instead of merging into
+   an existing element. */
+@keyframes ab-reveal-dominant {
+  from { opacity: 0; transform: scale(0.96); }
+  to   { opacity: 1; transform: scale(1); }
+}
+.ab-grid-revealing.ab-grid-dominant {
+  animation: ab-reveal-dominant 1100ms var(--ease-considered) both;
+}
+
+@keyframes ab-reveal-thumb {
+  from { opacity: 0; transform: translateY(4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.ab-grid-revealing.ab-grid-thumbs > .ab-grid-thumb {
+  opacity: 0;
+  animation: ab-reveal-thumb 600ms var(--ease-considered) both;
+  animation-delay: calc(80ms * var(--thumb-index, 0));
+}
+
+@keyframes ab-reveal-bar {
+  from { transform: scaleY(0); }
+  to   { transform: scaleY(1); }
+}
+/* Spectrum bars inside PatchPreview tiles draw from the bottom up. We
+   key off the existing visual-spectrum bar selector so we don't need
+   PatchPreview to know about morph state. Animation duration matches
+   the spec (600ms) with the spec-defined ease. */
+.ab-grid-revealing .visual-spectrum-bar,
+.ab-grid-revealing .spectrum-bar {
+  transform-origin: bottom;
+  animation: ab-reveal-bar 600ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ab-grid-revealing.ab-grid-dominant,
+  .ab-grid-revealing.ab-grid-thumbs > .ab-grid-thumb,
+  .ab-grid-revealing .visual-spectrum-bar,
+  .ab-grid-revealing .spectrum-bar {
+    animation: none;
+    transition: none;
+    opacity: 1;
+    transform: none;
+  }
+}
+
 /* ── Feedback bar ─────────────────────────────────────────────────── */
 
 .feedback-bar {

@@ -3,6 +3,8 @@
 #include <juce_gui_extra/juce_gui_extra.h>
 
 #include <atomic>
+#include <cstdint>
+#include <deque>
 #include <functional>
 #include <mutex>
 #include <optional>
@@ -188,6 +190,17 @@ private:
     mutable std::mutex lastPatchMutex_;
     std::optional<PatchStruct> lastSuccessfulPatch_;
     std::string lastPrompt_;
+
+    // Phase B simple-view #249 — rolling history + liked-pool for the
+    // `morph_request` worker. We keep a small deque per axis so we never
+    // unbounded-grow inside a long DAW session. Liked is wired via the
+    // existing `feedback` native function (kind == "like"); history is
+    // populated by morph_request itself so consecutive clicks accumulate
+    // generations.
+    mutable std::mutex morphMutex_;
+    std::deque<PatchStruct> morphHistory_;
+    std::deque<PatchStruct> morphLiked_;
+    uint32_t morphSeedCounter_{0};
 
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(WebUiComponent)
 };
