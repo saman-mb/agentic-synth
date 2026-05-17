@@ -292,6 +292,17 @@ AgentBridge::AgentBridge() {
         std::cerr << "[AgentBridge] GEMINI_KEY not set; Gemini fallback disabled\n";
     }
 
+    // Phase 34b (#264) — wire the delta-nudger to the same key. When the
+    // key is empty deltaNudger_.enabled() stays false and PromptHandler
+    // skips straight to the Phase 34a top-1 archetype path.
+    if (!geminiKey.empty()) {
+        deltaNudger_.setApiKey(geminiKey);
+        std::cerr << "[AgentBridge] DeltaNudger enabled (LLM nudges over RAG retrieval)\n";
+    } else {
+        std::cerr << "[AgentBridge] DeltaNudger disabled — no GEMINI_KEY\n";
+    }
+    prompt_.setDeltaNudger(&deltaNudger_);
+
     // ── Two-step LLM flow: ENHANCER (translator) step ────────────────────────
     //
     // Load the bundled TIMBRE translator briefing (enhancer-prompt.md, ~280

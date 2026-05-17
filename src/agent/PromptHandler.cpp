@@ -338,12 +338,51 @@ std::optional<PatchStruct> PromptHandler::generateLlmPatch(const std::string& pr
         std::cerr << "[PromptHandler] local llama.cpp unavailable and GEMINI_KEY unset; no patch produced\n";
     }
 
+    // ── Phase 34b: LLM-as-delta-nudger over RAG retrieval ───────────────────
+    //
+    // Both LLM patch-generation paths failed. Before falling through to the
+    // top-1 archetype retrieve (Phase 34a), give the LLM a cheaper, narrower
+    // job: pick the best of the top-3 candidates and propose 0..4 percentage
+    // nudges on whitelisted audible axes. Failure is silent and degrades to
+    // the existing top-1 path — there is NO new failure mode.
+    //
+    // Refinement-mode is skipped: when the user is nudging an existing
+    // topology (isRelativePrompt + previousPatch), restarting from an
+    // archetype is exactly the wrong move; defer to the top-1 path which
+    // already honours that contract via applyGuardrail.
+    if (deltaNudger_ && deltaNudger_->enabled() && !refinement) {
+        auto top3 = mapper::ArchetypeRetriever::retrieveTopN(prompt, 3);
+        if (!top3.empty()) {
+            mapper::NudgeRequest nreq{prompt, top3};
+            auto nres = deltaNudger_->nudge(nreq);
+            if (nres.selected_index >= 0) {
+                const auto* picked = top3[static_cast<std::size_t>(nres.selected_index)];
+                std::cerr << "[PromptHandler] DeltaNudger picked archetype '"
+                          << (picked ? picked->name : std::string("<null>"))
+                          << "' with " << nres.nudges.size() << " nudges\n";
+                if (failureSink_) {
+                    const std::string detail = std::string("LLM unavailable — nudged archetype '") +
+                                               (picked ? picked->name : std::string("?")) +
+                                               "' (" + std::to_string(nres.nudges.size()) + " params)";
+                    failureSink_("llm_offline", detail);
+                }
+                PatchStruct patch = nres.patch;
+                patch.patch_id = patch_id;
+                applyGuardrail(patch);
+                refinePatch(patch);
+                return patch;
+            }
+            std::cerr << "[PromptHandler] DeltaNudger declined or failed; falling through to top-1 archetype\n";
+        }
+    }
+
     // ── Phase 34a: minimum-viable RAG fallback ──────────────────────────────
     //
-    // Both LLM paths failed. Rather than hand back nullopt and let the worker
-    // ship the bare heuristic patch from PrePatchPipeline, we retrieve the
-    // best-matching archetype from the curated library (substring score over
-    // descriptor tags) and return that. The retrieved patch still flows
+    // Both LLM paths failed (and the optional Phase 34b nudger above also
+    // failed or was disabled). Rather than hand back nullopt and let the
+    // worker ship the bare heuristic patch from PrePatchPipeline, we retrieve
+    // the best-matching archetype from the curated library (substring score
+    // over descriptor tags) and return that. The retrieved patch still flows
     // through applyGuardrail (PatchAugmenter) so refinement-mode bypass and
     // §0 layering rules still apply — exactly the same pipeline as a
     // successful LLM response.

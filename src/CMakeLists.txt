@@ -14,6 +14,11 @@ add_library(agentic_synth_mapper STATIC
     # (no disk I/O) so the library ships with the binary.
     mapper/ArchetypeLibrary.cpp
     mapper/ArchetypeRetriever.cpp
+    # Phase 34b (#264) — LLM-as-delta-nudger over the Phase 34a retriever.
+    # After RAG pulls the top-3 archetypes, Gemini picks the best one and
+    # proposes a small list of percentage nudges on whitelisted audible
+    # axes. Falls back silently to top-1 on any failure.
+    mapper/DeltaNudger.cpp
 )
 target_include_directories(agentic_synth_mapper PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 agentic_synth_configure_target(agentic_synth_mapper)
