@@ -310,6 +310,24 @@ export function useSynthBridge(): UseSynthBridgeReturn {
           void callNative('get_midi_mappings', []);
           return;
         }
+        case 'record_variation_picked': {
+          // Phase H / #261 — fire-and-forget telemetry. C++ appends one
+          // JSONL line per event; no return value to await.
+          void callNative('record_variation_picked', [
+            msg.strategy_id,
+            msg.label,
+            msg.time_since_arrival_ms,
+          ]);
+          return;
+        }
+        case 'record_macro_tweak': {
+          void callNative('record_macro_tweak', [msg.macro_index, msg.value, msg.dwell_ms]);
+          return;
+        }
+        case 'record_ab_toggle': {
+          void callNative('record_ab_toggle', [msg.from_slot, msg.to_slot]);
+          return;
+        }
         // Spread each known WireOutgoing variant onto positional `params`
         // matching the C++ native function arity in WebUiComponent.cpp.
         // Wrapping into a single object arg breaks args[0]/args[1] reads

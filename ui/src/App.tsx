@@ -908,6 +908,14 @@ export function App() {
   const switchSlot = useCallback(
     (target: ABSlot) => {
       if (target === activeSlot) return;
+      // Phase H / #261 — log the toggle before mutating state so a UI
+      // crash mid-switch still surfaces the gesture intent. Slot codes
+      // are A=0 / B=1 to keep the JSONL numeric and grep-friendly.
+      synthBridge.send({
+        type: 'record_ab_toggle',
+        from_slot: activeSlot === 'A' ? 0 : 1,
+        to_slot: target === 'A' ? 0 : 1,
+      });
       const cur = patch;
       const incoming = inactiveSlotPatch;
       setInactiveSlotPatch(cur);
@@ -924,7 +932,7 @@ export function App() {
       bumpPatchLoad();
       // Engine notification handled by the effectivePatch effect.
     },
-    [activeSlot, inactiveSlotPatch, patch, ph, bumpPatchLoad],
+    [activeSlot, inactiveSlotPatch, patch, ph, bumpPatchLoad, synthBridge],
   );
 
   // Copy active slot's patch into the inactive slot.
@@ -951,13 +959,36 @@ export function App() {
   // Macro values project through enabled mod-matrix routes into the
   // effective patch above. Persist explicit label changes so renames
   // survive page reloads.
+  //
+  // Phase H / #261 — telemetry debouncer. Track first-touch timestamp
+  // per knob index; emit one `record_macro_tweak` 250ms after the last
+  // change (release ≈ idle). Refs avoid re-renders + survive useCallback
+  // identity changes.
+  const macroDwellRef = useRef<Array<{ start: number; timer: number | null } | null>>([null, null, null, null]);
   const handleMacroChange = useCallback((index: number, value: number) => {
     setMacros((prev) => {
       const next = prev.slice();
       next[index] = { ...next[index], value };
       return next;
     });
-  }, []);
+    const slot = macroDwellRef.current[index];
+    const now = performance.now();
+    if (slot && slot.timer !== null) {
+      window.clearTimeout(slot.timer);
+    }
+    const start = slot?.start ?? now;
+    const timer = window.setTimeout(() => {
+      const dwell = Math.round(performance.now() - start);
+      synthBridge.send({
+        type: 'record_macro_tweak',
+        macro_index: index,
+        value,
+        dwell_ms: dwell,
+      });
+      macroDwellRef.current[index] = null;
+    }, 250);
+    macroDwellRef.current[index] = { start, timer };
+  }, [synthBridge]);
 
   const handleMacroRename = useCallback((index: number, label: string) => {
     setMacros((prev) => {
