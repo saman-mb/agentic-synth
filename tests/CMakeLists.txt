@@ -13,6 +13,9 @@ add_executable(agentic_synth_tests
     VAOscillatorTest.cpp
     DelayTest.cpp
     ReverbTest.cpp
+    # Phase E (#265) — pre-filter chorus + tube saturation tests.
+    ChorusTest.cpp
+    TubeSatTest.cpp
     FilterTest.cpp
     LFOTest.cpp
     ParamSmootherTest.cpp

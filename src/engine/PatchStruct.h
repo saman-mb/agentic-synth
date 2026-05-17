@@ -106,6 +106,27 @@ struct ReverbParams {
 };
 static_assert(sizeof(ReverbParams) == 16);
 
+// Phase E (#265): pre-filter chorus + tube saturation + reverb-send HPF.
+//
+// The augmenter writes these for the cinematic recipe; LLM grammar emits
+// them as well so the same patch JSON round-trips. All POD, fixed size,
+// trivially copyable — no allocation, no juce::var, no std::string.
+
+struct ChorusParams {
+    float rate_hz; // 0.1 .. 5.0 (default 0.4)
+    float depth;   // 0 .. 1     (default 0.35)
+    float mix;     // 0 .. 1     (default 0.0 — bit-exact bypass when off)
+    uint8_t _pad[8];
+};
+static_assert(sizeof(ChorusParams) == 20);
+
+struct TubeSatParams {
+    float drive;   // 0 .. 0.5 (default 0.0 — bit-exact bypass when off)
+    float mix;     // 0 .. 1   (default 1.0 when active — full wet)
+    uint8_t _pad[8];
+};
+static_assert(sizeof(TubeSatParams) == 16);
+
 // delay.bpm_sync semantics:
 //   - When false: time_s is the delay length in seconds.
 //   - When true:  time_s is reinterpreted as BEATS (not seconds). The
@@ -157,6 +178,20 @@ struct PatchStruct {
     // Effects
     ReverbParams reverb;
     DelayParams delay;
+
+    // Phase E (#265): pre-filter chorus + tube saturation. Inserted in the
+    // per-voice signal chain BEFORE the filter (see VoiceManager.cpp). Both
+    // default to bypass (chorus.mix==0, tubesat.drive==0) so older patches
+    // and the augmenter's non-cinematic paths leave the audio untouched.
+    ChorusParams chorus;
+    TubeSatParams tubesat;
+    // Reverb auxiliary-send HPF cutoff (Hz). 0 = bypass; 60..200 Hz = clean
+    // sub energy off the reverb feed so the cathedral tail does not smear
+    // the low end. Filter is per-voice on the send only — the dry path is
+    // untouched. Applied in VoiceManager renderBlock before the master
+    // reverb stage.
+    float reverb_send_hpf_hz;
+    uint8_t _pad_reverb_send[4];
 
     // Global
     float master_gain;   // 0 .. 1
@@ -241,6 +276,17 @@ inline PatchStruct make_default_patch() noexcept {
     // default of 0 (memset) would now silently make every patch mono. 1.0
     // matches what Freeverb produced pre-Phase-3.
     p.reverb.width = 1.0f;
+
+    // Phase E (#265): chorus + tubesat default to OFF so any patch authored
+    // before these fields existed (zero-filled by memset above) sounds
+    // identical to its pre-Phase-E behaviour. The augmenter cinematic recipe
+    // raises chorus.mix / tubesat.drive when the prompt asks for lushness.
+    p.chorus.rate_hz = 0.4f;
+    p.chorus.depth = 0.35f;
+    p.chorus.mix = 0.0f;
+    p.tubesat.drive = 0.0f;
+    p.tubesat.mix = 1.0f;
+    p.reverb_send_hpf_hz = 0.0f;
 
     p.master_gain = 1.0f;
     p.voice_count = 8;

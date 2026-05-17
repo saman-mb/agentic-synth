@@ -195,6 +195,18 @@ std::string patchToJsonString(const PatchStruct& p) {
     o << "\"master_gain\":" << p.master_gain << ","
       << "\"portamento_s\":" << p.portamento_s << ","
       << "\"voice_count\":" << static_cast<int>(p.voice_count);
+    // Phase E (#265): emit chorus + tubesat + reverb_send_hpf_hz so the
+    // refinement wrapper round-trips losslessly through
+    // GrammarSampler::parse_patch_json. Order matches the parser's optional
+    // dispatch (chorus → tubesat → reverb_send_hpf_hz → rationale).
+    o << ",\"chorus\":{"
+      << "\"rate_hz\":" << p.chorus.rate_hz << ","
+      << "\"depth\":" << p.chorus.depth << ","
+      << "\"mix\":" << p.chorus.mix << "}";
+    o << ",\"tubesat\":{"
+      << "\"drive\":" << p.tubesat.drive << ","
+      << "\"mix\":" << p.tubesat.mix << "}";
+    o << ",\"reverb_send_hpf_hz\":" << p.reverb_send_hpf_hz;
     o << "}";
     return o.str();
 }

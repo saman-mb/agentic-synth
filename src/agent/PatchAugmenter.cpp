@@ -366,6 +366,20 @@ void applyCinematicPadLayering(PatchStruct& p) noexcept {
     p.reverb.damping = 0.55f;
     p.reverb.width = 1.0f;
     p.reverb.mix = std::clamp(p.reverb.mix, 0.30f, 0.45f);
+
+    // Phase E (#265) — pre-filter chorus + tube saturation + reverb-send
+    // HPF. Panel quote: "80% of Vangelis lushness lives in chorus + tube
+    // saturation pre-filter, NOT in reverb." Defaults match the Dimension-D
+    // / Juno-ensemble reference values cited in §32 panel research.
+    p.tubesat.drive = std::max(p.tubesat.drive, 0.30f); // harmonic glue
+    p.tubesat.mix = 1.0f;
+    p.chorus.rate_hz = 0.4f;
+    p.chorus.depth = 0.35f;
+    p.chorus.mix = std::max(p.chorus.mix, 0.40f); // Juno ensemble
+    // HPF the reverb send at 100 Hz so cathedral tail loses sub energy
+    // without thinning the dry path. 0 → bypass; we set 100 unconditionally
+    // here because cinematic patches always have an active reverb send.
+    p.reverb_send_hpf_hz = 100.0f;
 }
 
 // Auto-layer strategy for a single-triangle mainosc (pad archetype). Detuned
