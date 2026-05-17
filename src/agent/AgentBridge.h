@@ -205,6 +205,12 @@ public:
     // Distinct from `suggest_variations` (proactive 3-suggestion stream) — this
     // fires once per explicit user "more variations" request.
     [[nodiscard]] SubscriberHandle onVariationsReady(Callback cb);
+    // Phase C failure-state UX (#269) — first-class user-facing surface for
+    // LLM-offline / prompt-unclear / safety-block. The kind drives the
+    // banner copy in the UI; `detail` (optional) is opaque engineering text
+    // the user can choose to expand. mic_denied stays handled inline by
+    // PushToTalk; emitting it here is reserved for future routing.
+    [[nodiscard]] SubscriberHandle onFailure(Callback cb);
 
     // Test/integration emission helpers — visible so call sites in this
     // translation unit and the test fixture can drive the subscriber fan-out
@@ -219,6 +225,7 @@ public:
     void notifyTranscript(const juce::var& payload);
     void notifyEnhancement(const juce::var& payload);
     void notifyVariationsReady(const juce::var& payload);
+    void notifyFailure(const juce::var& payload);
 
     // Full patch wire helpers used by native UI events and tests. The shape
     // mirrors React PatchParams: nested modules with numeric enum/bool fields.
@@ -282,6 +289,7 @@ private:
     SlotList transcriptSlots_;
     SlotList enhancementSlots_;
     SlotList variationsReadySlots_;
+    SlotList failureSlots_;
 
     // Phase 12A: midi cutoff/resonance atomics moved to KnobBridge (knob_);
     // read via knob_.midiCutoffNorm() / knob_.midiResonanceNorm().

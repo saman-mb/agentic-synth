@@ -306,6 +306,19 @@ AgentBridge::AgentBridge() {
         obj->setProperty("data", patchToVar(p));
         notifyPatch(juce::var{obj});
     });
+
+    // Phase C (#269) — wire the PromptHandler's failure sink to our
+    // typed `failure` notifier so degraded-generation events flow out
+    // through the same subscriber fan-out the rest of the agent uses.
+    // The lambda captures `this`; AgentBridge outlives PromptHandler so
+    // the back-reference is safe for the bridge's lifetime.
+    prompt_.setFailureSink([this](const std::string& kind, const std::string& detail) {
+        auto* obj = new juce::DynamicObject{};
+        obj->setProperty("kind", juce::String(kind));
+        if (!detail.empty())
+            obj->setProperty("detail", juce::String(detail));
+        notifyFailure(juce::var{obj});
+    });
 }
 
 // ── Phase 2: subscription + dispatch plumbing ────────────────────────────────
@@ -411,6 +424,9 @@ AgentBridge::SubscriberHandle AgentBridge::onEnhancement(Callback cb) {
 AgentBridge::SubscriberHandle AgentBridge::onVariationsReady(Callback cb) {
     return subscribe(variationsReadySlots_, std::move(cb));
 }
+AgentBridge::SubscriberHandle AgentBridge::onFailure(Callback cb) {
+    return subscribe(failureSlots_, std::move(cb));
+}
 
 void AgentBridge::notifyToken(const juce::var& payload) { dispatch(tokenSlots_, payload); }
 void AgentBridge::notifyPatch(const juce::var& payload) { dispatch(patchSlots_, payload); }
@@ -422,6 +438,7 @@ void AgentBridge::notifyPatchUpdate(const juce::var& payload) { dispatch(patchUp
 void AgentBridge::notifyTranscript(const juce::var& payload) { dispatch(transcriptSlots_, payload); }
 void AgentBridge::notifyEnhancement(const juce::var& payload) { dispatch(enhancementSlots_, payload); }
 void AgentBridge::notifyVariationsReady(const juce::var& payload) { dispatch(variationsReadySlots_, payload); }
+void AgentBridge::notifyFailure(const juce::var& payload) { dispatch(failureSlots_, payload); }
 
 std::string AgentBridge::enhancePrompt(const std::string& userPrompt) { return enhancer_.enhance(userPrompt); }
 

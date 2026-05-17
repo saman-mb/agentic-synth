@@ -11,6 +11,7 @@
 #include "agent/PatchAugmenter.h"
 #include "mapper/ArchetypeLibrary.h"
 #include "mapper/ArchetypeRetriever.h"
+#include "mapper/PromptSanitizer.h"
 
 namespace agentic_synth::agent {
 
@@ -284,12 +285,28 @@ std::optional<PatchStruct> PromptHandler::generateLlmPatch(const std::string& pr
             augmentPatch(patch, prompt);
     };
 
+    // Phase C (#269) — when the sanitizer rewrites trigger words before
+    // the sampler sees them we want to surface that as a calm UI banner.
+    // We drain the global sanitizer log AFTER the sampler call so any
+    // substitution that fired inside GeminiSampler/PromptEnhancer is
+    // captured. The pop happens on every code path that produced a real
+    // patch (local llama OR Gemini); the RAG fallback below has its own
+    // failure-state surface so we don't double-report there.
+    auto emitSafetyBlockIfAny = [&]() {
+        if (!failureSink_)
+            return;
+        const std::string diff = mapper::popSanitizerLog();
+        if (!diff.empty())
+            failureSink_("safety_block", diff);
+    };
+
     auto result = sampler_.generate(promptForSampler, patch_id);
     if (result) {
         std::cerr << "[PromptHandler] LLM path=local-llama.cpp ok"
                   << (refinement ? " (refinement)" : "") << "\n";
         applyGuardrail(*result);
         refinePatch(*result);
+        emitSafetyBlockIfAny();
         return result;
     }
 
@@ -301,6 +318,7 @@ std::optional<PatchStruct> PromptHandler::generateLlmPatch(const std::string& pr
                       << (refinement ? " (refinement)" : "") << "\n";
             applyGuardrail(*result);
             refinePatch(*result);
+            emitSafetyBlockIfAny();
             return result;
         }
         std::cerr << "[PromptHandler] LLM path=gemini failed; no patch produced\n";
@@ -330,6 +348,24 @@ std::optional<PatchStruct> PromptHandler::generateLlmPatch(const std::string& pr
         }
         std::cerr << "[PromptHandler] LLM unavailable; using retrieved archetype '"
                   << arch->name << "' (tags: " << tagList << ")\n";
+        // ── Phase C (#269) failure-state surface ────────────────────────────
+        //
+        // The user MUST know the LLM was unavailable so they understand why
+        // the patch may not match their prompt precisely. Two cases:
+        //   * default_init match (score 0) → the retriever fell back to a
+        //     vanilla init patch. Surface as 'prompt_unclear' so the user
+        //     knows their wording didn't pin down an archetype.
+        //   * any other archetype → surface as 'llm_offline'. The patch is
+        //     a curated recipe; we shipped it because the agent itself was
+        //     unreachable. Banner explains the substitution.
+        if (failureSink_) {
+            const bool defaultMatch = arch->name == "default_init";
+            const std::string kind = defaultMatch ? "prompt_unclear" : "llm_offline";
+            const std::string detail = defaultMatch
+                ? std::string("No archetype tag matched the prompt; shipped the default init patch.")
+                : std::string("Archetype '") + arch->name + "' selected from local library (tags: " + tagList + ")";
+            failureSink_(kind, detail);
+        }
         PatchStruct patch = arch->patch;
         patch.patch_id = patch_id;
         applyGuardrail(patch);

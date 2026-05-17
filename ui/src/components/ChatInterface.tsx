@@ -22,6 +22,7 @@ import type {
 } from '../types/chat';
 import { AuditionKeyboard } from './AuditionKeyboard';
 import { ConfidenceChips } from './ConfidenceChips';
+import { FailureBanner, type FailureKind } from './FailureBanner';
 import { PatchPreview } from './PatchPreview';
 import { PushToTalk } from './PushToTalk';
 import './ChatInterface.css';
@@ -496,11 +497,31 @@ interface ChatInterfaceProps {
   // the prompt locally (no bridge round-trip) and asks App to load the
   // hardcoded RTFM patch. Optional so existing callers stay unchanged.
   onRtfmEasterEgg?: () => void;
+  // Phase C onboarding (#256) — first-launch quick-start seed. When
+  // supplied AND the message list is empty on mount, we seed a single
+  // assistant bubble carrying this patch + a friendly one-line copy so
+  // the producer can audition something premium immediately.
+  initialMessages?: ChatMessage[];
+  // Phase C onboarding (#256) — fires the moment the FIRST patch wire
+  // event lands during the user's first session. The parent uses this
+  // to unlock onboarding step 2 (the variation grid pointer).
+  onFirstPatchLanded?: () => void;
 }
 
-export function ChatInterface({ externalTranscript, onAudio, onSelectVariation, onRtfmEasterEgg }: ChatInterfaceProps = {}) {
+export function ChatInterface({
+  externalTranscript,
+  onAudio,
+  onSelectVariation,
+  onRtfmEasterEgg,
+  initialMessages,
+  onFirstPatchLanded,
+}: ChatInterfaceProps = {}) {
   const inputId = useId();
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  // Phase C onboarding (#256) — seed the chat with the first-launch
+  // quick-start preset bubble when the parent supplies one. Subsequent
+  // renders never touch this initialiser — React only runs it once on
+  // mount, so the seed is a true first-impression artifact.
+  const [messages, setMessages] = useState<ChatMessage[]>(() => initialMessages ?? []);
   const [inputValue, setInputValue] = useState('');
   const [isGenerating, setIsGenerating] = useState(false);
   const [proactiveSuggestions, setProactiveSuggestions] = useState<ProactiveSuggestion[]>([]);
@@ -546,6 +567,18 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation, 
   // animation actually restarts (revealKey is wired to ABVariationGrid).
   const morphTargetIdRef = useRef<string | null>(null);
   const [revealCount, setRevealCount] = useState<Record<string, number>>({});
+  // Phase C failure-state UX (#269) — single-slot banner above the input
+  // bar. Auto-clears on the next successful `patch` event. We track the
+  // last-prompt so the LLM-offline retry button can resend the same
+  // string the agent failed to honour.
+  const [currentFailure, setCurrentFailure] = useState<
+    { kind: FailureKind; detail?: string } | null
+  >(null);
+  const lastPromptRef = useRef<string>('');
+  // Phase C onboarding (#256) — fires the parent callback exactly once
+  // on the FIRST patch wire event of the session. Subsequent patches
+  // don't re-emit (the overlay only needs the unlock signal once).
+  const firstPatchEmittedRef = useRef<boolean>(false);
 
   const { status, send, lastMessage, subscribe } = useSynthBridge();
 
@@ -584,6 +617,18 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation, 
           break;
         }
         case 'patch': {
+          // Phase C failure-state UX (#269) — a fresh successful patch
+          // clears any banner that was up. Auto-dismiss is part of the
+          // contract: the user shouldn't have to re-dismiss after the
+          // agent recovers.
+          setCurrentFailure(null);
+          // Phase C onboarding (#256) — unlock step 2 of the tour the
+          // FIRST time a patch lands in this session. Fire once only;
+          // subsequent patches don't re-trigger the callback.
+          if (!firstPatchEmittedRef.current) {
+            firstPatchEmittedRef.current = true;
+            if (onFirstPatchLanded) onFirstPatchLanded();
+          }
           const sid = streamingIdRef.current;
           if (!sid) return;
           setMessages((prev) =>
@@ -719,9 +764,23 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation, 
           setRevealCount((prev) => ({ ...prev, [tid]: (prev[tid] ?? 0) + 1 }));
           break;
         }
+        case 'failure': {
+          // Phase C failure-state UX (#269) — the C++ agent told us a
+          // generation finished but in a degraded mode (RAG fallback /
+          // prompt-unclear / safety-block). Set the banner state; the
+          // patch itself (if any) still rides in via the `patch` event
+          // and renders normally — the banner explains WHY it might not
+          // match what the producer asked for.
+          //
+          // mic_denied is reserved for future wiring; PushToTalk currently
+          // handles that state inline. Setting it here is harmless.
+          setCurrentFailure({ kind: msg.kind, detail: msg.detail });
+          break;
+        }
       }
     },
-    [],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [onFirstPatchLanded],
   );
 
   const handleFeedback = useCallback(
@@ -800,6 +859,9 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation, 
     setInputValue('');
     setIsGenerating(true);
     streamingIdRef.current = assistantId;
+    // Phase C failure-state UX (#269) — stash the prompt so the
+    // `llm_offline` banner's Retry button can resend the same string.
+    lastPromptRef.current = prompt;
     // Two-step LLM flow: clear any stale brief from a previous generate so
     // the ticker starts in HEARING IT OUT mode for this new prompt.
     currentBriefRef.current = '';
@@ -1044,6 +1106,39 @@ export function ChatInterface({ externalTranscript, onAudio, onSelectVariation, 
       )}
 
       <ReasoningTicker active={isGenerating} brief={currentBrief} />
+
+      {currentFailure && (
+        <FailureBanner
+          kind={currentFailure.kind}
+          detail={currentFailure.detail}
+          onRetry={
+            currentFailure.kind === 'llm_offline' && lastPromptRef.current.length > 0
+              ? () => {
+                  const retryPrompt = lastPromptRef.current;
+                  setCurrentFailure(null);
+                  // Inject a fresh streaming assistant bubble and resend
+                  // the last prompt verbatim. We don't push a new user
+                  // bubble — the user's original message is still in the
+                  // list; we're retrying the response, not the request.
+                  const assistantId = nanoid();
+                  const assistantMsg: ChatMessage = {
+                    id: assistantId,
+                    role: 'assistant',
+                    content: '',
+                    streaming: true,
+                  };
+                  setMessages((prev) => [...prev, assistantMsg]);
+                  setIsGenerating(true);
+                  streamingIdRef.current = assistantId;
+                  currentBriefRef.current = '';
+                  setCurrentBrief('');
+                  send({ type: 'generate', prompt: retryPrompt, sessionId: SESSION_ID });
+                }
+              : undefined
+          }
+          onDismiss={() => setCurrentFailure(null)}
+        />
+      )}
 
       <form className="input-bar" onSubmit={handleSubmit} aria-label="Prompt input">
         <label htmlFor={inputId} className="visually-hidden">

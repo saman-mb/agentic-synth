@@ -134,6 +134,18 @@ public:
     // Per-dimension parameter bias derived from session memory.
     [[nodiscard]] PatchVector getParameterBias(const std::string& userPrompt) const;
 
+    // Phase C failure-state UX (#269) — inject a "report failure to UI"
+    // sink. Called from generateLlmPatch when:
+    //   * both LLM paths fail AND RAG fallback ships a real archetype
+    //     → kind="llm_offline"
+    //   * archetype retrieval falls back to `default_init` (no tag match)
+    //     → kind="prompt_unclear"
+    // Callable from any thread; AgentBridge::notifyFailure marshals onto
+    // the JUCE message thread via callAsync. Default sink is empty so
+    // unit tests that don't wire the sink stay silent.
+    using FailureSink = std::function<void(const std::string& kind, const std::string& detail)>;
+    void setFailureSink(FailureSink sink) noexcept { failureSink_ = std::move(sink); }
+
     // Issue #85: natural-language rationale for the chosen patch in the
     // context of the current prompt + session memory.
     [[nodiscard]] std::string generateRationale(const std::string& prompt, const PatchStruct& patch) const;
@@ -150,6 +162,8 @@ private:
     // a follow-up phase after telemetry confirms the §3 split doesn't
     // erode patch quality.
     bool use_rails_only_{false};
+    // Phase C failure-state UX (#269) — optional UI failure surface.
+    FailureSink failureSink_{};
 };
 
 } // namespace agentic_synth::agent

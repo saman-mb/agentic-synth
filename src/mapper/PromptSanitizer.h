@@ -31,4 +31,28 @@ namespace agentic_synth::mapper {
 // no-trigger path beyond the result copy.
 [[nodiscard]] std::string sanitizePromptForSafety(const std::string& prompt);
 
+// Phase C failure-state UX (#269) — variant that ALSO returns a human-
+// readable diff string when at least one replacement fired. `outDiff`
+// receives a single-line summary like "horror → uneasy, evil → dark"
+// suitable for the FailureBanner detail disclosure. When no replacements
+// fired, `outDiff` is set to the empty string and `prompt` is returned
+// verbatim. Caller passes ownership of `outDiff`; we overwrite it.
+[[nodiscard]] std::string sanitizePromptForSafetyWithDiff(const std::string& prompt,
+                                                          std::string& outDiff);
+
+// Phase C failure-state UX (#269) — process-wide queue of recent
+// sanitizer modifications. Producers (GeminiSampler, PromptEnhancer)
+// push via the auto-queueing wrapper inside `sanitizePromptForSafety`;
+// PromptHandler pops the most recent entry after a generation completes
+// and forwards it to the UI as a `safety_block` failure event.
+//
+// Implementation detail: a small bounded-size FIFO behind a mutex. We
+// intentionally do not key by thread — generation may hop between the
+// JUCE worker pool and the Gemini HTTP thread. The last-write-wins
+// semantics are fine because the only legitimate consumer
+// (PromptHandler::generateLlmPatch) calls pop right after its sampler
+// call returns, so contention is negligible.
+void pushSanitizerLog(std::string diff);
+[[nodiscard]] std::string popSanitizerLog();
+
 } // namespace agentic_synth::mapper
