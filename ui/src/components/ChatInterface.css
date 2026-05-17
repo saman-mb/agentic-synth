@@ -531,6 +531,44 @@
   background: var(--error-tint-15, rgba(255, 61, 136, 0.15));
 }
 
+/* Phase G / #247 — pitch hint chip. Lives just above the input bar so
+   it reads as ambient context, not chrome. Musician-register copy
+   ("TIMBRE heard a note around B♭3"), never frequency in Hz. */
+.hum-pitch-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 1rem 6px 1rem;
+  padding: 6px 10px;
+  border: 1px solid var(--accent-tint-40, rgba(180, 140, 255, 0.4));
+  border-radius: var(--r-2, 8px);
+  background: var(--accent-tint-12, rgba(180, 140, 255, 0.12));
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  color: var(--text-primary);
+}
+.hum-pitch-text {
+  flex: 1 1 auto;
+}
+.hum-pitch-action {
+  background: transparent;
+  border: 1px solid var(--accent-tint-40, rgba(180, 140, 255, 0.4));
+  border-radius: var(--r-1, 4px);
+  padding: 2px 8px;
+  font: inherit;
+  font-size: 0.72rem;
+  color: var(--text-accent, #B388FF);
+  cursor: pointer;
+}
+.hum-pitch-action:hover { background: var(--accent-tint-12, rgba(180, 140, 255, 0.12)); }
+.hum-pitch-muted {
+  color: var(--text-secondary);
+  border-color: var(--color-border-strong, rgba(255,255,255,0.1));
+  font-size: 0.9rem;
+  line-height: 1;
+  padding: 2px 6px;
+}
+
 /* ── Input bar ────────────────────────────────────────────────────── */
 
 .input-bar {

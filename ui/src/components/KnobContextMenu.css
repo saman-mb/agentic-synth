@@ -1,0 +1,47 @@
+/* Phase G / #262 — right-click MIDI menu on every Knob. Pinned to the
+   click point via absolute coords from KnobContextMenu.tsx (clamped to
+   viewport inside the component). Calm grey container with hairline
+   border; items get accent-tinted on hover. */
+.knob-context-menu {
+  position: fixed;
+  z-index: 10000;
+  min-width: 160px;
+  padding: 4px;
+  border: 1px solid var(--color-border-strong, rgba(255, 255, 255, 0.12));
+  border-radius: var(--r-2, 8px);
+  background: var(--bg-panel, #1A1D24);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+  font-family: var(--font-sans);
+  font-size: 0.82rem;
+  user-select: none;
+}
+
+.knob-context-item {
+  display: block;
+  width: 100%;
+  padding: 6px 10px;
+  background: transparent;
+  border: none;
+  border-radius: var(--r-1, 4px);
+  color: var(--text-primary);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+.knob-context-item:hover:not(:disabled) {
+  background: var(--accent-tint-12, rgba(180, 140, 255, 0.12));
+  color: var(--text-accent, #B388FF);
+}
+
+.knob-context-item:disabled {
+  color: var(--text-secondary);
+  opacity: 0.55;
+  cursor: default;
+}
+
+.knob-context-item:focus { outline: none; }
+.knob-context-item:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}

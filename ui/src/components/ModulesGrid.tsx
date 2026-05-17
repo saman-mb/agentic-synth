@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { Knob } from './Knob';
 import type { ModSource } from './Knob';
 import type { PatchParams } from './KnobGrid';
+import { KnobContextMenu } from './KnobContextMenu';
 import { dominantConnection, ModMatrix, type ModConnection, type ModSourceId } from '../data/modulation';
 import { Visualizer } from './Visualizer';
 import { ModMatrixPanel } from './ModMatrixPanel';
@@ -40,6 +41,13 @@ interface ModulesGridProps {
   onUpdateConnection?: (id: string, patch: Partial<ModConnection>) => void;
   onDeleteConnection?: (id: string) => void;
   onAddConnection?: (source: ModSourceId, destination: string) => void;
+  // Phase G / #262 — MIDI learn affordances. Right-click on any knob opens
+  // a context menu wired to these callbacks. midiMappings is the current
+  // knob_id → { cc, channel } map so the menu can show / clear intelligently.
+  onMidiLearn?: (knobId: string) => void;
+  onClearMidiMapping?: (knobId: string) => void;
+  onShowMidiMapping?: (knobId: string) => void;
+  midiMappings?: Record<string, { cc: number; channel: number }>;
 }
 
 // Signal-flow stage index per param prefix. Drives the staggered settle when
@@ -123,7 +131,19 @@ export function ModulesGrid({
   onUpdateConnection,
   onDeleteConnection,
   onAddConnection,
+  onMidiLearn,
+  onClearMidiMapping,
+  onShowMidiMapping,
+  midiMappings,
 }: ModulesGridProps) {
+  // Phase G / #262 — right-click context menu state. One menu is open
+  // at a time; closing routes through onClose so the doc-level dismiss
+  // listener stays self-contained inside KnobContextMenu.
+  const [contextMenu, setContextMenu] = useState<{
+    x: number;
+    y: number;
+    knobId: string;
+  } | null>(null);
   // When a patch-load token bumps, open a brief animation window during
   // which any knob whose value changes will lerp from old → new with a
   // stage-based delay. The window closes after the last stage finishes
@@ -176,11 +196,18 @@ export function ModulesGrid({
             destinationKey={param}
             onAssignMod={onAssignMod}
             spinToken={spinToken}
+            onContextMenu={
+              onMidiLearn
+                ? (e: React.MouseEvent) => {
+                    setContextMenu({ x: e.clientX, y: e.clientY, knobId: param });
+                  }
+                : undefined
+            }
           />
         </div>
       );
     },
-    [agentKeys, onKnobChange, animatePatchLoad, modMatrix, onAssignMod, spinToken],
+    [agentKeys, onKnobChange, animatePatchLoad, modMatrix, onAssignMod, spinToken, onMidiLearn],
   );
 
   const renderOption = useCallback(
@@ -415,6 +442,20 @@ export function ModulesGrid({
             onAddConnection={onAddConnection}
           />
         </div>
+      )}
+      {/* Phase G / #262 — right-click MIDI menu. Rendered last so it
+          paints over knobs / popovers without z-index ceremony. */}
+      {contextMenu && (
+        <KnobContextMenu
+          x={contextMenu.x}
+          y={contextMenu.y}
+          knobId={contextMenu.knobId}
+          currentMapping={midiMappings?.[contextMenu.knobId] ?? null}
+          onLearn={(id) => onMidiLearn?.(id)}
+          onClear={(id) => onClearMidiMapping?.(id)}
+          onShow={(id) => onShowMidiMapping?.(id)}
+          onClose={() => setContextMenu(null)}
+        />
       )}
     </div>
   );

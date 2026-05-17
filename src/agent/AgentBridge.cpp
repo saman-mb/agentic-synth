@@ -9,6 +9,7 @@
 #include <string_view>
 #include <utility>
 
+#include "agent/MidiLearnStore.h"
 #include "agent/PresetStore.h"
 #include "engine/OfflineRenderer.h"
 #include "mapper/EnvLoader.h"
@@ -474,6 +475,12 @@ AgentBridge::SubscriberHandle AgentBridge::onPresetCommitted(Callback cb) {
 AgentBridge::SubscriberHandle AgentBridge::onBounceComplete(Callback cb) {
     return subscribe(bounceCompleteSlots_, std::move(cb));
 }
+AgentBridge::SubscriberHandle AgentBridge::onMidiLearned(Callback cb) {
+    return subscribe(midiLearnedSlots_, std::move(cb));
+}
+AgentBridge::SubscriberHandle AgentBridge::onHumPitch(Callback cb) {
+    return subscribe(humPitchSlots_, std::move(cb));
+}
 
 void AgentBridge::notifyToken(const juce::var& payload) { dispatch(tokenSlots_, payload); }
 void AgentBridge::notifyPatch(const juce::var& payload) { dispatch(patchSlots_, payload); }
@@ -488,6 +495,8 @@ void AgentBridge::notifyVariationsReady(const juce::var& payload) { dispatch(var
 void AgentBridge::notifyFailure(const juce::var& payload) { dispatch(failureSlots_, payload); }
 void AgentBridge::notifyPresetCommitted(const juce::var& payload) { dispatch(presetCommittedSlots_, payload); }
 void AgentBridge::notifyBounceComplete(const juce::var& payload) { dispatch(bounceCompleteSlots_, payload); }
+void AgentBridge::notifyMidiLearned(const juce::var& payload) { dispatch(midiLearnedSlots_, payload); }
+void AgentBridge::notifyHumPitch(const juce::var& payload) { dispatch(humPitchSlots_, payload); }
 
 // ── Phase D / #260 — preset commit + persistence ─────────────────────────────
 
@@ -595,7 +604,43 @@ void AgentBridge::applyGuardrailIfNotRefinement(PatchStruct& patch, const std::s
 
 void AgentBridge::feedChunk(std::string_view chunk) { prompt_.feedChunk(chunk); }
 
-void AgentBridge::onMidiCC(int controller, int value) noexcept { knob_.onMidiCC(controller, value); }
+void AgentBridge::onMidiCC(int controller, int value) noexcept {
+    knob_.onMidiCC(controller, value);
+
+    // Phase G / #262 — MIDI learn. If a knob is currently in learn mode,
+    // claim this CC and emit `midi_learned`. Otherwise look up any prior
+    // mapping and forward the CC value through the knob bridge so the
+    // physical controller drives the on-screen knob 1:1.
+    //
+    // Channel is not threaded through the CC sink today (engine MidiHandler
+    // collapses channels into one global state) — MVP stores channel 0 and
+    // matches omni-style.
+    auto& learn = MidiLearnStore::instance();
+    if (auto captured = learn.captureIfLearning(controller, /*channel=*/0); captured) {
+        auto* obj = new juce::DynamicObject{};
+        obj->setProperty("knob_id", juce::String(*captured));
+        obj->setProperty("cc", controller);
+        obj->setProperty("channel", 0);
+        notifyMidiLearned(juce::var{obj});
+        return;
+    }
+    if (auto knobId = learn.findKnobFor(controller, /*channel=*/0); knobId) {
+        const float norm = std::clamp(static_cast<float>(value) / 127.0f, 0.0f, 1.0f);
+        try {
+            knob_.handleKnobTweak(*knobId, norm);
+        } catch (...) {
+            // Defensive — handleKnobTweak walks the param map and can throw
+            // on unknown ids; swallow so the MIDI thread keeps moving.
+        }
+        // Notify the UI so it can flash the knob + reflect the new value
+        // in the React state. Reuses patch_update which UI already handles.
+        auto* obj = new juce::DynamicObject{};
+        auto* params = new juce::DynamicObject{};
+        params->setProperty(juce::String(*knobId), norm);
+        obj->setProperty("params", juce::var{params});
+        notifyPatchUpdate(juce::var{obj});
+    }
+}
 
 // ── Issue #72: Bidirectional knob bridge (Phase 12A: forwards to KnobBridge) ─
 

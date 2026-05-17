@@ -521,6 +521,46 @@ export function App() {
 
   const [presetListOpen, setPresetListOpen] = useState<boolean>(false);
 
+  // Phase G / #262 — MIDI learn map mirror. The canonical store is on the
+  // C++ side (MidiLearnStore); React mirrors it via `midi_learned` events
+  // and an initial `get_midi_mappings` round-trip so the context menu can
+  // show / clear with accurate state.
+  const [midiMappings, setMidiMappings] = useState<Record<string, { cc: number; channel: number }>>({});
+  useEffect(() => {
+    // Best-effort load at startup. Failure (no native bridge) is silent —
+    // the menu still works for the in-session learn flow.
+    const j = (window as unknown as { __JUCE__?: { backend?: { emitEvent?: (n: string, p: unknown) => void } } }).__JUCE__;
+    if (!j?.backend?.emitEvent) return;
+    synthBridge.send({ type: 'get_midi_mappings' });
+  }, [synthBridge]);
+  useEffect(() => {
+    const msg = synthBridge.lastMessage;
+    if (!msg) return;
+    if (msg.type === 'midi_learned') {
+      setMidiMappings((cur) => ({ ...cur, [msg.knob_id]: { cc: msg.cc, channel: msg.channel } }));
+    }
+  }, [synthBridge.lastMessage]);
+
+  const handleMidiLearn = useCallback((knobId: string) => {
+    synthBridge.send({ type: 'start_midi_learn', knob_id: knobId });
+  }, [synthBridge]);
+  const handleClearMidiMapping = useCallback((knobId: string) => {
+    synthBridge.send({ type: 'clear_midi_mapping', knob_id: knobId });
+    setMidiMappings((cur) => {
+      const next = { ...cur };
+      delete next[knobId];
+      return next;
+    });
+  }, [synthBridge]);
+  const handleShowMidiMapping = useCallback((knobId: string) => {
+    const m = midiMappings[knobId];
+    if (!m) return;
+    // No global toast plumbing at this layer — use console + a brief
+    // alert affordance later. For MVP we log so power users can confirm.
+    // eslint-disable-next-line no-console
+    console.info(`[TIMBRE] ${knobId} is mapped to CC${m.cc} (channel ${m.channel + 1})`);
+  }, [midiMappings]);
+
   // ── Macro projection (Phase 13) ───────────────────────────────────
   // Apply the sum of all enabled macro ModConnections on top of the
   // base patch. Each connection contributes:
@@ -1062,6 +1102,10 @@ export function App() {
               onUpdateConnection={handleUpdateConnection}
               onDeleteConnection={handleDeleteConnection}
               onAddConnection={handleAddConnection}
+              onMidiLearn={handleMidiLearn}
+              onClearMidiMapping={handleClearMidiMapping}
+              onShowMidiMapping={handleShowMidiMapping}
+              midiMappings={midiMappings}
             />
           </HoodSlideOver>
         </div>
