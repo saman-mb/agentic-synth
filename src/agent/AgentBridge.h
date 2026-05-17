@@ -23,6 +23,7 @@
 #include "engine/PatchStruct.h"
 #include "engine/VariationEngine.h"
 #include "agent/GeminiSTT.h"
+#include "mapper/DeltaNudger.h"
 #include "mapper/GeminiSampler.h"
 #include "mapper/GrammarSampler.h"
 #include "mapper/PromptEnhancer.h"
@@ -276,6 +277,9 @@ private:
     // so the fallback degrades silently in unit-test/CI environments that
     // don't ship credentials.
     mapper::GeminiSampler gemini_{mapper::GeminiSamplerConfig{}};
+    // Phase 34b (#264) — LLM-delta-nudger. Same key as gemini_; wired in
+    // the ctor below. PromptHandler picks this up via setDeltaNudger().
+    mapper::DeltaNudger deltaNudger_{};
     // Step 1 of the 2-step LLM flow (translator → generator). Constructed
     // empty; AgentBridge() injects GEMINI_KEY + the enhancer-prompt.md
     // briefing at startup, mirroring how gemini_ is configured.

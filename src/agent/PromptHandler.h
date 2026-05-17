@@ -11,6 +11,7 @@
 #include "agent/SessionMemory.h"
 #include "agent/StreamParser.h"
 #include "engine/PatchStruct.h"
+#include "mapper/DeltaNudger.h"
 #include "mapper/GeminiSampler.h"
 #include "mapper/GrammarSampler.h"
 #include "mapper/SemanticMapper.h"
@@ -45,6 +46,13 @@ public:
                   const KnobBridge& knob) noexcept
         : pipeline_(pipeline), sampler_(sampler), gemini_(gemini), semanticMapper_(semanticMapper),
           streamParser_(streamParser), memory_(memory), knob_(knob) {}
+
+    // Phase 34b — wire the LLM-delta-nudger in front of the Phase 34a top-1
+    // archetype fallback. Default-constructed nudger is disabled; AgentBridge
+    // pokes the GEMINI_KEY in at startup the same way it does for gemini_ /
+    // enhancer_ / stt_. Test seam: inject a mock subclass.
+    void setDeltaNudger(mapper::DeltaNudger* nudger) noexcept { deltaNudger_ = nudger; }
+    [[nodiscard]] mapper::DeltaNudger* deltaNudger() const noexcept { return deltaNudger_; }
 
     // Issue #65/#68: parse heuristically and dispatch to audio thread
     // immediately (< 200 ms); semantic mapper refines in place.
@@ -164,6 +172,10 @@ private:
     bool use_rails_only_{false};
     // Phase C failure-state UX (#269) — optional UI failure surface.
     FailureSink failureSink_{};
+    // Phase 34b — LLM-delta-nudger over RAG retrieval. Non-owning; supplied
+    // by AgentBridge (or unit tests). Nullptr / disabled() == fall straight
+    // through to the Phase 34a top-1 archetype path.
+    mapper::DeltaNudger* deltaNudger_{nullptr};
 };
 
 } // namespace agentic_synth::agent
