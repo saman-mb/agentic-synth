@@ -3,6 +3,14 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 interface PushToTalkProps {
   onData: (buf: ArrayBuffer) => void;
   wsReady: boolean;
+  // Phase G / #244 — transcript confirmation step. When set, PushToTalk
+  // renders a muted "Use / Re-record / Edit" affordance until the user
+  // acts or 2 seconds elapse. The parent owns the accept/reject branch so
+  // PushToTalk stays presentational about transcript lifecycle.
+  pendingTranscript?: string | null;
+  onAcceptTranscript?: (text: string) => void;
+  onEditTranscript?: (text: string) => void;
+  onRerecord?: () => void;
 }
 
 type RecordState = 'idle' | 'recording' | 'processing';
@@ -25,6 +33,11 @@ const MIC_FAILURE_COPY: Record<MicFailure, string> = {
   'audio-init': "Audio pipeline didn't start. Try again in a moment.",
   resample: "Audio capture finished but couldn't be processed. Try again.",
 };
+
+// Phase G / #244 — transcript auto-confirm delay. Matches the brief: if
+// the user doesn't act within 2s, we behave like the old auto-accept path
+// so the default is no worse than what shipped in Phase 29.
+const TRANSCRIPT_AUTO_CONFIRM_MS = 2000;
 
 function openSystemSettings() {
   // Phase 15 fix: window.open(..., '_self') navigates the WKWebView itself
@@ -60,10 +73,38 @@ function openSystemSettings() {
   }
 }
 
-export function PushToTalk({ onData, wsReady }: PushToTalkProps) {
+// Compute RMS over a Float32 chunk in [0, 1]. Used to drive the on-press
+// level meter — bar reads the most recent chunk's RMS, smoothed by the
+// browser repaint cadence (no requestAnimationFrame needed; each chunk is
+// ~21 ms at 48 k which is already finer than the eye can resolve).
+function rmsOf(chunk: Float32Array): number {
+  let sum = 0;
+  for (let i = 0; i < chunk.length; i++) {
+    const v = chunk[i];
+    sum += v * v;
+  }
+  const rms = Math.sqrt(sum / Math.max(1, chunk.length));
+  // Compress to 0..1 with a soft knee so a "loud" hum reads ~0.8 not 0.2.
+  // 0.3 RMS is already very loud for a near-field laptop mic, so we map
+  // 0..0.3 → 0..1.
+  return Math.max(0, Math.min(1, rms / 0.3));
+}
+
+export function PushToTalk({
+  onData,
+  wsReady,
+  pendingTranscript,
+  onAcceptTranscript,
+  onEditTranscript,
+  onRerecord,
+}: PushToTalkProps) {
   const [state, setState] = useState<RecordState>('idle');
   // Failure flag drives the calm subtitle; null = healthy.
   const [failure, setFailure] = useState<MicFailure | null>(null);
+  // Phase G / #244 — 0..1 RMS shown as a thin bar while recording. Updates
+  // every PCM-tap chunk (~21 ms). Quiet mic = bar stays empty so the user
+  // sees immediately that their input isn't reaching the worklet.
+  const [level, setLevel] = useState(0);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
   const workletRef = useRef<AudioWorkletNode | null>(null);
@@ -152,8 +193,12 @@ export function PushToTalk({ onData, wsReady }: PushToTalkProps) {
       });
       workletRef.current = node;
       chunksRef.current = [];
+      setLevel(0);
       node.port.onmessage = (e: MessageEvent<Float32Array>) => {
         chunksRef.current.push(e.data);
+        // Phase G / #244 — drive the level meter from the same chunk
+        // we're buffering for STT. No extra audio graph node needed.
+        setLevel(rmsOf(e.data));
       };
       src.connect(node);
       // No destination connection needed: the worklet has zero outputs and
@@ -172,6 +217,7 @@ export function PushToTalk({ onData, wsReady }: PushToTalkProps) {
   const stop = useCallback(async () => {
     if (state !== 'recording') return;
     setState('processing');
+    setLevel(0);
 
     // Capture chunks + sample rate before tearing down the context.
     const ctx = audioCtxRef.current;
@@ -230,6 +276,38 @@ export function PushToTalk({ onData, wsReady }: PushToTalkProps) {
     setState('idle');
   }, [state, onData]);
 
+  // Phase G / #244 — transcript confirmation. When `pendingTranscript`
+  // appears, hold it visible with Use / Re-record / Edit affordances for
+  // 2s. If the user doesn't act we fire onAcceptTranscript (matches the
+  // Phase 29 auto-accept default so nobody is worse off than before).
+  const autoConfirmTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!pendingTranscript) return;
+    if (!onAcceptTranscript) return;
+    if (autoConfirmTimerRef.current) clearTimeout(autoConfirmTimerRef.current);
+    autoConfirmTimerRef.current = setTimeout(() => {
+      onAcceptTranscript(pendingTranscript);
+    }, TRANSCRIPT_AUTO_CONFIRM_MS);
+    return () => {
+      if (autoConfirmTimerRef.current) clearTimeout(autoConfirmTimerRef.current);
+    };
+  }, [pendingTranscript, onAcceptTranscript]);
+
+  const handleUse = useCallback(() => {
+    if (autoConfirmTimerRef.current) clearTimeout(autoConfirmTimerRef.current);
+    if (pendingTranscript && onAcceptTranscript) onAcceptTranscript(pendingTranscript);
+  }, [pendingTranscript, onAcceptTranscript]);
+
+  const handleEdit = useCallback(() => {
+    if (autoConfirmTimerRef.current) clearTimeout(autoConfirmTimerRef.current);
+    if (pendingTranscript && onEditTranscript) onEditTranscript(pendingTranscript);
+  }, [pendingTranscript, onEditTranscript]);
+
+  const handleRerecord = useCallback(() => {
+    if (autoConfirmTimerRef.current) clearTimeout(autoConfirmTimerRef.current);
+    if (onRerecord) onRerecord();
+  }, [onRerecord]);
+
   // In a failure state, the button still renders so the user sees the
   // affordance — but with a struck-through mic icon, calm grey subtitle,
   // and an inline "Open Settings" link below. The button is disabled so
@@ -242,6 +320,8 @@ export function PushToTalk({ onData, wsReady }: PushToTalkProps) {
     : state === 'processing' ? 'Transcribing...'
     : isMicFailure ? "Can't hear you"
     : 'Hold to speak';
+
+  const showConfirm = Boolean(pendingTranscript) && state === 'idle';
 
   return (
     <div className="ptt-host">
@@ -264,6 +344,49 @@ export function PushToTalk({ onData, wsReady }: PushToTalkProps) {
         )}
         <span className="ptt-btn-label">{label}</span>
       </button>
+      {state === 'recording' && (
+        <div
+          className="ptt-level"
+          role="meter"
+          aria-label="Microphone level"
+          aria-valuemin={0}
+          aria-valuemax={1}
+          aria-valuenow={level}
+        >
+          <div
+            className="ptt-level-fill"
+            style={{ width: `${Math.round(level * 100)}%` }}
+          />
+        </div>
+      )}
+      {showConfirm && pendingTranscript && (
+        <div className="ptt-transcript-confirm" role="status" aria-live="polite">
+          <span className="ptt-transcript-text">{pendingTranscript}</span>
+          <span className="ptt-transcript-actions">
+            <button type="button" className="ptt-confirm-btn" onClick={handleUse}>
+              Use
+            </button>
+            {onRerecord && (
+              <button
+                type="button"
+                className="ptt-confirm-btn ptt-confirm-muted"
+                onClick={handleRerecord}
+              >
+                Re-record
+              </button>
+            )}
+            {onEditTranscript && (
+              <button
+                type="button"
+                className="ptt-confirm-btn ptt-confirm-muted"
+                onClick={handleEdit}
+              >
+                Edit
+              </button>
+            )}
+          </span>
+        </div>
+      )}
       {failure && (
         <div className="ptt-subtitle" role="status" aria-live="polite">
           <span>{MIC_FAILURE_COPY[failure]}</span>

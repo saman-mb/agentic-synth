@@ -896,6 +896,65 @@ body {
   border-radius: var(--r-1);
 }
 
+/* Phase G / #244 — push-to-talk level meter. A single thin bar fills
+   left-to-right from 0 → 100%. Quiet mic = no fill, so silence is
+   visible immediately and the user knows their input isn't landing. */
+.ptt-level {
+  margin-top: 6px;
+  width: 100%;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--accent-tint-12);
+  overflow: hidden;
+}
+.ptt-level-fill {
+  height: 100%;
+  background: var(--accent-primary);
+  transition: width 60ms linear;
+}
+
+/* Phase G / #244 — transcript confirm step. Muted bubble that holds
+   the transcript visible with Use / Re-record / Edit affordances; auto-
+   accepts after 2s so users who don't act are no worse off than the
+   Phase 29 auto-accept default. */
+.ptt-transcript-confirm {
+  margin-top: 8px;
+  padding: 8px 10px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--r-2);
+  background: var(--accent-tint-12);
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  text-align: left;
+}
+.ptt-transcript-text {
+  color: var(--text-primary);
+  font-style: italic;
+}
+.ptt-transcript-actions {
+  display: inline-flex;
+  gap: 8px;
+}
+.ptt-confirm-btn {
+  background: transparent;
+  border: 1px solid var(--accent-tint-40);
+  border-radius: var(--r-1);
+  padding: 2px 8px;
+  font: inherit;
+  font-size: 0.72rem;
+  color: var(--text-accent);
+  cursor: pointer;
+}
+.ptt-confirm-btn:hover { background: var(--accent-tint-12); }
+.ptt-confirm-muted {
+  color: var(--text-secondary);
+  border-color: var(--color-border-strong);
+}
+
 /* ── Accessibility: focus-visible outlines ────────────────────────────
    Only show the focus ring for keyboard focus; pointer focus stays
    clean. 2px solid var(--color-focus-ring) matches the brand accent. */

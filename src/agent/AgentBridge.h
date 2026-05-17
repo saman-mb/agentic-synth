@@ -219,6 +219,14 @@ public:
     // Phase D export-to-track (#268) — fires after renderPatchToWav completes.
     // Payload: { ok, path?, error? }. UI surfaces a "Saved to <path>" toast.
     [[nodiscard]] SubscriberHandle onBounceComplete(Callback cb);
+    // Phase G / #262 — fires once when MidiLearnStore captures a CC for the
+    // currently-learning knob. Payload: { knob_id, cc, channel }. UI uses
+    // this to close the "Learn MIDI" affordance and show a chip on the knob.
+    [[nodiscard]] SubscriberHandle onMidiLearned(Callback cb);
+    // Phase G / #247 — fires when push_audio_pcm contains a confident
+    // monophonic pitch. Payload: { midi_note, confidence, frequency_hz }.
+    // UI shows a "TIMBRE heard a note around B♭3" chip near the textarea.
+    [[nodiscard]] SubscriberHandle onHumPitch(Callback cb);
 
     // Test/integration emission helpers — visible so call sites in this
     // translation unit and the test fixture can drive the subscriber fan-out
@@ -236,6 +244,8 @@ public:
     void notifyFailure(const juce::var& payload);
     void notifyPresetCommitted(const juce::var& payload);
     void notifyBounceComplete(const juce::var& payload);
+    void notifyMidiLearned(const juce::var& payload);
+    void notifyHumPitch(const juce::var& payload);
 
     // ── Phase D / #260 / #268 — preset commit + offline render ───────────────
     //
@@ -323,6 +333,8 @@ private:
     SlotList failureSlots_;
     SlotList presetCommittedSlots_;
     SlotList bounceCompleteSlots_;
+    SlotList midiLearnedSlots_;
+    SlotList humPitchSlots_;
 
     // Phase 12A: midi cutoff/resonance atomics moved to KnobBridge (knob_);
     // read via knob_.midiCutoffNorm() / knob_.midiResonanceNorm().

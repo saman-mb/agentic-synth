@@ -182,6 +182,12 @@ export function useSynthBridge(): UseSynthBridgeReturn {
     // Phase D export-to-track (#268) — fired after the offline bounce
     // finishes (or fails / cancels). UI shows the "Saved to <path>" toast.
     wrap('bounce_complete');
+    // Phase G / #247 — autocorrelation pitch detection result from the
+    // push-to-talk audio buffer.
+    wrap('hum_pitch_detected');
+    // Phase G / #262 — MIDI learn store captured the next CC for the
+    // currently-learning knob.
+    wrap('midi_learned');
     juce.backend.addEventListener('patch_update', (payload) => {
       enqueueMessage({ type: 'patch_update' as unknown as WireIncoming['type'], ...(payload as object) } as unknown as WireIncoming);
     });
@@ -285,6 +291,23 @@ export function useSynthBridge(): UseSynthBridgeReturn {
           // Phase D / #268 — fire-and-forget; C++ opens FileChooser then
           // emits `bounce_complete`.
           void callNative('bounce_patch', [msg.patch ?? null, msg.suggestedName ?? 'timbre-bounce']);
+          return;
+        }
+        case 'start_midi_learn': {
+          // Phase G / #262 — enter learn mode for this knob.
+          void callNative('start_midi_learn', [msg.knob_id]);
+          return;
+        }
+        case 'cancel_midi_learn': {
+          void callNative('cancel_midi_learn', []);
+          return;
+        }
+        case 'clear_midi_mapping': {
+          void callNative('clear_midi_mapping', [msg.knob_id]);
+          return;
+        }
+        case 'get_midi_mappings': {
+          void callNative('get_midi_mappings', []);
           return;
         }
         // Spread each known WireOutgoing variant onto positional `params`

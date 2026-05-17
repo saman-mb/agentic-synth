@@ -51,6 +51,10 @@ add_executable(agentic_synth_tests
     PresetExporterTest.cpp
     # Phase D / #260 — preset commit + persistence (PresetStore).
     PresetStoreTest.cpp
+    # Phase G / #262 — MIDI learn map persistence.
+    MidiLearnStoreTest.cpp
+    # Phase G / #247 — autocorrelation pitch detector for "hum a note".
+    PitchDetectorTest.cpp
     # Phase D / #268 (partial) — synchronous offline render.
     OfflineRendererTest.cpp
     StyleTransferTest.cpp

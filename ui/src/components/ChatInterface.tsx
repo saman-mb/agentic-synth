@@ -612,6 +612,16 @@ export function ChatInterface({
   // mount, so the seed is a true first-impression artifact.
   const [messages, setMessages] = useState<ChatMessage[]>(() => initialMessages ?? []);
   const [inputValue, setInputValue] = useState('');
+  // Phase G / #247 — detected hum chip. Cleared on accept / dismiss /
+  // 8-second timeout so it never sticks around past the moment it's useful.
+  const [detectedHum, setDetectedHum] = useState<{ midi: number; confidence: number; stampedAt: number } | null>(null);
+  useEffect(() => {
+    if (!detectedHum) return;
+    const t = setTimeout(() => {
+      setDetectedHum((cur) => (cur && cur.stampedAt === detectedHum.stampedAt ? null : cur));
+    }, 8000);
+    return () => clearTimeout(t);
+  }, [detectedHum]);
   const [isGenerating, setIsGenerating] = useState(false);
   const [proactiveSuggestions, setProactiveSuggestions] = useState<ProactiveSuggestion[]>([]);
   // ID of the just-submitted user message — the bubble shows the cyan
@@ -682,10 +692,39 @@ export function ChatInterface({
 
   const { status, send, lastMessage, subscribe } = useSynthBridge();
 
-  // Populate input from external transcript (Whisper STT result)
+  // Phase G / #244 — transcript confirmation step. Instead of dumping the
+  // STT result straight into the textarea, hold it in pendingTranscript
+  // until the user clicks Use / Re-record / Edit or 2s passes (PushToTalk
+  // owns the auto-confirm timer). This avoids the failure mode where a
+  // mis-heard "deep pad" jumps into the prompt and the user has to fight
+  // it out before pressing Send.
+  const [pendingTranscript, setPendingTranscript] = useState<string | null>(null);
+  const lastSeenTranscriptRef = useRef<string>('');
   useEffect(() => {
-    if (externalTranscript) setInputValue(externalTranscript);
+    if (!externalTranscript) return;
+    if (externalTranscript === lastSeenTranscriptRef.current) return;
+    lastSeenTranscriptRef.current = externalTranscript;
+    setPendingTranscript(externalTranscript);
   }, [externalTranscript]);
+
+  const handleAcceptTranscript = useCallback((text: string) => {
+    setInputValue(text);
+    setPendingTranscript(null);
+  }, []);
+  const handleEditTranscript = useCallback((text: string) => {
+    setInputValue(text);
+    setPendingTranscript(null);
+    // Focus the textarea so the cursor lands ready for the producer to
+    // tweak ("deep pad" → "deep brassy pad") without an extra click.
+    requestAnimationFrame(() => {
+      const ta = document.getElementById(inputId) as HTMLTextAreaElement | null;
+      ta?.focus();
+      ta?.setSelectionRange(text.length, text.length);
+    });
+  }, []);
+  const handleRerecord = useCallback(() => {
+    setPendingTranscript(null);
+  }, []);
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -890,6 +929,24 @@ export function ChatInterface({
           } else if (msg.error && msg.error !== 'cancelled') {
             showToast(`Bounce failed: ${msg.error}`);
           }
+          break;
+        }
+        case 'hum_pitch_detected': {
+          // Phase G / #247 — soft pitch suggestion. Lives next to the
+          // textarea for ~6 s; user can accept it (folds the note into
+          // the prompt as inline context) or ignore it. Brand voice: we
+          // call it "a note around B♭3", never "fundamental frequency".
+          setDetectedHum({
+            midi: msg.midi_note,
+            confidence: msg.confidence,
+            stampedAt: Date.now(),
+          });
+          break;
+        }
+        case 'midi_learned': {
+          // Phase G / #262 — quiet confirmation that a CC was captured.
+          // Note format mirrors brand voice: "Mapped CC74 to filter".
+          showToast(`Mapped CC${msg.cc} to ${msg.knob_id}`);
           break;
         }
       }
@@ -1278,6 +1335,44 @@ export function ChatInterface({
         />
       )}
 
+      {detectedHum && (() => {
+        // Phase G / #247 — soft pitch hint chip. Format the MIDI note as
+        // a name + octave (e.g. "B♭3"); musician register, no Hz number.
+        const formatNoteName = (midi: number): string => {
+          const names = ['C', 'C♯', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A', 'B♭', 'B'];
+          const idx = ((midi % 12) + 12) % 12;
+          const octave = Math.floor(midi / 12) - 1;
+          return `${names[idx]}${octave}`;
+        };
+        const noteLabel = formatNoteName(detectedHum.midi);
+        return (
+          <div className="hum-pitch-chip" role="status" aria-live="polite">
+            <span className="hum-pitch-text">TIMBRE heard a note around {noteLabel}.</span>
+            <button
+              type="button"
+              className="hum-pitch-action"
+              onClick={() => {
+                // Fold the note into the prompt as inline context. Idempotent —
+                // we don't append if the same hint is already on the line.
+                const hint = `[tuned to ${noteLabel}]`;
+                setInputValue((cur) => (cur.includes(hint) ? cur : cur ? `${cur} ${hint}` : hint));
+                setDetectedHum(null);
+              }}
+            >
+              Use {noteLabel}
+            </button>
+            <button
+              type="button"
+              className="hum-pitch-action hum-pitch-muted"
+              onClick={() => setDetectedHum(null)}
+              aria-label="Dismiss pitch hint"
+            >
+              ×
+            </button>
+          </div>
+        );
+      })()}
+
       <form className="input-bar" onSubmit={handleSubmit} aria-label="Prompt input">
         <label htmlFor={inputId} className="visually-hidden">
           Describe a sound
@@ -1311,6 +1406,10 @@ export function ChatInterface({
           <PushToTalk
             onData={onAudio}
             wsReady={status === 'open'}
+            pendingTranscript={pendingTranscript}
+            onAcceptTranscript={handleAcceptTranscript}
+            onEditTranscript={handleEditTranscript}
+            onRerecord={handleRerecord}
           />
         )}
         <button

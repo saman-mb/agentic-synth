@@ -101,7 +101,15 @@ export type WireIncoming =
   | { type: 'preset_committed'; name: string; prompt?: string; created_ms?: number; patch?: PatchPreviewData }
   // Phase D export-to-track (#268). Fires once per offline bounce. ok=false
   // covers both user cancel and write failure; UI distinguishes via `error`.
-  | { type: 'bounce_complete'; ok: boolean; path?: string; error?: string };
+  | { type: 'bounce_complete'; ok: boolean; path?: string; error?: string }
+  // Phase G / #247 — autocorrelation pitch detection over the PTT buffer.
+  // Confidence-gated on the C++ side at >0.7. UI shows a "TIMBRE heard a
+  // note around B♭3" chip near the prompt textarea.
+  | { type: 'hum_pitch_detected'; midi_note: number; confidence: number; frequency_hz: number }
+  // Phase G / #262 — MidiLearnStore captured a CC for the learning knob.
+  // UI uses this to close the "Learn MIDI" affordance and reflect the
+  // mapping (chip on the knob, value driven by physical controller).
+  | { type: 'midi_learned'; knob_id: string; cc: number; channel: number };
 
 export interface ProactiveSuggestion {
   label: string;
@@ -129,4 +137,11 @@ export type WireOutgoing =
   // Phase D / #268 — bounce the current patch (or a passed-in one) to a
   // .wav. JUCE opens a save-as FileChooser, then renders on a worker; the
   // UI listens for the `bounce_complete` event for the result.
-  | { type: 'bounce_patch'; patch?: PatchPreviewData; suggestedName?: string };
+  | { type: 'bounce_patch'; patch?: PatchPreviewData; suggestedName?: string }
+  // Phase G / #262 — enter "Learn MIDI" mode for the given knob. Empty
+  // knob_id cancels any in-flight learn. The C++ side captures the next
+  // incoming non-bank-select CC and emits `midi_learned`.
+  | { type: 'start_midi_learn'; knob_id: string }
+  | { type: 'cancel_midi_learn' }
+  | { type: 'clear_midi_mapping'; knob_id: string }
+  | { type: 'get_midi_mappings' };

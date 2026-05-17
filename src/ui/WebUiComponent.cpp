@@ -1,7 +1,9 @@
 #include "ui/WebUiComponent.h"
 
 #include "UiBinaryData.h"
+#include "agent/MidiLearnStore.h"
 #include "agent/MorphLoop.h"
+#include "agent/PitchDetector.h"
 #include "agent/PromptHandler.h"
 #include "agent/WhisperClient.h"
 
@@ -728,6 +730,20 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
                 }
                 const auto* samples = reinterpret_cast<const std::int16_t*>(raw.getData());
                 const int numSamples = static_cast<int>(byteCount / sizeof(std::int16_t));
+
+                // Phase G / #247 — run autocorrelation pitch detection over
+                // the same buffer the STT path uses. We fire the event ONLY
+                // when confidence > 0.7 so the "did you mean B♭3?" hint
+                // stays silent on speech / rumble.
+                const auto pitch = agentic_synth::agent::PitchDetector::detect(samples, numSamples, 16000);
+                if (pitch.midi_note >= 0 && pitch.confidence > 0.7f) {
+                    auto* pobj = new juce::DynamicObject{};
+                    pobj->setProperty("midi_note", pitch.midi_note);
+                    pobj->setProperty("confidence", static_cast<double>(pitch.confidence));
+                    pobj->setProperty("frequency_hz", static_cast<double>(pitch.frequency_hz));
+                    bridge.notifyHumPitch(juce::var{pobj});
+                }
+
                 const std::string transcript = bridge.transcribeAudio(samples, numSamples, 16000);
                 if (transcript.empty()) {
                     DBG("push_audio_pcm: empty transcript from GeminiSTT");
@@ -776,6 +792,53 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
             const auto name = argOr(args, 0, juce::var{""}).toString().toStdString();
             bridge_.deletePreset(name);
             completion(juce::var{});
+        });
+
+    // ── Phase G / #262 — MIDI learn ──────────────────────────────────────────
+    options = options.withNativeFunction(
+        juce::Identifier{"start_midi_learn"},
+        [](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
+            // Arg: [knob_id (string)]. Empty-string cancels.
+            const auto knobId = argOr(args, 0, juce::var{""}).toString().toStdString();
+            if (knobId.empty()) {
+                agentic_synth::agent::MidiLearnStore::instance().cancelLearnMode();
+            } else {
+                agentic_synth::agent::MidiLearnStore::instance().enterLearnMode(knobId);
+            }
+            completion(juce::var{});
+        });
+
+    options = options.withNativeFunction(
+        juce::Identifier{"cancel_midi_learn"},
+        [](const juce::Array<juce::var>&, NativeFnCompletion completion) {
+            agentic_synth::agent::MidiLearnStore::instance().cancelLearnMode();
+            completion(juce::var{});
+        });
+
+    options = options.withNativeFunction(
+        juce::Identifier{"clear_midi_mapping"},
+        [](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
+            const auto knobId = argOr(args, 0, juce::var{""}).toString().toStdString();
+            agentic_synth::agent::MidiLearnStore::instance().clearMapping(knobId);
+            completion(juce::var{});
+        });
+
+    options = options.withNativeFunction(
+        juce::Identifier{"get_midi_mappings"},
+        [](const juce::Array<juce::var>&, NativeFnCompletion completion) {
+            const auto all = agentic_synth::agent::MidiLearnStore::instance().all();
+            juce::Array<juce::var> arr;
+            arr.ensureStorageAllocated(static_cast<int>(all.size()));
+            for (const auto& m : all) {
+                auto* obj = new juce::DynamicObject{};
+                obj->setProperty("knob_id", juce::String(m.knob_id));
+                obj->setProperty("cc", m.cc);
+                obj->setProperty("channel", m.channel);
+                arr.add(juce::var{obj});
+            }
+            auto* root = new juce::DynamicObject{};
+            root->setProperty("mappings", juce::var{arr});
+            completion(juce::var{root});
         });
 
     // ── Phase D / #268 (partial) — audio bounce ──────────────────────────────
@@ -878,7 +941,7 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
     browser_ = std::make_unique<TelemetryAwareBrowser>(options, bridge_, *this);
     addAndMakeVisible(*browser_);
 
-    // ── 8 AgentBridge subscriber hookups (C++ → UI) ──────────────────────────
+    // ── 15 AgentBridge subscriber hookups (C++ → UI) ─────────────────────────
     //
     // AgentBridge::dispatch() already marshals every callback onto the
     // message thread via MessageManager::callAsync (see AgentBridge.cpp).
@@ -948,6 +1011,16 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
     subs_.push_back(bridge_.onBounceComplete([this](const juce::var& v) {
         if (browser_)
             browser_->emitEventIfBrowserIsVisible(juce::Identifier{"bounce_complete"}, v);
+    }));
+    // Phase G / #262 — MIDI learn capture confirmation.
+    subs_.push_back(bridge_.onMidiLearned([this](const juce::var& v) {
+        if (browser_)
+            browser_->emitEventIfBrowserIsVisible(juce::Identifier{"midi_learned"}, v);
+    }));
+    // Phase G / #247 — confident monophonic pitch detected on the PTT buffer.
+    subs_.push_back(bridge_.onHumPitch([this](const juce::var& v) {
+        if (browser_)
+            browser_->emitEventIfBrowserIsVisible(juce::Identifier{"hum_pitch_detected"}, v);
     }));
 
 #if AGENTIC_SYNTH_UI_DEV

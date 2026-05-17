@@ -123,6 +123,10 @@ add_library(agentic_synth_agent STATIC
     agent/PrePatchPipeline.cpp
     # Phase D / #260 — JSON-backed preset store + commit ceremony.
     agent/PresetStore.cpp
+    # Phase G / #262 — JSON-backed MIDI learn map (knob_id ↔ CC).
+    agent/MidiLearnStore.cpp
+    # Phase G / #247 — autocorrelation pitch detector for "hum a note".
+    agent/PitchDetector.cpp
     # Phase B / TIMBRE simple-view (#249/#250/#263) — morph loop. Distinct
     # from engine::MorphEngine (live MIDI-CC morph) — generates 5 candidate
     # variations from base + history + liked + archetype RAG.
@@ -140,6 +144,22 @@ agentic_synth_configure_target(agentic_synth_agent)
 target_link_libraries(agentic_synth_agent
     PUBLIC
         agentic_synth_engine
+        juce::juce_core
+        juce::juce_events
+)
+
+# ── Phase G / #245 — Headless CLI ────────────────────────────────────────────
+# Minimal CLI binary: reads a prompt, prints the PatchStruct as JSON. Lives
+# outside the AGENTIC_SYNTH_BUILD_PLUGIN gate so CI can build + run it on a
+# headless box without any of the JUCE GUI / audio-plugin machinery. Links
+# only against the agent + engine libs that are already JUCE-light.
+add_executable(agentic_synth_cli
+    cli/main.cpp
+)
+agentic_synth_configure_target(agentic_synth_cli)
+target_link_libraries(agentic_synth_cli
+    PRIVATE
+        agentic_synth_agent
         juce::juce_core
         juce::juce_events
 )
