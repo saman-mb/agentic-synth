@@ -1,0 +1,131 @@
+/* ── FailureBanner (Phase C #269) ─────────────────────────────────────
+ *
+ * Calm, not alarming. Muted violet — never red. Auto-fades on next
+ * successful patch arrival (parent unmounts). Sits between the message
+ * list and the input bar; same horizontal padding as the input bar so
+ * it lines up visually with the chat shell.
+ */
+
+.failure-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0 1rem 0.5rem;
+  padding: 0.65rem 0.9rem;
+  border-radius: 10px;
+
+  /* Muted violet — pulls from the theme tokens with a fall-back. */
+  background: var(--violet-bg, rgba(140, 102, 200, 0.10));
+  border: 1px solid var(--violet-border, rgba(140, 102, 200, 0.28));
+  color: var(--text-primary);
+
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  line-height: 1.4;
+
+  opacity: 0;
+  transform: translateY(-2px);
+  transition: opacity 200ms ease-out, transform 200ms ease-out;
+}
+
+.failure-banner.is-entered {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .failure-banner {
+    transition: none;
+    transform: none;
+  }
+}
+
+.failure-banner-text {
+  flex: 1 1 240px;
+  min-width: 0;
+}
+
+.failure-banner-detail {
+  flex: 1 1 100%;
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+}
+
+.failure-banner-detail > summary {
+  cursor: pointer;
+  user-select: none;
+  opacity: 0.7;
+  font-style: italic;
+}
+
+.failure-banner-detail > summary:hover {
+  opacity: 1;
+}
+
+.failure-banner-detail > p {
+  margin: 0.35rem 0 0;
+  padding: 0.35rem 0.5rem;
+  background: rgba(0, 0, 0, 0.18);
+  border-radius: 6px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.failure-banner-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.failure-banner-action {
+  appearance: none;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  padding: 0.35rem 0.7rem;
+  font-family: var(--font-sans);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  transition: background-color 160ms ease-out, border-color 160ms ease-out, color 160ms ease-out;
+}
+
+.failure-banner-retry {
+  background: var(--violet-strong, rgba(140, 102, 200, 0.35));
+  color: var(--text-primary);
+  border-color: var(--violet-border, rgba(140, 102, 200, 0.48));
+}
+
+.failure-banner-retry:hover {
+  background: var(--violet-stronger, rgba(140, 102, 200, 0.52));
+}
+
+.failure-banner-dismiss {
+  background: transparent;
+  color: var(--text-secondary);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+
+.failure-banner-dismiss:hover {
+  color: var(--text-primary);
+  border-color: rgba(255, 255, 255, 0.18);
+}
+
+/* Slight variant per kind — same hue, different border weight so the
+ * three states are visually distinguishable when one stacks above
+ * another mid-conversation. */
+.failure-llm_offline {
+  border-left: 3px solid rgba(140, 102, 200, 0.5);
+}
+
+.failure-prompt_unclear {
+  border-left: 3px solid rgba(140, 102, 200, 0.35);
+}
+
+.failure-safety_block {
+  border-left: 3px solid rgba(140, 102, 200, 0.65);
+}
+
+.failure-mic_denied {
+  border-left: 3px solid rgba(140, 102, 200, 0.45);
+}

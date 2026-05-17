@@ -166,6 +166,9 @@ export function useSynthBridge(): UseSynthBridgeReturn {
     wrap('enhancement');
     // Phase B simple-view (#249) — explicit morph reply from C++.
     wrap('variations_ready');
+    // Phase C failure-state UX (#269) — calm banner for LLM-offline /
+    // prompt-unclear / safety-block / mic-denied.
+    wrap('failure');
     juce.backend.addEventListener('patch_update', (payload) => {
       enqueueMessage({ type: 'patch_update' as unknown as WireIncoming['type'], ...(payload as object) } as unknown as WireIncoming);
     });

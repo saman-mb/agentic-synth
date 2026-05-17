@@ -87,7 +87,15 @@ export type WireIncoming =
   // Phase B simple-view (#249/#263) — explicit "more variations" reply.
   // Distinct from `suggest_variations` (proactive 3-suggestion stream);
   // this fires once per `morph_request` user gesture and carries 5 tiles.
-  | { type: 'variations_ready'; variations: PatchVariation[] };
+  | { type: 'variations_ready'; variations: PatchVariation[] }
+  // Phase C failure-state UX (#269) — surfaced when the agent can't
+  // produce a useful response. `kind` selects the banner copy; `detail`
+  // is opaque engineering text the user can optionally expand to read.
+  | {
+      type: 'failure';
+      kind: 'llm_offline' | 'prompt_unclear' | 'safety_block' | 'mic_denied';
+      detail?: string;
+    };
 
 export interface ProactiveSuggestion {
   label: string;

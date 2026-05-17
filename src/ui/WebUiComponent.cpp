@@ -834,6 +834,14 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
         if (browser_)
             browser_->emitEventIfBrowserIsVisible(juce::Identifier{"variations_ready"}, v);
     }));
+    // Phase C failure-state UX #269 — calm banner for degraded modes
+    // (LLM-offline, prompt-unclear, safety-block). The C++ side emits a
+    // single failure frame per generation; the JS side renders a banner
+    // above the input bar and auto-clears it on the next successful patch.
+    subs_.push_back(bridge_.onFailure([this](const juce::var& v) {
+        if (browser_)
+            browser_->emitEventIfBrowserIsVisible(juce::Identifier{"failure"}, v);
+    }));
 
 #if AGENTIC_SYNTH_UI_DEV
     browser_->goToURL("http://localhost:5173");

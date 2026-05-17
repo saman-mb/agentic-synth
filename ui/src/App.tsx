@@ -5,6 +5,7 @@ import { BootSplash } from './components/BootSplash';
 import { makeDefaultPatch, PatchParams } from './components/KnobGrid';
 import { MacroBar, MacroState } from './components/MacroBar';
 import { ModulesGrid } from './components/ModulesGrid';
+import { OnboardingOverlay } from './components/OnboardingOverlay';
 import {
   BrowserEntry,
   loadStarred,
@@ -22,7 +23,12 @@ import { useWebSocket } from './hooks/useWebSocket';
 import { usePatchHistory } from './hooks/usePatchHistory';
 import { useUiAudioSettings } from './hooks/useUiAudioSettings';
 import { playTapeStop, playVoicePip } from './data/uiAudio';
-import type { AgentModulationPlan, PatchPreviewData } from './types/chat';
+import {
+  QUICK_START_PATCH,
+  isOnboardingCompleted,
+  markOnboardingCompleted,
+} from './data/quickStartPreset';
+import type { AgentModulationPlan, ChatMessage, PatchPreviewData } from './types/chat';
 import {
   ModMatrix,
   ModConnection,
@@ -249,6 +255,56 @@ export function App() {
   // ToolsDrawer (Dictionary / Telemetry / History / Settings — gear icon).
   const [toolsOpen, setToolsOpen] = useState<boolean>(false);
   const [toolsTab, setToolsTab] = useState<DrawerTab>('dictionary');
+
+  // ── Phase C onboarding (#256) ────────────────────────────────────────
+  // Show the 3-step tour on first launch. Persistence via localStorage
+  // (timbre.onboarding.completed). Once flipped, the overlay never
+  // reappears for the life of the install — neither Skip nor Got it
+  // distinguishes between "user finished" and "user dismissed".
+  const [onboardingActive, setOnboardingActive] = useState<boolean>(
+    () => !isOnboardingCompleted(),
+  );
+  // Bridge between ChatInterface's first-patch event and the overlay's
+  // step-2 gate. Flipped exactly once per session, the first time a
+  // `patch` wire event reaches the chat.
+  const [firstPatchLanded, setFirstPatchLanded] = useState<boolean>(false);
+  const handleFirstPatchLanded = useCallback(() => setFirstPatchLanded(true), []);
+
+  // First-launch seed message — primes the chat with the cinematic
+  // Kubrick pad so the producer can audition something premium the
+  // moment they hit a key, without typing anything first. Built once on
+  // mount; if onboarding has already been completed the seed is empty
+  // (no nostalgic bubble on return visits).
+  const initialChatMessages = useMemo<ChatMessage[]>(() => {
+    if (isOnboardingCompleted()) return [];
+    return [
+      {
+        id: 'quickstart-seed',
+        role: 'assistant',
+        content: 'Hit a key. Or describe a sound.',
+        patch: QUICK_START_PATCH,
+      },
+    ];
+  }, []);
+
+  // Apply the quick-start patch to the engine on first mount so the
+  // audition keyboard actually plays the cinematic Kubrick pad instead
+  // of the bare default. Guarded so it only fires when the seed bubble
+  // is present (i.e. only on first launch).
+  const quickStartAppliedRef = useRef<boolean>(false);
+  useEffect(() => {
+    if (quickStartAppliedRef.current) return;
+    if (initialChatMessages.length === 0) return;
+    quickStartAppliedRef.current = true;
+    // Defer one tick so usePatchHistory has mounted its initial entry
+    // and lastSentEffectiveRef has primed against the default patch —
+    // the engine then receives the kubrick-pad as a diff'd batch.
+    // eslint-disable-next-line @typescript-eslint/no-use-before-define
+    Promise.resolve().then(() => seedQuickStartPatch());
+    // seedQuickStartPatch is declared below; resolved at runtime via closure
+    // since this effect doesn't list it as a dep (we want to fire exactly once).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialChatMessages.length]);
 
   // Hood-open state (Phase A / #271). Session-persisted only — fresh
   // launches always show the simple play surface first per the brand's
@@ -762,6 +818,16 @@ export function App() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [patch]);
 
+  // Phase C onboarding (#256) — seed the engine with the quick-start
+  // patch so the audition keyboard plays the cinematic Kubrick pad on
+  // first launch without any user input. Wired via handleLoadPreset so
+  // history + browser capture stays consistent. Casting through the
+  // PatchPreviewData shape works because QUICK_START_PATCH is itself a
+  // full PatchParams.
+  const seedQuickStartPatch = useCallback(() => {
+    handleLoadPreset(QUICK_START_PATCH as PatchParams);
+  }, [handleLoadPreset]);
+
   // ── Voice transcribe pip (Phase 10 §17) ──────────────────────────
   // Whenever a fresh transcript arrives AND the user has opted in,
   // play a 40ms pip. Skip the very first render (transcript = '').
@@ -1002,6 +1068,8 @@ export function App() {
           onAudio={handleAudio}
           onSelectVariation={handleSelectVariation}
           onRtfmEasterEgg={handleRtfmEasterEgg}
+          initialMessages={initialChatMessages}
+          onFirstPatchLanded={handleFirstPatchLanded}
         />
       </div>
 
@@ -1026,6 +1094,16 @@ export function App() {
         onVoicePipChange={uiAudio.setVoicePip}
         onPatchThunkChange={uiAudio.setPatchThunk}
       />
+
+      {onboardingActive && (
+        <OnboardingOverlay
+          patchLanded={firstPatchLanded}
+          onComplete={() => {
+            markOnboardingCompleted();
+            setOnboardingActive(false);
+          }}
+        />
+      )}
     </div>
   );
 }

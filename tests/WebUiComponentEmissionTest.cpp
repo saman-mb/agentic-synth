@@ -29,7 +29,7 @@ struct GuiFixture {
 };
 } // namespace
 
-TEST_CASE("WebUiComponent registers all 10 AgentBridge subscribers on construction", "[WebUiComponent][Emission]") {
+TEST_CASE("WebUiComponent registers all 11 AgentBridge subscribers on construction", "[WebUiComponent][Emission]") {
     GuiFixture fix;
     AgentBridge bridge;
 
@@ -37,10 +37,10 @@ TEST_CASE("WebUiComponent registers all 10 AgentBridge subscribers on constructi
     // observe that subscribers go away.
     auto component = std::make_unique<WebUiComponent>(bridge);
 
-    // 10 hookups: token, patch, done, error, rationale, suggest_variations,
+    // 11 hookups: token, patch, done, error, rationale, suggest_variations,
     // patch_update, transcript, enhancement (2-step LLM flow), variations_ready
-    // (Phase B morph reply #249).
-    CHECK(component->subscriberCountForTesting() == 10u);
+    // (Phase B morph reply #249), failure (Phase C #269).
+    CHECK(component->subscriberCountForTesting() == 11u);
 
     // Sanity-check that emissions don't crash with a live component bound.
     // We cannot observe the WebView receiving them — JUCE swallows them when

@@ -2,10 +2,44 @@
 
 #include <array>
 #include <cctype>
+#include <deque>
+#include <mutex>
 #include <string>
 #include <string_view>
 
 namespace agentic_synth::mapper {
+
+namespace {
+// Phase C (#269) sanitizer log queue. Tiny bounded FIFO; PromptHandler
+// drains it once per generation.
+std::mutex& sanitizerLogMutex() {
+    static std::mutex m;
+    return m;
+}
+std::deque<std::string>& sanitizerLog() {
+    static std::deque<std::string> q;
+    return q;
+}
+constexpr std::size_t kMaxLogEntries = 4;
+} // namespace
+
+void pushSanitizerLog(std::string diff) {
+    if (diff.empty())
+        return;
+    std::lock_guard<std::mutex> lock(sanitizerLogMutex());
+    sanitizerLog().push_back(std::move(diff));
+    while (sanitizerLog().size() > kMaxLogEntries)
+        sanitizerLog().pop_front();
+}
+
+std::string popSanitizerLog() {
+    std::lock_guard<std::mutex> lock(sanitizerLogMutex());
+    if (sanitizerLog().empty())
+        return {};
+    std::string s = std::move(sanitizerLog().back());
+    sanitizerLog().pop_back();
+    return s;
+}
 
 namespace {
 
@@ -64,11 +98,38 @@ bool is_word_boundary(const std::string& s, std::size_t pos) noexcept {
 } // namespace
 
 std::string sanitizePromptForSafety(const std::string& prompt) {
+    std::string diff;
+    std::string out = sanitizePromptForSafetyWithDiff(prompt, diff);
+    // Phase C (#269) — push the modification log so PromptHandler can
+    // surface a `safety_block` banner detailing the swap.
+    if (!diff.empty())
+        pushSanitizerLog(diff);
+    return out;
+}
+
+std::string sanitizePromptForSafetyWithDiff(const std::string& prompt, std::string& outDiff) {
+    outDiff.clear();
     if (prompt.empty())
         return prompt;
 
     std::string out;
     out.reserve(prompt.size());
+
+    // Accumulate replacement summaries for the diff string. Deduped so a
+    // prompt that says "evil evil evil" surfaces "evil → dark" once.
+    std::string diffAcc;
+    auto noteReplacement = [&diffAcc](std::string_view from, std::string_view to) {
+        std::string pair;
+        pair.reserve(from.size() + to.size() + 4);
+        pair.append(from.begin(), from.end());
+        pair += " → ";
+        pair.append(to.begin(), to.end());
+        if (diffAcc.find(pair) != std::string::npos)
+            return;
+        if (!diffAcc.empty())
+            diffAcc += ", ";
+        diffAcc += pair;
+    };
 
     std::size_t i = 0;
     while (i < prompt.size()) {
@@ -86,6 +147,7 @@ std::string sanitizePromptForSafety(const std::string& prompt) {
                     if (!trailing_ok)
                         continue;
                     out += apply_case(m.to, prompt[i]);
+                    noteReplacement(m.from, m.to);
                     i += m.from.size();
                     matched = true;
                     break;
@@ -97,6 +159,7 @@ std::string sanitizePromptForSafety(const std::string& prompt) {
             ++i;
         }
     }
+    outDiff = std::move(diffAcc);
     return out;
 }
 

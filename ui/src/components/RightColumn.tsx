@@ -1,6 +1,6 @@
 import React from 'react';
 import { ChatInterface } from './ChatInterface';
-import type { AgentModulationPlan, PatchPreviewData } from '../types/chat';
+import type { AgentModulationPlan, ChatMessage, PatchPreviewData } from '../types/chat';
 import './RightColumn.css';
 
 // ── RightColumn — chat-only ──────────────────────────────────────────
@@ -12,6 +12,10 @@ interface RightColumnProps {
   onAudio: (buf: ArrayBuffer) => void;
   onSelectVariation: (preview: PatchPreviewData, modulation?: AgentModulationPlan) => void;
   onRtfmEasterEgg?: () => void;
+  // Phase C onboarding (#256) — first-launch seed messages + first-patch
+  // unlock callback. Forwarded verbatim to ChatInterface.
+  initialMessages?: ChatMessage[];
+  onFirstPatchLanded?: () => void;
 }
 
 export function RightColumn({
@@ -19,6 +23,8 @@ export function RightColumn({
   onAudio,
   onSelectVariation,
   onRtfmEasterEgg,
+  initialMessages,
+  onFirstPatchLanded,
 }: RightColumnProps) {
   return (
     <aside className="right-column right-column-chat-only" aria-label="AI prompt">
@@ -28,6 +34,8 @@ export function RightColumn({
           onAudio={onAudio}
           onSelectVariation={onSelectVariation}
           onRtfmEasterEgg={onRtfmEasterEgg}
+          initialMessages={initialMessages}
+          onFirstPatchLanded={onFirstPatchLanded}
         />
       </section>
     </aside>
