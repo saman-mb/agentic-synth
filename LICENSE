@@ -1,6 +1,6 @@
 MIT License
 
-Copyright (c) 2026 Agentic Synth contributors
+Copyright (c) 2026 Saman Badakhshan
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -19,6 +19,3 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
-
-Third-party dependencies are not covered by this license. In particular, JUCE
-and llama.cpp are expected to be brought in under their own license terms.
