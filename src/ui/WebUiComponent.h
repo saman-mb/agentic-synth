@@ -71,6 +71,28 @@ public:
     using ScopeSampleProvider = std::function<int(float* dest, int max)>;
     void setScopeSampleProvider(ScopeSampleProvider provider) { scopeProvider_ = std::move(provider); }
 
+    // Audio-device settings hookup. JUCE puts its device picker behind an
+    // "Options" button in the standalone window's title bar, which nobody
+    // finds; the React SETTINGS panel exposes it instead. The editor wires
+    // this to whatever device UI its wrapper provides.
+    //
+    // Invoked on the message thread from the `open_audio_settings` native
+    // function. When unset, `audio_settings_supported` resolves false and the
+    // panel hides its AUDIO DEVICE section — the correct behaviour under
+    // VST3/AU, where the host owns audio I/O.
+    using AudioSettingsHandler = std::function<void()>;
+    void setAudioSettingsHandler(AudioSettingsHandler handler) { audioSettingsHandler_ = std::move(handler); }
+
+    // Display-relative default window size, shared by the plugin editor and
+    // the standalone app so both open at the same size. A fixed 1200x800 was
+    // written for 1080p-era screens and opens as a postage stamp on a 4K
+    // panel. Clamped at both ends: never smaller than the old default (small
+    // laptop panels), never so large it overflows a host's editor area.
+    //
+    // Static and free of component state so the sizing policy is unit-testable
+    // without a live WebView.
+    static juce::Rectangle<int> defaultWindowSize();
+
     // Pure resource lookup against the bundled UI binary data. Exposed as a
     // free static so unit tests can exercise it without instantiating the
     // component (which would require a windowed parent + a live WebView).
@@ -169,6 +191,12 @@ private:
     // `getScopeSamples` native function. Default-empty so the JS bridge call
     // returns an empty array when no provider is wired (browser dev / tests).
     ScopeSampleProvider scopeProvider_;
+
+    // Audio-device settings hook — set by the editor when the host provides a
+    // device settings UI (today: the JUCE standalone wrapper). Left unset in
+    // the plugin formats, where the host owns audio I/O, and in the UI-only
+    // standalone app, which has no audio device at all.
+    AudioSettingsHandler audioSettingsHandler_;
 
     std::atomic<bool> loadFailed_{false};
     juce::String lastLoadError_;

@@ -81,6 +81,32 @@ export async function fetchPresets(): Promise<unknown> {
   return callNative('get_presets', []);
 }
 
+// ── Audio device settings ────────────────────────────────────────────
+// JUCE hides its device picker behind an "Options" button in the standalone
+// title bar. The SETTINGS panel offers it instead, but only where a picker
+// exists: false in the browser dev server, and false under VST3/AU where the
+// host owns audio I/O.
+export async function audioSettingsSupported(): Promise<boolean> {
+  if (!usingJuce) return false;
+  try {
+    return (await callNative('audio_settings_supported', [])) === true;
+  } catch {
+    // Older binary without the native function — degrade to hiding the row.
+    return false;
+  }
+}
+
+// Opens the wrapper's device dialog. Resolves false when unavailable so the
+// caller can surface that rather than appearing to do nothing.
+export async function openAudioSettings(): Promise<boolean> {
+  if (!usingJuce) return false;
+  try {
+    return (await callNative('open_audio_settings', [])) === true;
+  } catch {
+    return false;
+  }
+}
+
 interface UseSynthBridgeReturn {
   status: BridgeStatus;
   send: (msg: WireOutgoing) => void;

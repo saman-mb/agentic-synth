@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import './SettingsPanel.css';
 import { playTapeStop, playVoicePip } from '../data/uiAudio';
+import { audioSettingsSupported, openAudioSettings } from '../hooks/useSynthBridge';
 
 // ── SettingsPanel (Phase 10 §17 + Phase 14 expansion) ───────────────
 //
@@ -126,6 +127,29 @@ function useMidiInputs(): MidiState {
   return state;
 }
 
+// ── Audio device availability ──────────────────────────────────────
+//
+// Only the standalone build has a device picker to open. Ask the native
+// side once on mount; hide the AUDIO DEVICE section entirely when the
+// answer is no (browser dev server, or VST3/AU where the host owns I/O).
+function useAudioSettingsAvailable(): boolean {
+  const [available, setAvailable] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    audioSettingsSupported()
+      .then((ok) => {
+        if (!cancelled) setAvailable(ok);
+      })
+      .catch(() => {
+        if (!cancelled) setAvailable(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+  return available;
+}
+
 export interface SettingsPanelProps {
   voicePip: boolean;
   patchThunk: boolean;
@@ -178,6 +202,16 @@ export function SettingsPanel({
     return [{ id: '', name: 'Any' }, ...midi.inputs];
   }, [midi.inputs]);
 
+  // ── Audio device ──────────────────────────────────────────────
+  const audioSettingsAvailable = useAudioSettingsAvailable();
+  const [audioSettingsError, setAudioSettingsError] = useState(false);
+  const handleOpenAudioSettings = () => {
+    setAudioSettingsError(false);
+    void openAudioSettings().then((ok) => {
+      if (!ok) setAudioSettingsError(true);
+    });
+  };
+
   return (
     <div className="settings-panel" role="region" aria-label="Settings">
       <header className="settings-panel-header">
@@ -186,6 +220,36 @@ export function SettingsPanel({
           TIMBRE is mostly silent. Opt in to confirmation sounds below.
         </p>
       </header>
+
+      {/* ── Audio device ──────────────────────────────────────────
+          First group on purpose: if you hear nothing, this is the
+          setting you came here for. Hidden when no picker exists. */}
+      {audioSettingsAvailable && (
+        <section className="settings-group" aria-label="Audio device">
+          <h3 className="settings-group-title">Audio device</h3>
+          <div className="settings-row">
+            <div className="settings-row-text">
+              <span className="settings-row-label">Output &amp; MIDI</span>
+              <span className="settings-row-desc">
+                Choose the output device, sample rate, and buffer size. Also
+                where hardware MIDI inputs are enabled.
+              </span>
+              {audioSettingsError && (
+                <span className="settings-row-disabled">
+                  Could not open audio settings.
+                </span>
+              )}
+            </div>
+            <button
+              type="button"
+              className="settings-row-preview"
+              onClick={handleOpenAudioSettings}
+            >
+              Open
+            </button>
+          </div>
+        </section>
+      )}
 
       <section className="settings-group" aria-label="UI sound feedback">
         <h3 className="settings-group-title">UI sound feedback</h3>
