@@ -152,6 +152,30 @@ juce::File webView2UserDataFolderForThisInstance() {
 
 } // namespace
 
+juce::Rectangle<int> WebUiComponent::defaultWindowSize() {
+    constexpr int minW = 1200, minH = 800;
+    constexpr int maxW = 2400, maxH = 1600;
+
+    auto* display = juce::Desktop::getInstance().getDisplays().getPrimaryDisplay();
+    if (display == nullptr) {
+        return {minW, minH};
+    }
+
+    // 70% of the usable area (excludes menu bar / dock) leaves the window
+    // clearly framed rather than pinned edge to edge.
+    const auto area = display->userArea;
+    int w = juce::jlimit(minW, maxW, juce::roundToInt(static_cast<float>(area.getWidth()) * 0.7f));
+    int h = juce::jlimit(minH, maxH, juce::roundToInt(static_cast<float>(area.getHeight()) * 0.7f));
+
+    // Hold the 3:2 proportion the layout was designed against — matching an
+    // odd screen aspect stretches the play surface. Fit inside both clamps by
+    // deriving height from width, then width back from the clamped height.
+    h = juce::jlimit(minH, maxH, juce::jmin(h, juce::roundToInt(static_cast<float>(w) / 1.5f)));
+    w = juce::jlimit(minW, maxW, juce::roundToInt(static_cast<float>(h) * 1.5f));
+
+    return {w, h};
+}
+
 std::optional<juce::WebBrowserComponent::Resource> WebUiComponent::serveResource(const juce::String& path) {
     // Normalise: strip any query/fragment, default "/" → "/index.html".
     juce::String trimmed = path.upToFirstOccurrenceOf("?", false, false).upToFirstOccurrenceOf("#", false, false);
@@ -688,6 +712,29 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
                                              const bool enabled = static_cast<bool>(argOr(args, 0, juce::var{false}));
                                              bridge_.setTelemetryEnabled(enabled);
                                              completion(juce::var{});
+                                         });
+
+    // ── Audio device settings ────────────────────────────────────────────
+    // The SETTINGS panel asks whether this build has a device picker before
+    // rendering its AUDIO DEVICE section. True only when the editor wired a
+    // handler (standalone wrapper); false under VST3/AU, where the host owns
+    // audio I/O, and in the UI-only app, which has no audio device.
+    options = options.withNativeFunction(juce::Identifier{"audio_settings_supported"},
+                                         [this](const juce::Array<juce::var>& /*args*/, NativeFnCompletion completion) {
+                                             completion(juce::var{audioSettingsHandler_ != nullptr});
+                                         });
+
+    // Opens the wrapper's device dialog. Runs on the message thread, which is
+    // what showAudioSettingsDialog() requires. Resolves false when unwired so
+    // a panel that called it anyway can report the failure rather than hang.
+    options = options.withNativeFunction(juce::Identifier{"open_audio_settings"},
+                                         [this](const juce::Array<juce::var>& /*args*/, NativeFnCompletion completion) {
+                                             if (!audioSettingsHandler_) {
+                                                 completion(juce::var{false});
+                                                 return;
+                                             }
+                                             audioSettingsHandler_();
+                                             completion(juce::var{true});
                                          });
 
     options = options.withNativeFunction(
