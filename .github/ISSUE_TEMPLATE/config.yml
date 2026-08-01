@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: 💬 Questions and ideas
+    url: https://github.com/saman-mb/agentic-synth/discussions
+    about: Ask how something works, or float an idea before opening an issue.
+  - name: 📚 Documentation
+    url: https://github.com/saman-mb/agentic-synth/blob/master/docs/index.md
+    about: Architecture, audio engine internals, and build guides.
