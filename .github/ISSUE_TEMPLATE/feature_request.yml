@@ -1,0 +1,47 @@
+name: ✨ Feature request
+description: Suggest a capability, a sound-design improvement, or a UX change
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What's the problem?
+      description: >
+        Describe the situation you hit, not the solution you have in mind.
+        What were you trying to make, and where did the tool get in the way?
+      placeholder: |
+        I can't get a convincing plucked string. Asking for "pluck" gives me
+        a short envelope on a saw, but no physical-modelling character.
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What would you like instead?
+      placeholder: |
+        A Karplus-Strong oscillator mode the agent can select when the
+        prompt implies a plucked or struck string.
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Which part of the project?
+      options:
+        - DSP / audio engine
+        - Agent — natural-language to parameters
+        - UI / UX
+        - Plugin hosting (VST3 / AU / standalone)
+        - Build, CI, or tooling
+        - Documentation
+        - Other / not sure
+    validations:
+      required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References
+      description: >
+        Papers, other synths that do this well, or audio examples. Concrete
+        references make a proposal much easier to act on.

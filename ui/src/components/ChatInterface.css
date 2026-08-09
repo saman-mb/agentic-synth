@@ -125,10 +125,10 @@
 
 .bubble-text {
   margin: 0;
-  padding: 0.75rem 1rem;
+  padding: 0.85rem 1.1rem;
   border-radius: var(--r-4);
   line-height: 1.6;
-  font-size: 0.95rem;
+  font-size: 1.15rem;
   white-space: pre-wrap;
   word-break: break-word;
   position: relative;
@@ -201,56 +201,6 @@
   min-width: 200px;
 }
 
-/* Inline variant — used beneath a chat bubble. One dominant tile at
-   full width, the remaining variations as a row of clickable thumbnails
-   below. Per #253 partial: tiles labeled with sensory descriptors when
-   available, falling back to prompt fragment then to letters. */
-.ab-grid--inline {
-  flex-direction: column;
-  width: 100%;
-  gap: var(--sp-3);
-}
-
-.ab-grid-dominant {
-  display: flex;
-  flex-direction: column;
-  gap: 0.4rem;
-  width: 100%;
-}
-
-.ab-grid-thumbs {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(110px, 1fr));
-  gap: var(--sp-2);
-}
-
-.ab-grid-thumb {
-  display: block;
-  width: 100%;
-  background: transparent;
-  border: 1px solid var(--color-border);
-  border-radius: var(--r-2);
-  padding: var(--sp-2);
-  cursor: pointer;
-  text-align: left;
-  font: inherit;
-  color: inherit;
-  transition:
-    border-color var(--dur-state) var(--ease-considered),
-    background var(--dur-state) var(--ease-considered);
-}
-
-.ab-grid-thumb:hover {
-  border-color: var(--accent-tint-40);
-  background: var(--accent-tint-12);
-}
-
-.ab-grid-thumb:focus { outline: none; }
-.ab-grid-thumb:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
-}
-
 .ab-commit-btn {
   background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
   border: none;
@@ -273,218 +223,6 @@
 .ab-commit-btn:focus-visible {
   outline: 2px solid var(--accent-primary);
   outline-offset: 2px;
-}
-
-/* Row hosting the dominant tile's commit + "More variations" actions.
-   Wraps so the row collapses to a single column on narrow message
-   widths instead of squeezing the labels. */
-.ab-grid-dominant-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--sp-2);
-  align-items: center;
-}
-
-/* "More variations" — secondary affordance next to the dominant tile.
-   Reads as ghost-on-glass next to the gradient commit button so the
-   primary action stays clearly dominant. No new color tokens; reuses
-   the existing border/accent tints. */
-.ab-more-btn {
-  background: transparent;
-  border: 1px solid var(--color-border);
-  border-radius: var(--r-3);
-  color: var(--text-primary);
-  font-family: var(--font-sans);
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  padding: 0.45rem 0.75rem;
-  cursor: pointer;
-  transition:
-    border-color var(--dur-state) var(--ease-considered),
-    background var(--dur-state) var(--ease-considered),
-    transform 0.1s;
-}
-.ab-more-btn:hover {
-  border-color: var(--accent-tint-40);
-  background: var(--accent-tint-12);
-}
-.ab-more-btn:active { transform: scale(0.97); }
-.ab-more-btn:focus { outline: none; }
-.ab-more-btn:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
-}
-
-/* ──────────────────────────────────────────────────────────────────────
-   Phase D / #260 — Keep this sound (commit ceremony)
-   ────────────────────────────────────────────────────────────────────── */
-
-.keep-this {
-  background: transparent;
-  border: 1px solid var(--color-border);
-  border-radius: var(--r-3);
-  color: var(--text-primary);
-  font-family: var(--font-sans);
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  padding: 0.45rem 0.75rem;
-  cursor: pointer;
-  transition:
-    border-color var(--dur-state) var(--ease-considered),
-    background var(--dur-state) var(--ease-considered),
-    transform 0.1s;
-}
-.keep-this:hover {
-  border-color: var(--accent-tint-40);
-  background: var(--accent-tint-12);
-}
-.keep-this:active { transform: scale(0.97); }
-.keep-this:focus { outline: none; }
-.keep-this:focus-visible {
-  outline: 2px solid var(--color-focus-ring);
-  outline-offset: 2px;
-}
-
-.keep-this--editing {
-  display: inline-flex;
-  align-items: center;
-  gap: var(--sp-1);
-  padding: 0;
-  border: none;
-  background: transparent;
-}
-
-.keep-this-input {
-  background: var(--bg-elevated, rgba(255,255,255,0.04));
-  color: var(--text-primary);
-  border: 1px solid var(--accent-tint-40);
-  border-radius: var(--r-3);
-  font-family: var(--font-sans);
-  font-size: 0.78rem;
-  padding: 0.4rem 0.6rem;
-  min-width: 12rem;
-  outline: none;
-}
-.keep-this-input:focus {
-  border-color: var(--accent-primary);
-}
-
-.keep-this-confirm {
-  background: linear-gradient(135deg, var(--accent-primary), var(--accent-secondary));
-  border: none;
-  border-radius: var(--r-3);
-  color: var(--text-primary);
-  font-family: var(--font-sans);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  padding: 0.45rem 0.65rem;
-  cursor: pointer;
-}
-
-.bounce-wav {
-  background: transparent;
-  border: 1px solid var(--color-border);
-  border-radius: var(--r-3);
-  color: var(--text-primary);
-  font-family: var(--font-sans);
-  font-size: 0.75rem;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  padding: 0.45rem 0.75rem;
-  cursor: pointer;
-  transition:
-    border-color var(--dur-state) var(--ease-considered),
-    background var(--dur-state) var(--ease-considered),
-    transform 0.1s;
-}
-.bounce-wav:hover {
-  border-color: var(--accent-tint-40);
-  background: var(--accent-tint-12);
-}
-.bounce-wav:active { transform: scale(0.97); }
-
-/* Toast-style banner shown when a commit ceremony or bounce finishes. */
-.commit-toast {
-  position: fixed;
-  bottom: 1.5rem;
-  left: 50%;
-  transform: translateX(-50%);
-  background: var(--bg-elevated, rgba(20,20,28,0.92));
-  color: var(--text-primary);
-  border: 1px solid var(--accent-tint-40);
-  border-radius: var(--r-3);
-  padding: 0.6rem 1rem;
-  font-family: var(--font-sans);
-  font-size: 0.78rem;
-  letter-spacing: 0.04em;
-  z-index: 8000;
-  pointer-events: none;
-  animation: commitToastIn 0.32s var(--ease-considered, ease-out);
-}
-
-@keyframes commitToastIn {
-  from { opacity: 0; transform: translate(-50%, 8px); }
-  to   { opacity: 1; transform: translate(-50%, 0);   }
-}
-
-/* ── Reveal animation (#263) ──────────────────────────────────────────
-   When a fresh variation family lands the dominant tile cross-fades and
-   scales up over 1100ms, then the thumbnails follow with an 80ms-per-tile
-   stagger driven by the `--thumb-index` CSS variable set inline on each
-   thumb. Spectrum bars inside the tiles slide up bottom-anchored over
-   600ms. All keyframes are short-lived; we use `animation` (one-shot)
-   rather than `transition` so the effect replays cleanly when the React
-   tree remounts the tile via `key={revealKey}` instead of merging into
-   an existing element. */
-@keyframes ab-reveal-dominant {
-  from { opacity: 0; transform: scale(0.96); }
-  to   { opacity: 1; transform: scale(1); }
-}
-.ab-grid-revealing.ab-grid-dominant {
-  animation: ab-reveal-dominant 1100ms var(--ease-considered) both;
-}
-
-@keyframes ab-reveal-thumb {
-  from { opacity: 0; transform: translateY(4px); }
-  to   { opacity: 1; transform: translateY(0); }
-}
-.ab-grid-revealing.ab-grid-thumbs > .ab-grid-thumb {
-  opacity: 0;
-  animation: ab-reveal-thumb 600ms var(--ease-considered) both;
-  animation-delay: calc(80ms * var(--thumb-index, 0));
-}
-
-@keyframes ab-reveal-bar {
-  from { transform: scaleY(0); }
-  to   { transform: scaleY(1); }
-}
-/* Spectrum bars inside PatchPreview tiles draw from the bottom up. We
-   key off the existing visual-spectrum bar selector so we don't need
-   PatchPreview to know about morph state. Animation duration matches
-   the spec (600ms) with the spec-defined ease. */
-.ab-grid-revealing .visual-spectrum-bar,
-.ab-grid-revealing .spectrum-bar {
-  transform-origin: bottom;
-  animation: ab-reveal-bar 600ms cubic-bezier(0.22, 0.61, 0.36, 1) both;
-}
-
-@media (prefers-reduced-motion: reduce) {
-  .ab-grid-revealing.ab-grid-dominant,
-  .ab-grid-revealing.ab-grid-thumbs > .ab-grid-thumb,
-  .ab-grid-revealing .visual-spectrum-bar,
-  .ab-grid-revealing .spectrum-bar {
-    animation: none;
-    transition: none;
-    opacity: 1;
-    transform: none;
-  }
 }
 
 /* ── Feedback bar ─────────────────────────────────────────────────── */
@@ -529,44 +267,6 @@
 .feedback-btn.dislike.active,
 .feedback-btn.dislike:hover:not(:disabled) {
   background: var(--error-tint-15, rgba(255, 61, 136, 0.15));
-}
-
-/* Phase G / #247 — pitch hint chip. Lives just above the input bar so
-   it reads as ambient context, not chrome. Musician-register copy
-   ("TIMBRE heard a note around B♭3"), never frequency in Hz. */
-.hum-pitch-chip {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin: 0 1rem 6px 1rem;
-  padding: 6px 10px;
-  border: 1px solid var(--accent-tint-40, rgba(180, 140, 255, 0.4));
-  border-radius: var(--r-2, 8px);
-  background: var(--accent-tint-12, rgba(180, 140, 255, 0.12));
-  font-family: var(--font-sans);
-  font-size: 0.78rem;
-  color: var(--text-primary);
-}
-.hum-pitch-text {
-  flex: 1 1 auto;
-}
-.hum-pitch-action {
-  background: transparent;
-  border: 1px solid var(--accent-tint-40, rgba(180, 140, 255, 0.4));
-  border-radius: var(--r-1, 4px);
-  padding: 2px 8px;
-  font: inherit;
-  font-size: 0.72rem;
-  color: var(--text-accent, #B388FF);
-  cursor: pointer;
-}
-.hum-pitch-action:hover { background: var(--accent-tint-12, rgba(180, 140, 255, 0.12)); }
-.hum-pitch-muted {
-  color: var(--text-secondary);
-  border-color: var(--color-border-strong, rgba(255,255,255,0.1));
-  font-size: 0.9rem;
-  line-height: 1;
-  padding: 2px 6px;
 }
 
 /* ── Input bar ────────────────────────────────────────────────────── */
@@ -659,8 +359,8 @@
   border-radius: calc(var(--r-3) - 1px);
   color: var(--text-primary);
   font-family: var(--font-sans);
-  font-size: 0.95rem;
-  padding: 0.65rem 0.9rem;
+  font-size: 1.15rem;
+  padding: 0.75rem 1rem;
   /* Allow vertical user-resize up to a sensible cap so long prompts
      don't squeeze the message list. resize:vertical keeps the width
      stable while letting the user tug down. */

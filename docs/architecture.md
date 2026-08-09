@@ -186,6 +186,7 @@ Architecture decisions are recorded as ADRs in `docs/adr/`.
 | ADR | Status | Decision |
 | --- | --- | --- |
 | [ADR-0001](adr/ADR-0001-initial-architecture.md) | Accepted | Use JUCE 7 as the audio plugin framework. |
+| [ADR-0007](adr/ADR-0007-option2-local-audio-generation-model.md) | Proposed | Option 2 local audio model: Stable Audio 3 (Small SFX / Medium), not the non-existent "Stable Audio Open 2". |
 
 Current guiding decisions:
 

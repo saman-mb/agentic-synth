@@ -1,0 +1,94 @@
+name: 🐛 Bug report
+description: Something behaves incorrectly — wrong audio, a crash, a broken build
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to file a report.
+
+        Before you start, please check the **Known issues** section of the
+        README — `osc0_enabled` not muting oscillator 0 and the AU
+        version-hint assertion are already tracked.
+
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: What did you expect, and what did you get instead?
+      placeholder: |
+        I asked for a "dark pad" and got a bright pluck.
+        Expected the filter cutoff to land low.
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Steps to reproduce
+      description: The exact sequence. Include the prompt text if the agent is involved.
+      placeholder: |
+        1. Launch the standalone
+        2. Type "a dark, wide pad with movement"
+        3. Play C3
+        4. Filter is fully open
+    validations:
+      required: true
+
+  - type: dropdown
+    id: build-target
+    attributes:
+      label: Which build were you running?
+      options:
+        - Standalone (AgenticSynth_Plugin_Standalone) — has audio
+        - VST3 in a DAW
+        - AU in a DAW
+        - AgenticSynth (UI-only shell, no audio)
+        - Not sure
+    validations:
+      required: true
+
+  - type: input
+    id: daw
+    attributes:
+      label: DAW and version
+      description: Only if you hit this as a plugin.
+      placeholder: Ableton Live 12.1
+
+  - type: input
+    id: os
+    attributes:
+      label: OS and version
+      placeholder: macOS 15.2 (Apple Silicon)
+    validations:
+      required: true
+
+  - type: input
+    id: commit
+    attributes:
+      label: Commit or branch
+      description: Output of `git rev-parse --short HEAD`
+      placeholder: e5ece1c
+    validations:
+      required: true
+
+  - type: dropdown
+    id: llm-path
+    attributes:
+      label: Was a Gemini API key configured?
+      description: >
+        Without GEMINI_KEY the agent falls back to the keyword heuristic, which
+        produces noticeably blunter patches. Worth ruling out first.
+      options:
+        - "Yes — GEMINI_KEY set"
+        - "No — running on the heuristic fallback"
+        - "Not sure"
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Console output
+      description: >
+        Relevant lines from stdout/stderr. The startup banner is especially
+        useful — it reports which agent paths are enabled.
+      render: shell
