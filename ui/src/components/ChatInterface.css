@@ -125,10 +125,10 @@
 
 .bubble-text {
   margin: 0;
-  padding: 0.75rem 1rem;
+  padding: 0.85rem 1.1rem;
   border-radius: var(--r-4);
   line-height: 1.6;
-  font-size: 0.95rem;
+  font-size: 1.15rem;
   white-space: pre-wrap;
   word-break: break-word;
   position: relative;
@@ -359,8 +359,8 @@
   border-radius: calc(var(--r-3) - 1px);
   color: var(--text-primary);
   font-family: var(--font-sans);
-  font-size: 0.95rem;
-  padding: 0.65rem 0.9rem;
+  font-size: 1.15rem;
+  padding: 0.75rem 1rem;
   /* Allow vertical user-resize up to a sensible cap so long prompts
      don't squeeze the message list. resize:vertical keeps the width
      stable while letting the user tug down. */

@@ -67,20 +67,45 @@ echo
 echo "Recording. Press q to stop early."
 echo
 
+# Detect TIMBRE window bounds via Python Quartz API for window-only crop
+crop_filter=""
+win_bounds="$(python3 -c "
+import Quartz
+for w in Quartz.CGWindowListCopyWindowInfo(Quartz.kCGWindowListOptionOnScreenOnly, Quartz.kCGNullWindowID):
+    if 'TIMBRE' in w.get('kCGWindowOwnerName', ''):
+        b = w.get('kCGWindowBounds', {})
+        print(f\"{int(b['Width'])}:{int(b['Height'])}:{int(b['X'])}:{int(b['Y'])}\")
+        break
+" 2>/dev/null || true)"
+
+if [[ -n "$win_bounds" ]]; then
+    IFS=':' read -r w h x y <<< "$win_bounds"
+    # Ensure width and height are even for x264
+    w=$(( (w / 2) * 2 ))
+    h=$(( (h / 2) * 2 ))
+    crop_filter="crop=${w}:${h}:${x}:${y}"
+    echo "target : TIMBRE window bounds (${w}x${h} at +${x}+${y})"
+else
+    echo "target : Full screen (TIMBRE window bounds not found)"
+fi
+
+vf_args="scale=-2:${SCALE}"
+if [[ -n "$crop_filter" ]]; then
+    vf_args="${crop_filter}"
+fi
+
 # -capture_cursor 1  : include the pointer, so clicks are followable
-# -pix_fmt uyvy422   : the native avfoundation screen format; avoids a
-#                      conversion warning on capture
-# scale=-2:$SCALE    : -2 keeps the width even, which libx264 requires
-# +faststart         : moves the index to the front so the file streams
-exec ffmpeg -hide_banner \
+# -pix_fmt uyvy422   : native avfoundation screen format
+# +faststart         : moves index to front for web playback
+exec ffmpeg -y -hide_banner \
     -f avfoundation \
     -capture_cursor 1 \
     -framerate "$FPS" \
     -pix_fmt uyvy422 \
     -i "${screen_idx}:${audio_idx}" \
-    "${limit[@]}" \
+    ${limit+"${limit[@]}"} \
     -c:v libx264 -preset veryfast -crf 20 \
-    -vf "scale=-2:${SCALE}" \
+    -vf "$vf_args" \
     -pix_fmt yuv420p \
     -c:a aac -b:a 256k \
     -movflags +faststart \

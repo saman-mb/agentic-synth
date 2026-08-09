@@ -1,28 +1,30 @@
 <div align="center">
 
-# TIMBRE
+# 🎛️ TIMBRE
 
-**Say it. Hear it.**
+### **Say it. Hear it.**
 
-Describe a sound in plain English — get a playable synth patch.
-An agent-driven **VST3 / AU / standalone synthesizer** built with JUCE 8 and C++20.
+*An agent-driven **VST3 / AU / Standalone Synthesizer** powered by Gemini 2.5, JUCE 8, and C++20.*
 
-[![CI](https://github.com/saman-mb/agentic-synth/actions/workflows/ci.yml/badge.svg)](https://github.com/saman-mb/agentic-synth/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
-[![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C.svg?logo=cplusplus&logoColor=white)](https://en.cppreference.com/w/cpp/20)
-[![JUCE 8](https://img.shields.io/badge/JUCE-8-8DC63F.svg)](https://juce.com/)
+[![CI Status](https://img.shields.io/github/actions/workflow/status/saman-mb/agentic-synth/ci.yml?branch=main&style=for-the-badge&logo=github&logoColor=white&label=CI)](https://github.com/saman-mb/agentic-synth/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge&logo=opensourceinitiative&logoColor=white)](LICENSE)
+[![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C.svg?style=for-the-badge&logo=cplusplus&logoColor=white)](https://en.cppreference.com/w/cpp/20)
+[![JUCE 8](https://img.shields.io/badge/JUCE-8-8DC63F.svg?style=for-the-badge&logo=juce&logoColor=white)](https://juce.com/)
+[![React 18](https://img.shields.io/badge/React-18-61DAFB.svg?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 
-[![Platforms](https://img.shields.io/badge/platforms-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg)](#1-requirements)
-[![Formats](https://img.shields.io/badge/formats-VST3%20%7C%20AU%20%7C%20Standalone-blueviolet.svg)](#-build-outputs)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](CONTRIBUTING.md)
+[![Platforms](https://img.shields.io/badge/Platforms-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg?style=flat-square&logo=apple&logoColor=white)](#1-requirements)
+[![Formats](https://img.shields.io/badge/Formats-VST3%20%7C%20AU%20%7C%20Standalone-7C4DFF.svg?style=flat-square&logo=audio-technica&logoColor=white)](#-build-outputs)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg?style=flat-square)](CONTRIBUTING.md)
+
+---
 
 </div>
 
+> [!TIP]
+> 🎬 **Demo Video Available**: Check out the recorded demo video in [`timbre-demo.mp4`](file:///Users/saman/Dev/agentic-synth/timbre-demo.mp4) showing real-time prompt generation with Gemini 2.5 Flash!
+
 > [!WARNING]
-> **Early and experimental.** Builds from source only — there are no binary
-> releases yet. The patch format, the native bridge API, and the UI are all
-> still changing. Expect rough edges, and see [Known issues](#-known-issues)
-> before filing a bug.
+> **Early and experimental.** Builds from source only. The patch format, native bridge API, and UI are actively evolving. See [Known issues](#-known-issues) before filing a bug.
 
 ---
 
