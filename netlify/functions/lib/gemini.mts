@@ -88,7 +88,10 @@ async function postJson(
 // Enhancer — brief generation (C++ PromptEnhancer parity)
 // ---------------------------------------------------------------------------
 
-const ENHANCER_MODEL = "gemini-2.5-flash-lite";
+// Gemini retired the 2.5 models for newly issued API keys (#280: the demo
+// key gets 404 NOT_FOUND on them). 3.5/3.6 flash are the current free-tier
+// equivalents; env overrides keep older (still-served) keys usable.
+const ENHANCER_MODEL = process.env.GEMINI_ENHANCER_MODEL || "gemini-3.5-flash-lite";
 const ENHANCER_TIMEOUT_MS = 6_000;
 
 /**
@@ -134,10 +137,10 @@ export async function enhanceBrief(
 }
 
 // ---------------------------------------------------------------------------
-// Generator — patch JSON via gemini-2.5-flash, 3 attempts
+// Generator — patch JSON via Gemini flash, 3 attempts
 // ---------------------------------------------------------------------------
 
-const GENERATOR_MODEL = "gemini-2.5-flash";
+const GENERATOR_MODEL = process.env.GEMINI_GENERATOR_MODEL || "gemini-3.6-flash";
 const PER_ATTEMPT_TIMEOUT_MS = 12_000;
 const ABSOLUTE_DEADLINE_MS = 24_000;
 const BACKOFF_MS = [200, 600];
@@ -304,14 +307,21 @@ export async function generatePatchText(
     prompt +
     "\n\nReturn JSON only. No markdown. No prose. Match the schema exactly.";
 
+  // Gemini 3.x rejects thinkingBudget: 0 with INVALID_ARGUMENT (thinking
+  // is always on for those models); the zero-budget disable is a 2.5-era
+  // parameter. Send it only for 2.5-family models (#280 live-key finding).
+  const generationConfig: Record<string, unknown> = {
+    temperature: 0.35,
+    maxOutputTokens: 4096,
+    responseMimeType: "application/json",
+  };
+  if (GENERATOR_MODEL.startsWith("gemini-2.5")) {
+    generationConfig.thinkingConfig = { thinkingBudget: 0 };
+  }
+
   const body = {
     contents: [{ parts: [{ text }] }],
-    generationConfig: {
-      temperature: 0.35,
-      maxOutputTokens: 4096,
-      thinkingConfig: { thinkingBudget: 0 },
-      responseMimeType: "application/json",
-    },
+    generationConfig,
     safetySettings: ["HARASSMENT", "HATE_SPEECH", "SEXUALLY_EXPLICIT", "DANGEROUS_CONTENT"].map(
       (category) => ({ category: `HARM_CATEGORY_${category}`, threshold: "BLOCK_ONLY_HIGH" }),
     ),
