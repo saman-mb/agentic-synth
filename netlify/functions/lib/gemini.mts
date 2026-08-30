@@ -137,16 +137,19 @@ export async function enhanceBrief(
 }
 
 // ---------------------------------------------------------------------------
-// Generator — patch JSON via Gemini flash, 3 attempts
+// Generator — patch JSON via Gemini flash-lite, 2 attempts
 // ---------------------------------------------------------------------------
 
-const GENERATOR_MODEL = process.env.GEMINI_GENERATOR_MODEL || "gemini-3.6-flash";
-const PER_ATTEMPT_TIMEOUT_MS = 12_000;
-// 55 s: streaming functions are gated on TTFB, not total duration
-// (#280 r8), so the deadline covers the enhancer (6 s) plus all three
-// 12 s generator attempts with backoff.
-const ABSOLUTE_DEADLINE_MS = 55_000;
-const BACKOFF_MS = [200, 600];
+// Generator default is flash-lite: measured live, 3.6-flash thinking runs
+// 10.6s — over the platform's 10s total execution cap on the free plan —
+// while flash-lite produces equivalent patch JSON in ~2.8s (#280 r9).
+const GENERATOR_MODEL = process.env.GEMINI_GENERATOR_MODEL || "gemini-3.5-flash-lite";
+const PER_ATTEMPT_TIMEOUT_MS = 4_000;
+// The platform kills a function at 10 s TOTAL on the free plan —
+// streaming does not extend it (#280 r9 live finding). Each endpoint
+// therefore runs ONE model call with a slim retry inside a 9 s wall.
+const ABSOLUTE_DEADLINE_MS = 9_000;
+const BACKOFF_MS = [300];
 
 // Transient upstream error.status values worth one more attempt.
 const RETRYABLE_STATUSES = new Set(["UNAVAILABLE", "INTERNAL", "DEADLINE_EXCEEDED"]);

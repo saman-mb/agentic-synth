@@ -103,12 +103,50 @@ export async function runGenerateFlow(
     // never abort the event flow here — the UI still shows the patch.
   });
 
+  // ── Leg 1: /api/brief — the enhancer. Emits `enhancement` as soon as
+  // the brief lands, matching the C++ ordering (notifyEnhancement fires
+  // right after enhancePrompt, before the generator runs) and giving the
+  // visitor something to read while the patch generates. Each endpoint
+  // must stay under the platform's 10 s function cap (#280 r9), hence
+  // the split.
+  let briefRes: Response;
+  try {
+    briefRes = await fetch('/api/brief', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt }),
+    });
+  } catch {
+    emit('error', { message: 'Could not reach the patch service — check your connection and try again.' });
+    return;
+  }
+
+  let briefData: { brief?: string; error?: string } = {};
+  try {
+    briefData = JSON.parse(await briefRes.text()) as { brief?: string; error?: string };
+  } catch {
+    // Unparsable body — the status check below produces the error event.
+  }
+
+  if (!briefRes.ok) {
+    emit('error', { message: friendlyError(briefRes.status, asString(briefData.error)) });
+    return;
+  }
+  const serverBriefError = asString(briefData.error);
+  if (serverBriefError) {
+    emit('error', { message: serverBriefError });
+    return;
+  }
+  const brief = asString(briefData.brief) ?? prompt.trim();
+  emit('enhancement', { brief });
+
+  // ── Leg 2: /api/generate — the patch generator, fed the brief.
   let res: Response;
   try {
     res = await fetch('/api/generate', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ prompt }),
+      body: JSON.stringify({ prompt, brief }),
     });
   } catch {
     emit('error', { message: 'Could not reach the patch service — check your connection and try again.' });
@@ -145,10 +183,8 @@ export async function runGenerateFlow(
   }
   const patch = data.patch as PatchParams;
 
-  // 1. ENHANCER brief — emitted once per generate call, before anything
-  //    else, matching notifyEnhancement ordering.
-  const brief = asString(data.brief) ?? prompt.trim();
-  emit('enhancement', { brief });
+  // 1. Brief already emitted above (leg 1) — the patch frame comes next,
+  //    matching the C++ order enhancement → patch → patch_update → ….
 
   // 2. Apply to the engine (setPatch then macros) and update the snapshot
   //    so knob_tweak / feedback / audition keys work against this patch.

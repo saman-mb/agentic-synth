@@ -9,23 +9,28 @@
   command = "node scripts/sync-prompts.mjs && cd ui && npm ci && npm run build"
   functions = "netlify/functions"
 
+# generate.mts imports the shared patch codec from ui/src (outside the
+# functions directory). Netlify's server-side bundler only reaches
+# outside the functions dir for paths declared here — without them the
+# function 404s at request time (#280 live finding).
+[functions]
+  included_files = [
+    "ui/src/demo/patchCodec.ts",
+    "ui/src/data/modulation.ts",
+    "netlify/functions/lib/prompts.generated.mts",
+  ]
+
 [build.environment]
   NODE_VERSION = "22"
 
-# The generate handler self-registers its path via the Netlify v2
-# in-source `config = { path: "/api/generate" }` export, which bypasses
-# redirects entirely. The explicit rewrite below is belt-and-braces so
-# the route resolves even if the function is uploaded as a plain
-# /generate function (e.g. zip-it-and-ship-it without in-source config).
-# It must precede the SPA catch-all.
-[[redirects]]
-  from = "/api/generate"
-  to = "/.netlify/functions/generate"
-  status = 200
-  force = true
+# NOTE: no redirect for /api/generate — the function registers its own
+# route via in-source `config = { path: "/api/generate" }`. A force
+# redirect to /.netlify/functions/generate here would shadow the route
+# and 404 (the default URL doesn't exist for v2 functions with a custom
+# path) — #280 live finding.
 
-# SPA catch-all: force = false, so real files and the function route
-# above always win.
+# SPA catch-all: force = false, so the function route and real files
+# always win.
 [[redirects]]
   from = "/*"
   to = "/index.html"
