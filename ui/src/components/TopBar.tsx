@@ -1,5 +1,6 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import './TopBar.css';
+import type { PresetEntry } from '../data/presets';
 
 // ── TopBar (Phase 6) ─────────────────────────────────────────────────
 //
@@ -27,6 +28,124 @@ interface TopBarProps {
   // Phase 10 §16 — Option+double-click on the wordmark triggers the
   // one-time synchronized 360° knob spin easter egg. Once per session.
   onAltDoubleClickLogo?: () => void;
+  // Web-demo live preset selector (#280). When all three are provided the
+  // center-left placeholder below becomes a working selector; the plugin
+  // build omits them and renders the placeholder markup unchanged.
+  patchName?: string;
+  presets?: readonly PresetEntry[];
+  onSelectPreset?: (preset: PresetEntry) => void;
+}
+
+// ── Live preset selector (web demo only) ──────────────────────────────
+// Same chrome as the placeholder (arrows + name button) but enabled:
+// arrows step the catalogue with wrap-around, the name button opens a
+// listbox of every loadable preset. The chevron is an inline SVG rather
+// than the placeholder's ▾ text glyph — that glyph rendered as a broken
+// tofu/emoji box on the reporter's platform, and the SVG is stable
+// everywhere.
+function LivePresetSelector({
+  patchName,
+  presets,
+  onSelectPreset,
+}: {
+  patchName: string;
+  presets: readonly PresetEntry[];
+  onSelectPreset: (preset: PresetEntry) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+
+  // Close on outside pointer-down / Escape while the listbox is open.
+  useEffect(() => {
+    if (!open) return;
+    const onPointerDown = (e: PointerEvent) => {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    };
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setOpen(false);
+    };
+    window.addEventListener('pointerdown', onPointerDown);
+    window.addEventListener('keydown', onKeyDown);
+    return () => {
+      window.removeEventListener('pointerdown', onPointerDown);
+      window.removeEventListener('keydown', onKeyDown);
+    };
+  }, [open]);
+
+  const currentIdx = presets.findIndex((p) => p.name === patchName);
+  const step = (dir: 1 | -1) => {
+    if (presets.length === 0) return;
+    // Unknown current name (user-saved preset outside the catalogue)
+    // wraps in from the ends rather than throwing off the arithmetic.
+    const base = currentIdx === -1 ? (dir === 1 ? -1 : 0) : currentIdx;
+    onSelectPreset(presets[(base + dir + presets.length) % presets.length]);
+  };
+
+  return (
+    <div className="topbar-preset topbar-preset-live" ref={rootRef}>
+      <button
+        type="button"
+        className="topbar-preset-arrow"
+        aria-label="Previous preset"
+        disabled={presets.length === 0}
+        onClick={() => step(-1)}
+      >
+        ‹
+      </button>
+      <button
+        type="button"
+        className="topbar-preset-dropdown"
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        disabled={presets.length === 0}
+        onClick={() => setOpen((o) => !o)}
+      >
+        <span className="topbar-preset-name">{patchName}</span>
+        <svg
+          className="topbar-preset-chev-svg"
+          width="8"
+          height="6"
+          viewBox="0 0 8 6"
+          aria-hidden="true"
+        >
+          <path d="M1 1.5 L4 4.5 L7 1.5" fill="none" stroke="currentColor" strokeWidth="1.5" />
+        </svg>
+      </button>
+      <button
+        type="button"
+        className="topbar-preset-arrow"
+        aria-label="Next preset"
+        disabled={presets.length === 0}
+        onClick={() => step(1)}
+      >
+        ›
+      </button>
+      {open && (
+        <ul className="topbar-preset-list" role="listbox" aria-label="Presets">
+          {presets.map((p) => (
+            <li
+              key={p.id}
+              role="option"
+              aria-selected={p.name === patchName}
+            >
+              <button
+                type="button"
+                className={`topbar-preset-item${p.name === patchName ? ' topbar-preset-item-active' : ''}`}
+                onClick={() => {
+                  onSelectPreset(p);
+                  setOpen(false);
+                }}
+              >
+                {p.name}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
 }
 
 export function TopBar({
@@ -43,7 +162,16 @@ export function TopBar({
   onSelectSlot,
   onCopySlot,
   onAltDoubleClickLogo,
+  patchName,
+  presets,
+  onSelectPreset,
 }: TopBarProps) {
+  // All three live-selector props are passed together by App in demo mode;
+  // requiring all three keeps the plugin placeholder path total.
+  const liveSelector =
+    patchName !== undefined &&
+    presets !== undefined &&
+    onSelectPreset !== undefined;
   // Cyan confirmation sweep token for the A/B copy button. Bumped on
   // every copy so consecutive copies retrigger the animation. Cleared
   // after the 1000ms sweep+hold+fade finishes.
@@ -68,15 +196,24 @@ export function TopBar({
         </span>
       </div>
 
-      {/* Center-left: preset selector (placeholder — live browser is in sidebar) */}
-      <div className="topbar-section topbar-preset" aria-label="Preset selector">
-        <button type="button" className="topbar-preset-arrow" aria-label="Previous preset" disabled>‹</button>
-        <button type="button" className="topbar-preset-dropdown" aria-haspopup="listbox" disabled>
-          <span className="topbar-preset-name">init patch</span>
-          <span className="topbar-preset-chev" aria-hidden="true">▾</span>
-        </button>
-        <button type="button" className="topbar-preset-arrow" aria-label="Next preset" disabled>›</button>
-      </div>
+      {/* Center-left: preset selector — placeholder in the plugin (live
+          browser is in sidebar), working selector in the web demo (#280) */}
+      {liveSelector ? (
+        <LivePresetSelector
+          patchName={patchName}
+          presets={presets}
+          onSelectPreset={onSelectPreset}
+        />
+      ) : (
+        <div className="topbar-section topbar-preset" aria-label="Preset selector">
+          <button type="button" className="topbar-preset-arrow" aria-label="Previous preset" disabled>‹</button>
+          <button type="button" className="topbar-preset-dropdown" aria-haspopup="listbox" disabled>
+            <span className="topbar-preset-name">init patch</span>
+            <span className="topbar-preset-chev" aria-hidden="true">▾</span>
+          </button>
+          <button type="button" className="topbar-preset-arrow" aria-label="Next preset" disabled>›</button>
+        </div>
+      )}
 
       {/* Center: A/B compare (wired — Phase 6) */}
       <div className="topbar-section topbar-ab" role="group" aria-label="A/B compare">

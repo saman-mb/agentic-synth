@@ -24,6 +24,7 @@ import { useSynthBridge } from './hooks/useSynthBridge';
 import { useWebSocket } from './hooks/useWebSocket';
 import { usePatchHistory } from './hooks/usePatchHistory';
 import { useUiAudioSettings } from './hooks/useUiAudioSettings';
+import { PresetEntry, loadAllPresets } from './data/presets';
 import { playTapeStop, playVoicePip } from './data/uiAudio';
 import {
   QUICK_START_PATCH,
@@ -520,6 +521,19 @@ export function App() {
   const synthBridge = useSynthBridge();
 
   const [presetListOpen, setPresetListOpen] = useState<boolean>(false);
+  // Web demo only: name shown in the TopBar preset selector (#280). The
+  // plugin's TopBar ignores it (static placeholder there); in the demo it
+  // tracks the last-loaded preset name, agent generations, or init.
+  const [patchName, setPatchName] = useState('init patch');
+  // Agent generations relabel the selector: the wire may carry an explicit
+  // patch_name (the demo generate flow forwards the response's name when
+  // the service provides one); otherwise a generic agent label.
+  const setAgentPatchName = useCallback((msg: Record<string, unknown>) => {
+    const name = msg.patch_name;
+    setPatchName(
+      typeof name === 'string' && name.trim().length > 0 ? name : 'Agent patch',
+    );
+  }, []);
 
   // Phase G / #262 — MIDI learn map mirror. The canonical store is on the
   // C++ side (MidiLearnStore); React mirrors it via `midi_learned` events
@@ -668,6 +682,7 @@ export function App() {
         ph.push(fullPatch, 'agent');
         setLastAgentEditBatch(new Set(Object.keys(params)));
         bumpPatchLoad();
+        setAgentPatchName(msg);
         applyAgentModulationPlan(msg.modulation as AgentModulationPlan | undefined);
       } else if (msg.type === 'patch_update' && msg.params && typeof msg.params === 'object') {
         const params = msg.params as Record<string, number>;
@@ -677,6 +692,7 @@ export function App() {
         // Sticky: replace the batch wholesale; no timer-driven clear.
         setLastAgentEditBatch(new Set(Object.keys(params)));
         bumpPatchLoad();
+        setAgentPatchName(msg);
         applyAgentModulationPlan(msg.modulation as AgentModulationPlan | undefined);
       } else if (msg.type === 'transcript' && typeof msg.text === 'string') {
         setTranscript(msg.text as string);
@@ -793,7 +809,10 @@ export function App() {
   // entry so undo/redo and history capture work uniformly. Suppress the
   // browser-capture so we don't snapshot the recall itself.
   const handleLoadPreset = useCallback(
-    (next: PatchParams) => {
+    (next: PatchParams, name?: string) => {
+      // Name first: an identical-params reload must still relabel the
+      // TopBar selector (demo-only state; the plugin ignores it).
+      setPatchName(name ?? 'init patch');
       const diff = diffPatch(patch, next);
       if (Object.keys(diff).length === 0) return;
       let nextPatch = patch;
@@ -806,6 +825,26 @@ export function App() {
       // Engine notification handled by the effectivePatch effect.
     },
     [patch, ph, bumpPatchLoad],
+  );
+
+  // ── TopBar preset selector (web demo only, #280) ───────────────────
+  // The demo TopBar gets a working selector over the full catalogue.
+  // Keyed on patchName so a preset saved in the sidebar since the last
+  // load appears; the plugin passes nothing and keeps its placeholder.
+  const webDemo =
+    typeof document !== 'undefined' &&
+    document.body.classList.contains('web-demo');
+  const topPresets = useMemo(
+    () => (webDemo ? loadAllPresets() : []),
+    [webDemo, patchName],
+  );
+  const handleTopBarSelectPreset = useCallback(
+    (preset: PresetEntry) => {
+      // Same deep-clone discipline as PresetsSidebar's row click.
+      const cloned = JSON.parse(JSON.stringify(preset.params)) as PatchParams;
+      handleLoadPreset(cloned, preset.name);
+    },
+    [handleLoadPreset],
   );
 
   // ── Preset audition (Phase 13) ────────────────────────────────────
@@ -1088,6 +1127,13 @@ export function App() {
         onSelectSlot={switchSlot}
         onCopySlot={handleCopySlot}
         onAltDoubleClickLogo={triggerKnobSpin}
+        {...(webDemo
+          ? {
+              patchName,
+              presets: topPresets,
+              onSelectPreset: handleTopBarSelectPreset,
+            }
+          : {})}
       />
 
       <MacroBar

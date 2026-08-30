@@ -117,6 +117,53 @@
   color: var(--text-primary);
 }
 
+/* ── Live preset selector (web demo only — App passes liveSelector props
+   there; the plugin never renders these classes) ────────────────────── */
+
+.topbar-preset-live {
+  position: relative;
+}
+
+.topbar-preset-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 200px;
+  max-height: 280px;
+  overflow-y: auto;
+  margin: 0;
+  padding: var(--sp-1) 0;
+  list-style: none;
+  background: var(--bg-raised);
+  border: 1px solid var(--color-border-strong);
+  border-radius: var(--r-2);
+  box-shadow: var(--depth-card);
+  /* Above the demo FAB (40); the drawer/dropdown layers sit at 50+. */
+  z-index: 60;
+}
+
+.topbar-preset-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 6px var(--sp-3);
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+  font-size: 11px;
+}
+
+.topbar-preset-item:hover {
+  background: var(--fill-medium);
+  color: var(--text-primary);
+}
+
+.topbar-preset-item-active {
+  color: var(--text-accent);
+}
+
 /* ── A/B segmented control ─────────────────────────────────────────── */
 
 .topbar-ab {

@@ -34,6 +34,10 @@ export interface GenerateFlowDeps {
 
 interface GenerateApiResponse {
   brief?: unknown;
+  // Optional patch display name — mirrored into the TopBar selector by
+  // the App when present. The current function never sends it; kept for
+  // wire forward-compatibility.
+  name?: unknown;
   patch?: unknown;
   rationale?: unknown;
   modulation?: unknown;
@@ -160,7 +164,14 @@ export async function runGenerateFlow(
   if (modulation) patchPayload.modulation = modulation;
   if (actions.length > 0) patchPayload.augmenter_actions = actions;
   emit('patch', patchPayload);
-  emit('patch_update', { patch, modulation });
+  // patch_name is optional wire parity: the App mirrors it into the TopBar
+  // selector when the service names the patch (the C++ backend ignores the
+  // extra field). Absent → the UI falls back to its agent label.
+  const patchName = asString(data.name);
+  emit(
+    'patch_update',
+    patchName ? { patch, modulation, patch_name: patchName } : { patch, modulation },
+  );
 
   // 4. Rationale re-streamed as token frames (C++ re-sends the rationale as
   //    the primary bubble text), then the single rationale frame the

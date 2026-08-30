@@ -27,7 +27,10 @@ import {
 
 export interface PresetsSidebarProps {
   currentPatch: PatchParams;
-  onLoadPreset: (params: PatchParams) => void;
+  // `name` is the preset's display name — the web demo's TopBar patch
+  // selector mirrors it (#280). Plugin callers ignore it; loading the
+  // init patch passes no name and the selector falls back to its label.
+  onLoadPreset: (params: PatchParams, name?: string) => void;
   // Phase 13 — hover-to-audition. Fires 300ms after pointer-enter; the
   // preset is pushed ephemerally to the engine without history side
   // effects. On pointer-leave, onAuditionEnd reverts engine state. On
@@ -161,7 +164,7 @@ export function PresetsSidebar({
       setActivePresetId(preset.id);
       // Deep-clone so external edits to the patch don't mutate the catalogue entry.
       const cloned = JSON.parse(JSON.stringify(preset.params)) as PatchParams;
-      onLoadPreset(cloned);
+      onLoadPreset(cloned, preset.name);
     },
     [onLoadPreset, onAuditionCommit, clearHoverTimer],
   );

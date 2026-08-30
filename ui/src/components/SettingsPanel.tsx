@@ -234,10 +234,15 @@ export function SettingsPanel({
   // label-less. Input selection is out of scope: push-to-talk STT is
   // disabled in the demo, and the MIDI input section below uses Web MIDI
   // directly, not this bridge.
+  // Deliberately NOT gated on audioSettingsSupported: setSinkId is
+  // Chrome/Edge-only, and gating on it hid the whole section on
+  // Firefox/Safari (#280 user report). Discovery works everywhere —
+  // enumeration failure leaves just the Default option — while switching
+  // on an unsupported browser fails and surfaces the error note below.
   const [outputDevices, setOutputDevices] = useState<AudioOutputDevice[]>([]);
   const [outputDeviceId, setOutputDeviceId] = useState('');
   useEffect(() => {
-    if (!audioSettingsAvailable || !webDemo) return;
+    if (!webDemo) return;
     let cancelled = false;
     listAudioOutputDevices()
       .then((devices) => {
@@ -249,12 +254,23 @@ export function SettingsPanel({
     return () => {
       cancelled = true;
     };
-  }, [audioSettingsAvailable, webDemo]);
+  }, [webDemo]);
   const handleOutputDeviceChange = (deviceId: string) => {
-    setOutputDeviceId(deviceId);
     setAudioSettingsError(false);
+    // '' is the browser default — nothing to switch, always succeeds.
+    if (deviceId === '') {
+      setOutputDeviceId('');
+      return;
+    }
+    const previous = outputDeviceId;
+    setOutputDeviceId(deviceId);
     void setAudioOutputDevice(deviceId).then((ok) => {
-      if (!ok) setAudioSettingsError(true);
+      if (!ok) {
+        // Revert the selection so the control reflects what the user
+        // is actually hearing.
+        setOutputDeviceId(previous);
+        setAudioSettingsError(true);
+      }
     });
   };
 
@@ -299,9 +315,10 @@ export function SettingsPanel({
 
       {/* ── Audio device (web demo) ─────────────────────────────────
           Output selection only — the browser has no sample-rate/buffer
-          picker and demo push-to-talk is disabled. Hidden on browsers
-          without setSinkId via audioSettingsSupported. */}
-      {audioSettingsAvailable && webDemo && (
+          picker and demo push-to-talk is disabled. Always shown in demo
+          mode: hiding it on setSinkId-less browsers left users with no
+          way to even see where audio plays (#280). */}
+      {webDemo && (
         <section className="settings-group" aria-label="Audio device">
           <h3 className="settings-group-title">Audio device</h3>
           <div className="settings-row">
