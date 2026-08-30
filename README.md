@@ -2,7 +2,7 @@
 
 # 🎛️ TIMBRE
 
-<img src="docs/timbre-hero.png" alt="TIMBRE — an explosion of energy bursting into a waveform, purple, pink and yellow, with the wordmark TIMBRE — Say it. Hear it." width="640" />
+<img src="docs/timbre-hero.gif" alt="TIMBRE — an animated explosion of energy bursting into a waveform, purple, pink and yellow, with the wordmark TIMBRE — Say it. Hear it." width="640" />
 
 ### **Say it. Hear it.**
 
