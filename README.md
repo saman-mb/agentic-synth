@@ -2,6 +2,8 @@
 
 # 🎛️ TIMBRE
 
+<img src="docs/timbre-hero.png" alt="TIMBRE — an explosion of energy bursting into a waveform, purple, pink and yellow, with the wordmark TIMBRE — Say it. Hear it." width="640" />
+
 ### **Say it. Hear it.**
 
 *An agent-driven **VST3 / AU / Standalone Synthesizer** powered by Gemini 2.5, JUCE 8, and C++20.*
