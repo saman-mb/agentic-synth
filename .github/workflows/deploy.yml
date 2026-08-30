@@ -73,21 +73,14 @@ jobs:
           else
             ALIAS_FLAG="--alias pr-${{ github.event.number || github.ref_name }}"
           fi
-          # CI already built ui/dist and synced prompts. netlify deploy has
-          # no --config override and would re-run netlify.toml's build
-          # command, so stash it for the deploy call and carry the
-          # redirects over via _redirects (functions come from --functions).
-          mv netlify.toml netlify.toml.stash
-          {
-            echo "/api/generate /.netlify/functions/generate 200"
-            echo "/* /index.html 200"
-          } > ui/dist/_redirects
+          # CI already built ui/dist and synced prompts; --no-build skips
+          # netlify.toml's build command. Redirects/functions/paths all come
+          # from netlify.toml itself.
           npx --yes netlify-cli@latest deploy \
+            --site "$NETLIFY_SITE_ID" \
             --dir ui/dist \
             --functions netlify/functions \
+            --no-build \
             --message "Deploy from GitHub Actions: $COMMIT_MSG" \
             $PROD_FLAG $ALIAS_FLAG
-          RC=$?
-          mv netlify.toml.stash netlify.toml
-          exit $RC
         timeout-minutes: 10

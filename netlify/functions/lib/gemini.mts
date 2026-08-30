@@ -142,7 +142,10 @@ export async function enhanceBrief(
 
 const GENERATOR_MODEL = process.env.GEMINI_GENERATOR_MODEL || "gemini-3.6-flash";
 const PER_ATTEMPT_TIMEOUT_MS = 12_000;
-const ABSOLUTE_DEADLINE_MS = 24_000;
+// 55 s: streaming functions are gated on TTFB, not total duration
+// (#280 r8), so the deadline covers the enhancer (6 s) plus all three
+// 12 s generator attempts with backoff.
+const ABSOLUTE_DEADLINE_MS = 55_000;
 const BACKOFF_MS = [200, 600];
 
 // Transient upstream error.status values worth one more attempt.
@@ -263,7 +266,7 @@ function classify(status: number, json: unknown): AttemptOutcome {
   }
 
   // Truncated output: worth one more attempt (never more than the
-  // 3-attempt / 24 s budget the caller enforces).
+  // 3-attempt / 55 s budget the caller enforces).
   if (finishReason === "MAX_TOKENS") return { kind: "retry" };
 
   const text = extractCandidateText(json);
@@ -288,7 +291,7 @@ function sleep(ms: number): Promise<void> {
 
 /**
  * Patch generation with retry: 3 attempts, 200/600 ms backoff, 12 s
- * per-attempt timeout, 24 s absolute deadline (retries are skipped once
+ * per-attempt timeout, 55 s absolute deadline (retries are skipped once
  * past it). Retries on network errors, empty responses, transient 5xx /
  * UNAVAILABLE / INTERNAL / DEADLINE_EXCEEDED, and MAX_TOKENS. Never
  * retries safety blocks or non-5xx failures.

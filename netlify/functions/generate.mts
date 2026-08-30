@@ -4,6 +4,15 @@
 // validate/convert via the shared codec (ui/src/demo/patchCodec).
 // Free-tier safeguards: in-memory rate limit (rateLimit.mts) + brief
 // LRU cache (cache.mts). Node 20+ globals only, no external deps.
+//
+// Streaming (#280 r8): Netlify's free plan kills non-streaming functions
+// at 10 s time-to-first-byte, but the pipeline can legitimately run
+// ~40 s (enhancer + generator retries). The handler therefore returns a
+// ReadableStream that flushes its first byte immediately; the HTTP
+// status is fixed at Response construction, so only pre-pipeline
+// failures keep their real status (503) — failures detected mid-stream
+// are 200 + {"error": ...}, which generateFlow's defensive branch
+// treats as a failure.
 
 import { convertLlmPatch, validatePatch, type LlmPatch } from "../../ui/src/demo/patchCodec";
 import { enhanceBrief, generatePatchText, sanitizePrompt } from "./lib/gemini.mts";
@@ -34,6 +43,50 @@ function json(payload: unknown, status: number): Response {
   return new Response(JSON.stringify(payload), {
     status,
     headers: { "Content-Type": "application/json" },
+  });
+}
+
+// Streaming scaffold: send headers + a first byte immediately, run the
+// pipeline, then enqueue exactly one final JSON document and close.
+//
+// The initial chunk is a single ASCII space: JSON.parse (and
+// response.json()) skip leading whitespace, so the body stays one valid
+// JSON document and generateFlow's res.text() + JSON.parse contract is
+// unchanged. `run` returns the final body; its known-failure branches
+// return JSON.stringify({error: ...}) — the client reads {error} on
+// both !res.ok and 200 responses (generateFlow.ts).
+function streamPipeline(status: number, run: () => Promise<string>): Response {
+  const encoder = new TextEncoder();
+  const stream = new ReadableStream<Uint8Array>({
+    async start(controller) {
+      const send = (s: string): void => {
+        controller.enqueue(encoder.encode(s));
+      };
+      try {
+        send(" "); // TTFB chunk — must land well inside the 10 s gate.
+        send(await run());
+      } catch {
+        try {
+          send(JSON.stringify({ error: "Internal server error." }));
+        } catch {
+          // Stream already closed or cancelled by the client.
+        }
+      } finally {
+        try {
+          controller.close();
+        } catch {
+          // Already closed or errored.
+        }
+      }
+    },
+  });
+  return new Response(stream, {
+    status,
+    headers: {
+      "Content-Type": "application/json",
+      // Belt-and-braces: keep the edge from buffering the stream.
+      "X-Accel-Buffering": "no",
+    },
   });
 }
 
@@ -106,70 +159,80 @@ export default async function handler(req: Request): Promise<Response> {
     }
 
     // Immediate 503: never retried, never crashes, key never logged.
+    // Knowable before the pipeline starts, so the streamed Response can
+    // carry the real 503 status.
     const apiKey = process.env.GEMINI_KEY;
     if (typeof apiKey !== "string" || apiKey.length === 0) {
-      return json({ error: "Generation is not configured (missing GEMINI_KEY)." }, 503);
+      return streamPipeline(503, async () =>
+        JSON.stringify({ error: "Generation is not configured (missing GEMINI_KEY)." }),
+      );
     }
 
+    // Everything from here on runs after the headers have been sent, so
+    // mid-pipeline failures cannot change the status; they return
+    // {error} bodies that the client surfaces via its 200 + error branch.
     // Sanitize once; the brief and the generator prompt both use it.
     const sanitized = sanitizePrompt(body.prompt);
 
-    // Brief with LRU cache (hit = 1 upstream call saved).
-    const cacheKey = canonicalKey(sanitized);
-    let brief = briefCache.get(cacheKey);
-    if (brief === undefined) {
-      brief = await enhanceBrief(sanitized, apiKey);
-      briefCache.set(cacheKey, brief);
-    }
+    return streamPipeline(200, async () => {
+      // Brief with LRU cache (hit = 1 upstream call saved).
+      const cacheKey = canonicalKey(sanitized);
+      let brief = briefCache.get(cacheKey);
+      if (brief === undefined) {
+        brief = await enhanceBrief(sanitized, apiKey);
+        briefCache.set(cacheKey, brief);
+      }
 
-    // Generator: retries/backoff/deadline live inside gemini.mts.
-    const generated = await generatePatchText(sanitized, body.patchId, apiKey);
-    if (!generated.ok) {
-      if (generated.reason === "blocked") return json({ error: SAFETY_400 }, 400);
-      return json({ error: UPSTREAM_502 }, 502);
-    }
+      // Generator: retries/backoff/deadline live inside gemini.mts.
+      const generated = await generatePatchText(sanitized, body.patchId, apiKey);
+      if (!generated.ok) {
+        if (generated.reason === "blocked") return JSON.stringify({ error: SAFETY_400 });
+        return JSON.stringify({ error: UPSTREAM_502 });
+      }
 
-    // GrammarSampler parity: reject, never coerce. Malformed model JSON
-    // is a 400 after retries. The codec contract is convert-then-validate:
-    // the LLM emits string enums, convertLlmPatch maps them to ints (an
-    // unknown name becomes NaN), and validatePatch rejects the converted
-    // patch. Structural garbage that makes conversion throw is 400 too.
-    let parsedPatch: unknown;
-    try {
-      parsedPatch = JSON.parse(generated.text);
-    } catch {
-      return json({ error: "patch: malformed JSON from model" }, 400);
-    }
+      // GrammarSampler parity: reject, never coerce. Malformed model JSON
+      // is an error after retries. The codec contract is convert-then-
+      // validate: the LLM emits string enums, convertLlmPatch maps them
+      // to ints (an unknown name becomes NaN), and validatePatch rejects
+      // the converted patch. Structural garbage that makes conversion
+      // throw is an error too.
+      let parsedPatch: unknown;
+      try {
+        parsedPatch = JSON.parse(generated.text);
+      } catch {
+        return JSON.stringify({ error: "patch: malformed JSON from model" });
+      }
 
-    let patch: ReturnType<typeof convertLlmPatch>;
-    try {
-      patch = convertLlmPatch(parsedPatch as LlmPatch);
-    } catch {
-      return json({ error: "patch: malformed patch structure" }, 400);
-    }
+      let patch: ReturnType<typeof convertLlmPatch>;
+      try {
+        patch = convertLlmPatch(parsedPatch as LlmPatch);
+      } catch {
+        return JSON.stringify({ error: "patch: malformed patch structure" });
+      }
 
-    const verdict = validatePatch(patch);
-    if (!verdict.ok) {
-      return json({ error: `patch: ${verdict.error}` }, 400);
-    }
+      const verdict = validatePatch(patch);
+      if (!verdict.ok) {
+        return JSON.stringify({ error: `patch: ${verdict.error}` });
+      }
 
-    // rationale / augmenter_actions are LLM-transport fields read off the
-    // raw JSON (the codec drops them during conversion). Include only
-    // when present, capped to the PatchStruct buffer conventions.
-    const payload: Record<string, unknown> = { brief, patch };
-    const llm = parsedPatch as Record<string, unknown>;
-    const rationale = llm["rationale"];
-    if (typeof rationale === "string" && rationale.length > 0) {
-      payload["rationale"] = truncate(rationale, MAX_RATIONALE_LENGTH);
-    }
-    const actions = llm["augmenter_actions"];
-    if (typeof actions === "string" && actions.length > 0) {
-      payload["augmenter_actions"] = actions
-        .split("|")
-        .filter((a) => a.length > 0)
-        .map((a) => truncate(a, MAX_ACTION_LENGTH));
-    }
-    return json(payload, 200);
+      // rationale / augmenter_actions are LLM-transport fields read off the
+      // raw JSON (the codec drops them during conversion). Include only
+      // when present, capped to the PatchStruct buffer conventions.
+      const payload: Record<string, unknown> = { brief, patch };
+      const llm = parsedPatch as Record<string, unknown>;
+      const rationale = llm["rationale"];
+      if (typeof rationale === "string" && rationale.length > 0) {
+        payload["rationale"] = truncate(rationale, MAX_RATIONALE_LENGTH);
+      }
+      const actions = llm["augmenter_actions"];
+      if (typeof actions === "string" && actions.length > 0) {
+        payload["augmenter_actions"] = actions
+          .split("|")
+          .filter((a) => a.length > 0)
+          .map((a) => truncate(a, MAX_ACTION_LENGTH));
+      }
+      return JSON.stringify(payload);
+    });
   } catch {
     return json({ error: "Internal server error." }, 500);
   }
