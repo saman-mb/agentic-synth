@@ -90,8 +90,9 @@ add_executable(agentic_synth_tests
     SPSCQueueTest.cpp
     # Phase 1 P0 ship-blocker verification: SPSC audition path,
     # releaseResources state-clear, primeSmoothers no-glide,
-    # state-restore reapply.
-    PluginLifecycleTest.cpp
+    # state-restore reapply. Needs AgenticSynthPlugin TUs, so CI's
+    # PLUGIN=OFF job must not compile this file (same gate as the plugin .cpp).
+    $<$<BOOL:${AGENTIC_SYNTH_BUILD_PLUGIN}>:PluginLifecycleTest.cpp>
     # Phase 2 follow-up: unwired-field audio-differs tests. Marked [!shouldfail]
     # since the engine ignores these params today; flip green when Phase 3 lands.
     $<$<BOOL:${AGENTIC_SYNTH_BUILD_PLUGIN}>:UnwiredParamsTest.cpp>
