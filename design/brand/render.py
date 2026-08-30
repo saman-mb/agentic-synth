@@ -117,11 +117,13 @@ def render_gif(spec: dict, word: Image.Image, mask: list[tuple[int, int]], bg: t
     frames: list[Image.Image] = []
     durations: list[int] = []
     n = getattr(gif, "n_frames", 1)
+    black = (0, 0, 0, 255)
     for i in range(n):
         gif.seek(i)
         durations.append(int(gif.info.get("duration", 100)))
         fr = gif.convert("RGBA")
-        frames.append(erase_and_blit(fr, mask, word, origin, bg))
+        # GIF splash is true black; OG navy fill would stamp a rectangle.
+        frames.append(erase_and_blit(fr, mask, word, origin, black))
     # Quantize via adaptive palette from the first composited frame; keep
     # 3.6s loop (36 x 100ms on the source).
     rgb_frames = [fr.convert("RGB") for fr in frames]
