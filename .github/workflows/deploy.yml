@@ -1,0 +1,59 @@
+name: Deploy web demo
+
+# Deploys the browser demo (ui/dist + netlify/functions) to Netlify.
+# Lint/build/test gating lives in ci.yml - this workflow only ships.
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      # prompts.generated.mts is gitignored - it must exist before the UI
+      # build and before Netlify bundles netlify/functions at deploy time
+      # (the function imports it via lib/gemini.mts).
+      - name: Sync generated prompts
+        run: node scripts/sync-prompts.mjs
+
+      - name: Install UI dependencies
+        working-directory: ui
+        run: npm ci
+
+      - name: Build UI
+        working-directory: ui
+        run: npm run build
+
+      # Functions are bundled from netlify/functions at deploy time; the
+      # handler's repo-relative import of ui/src/demo/patchCodec.ts is
+      # resolved by the bundler then (source stays in the repo).
+      - name: Deploy to Netlify
+        uses: nwtgck/actions-netlify@v3.0
+        with:
+          publish-dir: "./ui/dist"
+          functions-dir: "./netlify/functions"
+          production-deploy: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          deploy-message: "Deploy from GitHub Actions: ${{ github.event.pull_request.title || github.ref_name }}"
+          enable-pull-request-comment: true
+          enable-commit-comment: true
+          overwrites-pull-request-comment: true
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        timeout-minutes: 10

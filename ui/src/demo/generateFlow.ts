@@ -1,0 +1,178 @@
+// ── Web-demo generate flow (issue #280) ─────────────────────────────
+//
+// Browser-side stand-in for WebUiComponent.cpp's generate job: POST the
+// prompt to the relative /api/generate endpoint (Netlify function, no
+// absolute URLs and no key material here) and replay the exact event
+// sequence the C++ backend emits — enhancement → patch → patch_update →
+// token(s) → rationale → done, or a single `error` event on any failure.
+//
+// The brief / rationale is re-sent as `token` frames (chunked for the
+// chat ticker) mirroring the C++ behaviour of streaming the rationale as
+// the primary bubble text (WebUiComponent.cpp notifyToken block). The
+// click handler that invoked `generate` is the autoplay-safe user
+// gesture, so ensureStarted() is kicked off at flow entry (idempotent in
+// the engine) and awaited just before events fire; a failed audio start
+// never aborts the event flow — the UI still shows the patch.
+//
+// Response contract (owned by the /api/generate function builder):
+//   200 { "brief": string, "patch": PatchParams, "rationale"?: string,
+//         "modulation"?: AgentModulationPlan, "augmenter_actions"?: string[] }
+//   400/429/502/503 { "error": string }
+
+import type { AgentModulationPlan } from '../types/chat';
+import type { PatchParams } from '../components/KnobGrid';
+import type { SynthEngine } from '../webaudio/engine';
+import { validatePatch } from './patchCodec';
+
+/** What the shim hands the flow — emit fans out to every JUCE listener. */
+export interface GenerateFlowDeps {
+  emit: (name: string, payload: unknown) => void;
+  engine: SynthEngine;
+  /** setPatch + applyMacros + update the shim's current-patch snapshot. */
+  applyServerPatch: (patch: PatchParams, modulation?: AgentModulationPlan) => void;
+  /** Set false when the AudioContext could not start (dead-engine errors). */
+  setEngineReady: (ready: boolean) => void;
+}
+
+interface GenerateApiResponse {
+  brief?: unknown;
+  patch?: unknown;
+  rationale?: unknown;
+  modulation?: unknown;
+  augmenter_actions?: unknown;
+  error?: unknown;
+}
+
+// ── pure helpers (no I/O — unit-testable) ────────────────────────────
+
+function isRecord(v: unknown): v is Record<string, unknown> {
+  return typeof v === 'object' && v !== null;
+}
+
+function asString(v: unknown): string | undefined {
+  return typeof v === 'string' && v.length > 0 ? v : undefined;
+}
+
+/** Friendly, user-facing copy per HTTP status; detail appended when present. */
+export function friendlyError(status: number, detail?: string): string {
+  const suffix = detail ? ` (${detail})` : '';
+  switch (status) {
+    case 400: return `The prompt was rejected${suffix}. Try rephrasing it.`;
+    case 429: return 'Rate limited (429) — too many generations in a row. Wait a moment and try again.';
+    case 502: return 'Patch service unavailable (502) — the upstream model could not be reached.';
+    case 503: return 'Patch service busy (503) — try again shortly.';
+    default: return `Generation failed (HTTP ${status}).${suffix}`;
+  }
+}
+
+/** Split text into small word-group chunks so the ticker streams. */
+export function chunkText(text: string, wordsPerChunk = 3): string[] {
+  const words = text.split(/\s+/).filter(Boolean);
+  const chunks: string[] = [];
+  for (let i = 0; i < words.length; i += wordsPerChunk) {
+    chunks.push(words.slice(i, i + wordsPerChunk).join(' '));
+  }
+  return chunks;
+}
+
+// ── the flow ─────────────────────────────────────────────────────────
+
+// sessionId is accepted by the wire contract but unused: /api/generate
+// correlates nothing server-side (stateless function call).
+export async function runGenerateFlow(
+  deps: GenerateFlowDeps,
+  prompt: string,
+): Promise<void> {
+  const { emit } = deps;
+
+  if (typeof prompt !== 'string' || prompt.trim().length === 0) {
+    emit('error', { message: 'Type a prompt first — there is nothing to generate.' });
+    return;
+  }
+
+  // Start the AudioContext while the generate click's user activation is
+  // still fresh (a slow fetch can outlive the transient gesture window).
+  // ensureStarted() is idempotent; the promise is awaited below.
+  const started: Promise<boolean> = deps.engine.ensureStarted().then(
+    () => true,
+    () => false,
+  );
+
+  let res: Response;
+  try {
+    res = await fetch('/api/generate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ prompt }),
+    });
+  } catch {
+    emit('error', { message: 'Could not reach the patch service — check your connection and try again.' });
+    return;
+  }
+
+  let data: GenerateApiResponse = {};
+  try {
+    data = JSON.parse(await res.text()) as GenerateApiResponse;
+  } catch {
+    // Body unparsable — fall through with an empty object; the status
+    // check below produces the error event.
+  }
+
+  if (!res.ok) {
+    emit('error', { message: friendlyError(res.status, asString(data.error)) });
+    return;
+  }
+
+  const serverError = asString(data.error);
+  if (serverError) {
+    // Defensive: a 200 body carrying {"error": ...} is a failure too.
+    emit('error', { message: serverError });
+    return;
+  }
+
+  // Defence in depth: the server already ran convertLlmPatch + validate;
+  // never trust the wire. An invalid patch is a function error, exactly
+  // like the C++ parser's fail-closed behaviour.
+  const validation = validatePatch(data.patch);
+  if (!validation.ok) {
+    emit('error', { message: `The patch service returned an invalid patch (${validation.error}).` });
+    return;
+  }
+  const patch = data.patch as PatchParams;
+
+  // 1. ENHANCER brief — emitted once per generate call, before anything
+  //    else, matching notifyEnhancement ordering.
+  const brief = asString(data.brief) ?? prompt.trim();
+  emit('enhancement', { brief });
+
+  // 2. Apply to the engine (setPatch then macros) and update the snapshot
+  //    so knob_tweak / feedback / audition keys work against this patch.
+  const modulation = isRecord(data.modulation) ? (data.modulation as AgentModulationPlan) : undefined;
+  deps.applyServerPatch(patch, modulation);
+
+  const engineOk = await started;
+  deps.setEngineReady(engineOk);
+
+  // 3. Patch frame BEFORE the rationale stream — C++ order is patch →
+  //    patch_update → token(s) → rationale → done (WebUiComponent.cpp:468-525).
+  const actions = Array.isArray(data.augmenter_actions)
+    ? data.augmenter_actions.filter((a): a is string => typeof a === 'string')
+    : [];
+  const patchPayload: Record<string, unknown> = { variation: 'A', data: patch };
+  if (modulation) patchPayload.modulation = modulation;
+  if (actions.length > 0) patchPayload.augmenter_actions = actions;
+  emit('patch', patchPayload);
+  emit('patch_update', { patch, modulation });
+
+  // 4. Rationale re-streamed as token frames (C++ re-sends the rationale as
+  //    the primary bubble text), then the single rationale frame the
+  //    "Why this patch?" details read.
+  const rationaleText = asString(data.rationale) ?? brief;
+  for (const chunk of chunkText(rationaleText)) {
+    emit('token', { content: chunk });
+  }
+  emit('rationale', { text: rationaleText });
+
+  // 5. done — the UI stops the ticker and commits the bubble.
+  emit('done', {});
+}

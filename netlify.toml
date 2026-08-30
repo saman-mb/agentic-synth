@@ -1,0 +1,43 @@
+# Netlify deploy configuration for the web demo (#280).
+#
+# CI (.github/workflows/deploy.yml) prebuilds ui/dist and runs
+# scripts/sync-prompts.mjs before deploying; `command` exists so manual
+# `netlify deploy` / `netlify dev` from a fresh checkout also work.
+
+[build]
+  publish = "ui/dist"
+  command = "node scripts/sync-prompts.mjs && cd ui && npm ci && npm run build"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "22"
+
+# The generate handler self-registers its path via the Netlify v2
+# in-source `config = { path: "/api/generate" }` export, which bypasses
+# redirects entirely. The explicit rewrite below is belt-and-braces so
+# the route resolves even if the function is uploaded as a plain
+# /generate function (e.g. zip-it-and-ship-it without in-source config).
+# It must precede the SPA catch-all.
+[[redirects]]
+  from = "/api/generate"
+  to = "/.netlify/functions/generate"
+  status = 200
+  force = true
+
+# SPA catch-all: force = false, so real files and the function route
+# above always win.
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
+  force = false
+
+# One-process local dev: `netlify dev` from the repo root starts Vite on
+# :5173 and proxies it (plus /api/generate) on :8888. Requires
+# GEMINI_KEY in the environment for generation to work.
+[dev]
+  framework = "#custom"
+  command = "node scripts/sync-prompts.mjs && cd ui && npm run dev"
+  targetPort = 5173
+  port = 8888
+  autoLaunch = false

@@ -54,6 +54,52 @@ audio thread.
 
 ---
 
+---
+
+## 🌐 Live demo (web)
+
+The same React UI runs in a browser at the Netlify demo site, backed by a
+Netlify Function that calls Gemini 2.5 server-side. The plugin binaries are
+untouched — the browser shim swaps the JUCE native bridge for
+`fetch("/api/generate")`, and audio renders through a WebAudio approximation
+of the C++ engine.
+
+Known approximations vs the native plugin:
+
+- `bpm_sync` is fixed at 120 BPM (WebAudio tempo sync)
+- Filter / effect colors differ from the C++ DSP implementations
+- Rate limits: 3 generations/minute and 200/day per IP (free-tier guard)
+
+The Gemini key is server-side only — it lives in the Netlify site env vars
+and is never shipped to the client.
+
+### Owner deploy checklist
+
+1. Create a Netlify site linked to this repo (deploy from `ui/dist`)
+2. Set `NETLIFY_SITE_ID` and `NETLIFY_AUTH_TOKEN` as GitHub repo secrets
+3. Set `GEMINI_KEY` in the Netlify site env vars — use a dedicated key on a
+   project where billing is never enabled (free tier only)
+4. Raise the function timeout to 26 s in the Netlify UI (free-tier default
+   is 10 s; the handler enforces its own 24 s deadline)
+
+### Run the web demo locally
+
+```sh
+node scripts/sync-prompts.mjs        # generates gitignored prompt constants
+cd ui && npm ci && npm run dev       # UI + browser shim on http://localhost:5173
+```
+
+To exercise the real `/api/generate` endpoint locally, use the Netlify CLI
+from the repo root — one process serves the UI and the function together
+(see `[dev]` in `netlify.toml`):
+
+```sh
+node scripts/sync-prompts.mjs
+GEMINI_KEY=your-key netlify dev      # http://localhost:8888
+```
+
+---
+
 ## 🚀 Quick start
 
 ### 1. Requirements
