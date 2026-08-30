@@ -1023,3 +1023,13 @@ body.web-demo .saved-sounds-fab:focus-visible {
   outline: 2px solid var(--color-focus-ring);
   outline-offset: 2px;
 }
+
+/* Demo-only: keep the hood open while playing. The slide-over's dimmed
+   backdrop is a click-to-close modal in the plugin; in the web demo the
+   user wants to keep tweaking knobs and hitting keys underneath (#280
+   feedback), so the backdrop passes clicks through and shows no dim.
+   Close paths stay: the Close button and Esc. */
+body.web-demo .hood-slide-over .hood-slide-over-backdrop {
+  pointer-events: none;
+  background: transparent;
+}
