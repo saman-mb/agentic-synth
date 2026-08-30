@@ -12,7 +12,11 @@
 //    lowpass whose coefficient closes over time; width cross-mixes the
 //    impulse channels (0 = mono, 1 = fully decorrelated). The impulse
 //    is rebuilt only when size/damping/width move by > 0.01 so knob
-//    drags do not thrash allocations.
+//    drags do not thrash allocations. Rebuilds are debounced off the
+//    click/knob task and cached by quantized key — the loaded impulse
+//    keeps sounding until the fresh buffer swaps in, so a preset switch
+//    never blocks the main thread (only the tail character may lag;
+//    mix/gain changes stay immediate).
 //  - Delay: two DelayNodes. stereo = 0 → two parallel independent
 //    lines; stereo = 1 → classic ping-pong (L→R→L cross-feedback); in
 //    between the feedback is split proportionally. Outputs merged hard
@@ -32,6 +36,12 @@ export interface EffectRack {
 
 const IMPULSE_REBUILD_EPS = 0.01;
 const FEEDBACK_GUARD = 0.95;
+// Impulse builds are debounced past the input event so a preset switch
+// (which fans out several reverb params in one tick) coalesces into a
+// single build off the click path. The cache is bounded: a 3.5 s stereo
+// impulse is >1 MB, and a knob drag would otherwise pin dozens.
+const IMPULSE_BUILD_DEBOUNCE_MS = 50;
+const IMPULSE_CACHE_MAX = 6;
 
 function clamp(v: number, lo: number, hi: number): number {
   return Math.min(hi, Math.max(lo, v));
@@ -83,6 +93,31 @@ export function createEffectRack(ctx: BaseAudioContext): EffectRack {
   reverbSend.connect(convolver);
   convolver.connect(output);
   let impulseKey = '';
+  // Quantized-key -> built buffer. Insertion-ordered; oldest entry is
+  // evicted once IMPULSE_CACHE_MAX is exceeded.
+  const impulseCache = new Map<string, AudioBuffer>();
+  let pendingBuild: { key: string; size: number; damping: number; width: number } | null = null;
+  let buildTimer: ReturnType<typeof setTimeout> | null = null;
+
+  // Runs IMPULSE_BUILD_DEBOUNCE_MS after the last setReverb() that asked
+  // for a new key. Builds the impulse, caches it, and swaps it into the
+  // convolver only if it is still the wanted key. Assigning
+  // ConvolverNode.buffer is an atomic graph change — the playing tail is
+  // replaced without a click.
+  const flushImpulseBuild = (): void => {
+    buildTimer = null;
+    if (!pendingBuild) return;
+    const req = pendingBuild;
+    pendingBuild = null;
+    const buf = buildImpulse(ctx, req.size, req.damping, req.width);
+    impulseCache.set(req.key, buf);
+    while (impulseCache.size > IMPULSE_CACHE_MAX) {
+      const oldest = impulseCache.keys().next();
+      if (oldest.done) break;
+      impulseCache.delete(oldest.value);
+    }
+    if (impulseKey === req.key) convolver.buffer = buf;
+  };
 
   // ── Delay network ────────────────────────────────────────────────
   // dl/dr = left/right delay lines; xLR/xRL = cross-feedback
@@ -125,10 +160,20 @@ export function createEffectRack(ctx: BaseAudioContext): EffectRack {
       // do not regenerate the impulse.
       const q = (v: number): number => Math.round(v / IMPULSE_REBUILD_EPS);
       const key = `${q(p.size)}|${q(p.damping)}|${q(p.width)}`;
-      if (key !== impulseKey) {
-        impulseKey = key;
-        convolver.buffer = buildImpulse(ctx, p.size, p.damping, p.width);
+      if (key === impulseKey) return;
+      impulseKey = key;
+      const cached = impulseCache.get(key);
+      if (cached) {
+        convolver.buffer = cached;
+        return;
       }
+      // Defer the build off the click/knob task; the current impulse
+      // keeps sounding until the rebuilt buffer is swapped in. The tail
+      // character may lag by one debounce window — the documented cost
+      // of never blocking the main thread while audio plays.
+      pendingBuild = { key, size: p.size, damping: p.damping, width: p.width };
+      if (buildTimer !== null) clearTimeout(buildTimer);
+      buildTimer = setTimeout(flushImpulseBuild, IMPULSE_BUILD_DEBOUNCE_MS);
     },
     setDelay(p: DelayParams): void {
       const t = ctx.currentTime;
@@ -145,6 +190,10 @@ export function createEffectRack(ctx: BaseAudioContext): EffectRack {
       delaySend.gain.setTargetAtTime(clamp(p.mix, 0, 1), t, 0.02);
     },
     dispose(): void {
+      if (buildTimer !== null) clearTimeout(buildTimer);
+      buildTimer = null;
+      pendingBuild = null;
+      impulseCache.clear();
       input.disconnect();
       reverbSend.disconnect();
       convolver.disconnect();

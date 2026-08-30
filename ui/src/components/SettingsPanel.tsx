@@ -328,6 +328,10 @@ export function SettingsPanel({
                 Choose where the web demo plays audio. Defaults to this
                 browser&apos;s output.
               </span>
+              <span className="settings-row-desc">
+                To hear the demo on a specific speaker, set it as the default
+                output in your OS sound settings.
+              </span>
               {audioSettingsError && (
                 <span className="settings-row-disabled">
                   Could not switch output device. Try Chrome or Edge.
