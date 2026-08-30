@@ -67,3 +67,6 @@ netlify/functions/lib/prompts.generated.mts
 .env
 .env.local
 .env.*.local
+
+# Local Netlify folder
+.netlify

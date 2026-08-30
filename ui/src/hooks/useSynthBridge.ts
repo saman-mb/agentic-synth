@@ -110,6 +110,51 @@ export async function openAudioSettings(): Promise<boolean> {
   }
 }
 
+// ── Web-demo output device picker (#280) ─────────────────────────────
+// Output-only: the standalone wrapper owns sample rate / buffer size and
+// hardware MIDI, and push-to-talk STT is disabled in the demo. These
+// resolve against the demo shim's list_output_devices / set_output_device
+// native functions; SettingsPanel only calls them in web-demo mode (it
+// keys off the shim's body class), so the plugin never invokes them and
+// the unregistered-name promise would never resolve there anyway.
+export interface AudioOutputDevice {
+  deviceId: string;
+  label: string;
+}
+
+export async function listAudioOutputDevices(): Promise<AudioOutputDevice[]> {
+  if (!usingJuce()) return [];
+  try {
+    const res = await callNative('list_output_devices', []);
+    if (!Array.isArray(res)) return [];
+    return res.filter(
+      (d): d is AudioOutputDevice =>
+        isOutputDeviceShape(d),
+    );
+  } catch {
+    return [];
+  }
+}
+
+function isOutputDeviceShape(d: unknown): d is AudioOutputDevice {
+  return (
+    typeof d === 'object' && d !== null &&
+    typeof (d as { deviceId?: unknown }).deviceId === 'string' &&
+    typeof (d as { label?: unknown }).label === 'string'
+  );
+}
+
+// Resolves false on unsupported browsers / failed switches so the panel
+// can surface its error state rather than appearing to do nothing.
+export async function setAudioOutputDevice(deviceId: string): Promise<boolean> {
+  if (!usingJuce()) return false;
+  try {
+    return (await callNative('set_output_device', [deviceId])) === true;
+  } catch {
+    return false;
+  }
+}
+
 interface UseSynthBridgeReturn {
   status: BridgeStatus;
   send: (msg: WireOutgoing) => void;
