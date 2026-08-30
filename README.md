@@ -1,8 +1,8 @@
 <div align="center">
 
-# 🎛️ TIMBRE
+# 🎛️ Tambra
 
-<img src="docs/timbre-hero.gif" alt="TIMBRE — an animated explosion of energy bursting into a waveform, purple, pink and yellow, with the wordmark TIMBRE — Say it. Hear it." width="640" />
+<img src="docs/timbre-hero.gif" alt="Tambra — an animated explosion of energy bursting into a waveform, purple, pink and yellow, with the wordmark Tambra — Say it. Hear it." width="640" />
 
 ### **Say it. Hear it.**
 
@@ -135,7 +135,7 @@ ctest --test-dir build --output-on-failure
 
 ### 3. Configure your API key
 
-TIMBRE calls Google Gemini to turn language into patches. Without a key the
+Tambra calls Google Gemini to turn language into patches. Without a key the
 agent falls back to a keyword heuristic — it works, but it is much blunter.
 
 ```sh
@@ -276,7 +276,7 @@ and pre-commit hooks (`pre-commit install`).
 
 ## 📄 License
 
-Licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE) — free to use, study, modify, and share for **noncommercial** purposes.
+Tambra by Tambra Labs — [PolyForm Noncommercial License 1.0.0](LICENSE). Free to use, study, modify, and share for **noncommercial** purposes.
 
 Commercial use — including forking the project to build a paid product or selling apps derived from it — requires a separate commercial license from the copyright holder. See the [LICENSE](LICENSE) for details and contact info.
 

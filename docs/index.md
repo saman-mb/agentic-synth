@@ -1,4 +1,4 @@
-# TIMBRE Documentation
+# Tambra Documentation
 
 Describe a sound in plain English, get a playable synth patch.
 Start at the [README](../README.md) if you haven't built the project yet.
@@ -59,6 +59,7 @@ Known issues in the [README](../README.md#-known-issues).
 | Guide | What it covers |
 |---|---|
 | [Privacy Statement](privacy-statement.md) | What data leaves your machine, telemetry, and how to turn it off |
+| [Naming (TIMBRE → Tambra)](REBRAND.md) | Product / company / reserved-name decision log |
 
 ---
 
