@@ -106,13 +106,8 @@ bool renderPatchToWav(const PatchStruct& patch, const juce::File& path, const Bo
     if (!stream)
         return false;
 
-    std::unique_ptr<juce::AudioFormatWriter> writer{
-        wav.createWriterFor(stream.get(),
-                            static_cast<double>(sampleRate),
-                            static_cast<unsigned int>(channels),
-                            bitDepth,
-                            {},
-                            0)};
+    std::unique_ptr<juce::AudioFormatWriter> writer{wav.createWriterFor(
+        stream.get(), static_cast<double>(sampleRate), static_cast<unsigned int>(channels), bitDepth, {}, 0)};
     if (!writer) {
         return false;
     }

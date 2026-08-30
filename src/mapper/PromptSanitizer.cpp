@@ -52,18 +52,16 @@ struct Mapping {
 // (e.g. "death" before any future "dea" key).
 constexpr std::array<Mapping, 8> kMap{{
     {"menacing", "intense"},
-    {"violent",  "aggressive"},
-    {"horror",   "uneasy"},
-    {"scary",    "unsettling"},
-    {"death",    "ending"},
-    {"dread",    "tension"},
-    {"evil",     "dark"},
-    {"kill",     "drop"},
+    {"violent", "aggressive"},
+    {"horror", "uneasy"},
+    {"scary", "unsettling"},
+    {"death", "ending"},
+    {"dread", "tension"},
+    {"evil", "dark"},
+    {"kill", "drop"},
 }};
 
-inline char to_lower_ascii(char c) noexcept {
-    return (c >= 'A' && c <= 'Z') ? static_cast<char>(c - 'A' + 'a') : c;
-}
+inline char to_lower_ascii(char c) noexcept { return (c >= 'A' && c <= 'Z') ? static_cast<char>(c - 'A' + 'a') : c; }
 
 // Case-insensitive substring match: returns true iff `s` at `pos` starts
 // with `needle` (compared lower-cased).
@@ -137,13 +135,14 @@ std::string sanitizePromptForSafetyWithDiff(const std::string& prompt, std::stri
         // Only attempt a match at a word boundary so substrings like
         // "killer" don't accidentally rewrite to "dropper" — keeps proper
         // nouns and compound words intact.
-        if (is_word_boundary(prompt, i == 0 ? 0 : i - 1) || i == 0 || !std::isalnum(static_cast<unsigned char>(prompt[i - 1]))) {
+        if (is_word_boundary(prompt, i == 0 ? 0 : i - 1) || i == 0 ||
+            !std::isalnum(static_cast<unsigned char>(prompt[i - 1]))) {
             for (const auto& m : kMap) {
                 if (match_at(prompt, i, m.from)) {
                     // Trailing boundary check — full-word match only.
                     const std::size_t after = i + m.from.size();
-                    const bool trailing_ok = after >= prompt.size() ||
-                                             !std::isalnum(static_cast<unsigned char>(prompt[after]));
+                    const bool trailing_ok =
+                        after >= prompt.size() || !std::isalnum(static_cast<unsigned char>(prompt[after]));
                     if (!trailing_ok)
                         continue;
                     out += apply_case(m.to, prompt[i]);

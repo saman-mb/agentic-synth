@@ -13,6 +13,7 @@
 #include <juce_core/juce_core.h>
 
 #include "agent/DictionaryService.h"
+#include "agent/GeminiSTT.h"
 #include "agent/KnobBridge.h"
 #include "agent/PrePatchPipeline.h"
 #include "agent/PromptHandler.h"
@@ -22,7 +23,6 @@
 #include "agent/TelemetryService.h"
 #include "engine/PatchStruct.h"
 #include "engine/VariationEngine.h"
-#include "agent/GeminiSTT.h"
 #include "mapper/DeltaNudger.h"
 #include "mapper/GeminiSampler.h"
 #include "mapper/GrammarSampler.h"
@@ -85,18 +85,16 @@ public:
     // ("darker", "more wobble") become NUDGES instead of fresh generations.
     // The detection (PromptHandler::isRelativePrompt) and request wrapping
     // live in the handler; this is a thin forward.
-    [[nodiscard]] std::optional<PatchStruct>
-    generateLlmPatch(const std::string& prompt, uint32_t patch_id = 0,
-                     std::optional<PatchStruct> previousPatch = std::nullopt,
-                     std::optional<std::string> previousPrompt = std::nullopt);
+    [[nodiscard]] std::optional<PatchStruct> generateLlmPatch(const std::string& prompt, uint32_t patch_id = 0,
+                                                              std::optional<PatchStruct> previousPatch = std::nullopt,
+                                                              std::optional<std::string> previousPrompt = std::nullopt);
 
     // Phase 31 — heuristic-fallback guardrail forward. Worker invokes this on
     // the LLM-failure branch so the Phase 23/27/30 PatchAugmenter still fires
     // on the bare heuristic patch from submitPrompt(). Refinement-skip rule
     // matches generateLlmPatch: when the prompt is relative AND a prior patch
     // exists, the augmenter is skipped. See PromptHandler.h for full notes.
-    void applyGuardrailIfNotRefinement(PatchStruct& patch, const std::string& prompt,
-                                       bool hasPreviousPatch) noexcept;
+    void applyGuardrailIfNotRefinement(PatchStruct& patch, const std::string& prompt, bool hasPreviousPatch) noexcept;
 
     // Two-step LLM flow: ENHANCER step. Rewrites a terse user prompt into a
     // 9-section plain-text sound-design brief that the generator (above)

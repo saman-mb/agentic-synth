@@ -51,9 +51,7 @@ TEST_CASE("ArchetypeLibrary: every archetype embeds a valid PatchStruct") {
     }
 }
 
-TEST_CASE("ArchetypeLibrary: default_init is present") {
-    REQUIRE(ArchetypeLibrary::byName("default_init") != nullptr);
-}
+TEST_CASE("ArchetypeLibrary: default_init is present") { REQUIRE(ArchetypeLibrary::byName("default_init") != nullptr); }
 
 // ─── Retriever scoring ──────────────────────────────────────────────────────
 

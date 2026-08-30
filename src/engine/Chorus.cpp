@@ -8,7 +8,7 @@ namespace agentic_synth::engine {
 namespace {
 constexpr double kTwoPi = 6.283185307179586;
 constexpr double kThirdTau = kTwoPi / 3.0;
-}
+} // namespace
 
 constexpr std::array<float, 3> Chorus::kTapBaseMs;
 constexpr std::array<float, 3> Chorus::kTapModMs;
@@ -29,17 +29,11 @@ void Chorus::prepare(double sampleRate, int channels) {
     phaseR_ = 0.5; // 180° offset on the right LFO → stereo width
 }
 
-void Chorus::setRate(float rateHz) noexcept {
-    rateHz_ = std::clamp(rateHz, 0.05f, 8.0f);
-}
+void Chorus::setRate(float rateHz) noexcept { rateHz_ = std::clamp(rateHz, 0.05f, 8.0f); }
 
-void Chorus::setDepth(float depth01) noexcept {
-    depth_ = std::clamp(depth01, 0.0f, 1.0f);
-}
+void Chorus::setDepth(float depth01) noexcept { depth_ = std::clamp(depth01, 0.0f, 1.0f); }
 
-void Chorus::setMix(float mix01) noexcept {
-    mix_ = std::clamp(mix01, 0.0f, 1.0f);
-}
+void Chorus::setMix(float mix01) noexcept { mix_ = std::clamp(mix01, 0.0f, 1.0f); }
 
 void Chorus::reset() noexcept {
     std::fill(bufL_.begin(), bufL_.end(), 0.0f);
@@ -49,8 +43,7 @@ void Chorus::reset() noexcept {
     phaseR_ = 0.5;
 }
 
-float Chorus::readInterpolated(const float* buf, int bufSize, int writeIdx,
-                               float delaySamples) noexcept {
+float Chorus::readInterpolated(const float* buf, int bufSize, int writeIdx, float delaySamples) noexcept {
     // Position is (writeIdx - delaySamples) wrapped into [0, bufSize).
     // We need four samples around the read point for Catmull-Rom / cubic
     // Hermite: y[-1], y[0], y[1], y[2] where the fractional position f lies

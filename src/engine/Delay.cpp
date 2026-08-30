@@ -80,10 +80,10 @@ void Delay::process(float inL, float inR, float& outL, float& outR) noexcept {
     const float frac = readPos - floorPos;
     const float oneMinusFrac = 1.0f - frac;
 
-    const float delayedL = bufL_[static_cast<std::size_t>(i0)] * oneMinusFrac
-                         + bufL_[static_cast<std::size_t>(i1)] * frac;
-    const float delayedR = bufR_[static_cast<std::size_t>(i0)] * oneMinusFrac
-                         + bufR_[static_cast<std::size_t>(i1)] * frac;
+    const float delayedL =
+        bufL_[static_cast<std::size_t>(i0)] * oneMinusFrac + bufL_[static_cast<std::size_t>(i1)] * frac;
+    const float delayedR =
+        bufR_[static_cast<std::size_t>(i0)] * oneMinusFrac + bufR_[static_cast<std::size_t>(i1)] * frac;
 
     // Real ping-pong topology.
     //   stereo = 0: parallel mono-style lines (L→L line, R→R line).

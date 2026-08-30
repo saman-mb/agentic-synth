@@ -31,13 +31,27 @@ std::string json_escape(const std::string& s) {
     out.reserve(s.size() + 8);
     for (char c : s) {
         switch (c) {
-        case '"': out += "\\\""; break;
-        case '\\': out += "\\\\"; break;
-        case '\n': out += "\\n"; break;
-        case '\r': out += "\\r"; break;
-        case '\t': out += "\\t"; break;
-        case '\b': out += "\\b"; break;
-        case '\f': out += "\\f"; break;
+        case '"':
+            out += "\\\"";
+            break;
+        case '\\':
+            out += "\\\\";
+            break;
+        case '\n':
+            out += "\\n";
+            break;
+        case '\r':
+            out += "\\r";
+            break;
+        case '\t':
+            out += "\\t";
+            break;
+        case '\b':
+            out += "\\b";
+            break;
+        case '\f':
+            out += "\\f";
+            break;
         default:
             if (static_cast<unsigned char>(c) < 0x20) {
                 char buf[8];
@@ -56,29 +70,54 @@ std::string json_unescape(const std::string& s) {
     std::string out;
     out.reserve(s.size());
     for (size_t i = 0; i < s.size(); ++i) {
-        if (s[i] != '\\') { out += s[i]; continue; }
-        if (i + 1 >= s.size()) break;
+        if (s[i] != '\\') {
+            out += s[i];
+            continue;
+        }
+        if (i + 1 >= s.size())
+            break;
         const char n = s[++i];
         switch (n) {
-        case '"': out += '"'; break;
-        case '\\': out += '\\'; break;
-        case '/': out += '/'; break;
-        case 'n': out += '\n'; break;
-        case 't': out += '\t'; break;
-        case 'r': out += '\r'; break;
-        case 'b': out += '\b'; break;
-        case 'f': out += '\f'; break;
+        case '"':
+            out += '"';
+            break;
+        case '\\':
+            out += '\\';
+            break;
+        case '/':
+            out += '/';
+            break;
+        case 'n':
+            out += '\n';
+            break;
+        case 't':
+            out += '\t';
+            break;
+        case 'r':
+            out += '\r';
+            break;
+        case 'b':
+            out += '\b';
+            break;
+        case 'f':
+            out += '\f';
+            break;
         case 'u': {
-            if (i + 4 >= s.size()) return out;
+            if (i + 4 >= s.size())
+                return out;
             const std::string hex = s.substr(i + 1, 4);
             i += 4;
             try {
                 const auto cp = static_cast<unsigned>(std::stoul(hex, nullptr, 16));
-                if (cp < 0x80) out += static_cast<char>(cp);
-            } catch (...) {}
+                if (cp < 0x80)
+                    out += static_cast<char>(cp);
+            } catch (...) {
+            }
             break;
         }
-        default: out += n; break;
+        default:
+            out += n;
+            break;
         }
     }
     return out;
@@ -88,18 +127,26 @@ std::string json_unescape(const std::string& s) {
 // Returns the unescaped string contents, or empty if not found / not a string.
 std::string find_string_field(const std::string& resp, const std::string& key) {
     auto pos = resp.find(key);
-    if (pos == std::string::npos) return {};
+    if (pos == std::string::npos)
+        return {};
     pos += key.size();
-    while (pos < resp.size() && (resp[pos] == ' ' || resp[pos] == ':')) ++pos;
-    if (pos >= resp.size() || resp[pos] != '"') return {};
+    while (pos < resp.size() && (resp[pos] == ' ' || resp[pos] == ':'))
+        ++pos;
+    if (pos >= resp.size() || resp[pos] != '"')
+        return {};
     ++pos;
     std::string raw;
     while (pos < resp.size()) {
         if (resp[pos] == '\\') {
-            if (pos + 1 >= resp.size()) break;
-            raw += resp[pos]; raw += resp[pos + 1]; pos += 2; continue;
+            if (pos + 1 >= resp.size())
+                break;
+            raw += resp[pos];
+            raw += resp[pos + 1];
+            pos += 2;
+            continue;
         }
-        if (resp[pos] == '"') break;
+        if (resp[pos] == '"')
+            break;
         raw += resp[pos++];
     }
     return json_unescape(raw);
@@ -108,23 +155,29 @@ std::string find_string_field(const std::string& resp, const std::string& key) {
 // Locate a JSON numeric field. Returns NaN when not found / not numeric.
 double find_number_field(const std::string& resp, const std::string& key, std::size_t from = 0) {
     auto pos = resp.find(key, from);
-    if (pos == std::string::npos) return std::nan("");
+    if (pos == std::string::npos)
+        return std::nan("");
     pos += key.size();
-    while (pos < resp.size() && (resp[pos] == ' ' || resp[pos] == ':')) ++pos;
+    while (pos < resp.size() && (resp[pos] == ' ' || resp[pos] == ':'))
+        ++pos;
     // Allow optional leading sign.
     const std::size_t start = pos;
-    if (pos < resp.size() && (resp[pos] == '-' || resp[pos] == '+')) ++pos;
+    if (pos < resp.size() && (resp[pos] == '-' || resp[pos] == '+'))
+        ++pos;
     bool has_digit = false;
-    while (pos < resp.size() && (std::isdigit(static_cast<unsigned char>(resp[pos])) ||
-                                 resp[pos] == '.' || resp[pos] == 'e' ||
-                                 resp[pos] == 'E' || resp[pos] == '+' || resp[pos] == '-')) {
-        if (std::isdigit(static_cast<unsigned char>(resp[pos]))) has_digit = true;
+    while (pos < resp.size() && (std::isdigit(static_cast<unsigned char>(resp[pos])) || resp[pos] == '.' ||
+                                 resp[pos] == 'e' || resp[pos] == 'E' || resp[pos] == '+' || resp[pos] == '-')) {
+        if (std::isdigit(static_cast<unsigned char>(resp[pos])))
+            has_digit = true;
         ++pos;
     }
-    if (!has_digit) return std::nan("");
+    if (!has_digit)
+        return std::nan("");
     try {
         return std::stod(resp.substr(start, pos - start));
-    } catch (...) { return std::nan(""); }
+    } catch (...) {
+        return std::nan("");
+    }
 }
 
 // Tempfile guard — copied from GeminiSampler's local TempFile.
@@ -132,7 +185,8 @@ struct TempFile {
     std::string path;
     explicit TempFile(const std::string& contents) {
         const char* tmp = std::getenv("TMPDIR");
-        if (tmp == nullptr || *tmp == 0) tmp = "/tmp";
+        if (tmp == nullptr || *tmp == 0)
+            tmp = "/tmp";
         std::mt19937_64 rng{std::random_device{}()};
         const auto rnd = rng();
         char buf[64];
@@ -152,8 +206,8 @@ struct TempFile {
 // timbral identity, not the full PatchStruct (which would burn tokens on
 // engine-internal padding bytes).
 std::string patchBriefJson(const PatchStruct& p) {
-    static const char* kOsc[] = {"Sine","Triangle","Sawtooth","Square","Pulse","Wavetable","FM","Noise"};
-    static const char* kLfoT[] = {"None","Pitch","FilterCutoff","Amplitude","Pan","WavetablePos","FmRatio"};
+    static const char* kOsc[] = {"Sine", "Triangle", "Sawtooth", "Square", "Pulse", "Wavetable", "FM", "Noise"};
+    static const char* kLfoT[] = {"None", "Pitch", "FilterCutoff", "Amplitude", "Pan", "WavetablePos", "FmRatio"};
     auto oscName = [&](OscType t) { return kOsc[static_cast<int>(t)]; };
     auto lfoTargetName = [&](LfoTarget t) { return kLfoT[static_cast<int>(t)]; };
 
@@ -161,21 +215,19 @@ std::string patchBriefJson(const PatchStruct& p) {
     o << "{\"osc\":[";
     for (int i = 0; i < kMaxOscillators; ++i) {
         const auto& osc = p.osc[i];
-        if (i > 0) o << ",";
+        if (i > 0)
+            o << ",";
         o << "{\"type\":\"" << oscName(osc.type) << "\","
           << "\"volume\":" << osc.volume << ","
           << "\"enabled\":" << (osc.enabled ? "true" : "false") << "}";
     }
-    o << "],\"filter\":{\"cutoff_hz\":" << p.filter.cutoff_hz
-      << ",\"resonance\":" << p.filter.resonance
+    o << "],\"filter\":{\"cutoff_hz\":" << p.filter.cutoff_hz << ",\"resonance\":" << p.filter.resonance
       << ",\"drive\":" << p.filter.drive << "}";
-    o << ",\"amp_env\":{\"attack_s\":" << p.amp_env.attack_s
-      << ",\"release_s\":" << p.amp_env.release_s << "}";
+    o << ",\"amp_env\":{\"attack_s\":" << p.amp_env.attack_s << ",\"release_s\":" << p.amp_env.release_s << "}";
     o << ",\"reverb\":{\"size\":" << p.reverb.size << ",\"mix\":" << p.reverb.mix << "}";
     o << ",\"chorus\":{\"mix\":" << p.chorus.mix << "}";
     o << ",\"tubesat\":{\"drive\":" << p.tubesat.drive << "}";
-    o << ",\"lfo[0]\":{\"target\":\"" << lfoTargetName(p.lfo[0].target)
-      << "\",\"depth\":" << p.lfo[0].depth
+    o << ",\"lfo[0]\":{\"target\":\"" << lfoTargetName(p.lfo[0].target) << "\",\"depth\":" << p.lfo[0].depth
       << ",\"rate_hz\":" << p.lfo[0].rate_hz << "}";
     o << "}";
     return o.str();
@@ -188,17 +240,19 @@ struct AxisCap {
     float max_pct;
 };
 constexpr std::array<AxisCap, 7> kAxisCaps{{
-    {"filter.cutoff_hz",      30.0f},
-    {"amp_env.attack_s",      50.0f},
-    {"reverb.mix",            30.0f},
-    {"chorus.mix",            50.0f},
-    {"tubesat.drive",         50.0f},
-    {"lfo[0].depth",          50.0f},
-    {"lfo[0].rate_hz",        30.0f},
+    {"filter.cutoff_hz", 30.0f},
+    {"amp_env.attack_s", 50.0f},
+    {"reverb.mix", 30.0f},
+    {"chorus.mix", 50.0f},
+    {"tubesat.drive", 50.0f},
+    {"lfo[0].depth", 50.0f},
+    {"lfo[0].rate_hz", 30.0f},
 }};
 
 float lookupAxisCap(const std::string& path) noexcept {
-    for (const auto& a : kAxisCaps) if (path == a.path) return a.max_pct;
+    for (const auto& a : kAxisCaps)
+        if (path == a.path)
+            return a.max_pct;
     // Sensible default for the unlisted-but-whitelisted paths in
     // applyNudges (decay, sustain, release, env.attack_s, etc.).
     return 30.0f;
@@ -214,33 +268,93 @@ bool applyOneNudge(PatchStruct& p, const Nudge& n) noexcept {
 
     auto scale = [&](float& field) { field = field * k; };
 
-    if (n.path == "filter.cutoff_hz") { scale(p.filter.cutoff_hz); return true; }
-    if (n.path == "filter.resonance") { scale(p.filter.resonance); return true; }
-    if (n.path == "filter.drive")     { scale(p.filter.drive); return true; }
+    if (n.path == "filter.cutoff_hz") {
+        scale(p.filter.cutoff_hz);
+        return true;
+    }
+    if (n.path == "filter.resonance") {
+        scale(p.filter.resonance);
+        return true;
+    }
+    if (n.path == "filter.drive") {
+        scale(p.filter.drive);
+        return true;
+    }
 
-    if (n.path == "amp_env.attack_s") { scale(p.amp_env.attack_s); return true; }
-    if (n.path == "amp_env.decay_s")  { scale(p.amp_env.decay_s); return true; }
-    if (n.path == "amp_env.release_s"){ scale(p.amp_env.release_s); return true; }
+    if (n.path == "amp_env.attack_s") {
+        scale(p.amp_env.attack_s);
+        return true;
+    }
+    if (n.path == "amp_env.decay_s") {
+        scale(p.amp_env.decay_s);
+        return true;
+    }
+    if (n.path == "amp_env.release_s") {
+        scale(p.amp_env.release_s);
+        return true;
+    }
 
-    if (n.path == "filter_env.attack_s") { scale(p.filter_env.attack_s); return true; }
-    if (n.path == "filter_env.decay_s")  { scale(p.filter_env.decay_s); return true; }
+    if (n.path == "filter_env.attack_s") {
+        scale(p.filter_env.attack_s);
+        return true;
+    }
+    if (n.path == "filter_env.decay_s") {
+        scale(p.filter_env.decay_s);
+        return true;
+    }
 
-    if (n.path == "reverb.mix")  { scale(p.reverb.mix); return true; }
-    if (n.path == "reverb.size") { scale(p.reverb.size); return true; }
+    if (n.path == "reverb.mix") {
+        scale(p.reverb.mix);
+        return true;
+    }
+    if (n.path == "reverb.size") {
+        scale(p.reverb.size);
+        return true;
+    }
 
-    if (n.path == "chorus.mix")     { scale(p.chorus.mix); return true; }
-    if (n.path == "chorus.depth")   { scale(p.chorus.depth); return true; }
-    if (n.path == "chorus.rate_hz") { scale(p.chorus.rate_hz); return true; }
+    if (n.path == "chorus.mix") {
+        scale(p.chorus.mix);
+        return true;
+    }
+    if (n.path == "chorus.depth") {
+        scale(p.chorus.depth);
+        return true;
+    }
+    if (n.path == "chorus.rate_hz") {
+        scale(p.chorus.rate_hz);
+        return true;
+    }
 
-    if (n.path == "tubesat.drive") { scale(p.tubesat.drive); return true; }
-    if (n.path == "tubesat.mix")   { scale(p.tubesat.mix); return true; }
+    if (n.path == "tubesat.drive") {
+        scale(p.tubesat.drive);
+        return true;
+    }
+    if (n.path == "tubesat.mix") {
+        scale(p.tubesat.mix);
+        return true;
+    }
 
-    if (n.path == "lfo[0].depth")   { scale(p.lfo[0].depth); return true; }
-    if (n.path == "lfo[0].rate_hz") { scale(p.lfo[0].rate_hz); return true; }
-    if (n.path == "lfo[1].depth")   { scale(p.lfo[1].depth); return true; }
-    if (n.path == "lfo[1].rate_hz") { scale(p.lfo[1].rate_hz); return true; }
+    if (n.path == "lfo[0].depth") {
+        scale(p.lfo[0].depth);
+        return true;
+    }
+    if (n.path == "lfo[0].rate_hz") {
+        scale(p.lfo[0].rate_hz);
+        return true;
+    }
+    if (n.path == "lfo[1].depth") {
+        scale(p.lfo[1].depth);
+        return true;
+    }
+    if (n.path == "lfo[1].rate_hz") {
+        scale(p.lfo[1].rate_hz);
+        return true;
+    }
 
-    if (n.path == "master_gain") { scale(p.master_gain); return true; }
+    if (n.path == "master_gain") {
+        scale(p.master_gain);
+        return true;
+    }
 
     return false;
 }
@@ -252,9 +366,11 @@ bool applyOneNudge(PatchStruct& p, const Nudge& n) noexcept {
 std::vector<Nudge> parseNudgeArray(const std::string& text, std::size_t max_count) {
     std::vector<Nudge> out;
     auto array_open = text.find("\"nudges\"");
-    if (array_open == std::string::npos) return out;
+    if (array_open == std::string::npos)
+        return out;
     auto bracket = text.find('[', array_open);
-    if (bracket == std::string::npos) return out;
+    if (bracket == std::string::npos)
+        return out;
 
     // Track brace depth so a nested object inside one entry doesn't confuse
     // the outer scanner.
@@ -263,12 +379,14 @@ std::vector<Nudge> parseNudgeArray(const std::string& text, std::size_t max_coun
     std::size_t entry_start = i;
     bool inside_entry = false;
     auto flush_entry = [&](std::size_t from, std::size_t to) {
-        if (out.size() >= max_count) return;
+        if (out.size() >= max_count)
+            return;
         const std::string entry = text.substr(from, to - from);
         Nudge n;
         n.path = find_string_field(entry, "\"path\"");
         const double d = find_number_field(entry, "\"delta_percent\"");
-        if (n.path.empty() || std::isnan(d)) return;
+        if (n.path.empty() || std::isnan(d))
+            return;
         n.delta_percent = static_cast<float>(d);
         out.push_back(std::move(n));
     };
@@ -276,14 +394,19 @@ std::vector<Nudge> parseNudgeArray(const std::string& text, std::size_t max_coun
     while (i < text.size()) {
         const char c = text[i];
         if (c == '{') {
-            if (depth == 0) { entry_start = i; inside_entry = true; }
+            if (depth == 0) {
+                entry_start = i;
+                inside_entry = true;
+            }
             ++depth;
         } else if (c == '}') {
-            if (depth > 0) --depth;
+            if (depth > 0)
+                --depth;
             if (depth == 0 && inside_entry) {
                 flush_entry(entry_start, i + 1);
                 inside_entry = false;
-                if (out.size() >= max_count) break;
+                if (out.size() >= max_count)
+                    break;
             }
         } else if (c == ']' && depth == 0) {
             break;
@@ -301,31 +424,30 @@ std::string DeltaNudger::buildSystemPrompt() {
     // Kept compact on purpose — the user message carries 3 patch briefs which
     // burn most of the token budget. The whitelist + caps mirror lookupAxisCap
     // so the model sees exactly what applyNudges will enforce.
-    return
-        "You are a synth patch curator. Given a user's sound description and 3 candidate\n"
-        "archetype patches, pick the BEST match and propose small parameter nudges to\n"
-        "tailor it closer to the description. Output JSON only:\n"
-        "\n"
-        "{\n"
-        "  \"selected_index\": 0 | 1 | 2,\n"
-        "  \"nudges\": [\n"
-        "    { \"path\": \"filter.cutoff_hz\", \"delta_percent\": -30..+30 },\n"
-        "    { \"path\": \"amp_env.attack_s\", \"delta_percent\": -50..+50 },\n"
-        "    { \"path\": \"reverb.mix\", \"delta_percent\": -30..+30 },\n"
-        "    { \"path\": \"chorus.mix\", \"delta_percent\": -50..+50 },\n"
-        "    { \"path\": \"tubesat.drive\", \"delta_percent\": -50..+50 },\n"
-        "    { \"path\": \"lfo[0].depth\", \"delta_percent\": -50..+50 },\n"
-        "    { \"path\": \"lfo[0].rate_hz\", \"delta_percent\": -30..+30 }\n"
-        "  ],\n"
-        "  \"rationale\": \"one sensory sentence\"\n"
-        "}\n"
-        "\n"
-        "Whitelisted paths only. Max 4 nudges. Use small deltas (5-25%) — big jumps\n"
-        "break archetypes. If the user prompt closely matches archetype 0/1/2 already,\n"
-        "nudges can be empty.\n"
-        "\n"
-        "Do NOT propose nudges on: osc types, filter type, lfo target, osc enabled,\n"
-        "voice_count. These are structural.\n";
+    return "You are a synth patch curator. Given a user's sound description and 3 candidate\n"
+           "archetype patches, pick the BEST match and propose small parameter nudges to\n"
+           "tailor it closer to the description. Output JSON only:\n"
+           "\n"
+           "{\n"
+           "  \"selected_index\": 0 | 1 | 2,\n"
+           "  \"nudges\": [\n"
+           "    { \"path\": \"filter.cutoff_hz\", \"delta_percent\": -30..+30 },\n"
+           "    { \"path\": \"amp_env.attack_s\", \"delta_percent\": -50..+50 },\n"
+           "    { \"path\": \"reverb.mix\", \"delta_percent\": -30..+30 },\n"
+           "    { \"path\": \"chorus.mix\", \"delta_percent\": -50..+50 },\n"
+           "    { \"path\": \"tubesat.drive\", \"delta_percent\": -50..+50 },\n"
+           "    { \"path\": \"lfo[0].depth\", \"delta_percent\": -50..+50 },\n"
+           "    { \"path\": \"lfo[0].rate_hz\", \"delta_percent\": -30..+30 }\n"
+           "  ],\n"
+           "  \"rationale\": \"one sensory sentence\"\n"
+           "}\n"
+           "\n"
+           "Whitelisted paths only. Max 4 nudges. Use small deltas (5-25%) — big jumps\n"
+           "break archetypes. If the user prompt closely matches archetype 0/1/2 already,\n"
+           "nudges can be empty.\n"
+           "\n"
+           "Do NOT propose nudges on: osc types, filter type, lfo target, osc enabled,\n"
+           "voice_count. These are structural.\n";
 }
 
 std::string DeltaNudger::buildUserMessage(const NudgeRequest& req) {
@@ -333,10 +455,12 @@ std::string DeltaNudger::buildUserMessage(const NudgeRequest& req) {
     o << "User prompt: \"" << req.prompt << "\"\n\n";
     for (std::size_t i = 0; i < req.top3.size() && i < 3; ++i) {
         const auto* a = req.top3[i];
-        if (a == nullptr) continue;
+        if (a == nullptr)
+            continue;
         o << "Archetype " << i << " — " << a->name << ", tags: ";
         for (std::size_t t = 0; t < a->tags.size(); ++t) {
-            if (t > 0) o << ", ";
+            if (t > 0)
+                o << ", ";
             o << a->tags[t];
         }
         o << ":\n" << patchBriefJson(a->patch) << "\n\n";
@@ -350,8 +474,7 @@ std::string DeltaNudger::http_post(const std::string& url, const std::string& js
     std::ostringstream cmd;
     const int timeout_s = std::max(1, cfg_.timeout_ms / 1000);
     cmd << "curl --silent --show-error --fail-with-body"
-        << " --max-time " << timeout_s
-        << " -H 'Content-Type: application/json'"
+        << " --max-time " << timeout_s << " -H 'Content-Type: application/json'"
         << " --data-binary @" << req.path << " '" << url << "'";
 
     std::string out;
@@ -374,8 +497,8 @@ std::string DeltaNudger::http_post(const std::string& url, const std::string& js
     const int rc = pclose(p);
 #endif
     if (rc != 0) {
-        std::cerr << "[DeltaNudger] curl exited with non-zero status (raw=" << rc
-                  << ", body_bytes=" << out.size() << ")\n";
+        std::cerr << "[DeltaNudger] curl exited with non-zero status (raw=" << rc << ", body_bytes=" << out.size()
+                  << ")\n";
         return {};
     }
     return out;
@@ -384,7 +507,8 @@ std::string DeltaNudger::http_post(const std::string& url, const std::string& js
 NudgeResult DeltaNudger::parseResponse(const std::string& response_body, int top3_size) {
     NudgeResult r;
     r.selected_index = -1;
-    if (response_body.empty() || top3_size <= 0) return r;
+    if (response_body.empty() || top3_size <= 0)
+        return r;
 
     // Unwrap the Gemini envelope. The candidates[0].content.parts[0].text
     // field IS our JSON-only output per the system-prompt's "Output JSON
@@ -400,15 +524,19 @@ NudgeResult DeltaNudger::parseResponse(const std::string& response_body, int top
     // Strip optional ``` fences (markdown leak path).
     if (inner.size() >= 3 && inner.compare(0, 3, "```") == 0) {
         const auto nl = inner.find('\n');
-        if (nl != std::string::npos) inner.erase(0, nl + 1);
+        if (nl != std::string::npos)
+            inner.erase(0, nl + 1);
         const auto fence = inner.rfind("```");
-        if (fence != std::string::npos) inner.erase(fence);
+        if (fence != std::string::npos)
+            inner.erase(fence);
     }
 
     const double idx = find_number_field(inner, "\"selected_index\"");
-    if (std::isnan(idx)) return r;
+    if (std::isnan(idx))
+        return r;
     const int idx_i = static_cast<int>(idx);
-    if (idx_i < 0 || idx_i >= top3_size) return r;
+    if (idx_i < 0 || idx_i >= top3_size)
+        return r;
 
     r.selected_index = idx_i;
     r.nudges = parseNudgeArray(inner, /*max_count=*/4);
@@ -426,36 +554,39 @@ namespace {
 // table needs to follow. Same source of truth for legal patch ranges, just
 // duplicated at the API boundary for layering hygiene.
 inline float clamp_f(float v, float lo, float hi) noexcept {
-    if (!std::isfinite(v)) return lo;
-    if (v < lo) return lo;
-    if (v > hi) return hi;
+    if (!std::isfinite(v))
+        return lo;
+    if (v < lo)
+        return lo;
+    if (v > hi)
+        return hi;
     return v;
 }
 
 void clampNudgedFields(PatchStruct& p) noexcept {
     p.filter.cutoff_hz = clamp_f(p.filter.cutoff_hz, 20.0f, 18000.0f);
     p.filter.resonance = clamp_f(p.filter.resonance, 0.0f, 0.85f);
-    p.filter.drive     = clamp_f(p.filter.drive, 0.0f, 1.0f);
+    p.filter.drive = clamp_f(p.filter.drive, 0.0f, 1.0f);
 
-    p.amp_env.attack_s  = clamp_f(p.amp_env.attack_s, 0.0f, 10.0f);
-    p.amp_env.decay_s   = clamp_f(p.amp_env.decay_s, 0.0f, 10.0f);
+    p.amp_env.attack_s = clamp_f(p.amp_env.attack_s, 0.0f, 10.0f);
+    p.amp_env.decay_s = clamp_f(p.amp_env.decay_s, 0.0f, 10.0f);
     p.amp_env.release_s = clamp_f(p.amp_env.release_s, 0.0f, 20.0f);
 
     p.filter_env.attack_s = clamp_f(p.filter_env.attack_s, 0.0f, 10.0f);
-    p.filter_env.decay_s  = clamp_f(p.filter_env.decay_s, 0.0f, 10.0f);
+    p.filter_env.decay_s = clamp_f(p.filter_env.decay_s, 0.0f, 10.0f);
 
     p.reverb.size = clamp_f(p.reverb.size, 0.0f, 1.0f);
-    p.reverb.mix  = clamp_f(p.reverb.mix, 0.0f, 1.0f);
+    p.reverb.mix = clamp_f(p.reverb.mix, 0.0f, 1.0f);
 
-    p.chorus.mix     = clamp_f(p.chorus.mix, 0.0f, 1.0f);
-    p.chorus.depth   = clamp_f(p.chorus.depth, 0.0f, 1.0f);
+    p.chorus.mix = clamp_f(p.chorus.mix, 0.0f, 1.0f);
+    p.chorus.depth = clamp_f(p.chorus.depth, 0.0f, 1.0f);
     p.chorus.rate_hz = clamp_f(p.chorus.rate_hz, 0.1f, 5.0f);
 
     p.tubesat.drive = clamp_f(p.tubesat.drive, 0.0f, 0.5f);
-    p.tubesat.mix   = clamp_f(p.tubesat.mix, 0.0f, 1.0f);
+    p.tubesat.mix = clamp_f(p.tubesat.mix, 0.0f, 1.0f);
 
     for (int i = 0; i < kMaxLfos; ++i) {
-        p.lfo[i].depth   = clamp_f(p.lfo[i].depth, 0.0f, 1.0f);
+        p.lfo[i].depth = clamp_f(p.lfo[i].depth, 0.0f, 1.0f);
         p.lfo[i].rate_hz = clamp_f(p.lfo[i].rate_hz, 0.01f, 20.0f);
     }
 
@@ -466,7 +597,8 @@ void clampNudgedFields(PatchStruct& p) noexcept {
 
 PatchStruct applyNudges(const PatchStruct& base, const std::vector<Nudge>& nudges) noexcept {
     PatchStruct p = base;
-    for (const auto& n : nudges) (void)applyOneNudge(p, n);
+    for (const auto& n : nudges)
+        (void)applyOneNudge(p, n);
     // Clamp the nudged axes back to their engine-legal ranges. The downstream
     // pipeline (PromptHandler::refinePatch → PrePatchPipeline) runs the full
     // validate_patch on its own; this is the cheap pre-flight that keeps the
@@ -478,7 +610,8 @@ PatchStruct applyNudges(const PatchStruct& base, const std::vector<Nudge>& nudge
 NudgeResult DeltaNudger::nudge(const NudgeRequest& req) const {
     NudgeResult fail;
     fail.selected_index = -1;
-    if (!req.top3.empty() && req.top3[0] != nullptr) fail.patch = req.top3[0]->patch;
+    if (!req.top3.empty() && req.top3[0] != nullptr)
+        fail.patch = req.top3[0]->patch;
 
     if (cfg_.api_key.empty()) {
         std::cerr << "[DeltaNudger] disabled: GEMINI_KEY not set\n";
@@ -549,8 +682,7 @@ NudgeResult DeltaNudger::nudge(const NudgeRequest& req) const {
                 outcome = "truncated";
             } else if (has_error) {
                 const std::string status = find_string_field(resp, "\"status\"");
-                const bool transient = status == "UNAVAILABLE" || status == "INTERNAL" ||
-                                       status == "DEADLINE_EXCEEDED";
+                const bool transient = status == "UNAVAILABLE" || status == "INTERNAL" || status == "DEADLINE_EXCEEDED";
                 if (transient) {
                     retry_reason = "transient 5xx in body";
                     outcome = "curl_error";
@@ -563,15 +695,16 @@ NudgeResult DeltaNudger::nudge(const NudgeRequest& req) const {
             }
         }
 
-        if (give_up || retry_reason == nullptr) break;
+        if (give_up || retry_reason == nullptr)
+            break;
         if (attempt < kMaxAttempts) {
             const int delay = kBackoffMs[static_cast<std::size_t>(attempt - 1)];
-            std::cerr << "[DeltaNudger] retry " << attempt << "/" << kMaxAttempts
-                      << " after " << delay << "ms (reason: " << retry_reason << ")\n";
+            std::cerr << "[DeltaNudger] retry " << attempt << "/" << kMaxAttempts << " after " << delay
+                      << "ms (reason: " << retry_reason << ")\n";
             std::this_thread::sleep_for(std::chrono::milliseconds(delay));
         } else {
-            std::cerr << "[DeltaNudger] giving up after " << kMaxAttempts
-                      << " attempts (final reason: " << retry_reason << ")\n";
+            std::cerr << "[DeltaNudger] giving up after " << kMaxAttempts << " attempts (final reason: " << retry_reason
+                      << ")\n";
         }
     }
 

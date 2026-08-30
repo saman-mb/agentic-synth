@@ -56,8 +56,7 @@ private:
     // Cubic-Hermite interpolation read of `buf` at fractional position
     // `delaySamples` behind `writeIdx`. Buffer must be at least
     // ceil(delaySamples) + 2 samples long; caller guarantees via prepare().
-    static float readInterpolated(const float* buf, int bufSize, int writeIdx,
-                                  float delaySamples) noexcept;
+    static float readInterpolated(const float* buf, int bufSize, int writeIdx, float delaySamples) noexcept;
 
     int bufSize_{0};
     std::vector<float> bufL_;

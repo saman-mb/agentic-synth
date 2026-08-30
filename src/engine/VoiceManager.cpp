@@ -131,8 +131,8 @@ void Voice::prepare(double sampleRate) {
     chorus.reset();
 }
 
-void Voice::renderStereo(float portamentoAlpha, float baseCutoffHz, float resonance,
-                         float& outL, float& outR) noexcept {
+void Voice::renderStereo(float portamentoAlpha, float baseCutoffHz, float resonance, float& outL,
+                         float& outR) noexcept {
     if (!isActive()) {
         outL = 0.0f;
         outR = 0.0f;
@@ -149,10 +149,10 @@ void Voice::renderStereo(float portamentoAlpha, float baseCutoffHz, float resona
     // the slot-0 gate — standard synth behaviour is for one LFO routed to
     // a per-osc target to affect all oscs uniformly).
     float lfoPitchSemis = 0.0f;
-    float lfoCutoffMod = 0.0f; // multiplicative around 1.0
-    float lfoAmpMod = 0.0f;    // multiplicative around 1.0
-    float lfoPanMod = 0.0f;    // additive to per-osc pan (all oscs)
-    float lfoWtMod = 0.0f;     // additive to wavetable_pos (all oscs)
+    float lfoCutoffMod = 0.0f;  // multiplicative around 1.0
+    float lfoAmpMod = 0.0f;     // multiplicative around 1.0
+    float lfoPanMod = 0.0f;     // additive to per-osc pan (all oscs)
+    float lfoWtMod = 0.0f;      // additive to wavetable_pos (all oscs)
     float lfoFmRatioMod = 0.0f; // multiplicative around 1.0 on fm_ratio (all oscs)
     for (size_t i = 0; i < lfos.size(); ++i) {
         const float lfoOut = lfos[i].processSample(); // [-depth, +depth]
@@ -367,8 +367,7 @@ void Voice::renderStereo(float portamentoAlpha, float baseCutoffHz, float resona
             crossfadeFromFilter->setDrive(driveNow);
             const float oldOut = crossfadeFromFilter->process(monoMix);
             const float newOut = filter->process(monoMix);
-            const float fadeOut = static_cast<float>(crossfadeRemaining) /
-                                  static_cast<float>(crossfadeTotal);
+            const float fadeOut = static_cast<float>(crossfadeRemaining) / static_cast<float>(crossfadeTotal);
             const float fadeIn = 1.0f - fadeOut;
             filteredMono = oldOut * fadeOut + newOut * fadeIn;
             --crossfadeRemaining;

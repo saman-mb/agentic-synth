@@ -15,19 +15,19 @@
 #include <thread>
 #include <vector>
 
-using agentic_synth::agent::PresetStore;
-using agentic_synth::agent::StoredPreset;
 using agentic_synth::make_default_patch;
 using agentic_synth::PatchStruct;
+using agentic_synth::agent::PresetStore;
+using agentic_synth::agent::StoredPreset;
 
 namespace {
 
 juce::File tempPresetsFile(const char* tag) {
     static std::atomic<int> counter{0};
     const auto id = counter.fetch_add(1, std::memory_order_relaxed);
-    const auto stamp = std::chrono::duration_cast<std::chrono::milliseconds>(
-                           std::chrono::system_clock::now().time_since_epoch())
-                           .count();
+    const auto stamp =
+        std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::system_clock::now().time_since_epoch())
+            .count();
     auto dir = juce::File::getSpecialLocation(juce::File::tempDirectory)
                    .getChildFile("AgenticSynthPresetStoreTest")
                    .getChildFile(juce::String(tag) + "-" + juce::String(stamp) + "-" + juce::String(id));
@@ -116,8 +116,7 @@ TEST_CASE("PresetStore: duplicate name overwrites (last write wins)", "[PresetSt
     CHECK(all[0].patch.reverb.mix == 0.9f);
 }
 
-TEST_CASE("PresetStore: 10 concurrent save() calls all complete without corruption",
-          "[PresetStore][Threading]") {
+TEST_CASE("PresetStore: 10 concurrent save() calls all complete without corruption", "[PresetStore][Threading]") {
     auto file = tempPresetsFile("threads");
     auto store = PresetStore::withFileForTesting(file);
 
@@ -126,9 +125,9 @@ TEST_CASE("PresetStore: 10 concurrent save() calls all complete without corrupti
     ts.reserve(kThreads);
     for (int i = 0; i < kThreads; ++i) {
         ts.emplace_back([&store, i]() {
-            store.save("preset-" + std::to_string(i), "prompt " + std::to_string(i),
-                       distinctPatch(static_cast<float>(500 + i * 100),
-                                     static_cast<float>(i) / static_cast<float>(kThreads)));
+            store.save(
+                "preset-" + std::to_string(i), "prompt " + std::to_string(i),
+                distinctPatch(static_cast<float>(500 + i * 100), static_cast<float>(i) / static_cast<float>(kThreads)));
         });
     }
     for (auto& t : ts)

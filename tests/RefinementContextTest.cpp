@@ -44,22 +44,19 @@ TEST_CASE("isRelativePrompt: fresh-patch prompts return false", "[refinement][ph
     REQUIRE_FALSE(PromptHandler::isRelativePrompt(""));
 }
 
-TEST_CASE("isRelativePrompt: edge case — 'more dubstep' is still refinement",
-          "[refinement][phase22]") {
+TEST_CASE("isRelativePrompt: edge case — 'more dubstep' is still refinement", "[refinement][phase22]") {
     // The user is saying "push it further in the dubstep direction" — the
     // word "more" is a directional cue regardless of what follows.
     REQUIRE(PromptHandler::isRelativePrompt("more dubstep"));
 }
 
-TEST_CASE("isRelativePrompt: edge case — 'wider snare' is refinement",
-          "[refinement][phase22]") {
+TEST_CASE("isRelativePrompt: edge case — 'wider snare' is refinement", "[refinement][phase22]") {
     // "wider" is in the §5.3 dictionary; the noun that follows is the
     // target dimension, not a category change.
     REQUIRE(PromptHandler::isRelativePrompt("wider snare"));
 }
 
-TEST_CASE("isRelativePrompt: edge case — descriptive 'soft' is NOT refinement",
-          "[refinement][phase22]") {
+TEST_CASE("isRelativePrompt: edge case — descriptive 'soft' is NOT refinement", "[refinement][phase22]") {
     // Bare "soft" is a primary descriptor for the patch (like "warm" or
     // "lush"), not a comparative. Only "softer" / "softer than" should
     // trigger refinement mode.
@@ -67,16 +64,14 @@ TEST_CASE("isRelativePrompt: edge case — descriptive 'soft' is NOT refinement"
     REQUIRE_FALSE(PromptHandler::isRelativePrompt("a soft warm pad"));
 }
 
-TEST_CASE("isRelativePrompt: word boundaries — 'software' must not match 'soft'",
-          "[refinement][phase22]") {
+TEST_CASE("isRelativePrompt: word boundaries — 'software' must not match 'soft'", "[refinement][phase22]") {
     // Smoke test for the word-boundary guard: substring matching alone would
     // false-positive on words that happen to contain a comparative root.
     REQUIRE_FALSE(PromptHandler::isRelativePrompt("software synth"));
     REQUIRE_FALSE(PromptHandler::isRelativePrompt("hardier sound design"));
 }
 
-TEST_CASE("isRelativePrompt: 'darker and more ominous' (the canonical bug)",
-          "[refinement][phase22]") {
+TEST_CASE("isRelativePrompt: 'darker and more ominous' (the canonical bug)", "[refinement][phase22]") {
     // The exact case Phase 22 was opened for: user types "darker and more
     // ominous" after generating a wobble bass. Pre-fix this regenerated from
     // scratch and stripped the wobble. Post-fix the classifier returns true,
