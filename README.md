@@ -9,7 +9,7 @@
 *An agent-driven **VST3 / AU / Standalone Synthesizer** powered by Gemini 2.5, JUCE 8, and C++20.*
 
 [![CI Status](https://img.shields.io/github/actions/workflow/status/saman-mb/agentic-synth/ci.yml?branch=main&style=for-the-badge&logo=github&logoColor=white&label=CI)](https://github.com/saman-mb/agentic-synth/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge&logo=opensourceinitiative&logoColor=white)](LICENSE)
+[![License: PolyForm Noncommercial](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-orange.svg?style=for-the-badge)](LICENSE)
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C.svg?style=for-the-badge&logo=cplusplus&logoColor=white)](https://en.cppreference.com/w/cpp/20)
 [![JUCE 8](https://img.shields.io/badge/JUCE-8-8DC63F.svg?style=for-the-badge&logo=juce&logoColor=white)](https://juce.com/)
 [![React 18](https://img.shields.io/badge/React-18-61DAFB.svg?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
@@ -276,7 +276,9 @@ and pre-commit hooks (`pre-commit install`).
 
 ## 📄 License
 
-[MIT](LICENSE) © Nous Research
+Licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE) — free to use, study, modify, and share for **noncommercial** purposes.
+
+Commercial use — including forking the project to build a paid product or selling apps derived from it — requires a separate commercial license from the copyright holder. See the [LICENSE](LICENSE) for details and contact info.
 
 ---
 
