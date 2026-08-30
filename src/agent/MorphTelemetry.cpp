@@ -243,14 +243,12 @@ void MorphTelemetry::log(const MorphEvent& ev) noexcept {
         const std::string ts = ev.ts.empty() ? iso8601_now() : ev.ts;
 
         std::ostringstream ss;
-        ss << "{"
-           << "\"ts\":\"" << jsonEscape(ts) << "\","
-           << "\"kind\":\"" << kindString(ev.kind) << "\"";
+        ss << "{" << "\"ts\":\"" << jsonEscape(ts) << "\"," << "\"kind\":\"" << kindString(ev.kind) << "\"";
 
         switch (ev.kind) {
         case MorphEventKind::MorphRequested:
-            ss << ",\"prompt_hash\":\"" << jsonEscape(ev.prompt_hash) << "\""
-               << ",\"history_size\":" << ev.history_size << ",\"liked_size\":" << ev.liked_size;
+            ss << ",\"prompt_hash\":\"" << jsonEscape(ev.prompt_hash) << "\"" << ",\"history_size\":" << ev.history_size
+               << ",\"liked_size\":" << ev.liked_size;
             break;
         case MorphEventKind::VariationPicked:
             ss << ",\"strategy_id\":" << ev.strategy_id << ",\"label\":\"" << jsonEscape(ev.label) << "\""

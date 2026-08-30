@@ -232,9 +232,8 @@ std::string PromptEnhancer::http_post_ex(const std::string& url, const std::stri
 
     std::ostringstream cmd;
     const int timeout_s = std::max(1, cfg_.timeout_ms / 1000);
-    cmd << "curl --silent --show-error --fail-with-body"
-        << " --max-time " << timeout_s << " -H 'Content-Type: application/json'"
-        << " --data-binary @" << req.path << " '" << url << "' 2>/dev/null";
+    cmd << "curl --silent --show-error --fail-with-body" << " --max-time " << timeout_s
+        << " -H 'Content-Type: application/json'" << " --data-binary @" << req.path << " '" << url << "' 2>/dev/null";
 
     std::string out;
     std::array<char, 4096> buf{};
@@ -365,16 +364,13 @@ std::string PromptEnhancer::enhance(const std::string& userPrompt) const {
         base_prompt + "\n\nProducer prompt: " + sanitized + "\n\nEmit the brief now, starting at SONIC CHARACTER:";
 
     std::ostringstream body;
-    body << "{"
-         << "\"contents\":[{\"parts\":[{\"text\":\"" << json_escape(composed) << "\"}]}],"
-         << "\"generationConfig\":{"
-         << "\"temperature\":"
+    body << "{" << "\"contents\":[{\"parts\":[{\"text\":\"" << json_escape(composed) << "\"}]}],"
+         << "\"generationConfig\":{" << "\"temperature\":"
          << cfg_.temperature
          // Deliberately NO responseMimeType — translator output is free-form
          // plain text, not JSON. Setting application/json here would make
          // the model wrap the brief in a quoted string and fight us.
-         << "}"
-         << "}";
+         << "}" << "}";
     const std::string bodyStr = body.str();
 
     const std::string url = "https://generativelanguage.googleapis.com/v1beta/models/" + cfg_.model +

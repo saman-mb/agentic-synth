@@ -159,21 +159,14 @@ std::string GeminiSampler::build_request(const std::string& user_prompt, uint32_
     const std::string& thr = cfg_.safety_threshold;
 
     std::ostringstream body;
-    body << "{"
-         << "\"contents\":[{\"parts\":[{\"text\":\"" << json_escape(composed) << "\"}]}],"
-         << "\"generationConfig\":{"
-         << "\"temperature\":" << cfg_.temperature << ","
-         << "\"maxOutputTokens\":" << cfg_.max_output_tokens << ","
-         << "\"thinkingConfig\":{\"thinkingBudget\":0},"
-         << "\"responseMimeType\":\"application/json\""
-         << "},"
-         << "\"safetySettings\":["
+    body << "{" << "\"contents\":[{\"parts\":[{\"text\":\"" << json_escape(composed) << "\"}]}],"
+         << "\"generationConfig\":{" << "\"temperature\":" << cfg_.temperature << ","
+         << "\"maxOutputTokens\":" << cfg_.max_output_tokens << "," << "\"thinkingConfig\":{\"thinkingBudget\":0},"
+         << "\"responseMimeType\":\"application/json\"" << "}," << "\"safetySettings\":["
          << "{\"category\":\"HARM_CATEGORY_HARASSMENT\",\"threshold\":\"" << thr << "\"},"
          << "{\"category\":\"HARM_CATEGORY_HATE_SPEECH\",\"threshold\":\"" << thr << "\"},"
          << "{\"category\":\"HARM_CATEGORY_SEXUALLY_EXPLICIT\",\"threshold\":\"" << thr << "\"},"
-         << "{\"category\":\"HARM_CATEGORY_DANGEROUS_CONTENT\",\"threshold\":\"" << thr << "\"}"
-         << "]"
-         << "}";
+         << "{\"category\":\"HARM_CATEGORY_DANGEROUS_CONTENT\",\"threshold\":\"" << thr << "\"}" << "]" << "}";
     return body.str();
 }
 
@@ -192,9 +185,8 @@ std::string GeminiSampler::http_post_ex(const std::string& url, const std::strin
     // Note: no `2>/dev/null` — we want curl's network/SSL/timeout/4xx errors
     // to surface on the calling process's stderr so silent failures become
     // visible. pclose() exit code is also checked below.
-    cmd << "curl --silent --show-error --fail-with-body"
-        << " --max-time " << timeout_s << " -H 'Content-Type: application/json'"
-        << " --data-binary @" << req.path << " '" << url << "'";
+    cmd << "curl --silent --show-error --fail-with-body" << " --max-time " << timeout_s
+        << " -H 'Content-Type: application/json'" << " --data-binary @" << req.path << " '" << url << "'";
 
     std::string out;
     std::array<char, 4096> buf{};

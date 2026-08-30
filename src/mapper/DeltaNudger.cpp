@@ -217,8 +217,7 @@ std::string patchBriefJson(const PatchStruct& p) {
         const auto& osc = p.osc[i];
         if (i > 0)
             o << ",";
-        o << "{\"type\":\"" << oscName(osc.type) << "\","
-          << "\"volume\":" << osc.volume << ","
+        o << "{\"type\":\"" << oscName(osc.type) << "\"," << "\"volume\":" << osc.volume << ","
           << "\"enabled\":" << (osc.enabled ? "true" : "false") << "}";
     }
     o << "],\"filter\":{\"cutoff_hz\":" << p.filter.cutoff_hz << ",\"resonance\":" << p.filter.resonance
@@ -473,9 +472,8 @@ std::string DeltaNudger::http_post(const std::string& url, const std::string& js
     TempFile req(json_body);
     std::ostringstream cmd;
     const int timeout_s = std::max(1, cfg_.timeout_ms / 1000);
-    cmd << "curl --silent --show-error --fail-with-body"
-        << " --max-time " << timeout_s << " -H 'Content-Type: application/json'"
-        << " --data-binary @" << req.path << " '" << url << "'";
+    cmd << "curl --silent --show-error --fail-with-body" << " --max-time " << timeout_s
+        << " -H 'Content-Type: application/json'" << " --data-binary @" << req.path << " '" << url << "'";
 
     std::string out;
     std::array<char, 4096> buf{};
@@ -626,21 +624,14 @@ NudgeResult DeltaNudger::nudge(const NudgeRequest& req) const {
     const std::string composed = buildSystemPrompt() + "\n\n" + buildUserMessage(req);
     const std::string& thr = cfg_.safety_threshold;
     std::ostringstream body_ss;
-    body_ss << "{"
-            << "\"contents\":[{\"parts\":[{\"text\":\"" << json_escape(composed) << "\"}]}],"
-            << "\"generationConfig\":{"
-            << "\"temperature\":" << cfg_.temperature << ","
-            << "\"maxOutputTokens\":" << cfg_.max_output_tokens << ","
-            << "\"thinkingConfig\":{\"thinkingBudget\":0},"
-            << "\"responseMimeType\":\"application/json\""
-            << "},"
-            << "\"safetySettings\":["
+    body_ss << "{" << "\"contents\":[{\"parts\":[{\"text\":\"" << json_escape(composed) << "\"}]}],"
+            << "\"generationConfig\":{" << "\"temperature\":" << cfg_.temperature << ","
+            << "\"maxOutputTokens\":" << cfg_.max_output_tokens << "," << "\"thinkingConfig\":{\"thinkingBudget\":0},"
+            << "\"responseMimeType\":\"application/json\"" << "}," << "\"safetySettings\":["
             << "{\"category\":\"HARM_CATEGORY_HARASSMENT\",\"threshold\":\"" << thr << "\"},"
             << "{\"category\":\"HARM_CATEGORY_HATE_SPEECH\",\"threshold\":\"" << thr << "\"},"
             << "{\"category\":\"HARM_CATEGORY_SEXUALLY_EXPLICIT\",\"threshold\":\"" << thr << "\"},"
-            << "{\"category\":\"HARM_CATEGORY_DANGEROUS_CONTENT\",\"threshold\":\"" << thr << "\"}"
-            << "]"
-            << "}";
+            << "{\"category\":\"HARM_CATEGORY_DANGEROUS_CONTENT\",\"threshold\":\"" << thr << "\"}" << "]" << "}";
     const std::string body = body_ss.str();
     const std::string url = "https://generativelanguage.googleapis.com/v1beta/models/" + cfg_.model +
                             ":generateContent?key=" + cfg_.api_key;

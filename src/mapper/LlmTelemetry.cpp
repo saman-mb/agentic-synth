@@ -123,18 +123,12 @@ void LlmTelemetry::log(const LlmCall& call) noexcept {
         const std::string ts = call.ts.empty() ? iso8601_now() : call.ts;
 
         std::ostringstream ss;
-        ss << "{"
-           << "\"ts\":\"" << jsonEscape(ts) << "\","
-           << "\"caller\":\"" << jsonEscape(call.caller) << "\","
-           << "\"model\":\"" << jsonEscape(call.model) << "\","
-           << "\"attempts\":" << call.attempts << ","
-           << "\"latency_ms\":" << call.latency_ms << ","
-           << "\"body_size_bytes\":" << call.body_size_bytes << ","
-           << "\"prompt_size_bytes\":" << call.prompt_size_bytes << ","
-           << "\"finish_reason\":\"" << jsonEscape(call.finish_reason) << "\","
-           << "\"block_reason\":\"" << jsonEscape(call.block_reason) << "\","
-           << "\"outcome\":\"" << jsonEscape(call.outcome) << "\""
-           << "}\n";
+        ss << "{" << "\"ts\":\"" << jsonEscape(ts) << "\"," << "\"caller\":\"" << jsonEscape(call.caller) << "\","
+           << "\"model\":\"" << jsonEscape(call.model) << "\"," << "\"attempts\":" << call.attempts << ","
+           << "\"latency_ms\":" << call.latency_ms << "," << "\"body_size_bytes\":" << call.body_size_bytes << ","
+           << "\"prompt_size_bytes\":" << call.prompt_size_bytes << "," << "\"finish_reason\":\""
+           << jsonEscape(call.finish_reason) << "\"," << "\"block_reason\":\"" << jsonEscape(call.block_reason) << "\","
+           << "\"outcome\":\"" << jsonEscape(call.outcome) << "\"" << "}\n";
 
         f << ss.str();
         f.flush();
