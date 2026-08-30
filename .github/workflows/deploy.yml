@@ -57,18 +57,25 @@ jobs:
       # Functions are bundled from netlify/functions at deploy time; the
       # handler's repo-relative import of ui/src/demo/patchCodec.ts is
       # resolved by the bundler then (source stays in the repo).
+      # nwtgck/actions-netlify@v3.0 was dropped: its dist ships without a
+      # working esbuild binary (spawn ENOENT on current runners). The CLI
+      # deploy below is the same mechanism without the broken bundling.
       - name: Deploy to Netlify
-        uses: nwtgck/actions-netlify@v3.0
-        with:
-          publish-dir: "./ui/dist"
-          functions-dir: "./netlify/functions"
-          production-deploy: ${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          deploy-message: "Deploy from GitHub Actions: ${{ github.event.pull_request.title || github.ref_name }}"
-          enable-pull-request-comment: true
-          enable-commit-comment: true
-          overwrites-pull-request-comment: true
         env:
           NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+          COMMIT_MSG: ${{ github.event.pull_request.title || github.ref_name }}
+        run: |
+          PROD_FLAG=""
+          ALIAS_FLAG=""
+          if [ "${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}" = "true" ]; then
+            PROD_FLAG="--prod"
+          else
+            ALIAS_FLAG="--alias pr-${{ github.event.number || github.ref_name }}"
+          fi
+          npx --yes netlify-cli@latest deploy \
+            --dir ui/dist \
+            --functions netlify/functions \
+            --message "Deploy from GitHub Actions: $COMMIT_MSG" \
+            $PROD_FLAG $ALIAS_FLAG
         timeout-minutes: 10
