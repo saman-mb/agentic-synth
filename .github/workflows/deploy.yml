@@ -73,7 +73,11 @@ jobs:
           else
             ALIAS_FLAG="--alias pr-${{ github.event.number || github.ref_name }}"
           fi
+          # CI already built ui/dist and synced prompts; strip the [build]
+          # command so the CLI doesn't rebuild from scratch on deploy.
+          sed '/^  command =/d' netlify.toml > /tmp/deploy-netlify.toml
           npx --yes netlify-cli@latest deploy \
+            --config /tmp/deploy-netlify.toml \
             --dir ui/dist \
             --functions netlify/functions \
             --message "Deploy from GitHub Actions: $COMMIT_MSG" \
