@@ -364,7 +364,7 @@ export function useSynthBridge(): UseSynthBridgeReturn {
         case 'bounce_patch': {
           // Phase D / #268 — fire-and-forget; C++ opens FileChooser then
           // emits `bounce_complete`.
-          void callNative('bounce_patch', [msg.patch ?? null, msg.suggestedName ?? 'timbre-bounce']);
+          void callNative('bounce_patch', [msg.patch ?? null, msg.suggestedName ?? 'tambra-bounce']);
           return;
         }
         case 'start_midi_learn': {

@@ -61,7 +61,7 @@ function defaultKeepName(prompt: string | undefined): string {
 function defaultBounceName(prompt: string | undefined): string {
   const frag = fragmentSlug(prompt, 4).replace(/[^a-zA-Z0-9_-]+/g, '_');
   const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-  return `TIMBRE_${frag.length > 0 ? frag : 'sound'}_${stamp}`;
+  return `Tambra_${frag.length > 0 ? frag : 'sound'}_${stamp}`;
 }
 
 // ---------------------------------------------------------------------------
@@ -1209,7 +1209,7 @@ export function ChatInterface({
       )}
       <header className="chat-header">
         <div className="chat-wordmark">
-          <span className="chat-title">TIMBRE</span>
+          <span className="chat-title">Tambra</span>
           <span className="chat-tagline">Say it. Hear it.</span>
         </div>
         <StatusDot status={status} />
@@ -1385,7 +1385,7 @@ export function ChatInterface({
         const noteLabel = formatNoteName(detectedHum.midi);
         return (
           <div className="hum-pitch-chip" role="status" aria-live="polite">
-            <span className="hum-pitch-text">TIMBRE heard a note around {noteLabel}.</span>
+            <span className="hum-pitch-text">Tambra heard a note around {noteLabel}.</span>
             <button
               type="button"
               className="hum-pitch-action"

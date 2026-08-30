@@ -34,7 +34,7 @@ function copyForKind(kind: FailureKind): CopyFor {
   switch (kind) {
     case 'llm_offline':
       return {
-        message: 'TIMBRE is using a backup recipe — the agent is offline right now.',
+        message: 'Tambra is using a backup recipe — the agent is offline right now.',
         retryLabel: 'Retry',
       };
     case 'prompt_unclear':
@@ -45,7 +45,7 @@ function copyForKind(kind: FailureKind): CopyFor {
     case 'safety_block':
       return {
         message:
-          'That phrasing tripped a content filter — TIMBRE swapped a few words. The shipped sound is from the rephrased version.',
+          'That phrasing tripped a content filter — Tambra swapped a few words. The shipped sound is from the rephrased version.',
       };
     case 'mic_denied':
       // Handled inline by PushToTalk's pre-press probe (Phase 28). This

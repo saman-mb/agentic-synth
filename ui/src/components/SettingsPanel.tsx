@@ -279,7 +279,7 @@ export function SettingsPanel({
       <header className="settings-panel-header">
         <h2 className="settings-panel-title">Settings</h2>
         <p className="settings-panel-subtitle">
-          TIMBRE is mostly silent. Opt in to confirmation sounds below.
+          Tambra is mostly silent. Opt in to confirmation sounds below.
         </p>
       </header>
 
@@ -475,7 +475,7 @@ export function SettingsPanel({
             {midi.supported ? (
               <>
                 <span className="settings-row-desc">
-                  Choose which MIDI device feeds note &amp; CC into TIMBRE.
+                  Choose which MIDI device feeds note &amp; CC into Tambra.
                   &quot;Any&quot; accepts events from every connected port.
                 </span>
                 <select
