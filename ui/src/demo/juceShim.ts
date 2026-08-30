@@ -2,9 +2,10 @@
 //
 // Fakes `window.__JUCE__` (the object JUCE 8's WebBrowserComponent with
 // withNativeIntegrationEnabled(true) injects) so the unmodified React UI
-// runs in a plain browser with no plugin backend. main.tsx installs this
-// ONLY when window.__JUCE__ is absent — inside the WebView the real
-// backend wins and this module is dead code.
+// runs in a plain browser with no plugin backend. demo/bootstrap.ts
+// installs this at module-evaluation time ONLY when window.__JUCE__ is
+// absent — inside the WebView the real backend wins and this module is
+// dead code.
 //
 // Wire parity with useSynthBridge.ts:48-74:
 //   • JS → native: emitEvent('__juce__invoke', { name, params: [positional],
@@ -14,8 +15,9 @@
 //     detaches; event payloads reach listeners synchronously and in order.
 //
 // There are zero side effects at import time: nothing runs until
-// installWebDemoShim() is called from main.tsx, and the synth engine is
-// only constructed at install (which in the plugin build never happens).
+// installWebDemoShim() is called from demo/bootstrap.ts, and the synth
+// engine is only constructed at install (which in the plugin build never
+// happens).
 //
 // Local persistence (dictionary / feedback / telemetry opt-in) lives in
 // localStorage under agentic-synth.demo.* keys — best-effort, try/catch
@@ -27,6 +29,7 @@ import type { PatchParams } from '../components/KnobGrid';
 import { createSynthEngine, type SynthEngine } from '../webaudio/engine';
 import { setPatchParam } from '../webaudio/paramMap';
 import { runGenerateFlow } from './generateFlow';
+import { validatePatch } from './patchCodec';
 
 // ── shapes (mirror useSynthBridge.ts / useWebSocket.ts interfaces) ──
 
@@ -53,6 +56,7 @@ interface ListenerEntry {
 const DICT_KEY = 'agentic-synth.demo.dictionary.v1';
 const FEEDBACK_KEY = 'agentic-synth.demo.feedback.v1';
 const TELEMETRY_ENABLED_KEY = 'agentic-synth.demo.telemetry-enabled.v1';
+const PRESETS_KEY = 'agentic-synth.demo.presets.v1';
 
 function readJson<T>(key: string, fallback: T): T {
   try {
@@ -77,6 +81,18 @@ interface FeedbackRecord {
   message_id: string;
   kind: string;
   patch: unknown;
+}
+
+// Mirrors StoredPresetWire in PresetList.tsx (PatchPreviewData === PatchParams).
+interface StoredPreset {
+  name: string;
+  prompt?: string;
+  created_ms?: number;
+  patch: PatchParams;
+}
+
+function readPresets(): StoredPreset[] {
+  return readJson<StoredPreset[]>(PRESETS_KEY, []);
 }
 
 // TelemetrySummary / TelemetryData field-for-field with TelemetryDashboard.tsx.
@@ -143,6 +159,11 @@ export function installWebDemoShim(): void {
   if (w.__JUCE__ || installed) return;
   installed = true;
 
+  // Layout hook: the web-demo stylesheet keys off this class. Present
+  // only in the browser demo — the plugin WebView never installs this
+  // shim, so it never gets the class.
+  document.body.classList.add('web-demo');
+
   // ── event bus ────────────────────────────────────────────────────
   const listeners = new Map<string, ListenerEntry[]>();
   let nextListenerId = 1;
@@ -178,14 +199,6 @@ export function installWebDemoShim(): void {
   // Current-patch snapshot for knob_tweak / feedback; starts at the same
   // default the UI renders, so those work before the first generation.
   let currentPatch: PatchParams = makeDefaultPatch();
-  // True only after a successful ensureStarted() inside the generate flow.
-  // Notes played into a dead engine emit an `error` event instead of
-  // silence, so the demo user is never left guessing.
-  let engineReady = false;
-
-  const setEngineReady = (ready: boolean): void => {
-    engineReady = ready;
-  };
 
   const applyServerPatch = (patch: PatchParams, modulation?: AgentModulationPlan): void => {
     engine.setPatch(patch); // then
@@ -195,6 +208,27 @@ export function installWebDemoShim(): void {
 
   const emitError = (message: string): void => {
     emitEvent('error', { message });
+  };
+
+  // Lazily starts the engine so notes work without a prior successful
+  // generate — the keydown/click that triggered the note IS the user
+  // gesture, so the autoplay policy is satisfied here (the old
+  // engineReady gate made every key silent after a failed generate).
+  // A failed start emits the existing `error` event once (key repeat
+  // must not spam the chat) until a later start succeeds.
+  let startErrorEmitted = false;
+  const ensureEngineForNotes = async (): Promise<boolean> => {
+    try {
+      await engine.ensureStarted();
+      startErrorEmitted = false;
+      return true;
+    } catch {
+      if (!startErrorEmitted) {
+        startErrorEmitted = true;
+        emitError('Could not start the audio engine — check that this browser allows audio, then try again.');
+      }
+      return false;
+    }
   };
 
   // ── native function handlers (positional args) ───────────────────
@@ -207,7 +241,7 @@ export function installWebDemoShim(): void {
         emitError('generate: expected a string prompt.');
         return undefined;
       }
-      void runGenerateFlow({ emit: emitEvent, engine, applyServerPatch, setEngineReady }, prompt);
+      void runGenerateFlow({ emit: emitEvent, engine, applyServerPatch }, prompt);
       return undefined;
     },
 
@@ -248,36 +282,24 @@ export function installWebDemoShim(): void {
       return undefined;
     },
 
-    note_on: (params) => {
+    note_on: async (params) => {
       const note = asInt(params[0]);
-      if (note === null) return undefined;
-      if (!engineReady) {
-        emitError('Audio engine is not running — generate a patch first.');
-        return undefined;
-      }
+      if (note === null || !(await ensureEngineForNotes())) return undefined;
       engine.noteOn(note, clampVelocity(params[1]));
       return undefined;
     },
 
-    note_off: (params) => {
+    note_off: async (params) => {
       const note = asInt(params[0]);
-      if (note === null) return undefined;
-      if (!engineReady) {
-        emitError('Audio engine is not running — generate a patch first.');
-        return undefined;
-      }
+      if (note === null || !(await ensureEngineForNotes())) return undefined;
       engine.noteOff(note);
       return undefined;
     },
 
-    play_midi_note: (params) => {
+    play_midi_note: async (params) => {
       const note = asInt(params[0]);
       const durationMs = asInt(params[2]);
-      if (note === null || durationMs === null) return undefined;
-      if (!engineReady) {
-        emitError('Audio engine is not running — generate a patch first.');
-        return undefined;
-      }
+      if (note === null || durationMs === null || !(await ensureEngineForNotes())) return undefined;
       engine.playMidiNote(note, clampVelocity(params[1]), durationMs);
       return undefined;
     },
@@ -291,6 +313,112 @@ export function installWebDemoShim(): void {
 
     open_external_url: (params) => openExternalUrl(params[0]),
 
+    // ── Phase D presets (#260) — localStorage stand-in for PresetStore ──
+    commit_preset: (params) => {
+      const name = params[0];
+      const prompt = params[1];
+      const patch = params[2];
+      if (typeof name !== 'string' || name.trim().length === 0) return undefined;
+      // Fail-closed like the plugin's PresetStore: never persist a patch
+      // the engine could not load later.
+      if (!validatePatch(patch).ok) return undefined;
+      const trimmed = name.trim();
+      const now = Date.now();
+      const presets = readPresets().filter((p) => p.name !== trimmed);
+      presets.push({
+        name: trimmed,
+        prompt: typeof prompt === 'string' ? prompt : '',
+        created_ms: now,
+        patch: patch as PatchParams,
+      });
+      writeJson(PRESETS_KEY, presets);
+      emitEvent('preset_committed', { name: trimmed, created_ms: now });
+      return undefined;
+    },
+
+    get_presets: () => ({ presets: readPresets() }),
+
+    delete_preset: (params) => {
+      const name = params[0];
+      if (typeof name !== 'string') return undefined;
+      writeJson(PRESETS_KEY, readPresets().filter((p) => p.name !== name));
+      return undefined;
+    },
+
+    // Offline bounce needs a render host — out of scope for the browser
+    // demo. Surface an honest bounce_complete so the UI toasts instead
+    // of appearing to do nothing.
+    bounce_patch: () => {
+      emitEvent('bounce_complete', {
+        ok: false,
+        error: 'Bounce to wav is not available in the web demo.',
+      });
+      return undefined;
+    },
+
+    // ── Phase B morph (#249) — needs the agent backend; no-op in demo ──
+    morph_request: () => undefined,
+
+    // ── Phase G MIDI learn (#262) — needs the native MidiLearnStore ──
+    // (Web MIDI routing into the demo engine is out of scope). The knob
+    // context menu's clear path also updates its React state locally, so
+    // a no-op here keeps the menu consistent.
+    start_midi_learn: () => undefined,
+    cancel_midi_learn: () => undefined,
+    clear_midi_mapping: () => undefined,
+    // The App-level mapping mirror starts empty and is updated via
+    // `midi_learned` events only — an empty record is the accurate answer.
+    get_midi_mappings: () => ({ mappings: {} }),
+
+    // ── Phase H telemetry (#261) — append-only JSONL on native; no-op ──
+    record_variation_picked: () => undefined,
+    record_macro_tweak: () => undefined,
+    record_ab_toggle: () => undefined,
+
+    // ── Audio device settings ──
+    // The web demo supports OUTPUT device selection only (push-to-talk
+    // STT is out of scope, and the panel's MIDI input section uses Web
+    // MIDI directly, not the bridge). `audio_settings_supported` mirrors
+    // the panel's boolean contract and reports real setSinkId capability
+    // so the section stays hidden on browsers without it.
+    audio_settings_supported: () =>
+      typeof AudioContext !== 'undefined' && 'setSinkId' in AudioContext.prototype,
+
+    // Same shape as the standalone picker's wire surface, minus sample
+    // rate / buffer size: { deviceId, label } per audiooutput device.
+    // Labels are blank until the user grants mic permission — fall back
+    // to a stable "Output N" so the picker is never empty-looking.
+    list_output_devices: async () => {
+      if (!navigator.mediaDevices?.enumerateDevices) return [];
+      try {
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        let n = 0;
+        return devices
+          .filter((d) => d.kind === 'audiooutput')
+          .map((d) => ({ deviceId: d.deviceId, label: d.label || `Output ${++n}` }));
+      } catch {
+        return [];
+      }
+    },
+
+    // Applies the selection through the engine's AudioContext. Resolves
+    // false so SettingsPanel can surface its error state instead of
+    // appearing to do nothing.
+    set_output_device: async (params) => {
+      const deviceId = params[0];
+      if (typeof deviceId !== 'string') return false;
+      try {
+        await engine.setOutputDevice(deviceId);
+        return true;
+      } catch {
+        return false;
+      }
+    },
+
+    // The standalone dialog has no demo equivalent; the panel's web-demo
+    // path renders an inline device picker instead of this button.
+    open_audio_settings: () => false,
+
     // Speech-to-text is out of scope for the web demo; acknowledge the
     // audio so the push-to-talk UI resolves instead of hanging.
     push_audio_pcm: () => {
@@ -300,6 +428,9 @@ export function installWebDemoShim(): void {
   };
 
   // ── promise plumbing (mirrors the JUCE getNativeFunction protocol) ──
+  // One warning per unknown function name — a UI path that polls every
+  // frame must not flood the console.
+  const warnedUnknownFns = new Set<string>();
   addEventListener('__juce__invoke', (payload) => {
     const p = isRecord(payload) ? payload : {};
     const name = typeof p.name === 'string' ? p.name : null;
@@ -309,7 +440,10 @@ export function installWebDemoShim(): void {
     const handler = nativeFns[name];
     let result: unknown = undefined;
     if (!handler) {
-      console.warn('[demo-shim] unhandled native function:', name);
+      if (!warnedUnknownFns.has(name)) {
+        warnedUnknownFns.add(name);
+        console.warn('[demo-shim] unhandled native function:', name);
+      }
     } else {
       try {
         result = handler(params);

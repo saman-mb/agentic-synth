@@ -1,14 +1,12 @@
 import React from 'react';
 import { createRoot } from 'react-dom/client';
 
-import { App } from './App';
-import { installWebDemoShim } from './demo/juceShim';
-
 // Web demo (#280): a plain-browser deploy has no JUCE WebView host, so
-// install the shim before React mounts and the hooks see window.__JUCE__
-// from the first render. Inside the plugin the real backend is already
-// present and this is a no-op.
-if (!(window as unknown as { __JUCE__?: unknown }).__JUCE__) installWebDemoShim();
+// the shim installs at module-evaluation time — BEFORE App (and every
+// module-scope bridge check it triggers) is evaluated. Inside the plugin
+// the real backend is already present and bootstrap.ts is a no-op.
+import './demo/bootstrap';
+import { App } from './App';
 
 createRoot(document.getElementById('root') as HTMLElement).render(
   <React.StrictMode>

@@ -42,6 +42,10 @@ export interface SynthEngine {
   noteOff(note: number): void;
   playMidiNote(note: number, velocity: number, durationMs: number): void;
   getScopeSamples(n: number): number[];
+  // Routes all output to the given device (AudioContext.setSinkId).
+  // Throws when the browser lacks setSinkId or the switch fails — the
+  // caller surfaces the message. Empty string restores the default.
+  setOutputDevice(deviceId: string): Promise<void>;
   dispose(): void;
 }
 
@@ -260,6 +264,20 @@ class WebSynthEngine implements SynthEngine {
     const buf = new Float32Array(count);
     this.analyser.getFloatTimeDomainData(buf);
     return Array.from(buf);
+  }
+
+  async setOutputDevice(deviceId: string): Promise<void> {
+    if (this.disposed) throw new Error('Audio engine disposed');
+    await this.ensureStarted();
+    const ctx = this.ctx;
+    if (!ctx) throw new Error('Audio engine not started');
+    // setSinkId is Chrome/Edge-only and not yet in TS lib.dom — narrow
+    // capability check instead of a blind cast.
+    const sink = ctx as AudioContext & { setSinkId?: (sinkId: string) => Promise<void> };
+    if (typeof sink.setSinkId !== 'function') {
+      throw new Error('Output device selection is not supported in this browser.');
+    }
+    await sink.setSinkId(deviceId);
   }
 
   dispose(): void {

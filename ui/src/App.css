@@ -927,3 +927,99 @@ body {
   outline-offset: 2px;
   border-radius: var(--r-2);
 }
+
+/* ── Web-demo-only layout overrides (issue #280 / PR #281) ──────────
+   The shell above was designed for the plugin's WebView: .app-layout
+   pins to 100vh with overflow:hidden and .app-body's single implicit
+   grid row sizes to its tallest content, so on real browser viewports
+   the presets sidebar / play surface spill UP over the macro strip and
+   DOWN past the keyboard dock, and the unstyled .saved-sounds-fab
+   becomes a clipped full-width bar in an implicit fifth grid row.
+
+   Every rule below is scoped under body.web-demo — a class the web
+   demo bootstrap (installWebDemoShim in ui/src/demo/) adds to <body>
+   and that is NEVER present inside the JUCE WebView — so the plugin's
+   rendering is untouched, pixel for pixel. Do not add unscoped rules
+   to this section. */
+
+body.web-demo .app-layout {
+  /* Keep a definite height (so the 1fr body row resolves against the
+     viewport, not against content) but drop overflow:hidden so a
+     genuinely too-short viewport scrolls the page instead of silently
+     clipping rows. Dynamic-viewport unit avoids mobile browser chrome
+     overshoot; plain 100vh first as a fallback. */
+  height: 100vh;
+  height: 100dvh;
+  overflow: visible;
+}
+
+body.web-demo .app-body {
+  /* Pin the row to the band: children stretch to it instead of the
+     implicit auto row growing to content height and overflowing the
+     hidden container (the overlap seen over the macro strip). The
+     320px floor keeps the app usable and lets the page scroll on
+     very short viewports instead of collapsing to nothing. */
+  grid-template-rows: minmax(320px, 1fr);
+}
+
+body.web-demo .play-surface,
+body.web-demo .right-column-chat-only {
+  /* These resolve height:100% against the stretched band, but the
+     codebase has no global box-sizing reset — content-box adds their
+     padding on top (56px / 24px), overflowing the row and turning
+     .app-body into an unexpectedly scrollable container. Border-box
+     keeps them exactly band-sized. */
+  box-sizing: border-box;
+}
+
+body.web-demo .app-center-column {
+  /* Was auto-placed (correct column by accident, no size constraint).
+     Place it explicitly and let it shrink so PlaySurface's own
+     overflow-y: auto takes over inside the band. */
+  grid-column: 3;
+  grid-row: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+body.web-demo .right-column {
+  /* Graceful degradation on short viewports: the cards' min-heights
+     (visualiser 200px + prompt dock 320px) can exceed the band; scroll
+     inside the column instead of silently clipping the chat input. */
+  overflow-y: auto;
+}
+
+body.web-demo .saved-sounds-fab {
+  /* Unstyled in the plugin build (it sits in an implicit grid row that
+     .app-layout's overflow:hidden clips off-viewport). In the browser
+     it rendered as a cut-off full-width bar at the viewport bottom —
+     style it here as the floating affordance Phase D intended. */
+  position: fixed;
+  right: var(--sp-6);
+  bottom: var(--sp-6);
+  z-index: 40; /* below ToolsDrawer (50) and PresetList (7000) */
+  padding: 10px 18px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  background: var(--bg-raised);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  box-shadow: var(--depth-card);
+  transition: background var(--dur-micro) var(--ease-considered),
+              color var(--dur-micro) var(--ease-considered);
+}
+
+body.web-demo .saved-sounds-fab:hover {
+  background: var(--accent-tint-15);
+  color: var(--text-accent);
+}
+
+body.web-demo .saved-sounds-fab:focus { outline: none; }
+body.web-demo .saved-sounds-fab:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}

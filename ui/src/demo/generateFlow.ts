@@ -11,8 +11,8 @@
 // the primary bubble text (WebUiComponent.cpp notifyToken block). The
 // click handler that invoked `generate` is the autoplay-safe user
 // gesture, so ensureStarted() is kicked off at flow entry (idempotent in
-// the engine) and awaited just before events fire; a failed audio start
-// never aborts the event flow — the UI still shows the patch.
+// the engine); a failed audio start never aborts the event flow — the UI
+// still shows the patch, and the note handlers lazy-start the engine.
 //
 // Response contract (owned by the /api/generate function builder):
 //   200 { "brief": string, "patch": PatchParams, "rationale"?: string,
@@ -30,8 +30,6 @@ export interface GenerateFlowDeps {
   engine: SynthEngine;
   /** setPatch + applyMacros + update the shim's current-patch snapshot. */
   applyServerPatch: (patch: PatchParams, modulation?: AgentModulationPlan) => void;
-  /** Set false when the AudioContext could not start (dead-engine errors). */
-  setEngineReady: (ready: boolean) => void;
 }
 
 interface GenerateApiResponse {
@@ -60,7 +58,8 @@ export function friendlyError(status: number, detail?: string): string {
     case 400: return `The prompt was rejected${suffix}. Try rephrasing it.`;
     case 429: return 'Rate limited (429) — too many generations in a row. Wait a moment and try again.';
     case 502: return 'Patch service unavailable (502) — the upstream model could not be reached.';
-    case 503: return 'Patch service busy (503) — try again shortly.';
+    case 503:
+      return 'Generation is not configured on this server — set GEMINI_KEY and restart (local) or ask the site owner (deployed).';
     default: return `Generation failed (HTTP ${status}).${suffix}`;
   }
 }
@@ -92,11 +91,13 @@ export async function runGenerateFlow(
 
   // Start the AudioContext while the generate click's user activation is
   // still fresh (a slow fetch can outlive the transient gesture window).
-  // ensureStarted() is idempotent; the promise is awaited below.
-  const started: Promise<boolean> = deps.engine.ensureStarted().then(
-    () => true,
-    () => false,
-  );
+  // ensureStarted() is idempotent; the AudioContext starts (or resumes)
+  // even when the fetch below fails — note handlers also lazy-start the
+  // engine, so no readiness flag is needed anymore.
+  void deps.engine.ensureStarted().catch(() => {
+    // A failed start is surfaced by the note handlers' lazy-start path;
+    // never abort the event flow here — the UI still shows the patch.
+  });
 
   let res: Response;
   try {
@@ -149,9 +150,6 @@ export async function runGenerateFlow(
   //    so knob_tweak / feedback / audition keys work against this patch.
   const modulation = isRecord(data.modulation) ? (data.modulation as AgentModulationPlan) : undefined;
   deps.applyServerPatch(patch, modulation);
-
-  const engineOk = await started;
-  deps.setEngineReady(engineOk);
 
   // 3. Patch frame BEFORE the rationale stream — C++ order is patch →
   //    patch_update → token(s) → rationale → done (WebUiComponent.cpp:468-525).

@@ -39,6 +39,10 @@ function getJuceForScope(): JuceGlobalForScope | null {
   return j ?? null;
 }
 
+// Evaluated per call: module-scope capture ran before demo/bootstrap.ts
+// installed the shim (#280).
+const scopeBridgeAvailable = (): boolean => getJuceForScope() !== null;
+
 // Module-scope promise plumbing for the scope pull. Module-scope (not
 // component-scope) so a remount doesn't double-register the __juce__complete
 // listener. ID offset 2_000_000 keeps our IDs distinct from both JUCE's
@@ -81,8 +85,11 @@ function callGetScopeSamples(n: number): Promise<number[]> | null {
   });
 }
 
-// Bridge presence is fixed for the page lifetime — cache once.
-const SCOPE_BRIDGE_AVAILABLE = getJuceForScope() !== null;
+// Evaluated per call, mirroring useSynthBridge.ts: the web-demo shim
+// installs at module-evaluation time (demo/bootstrap.ts), but a
+// module-scope capture here would still freeze the answer before that
+// import ran in older entry points — and per-call costs one property
+// read per frame (#280).
 
 type Mode = 'SCOPE' | 'SPECTRUM' | 'XY' | 'WT';
 const MODES: ReadonlyArray<Mode> = ['SCOPE', 'SPECTRUM', 'XY', 'WT'];
@@ -271,7 +278,7 @@ export function Visualizer({ sampleProvider }: VisualizerProps) {
       //    on a future tick; while it does, the render loop reads the most
       //    recent scopeBufRef.current synchronously. inFlightRef gates
       //    re-entry so concurrent RAFs don't pile up requests.
-      if (SCOPE_BRIDGE_AVAILABLE && !inFlightRef.current) {
+      if (scopeBridgeAvailable() && !inFlightRef.current) {
         inFlightRef.current = true;
         const p = callGetScopeSamples(SAMPLE_COUNT);
         if (p) {
@@ -310,7 +317,7 @@ export function Visualizer({ sampleProvider }: VisualizerProps) {
       const provided = providerRef.current?.();
       if (provided && provided.length >= SAMPLE_COUNT) {
         bufs.sample.set(provided.subarray(0, SAMPLE_COUNT));
-      } else if (SCOPE_BRIDGE_AVAILABLE && scopeFilledRef.current) {
+      } else if (scopeBridgeAvailable() && scopeFilledRef.current) {
         bufs.sample.set(scopeBufRef.current);
       }
 
