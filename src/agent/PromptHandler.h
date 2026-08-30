@@ -73,10 +73,9 @@ public:
     // a refinement frame so §5.3 of system-prompt.md fires and the LLM
     // nudges instead of restarting. Both args default to nullopt for legacy
     // call sites and for cold-start prompts where no prior patch exists.
-    [[nodiscard]] std::optional<PatchStruct>
-    generateLlmPatch(const std::string& prompt, uint32_t patch_id = 0,
-                     std::optional<PatchStruct> previousPatch = std::nullopt,
-                     std::optional<std::string> previousPrompt = std::nullopt);
+    [[nodiscard]] std::optional<PatchStruct> generateLlmPatch(const std::string& prompt, uint32_t patch_id = 0,
+                                                              std::optional<PatchStruct> previousPatch = std::nullopt,
+                                                              std::optional<std::string> previousPrompt = std::nullopt);
 
     // Phase 22: returns true when `prompt` contains comparative / refinement
     // language ("darker", "more wobble", "weirder", …). Used by callers
@@ -97,8 +96,7 @@ public:
     // augmenter is idempotent on already-augmented patches but should still
     // only be invoked on the LLM-failure path so we don't double-run on
     // success.
-    void applyGuardrailIfNotRefinement(PatchStruct& patch, const std::string& prompt,
-                                       bool hasPreviousPatch) noexcept;
+    void applyGuardrailIfNotRefinement(PatchStruct& patch, const std::string& prompt, bool hasPreviousPatch) noexcept;
 
     // Issue #67: streaming patch application — feed a JSON chunk.
     void feedChunk(std::string_view chunk);

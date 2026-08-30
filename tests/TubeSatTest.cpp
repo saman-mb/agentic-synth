@@ -73,8 +73,7 @@ TEST_CASE("TubeSat drive > 0 produces output that differs from input", "[tubesat
     REQUIRE(diffs > kBlock / 2);
 }
 
-TEST_CASE("TubeSat asymmetric: shapes positive and negative half-cycles differently",
-          "[tubesat][phaseE]") {
+TEST_CASE("TubeSat asymmetric: shapes positive and negative half-cycles differently", "[tubesat][phaseE]") {
     // Probe at a mid-range input level where tanh hasn't saturated yet.
     // At very high drive both ±x→±1 (the normalisation reaches its asymptote),
     // so asymmetry only shows on the linear-to-soft-knee portion of the curve.

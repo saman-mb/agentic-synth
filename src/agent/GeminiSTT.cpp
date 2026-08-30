@@ -37,15 +37,16 @@ std::vector<std::uint8_t> wrapWav(const std::int16_t* samples, int numSamples, i
         out.push_back(static_cast<std::uint8_t>((v >> 24) & 0xff));
     };
     auto str = [&](const char* s) {
-        for (; *s; ++s) out.push_back(static_cast<std::uint8_t>(*s));
+        for (; *s; ++s)
+            out.push_back(static_cast<std::uint8_t>(*s));
     };
 
     str("RIFF");
     u32(chunkSize);
     str("WAVE");
     str("fmt ");
-    u32(16);            // PCM fmt subchunk size
-    u16(1);             // PCM format code
+    u32(16); // PCM fmt subchunk size
+    u16(1);  // PCM format code
     u16(channels);
     u32(static_cast<std::uint32_t>(sampleRate));
     u32(byteRate);
@@ -62,15 +63,14 @@ std::vector<std::uint8_t> wrapWav(const std::int16_t* samples, int numSamples, i
 // RFC 4648 base64 encode. Mirrors what JUCE's Base64 would do but lives
 // in-translation-unit so this file has no JUCE dependency.
 std::string base64Encode(const std::uint8_t* data, std::size_t len) {
-    static constexpr char kAlphabet[] =
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+    static constexpr char kAlphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
     std::string out;
     out.reserve(((len + 2) / 3) * 4);
     std::size_t i = 0;
     while (i + 3 <= len) {
-        const std::uint32_t v = (static_cast<std::uint32_t>(data[i]) << 16)
-                              | (static_cast<std::uint32_t>(data[i + 1]) << 8)
-                              | static_cast<std::uint32_t>(data[i + 2]);
+        const std::uint32_t v = (static_cast<std::uint32_t>(data[i]) << 16) |
+                                (static_cast<std::uint32_t>(data[i + 1]) << 8) |
+                                static_cast<std::uint32_t>(data[i + 2]);
         out += kAlphabet[(v >> 18) & 0x3f];
         out += kAlphabet[(v >> 12) & 0x3f];
         out += kAlphabet[(v >> 6) & 0x3f];
@@ -116,11 +116,21 @@ std::string json_escape(const std::string& s) {
     out.reserve(s.size() + 8);
     for (char c : s) {
         switch (c) {
-        case '"':  out += "\\\""; break;
-        case '\\': out += "\\\\"; break;
-        case '\n': out += "\\n"; break;
-        case '\r': out += "\\r"; break;
-        case '\t': out += "\\t"; break;
+        case '"':
+            out += "\\\"";
+            break;
+        case '\\':
+            out += "\\\\";
+            break;
+        case '\n':
+            out += "\\n";
+            break;
+        case '\r':
+            out += "\\r";
+            break;
+        case '\t':
+            out += "\\t";
+            break;
         default:
             if (static_cast<unsigned char>(c) < 0x20) {
                 char buf[8];
@@ -143,25 +153,41 @@ std::string json_unescape(const std::string& s) {
             out += s[i];
             continue;
         }
-        if (i + 1 >= s.size()) break;
+        if (i + 1 >= s.size())
+            break;
         const char n = s[++i];
         switch (n) {
-        case '"':  out += '"'; break;
-        case '\\': out += '\\'; break;
-        case 'n':  out += '\n'; break;
-        case 't':  out += '\t'; break;
-        case 'r':  out += '\r'; break;
+        case '"':
+            out += '"';
+            break;
+        case '\\':
+            out += '\\';
+            break;
+        case 'n':
+            out += '\n';
+            break;
+        case 't':
+            out += '\t';
+            break;
+        case 'r':
+            out += '\r';
+            break;
         case 'u': {
-            if (i + 4 >= s.size()) return out;
+            if (i + 4 >= s.size())
+                return out;
             const std::string hex = s.substr(i + 1, 4);
             i += 4;
             try {
                 const auto cp = static_cast<unsigned>(std::stoul(hex, nullptr, 16));
-                if (cp < 0x80) out += static_cast<char>(cp);
-            } catch (...) {}
+                if (cp < 0x80)
+                    out += static_cast<char>(cp);
+            } catch (...) {
+            }
             break;
         }
-        default: out += n; break;
+        default:
+            out += n;
+            break;
         }
     }
     return out;
@@ -170,21 +196,26 @@ std::string json_unescape(const std::string& s) {
 std::string extract_text(const std::string& resp) {
     const std::string key = "\"text\"";
     auto pos = resp.find(key);
-    if (pos == std::string::npos) return {};
+    if (pos == std::string::npos)
+        return {};
     pos += key.size();
-    while (pos < resp.size() && (resp[pos] == ' ' || resp[pos] == ':')) ++pos;
-    if (pos >= resp.size() || resp[pos] != '"') return {};
+    while (pos < resp.size() && (resp[pos] == ' ' || resp[pos] == ':'))
+        ++pos;
+    if (pos >= resp.size() || resp[pos] != '"')
+        return {};
     ++pos;
     std::string raw;
     while (pos < resp.size()) {
         if (resp[pos] == '\\') {
-            if (pos + 1 >= resp.size()) break;
+            if (pos + 1 >= resp.size())
+                break;
             raw += resp[pos];
             raw += resp[pos + 1];
             pos += 2;
             continue;
         }
-        if (resp[pos] == '"') break;
+        if (resp[pos] == '"')
+            break;
         raw += resp[pos++];
     }
     return json_unescape(raw);
@@ -197,8 +228,7 @@ std::string GeminiSTT::http_post(const std::string& url, const std::string& json
     std::ostringstream cmd;
     const int timeout_s = std::max(1, cfg_.timeout_ms / 1000);
     cmd << "curl --silent --show-error --fail-with-body"
-        << " --max-time " << timeout_s
-        << " -H 'Content-Type: application/json'"
+        << " --max-time " << timeout_s << " -H 'Content-Type: application/json'"
         << " --data-binary @" << req.path << " '" << url << "' 2>/dev/null";
     std::string out;
     std::array<char, 4096> buf{};
@@ -207,7 +237,8 @@ std::string GeminiSTT::http_post(const std::string& url, const std::string& json
 #else
     FILE* p = popen(cmd.str().c_str(), "r");
 #endif
-    if (!p) return {};
+    if (!p)
+        return {};
     std::size_t n;
     while ((n = std::fread(buf.data(), 1, buf.size(), p)) > 0)
         out.append(buf.data(), n);
@@ -232,11 +263,10 @@ std::string GeminiSTT::transcribe(const std::int16_t* samples, int numSamples, i
     const auto wav = wrapWav(samples, numSamples, sampleRate);
     const std::string b64 = base64Encode(wav.data(), wav.size());
 
-    static constexpr const char* kPrompt =
-        "Transcribe the audio to plain text. Output the transcript only — no "
-        "preamble, no quotes, no punctuation around the transcript, no model "
-        "commentary. If the audio is silent or unintelligible, output an empty "
-        "string.";
+    static constexpr const char* kPrompt = "Transcribe the audio to plain text. Output the transcript only — no "
+                                           "preamble, no quotes, no punctuation around the transcript, no model "
+                                           "commentary. If the audio is silent or unintelligible, output an empty "
+                                           "string.";
 
     std::ostringstream body;
     body << "{"
@@ -247,8 +277,8 @@ std::string GeminiSTT::transcribe(const std::int16_t* samples, int numSamples, i
          << "\"generationConfig\":{\"temperature\":0.0}"
          << "}";
 
-    const std::string url = "https://generativelanguage.googleapis.com/v1beta/models/"
-                          + cfg_.model + ":generateContent?key=" + cfg_.api_key;
+    const std::string url = "https://generativelanguage.googleapis.com/v1beta/models/" + cfg_.model +
+                            ":generateContent?key=" + cfg_.api_key;
 
     const std::string resp = http_post(url, body.str());
     if (resp.empty()) {
@@ -263,13 +293,13 @@ std::string GeminiSTT::transcribe(const std::int16_t* samples, int numSamples, i
     }
     // Strip surrounding quotes / trailing newlines / leading whitespace the
     // model sometimes emits despite the instruction.
-    while (!text.empty() && (text.back() == '\n' || text.back() == '\r'
-                              || text.back() == ' ' || text.back() == '\t'))
+    while (!text.empty() && (text.back() == '\n' || text.back() == '\r' || text.back() == ' ' || text.back() == '\t'))
         text.pop_back();
     std::size_t start = 0;
     while (start < text.size() && (text[start] == ' ' || text[start] == '\t'))
         ++start;
-    if (start > 0) text.erase(0, start);
+    if (start > 0)
+        text.erase(0, start);
     if (text.size() >= 2 && text.front() == '"' && text.back() == '"')
         text = text.substr(1, text.size() - 2);
 

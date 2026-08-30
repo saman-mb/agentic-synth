@@ -55,8 +55,8 @@ TEST_CASE("Audition SPSC queue: burst from producer thread drains intact on cons
 
     std::thread producer([&] {
         for (int i = 0; i < kBurst; ++i) {
-            const auto msg = (i % 2 == 0) ? RawMidiMsg::noteOn(60 + i % 24, 100)
-                                          : RawMidiMsg::noteOff(60 + (i - 1) % 24);
+            const auto msg =
+                (i % 2 == 0) ? RawMidiMsg::noteOn(60 + i % 24, 100) : RawMidiMsg::noteOff(60 + (i - 1) % 24);
             // Capacity headroom > burst so this must succeed every time.
             REQUIRE(q.push(msg));
         }
@@ -176,19 +176,15 @@ TEST_CASE("primeSmoothers snaps smoothers — no first-block glide from defaults
     // up sample-by-sample. With primeSmoothers it should sit exactly on
     // target on the very first read.
     vm.primeSmoothers();
-    CHECK_THAT(vm.currentSmoothedCutoff(),
-               Catch::Matchers::WithinAbs(8000.0f, 1.0e-3f));
-    CHECK_THAT(vm.currentSmoothedGain(),
-               Catch::Matchers::WithinAbs(0.25f, 1.0e-6f));
+    CHECK_THAT(vm.currentSmoothedCutoff(), Catch::Matchers::WithinAbs(8000.0f, 1.0e-3f));
+    CHECK_THAT(vm.currentSmoothedGain(), Catch::Matchers::WithinAbs(0.25f, 1.0e-6f));
 
     // Render one sample — value must still match the target within one
     // smoother step (sanity check: primed state means no glide).
     std::vector<float> buf(1, 0.0f);
     vm.renderBlock(buf.data(), 1);
-    CHECK_THAT(vm.currentSmoothedCutoff(),
-               Catch::Matchers::WithinAbs(8000.0f, 1.0e-3f));
-    CHECK_THAT(vm.currentSmoothedGain(),
-               Catch::Matchers::WithinAbs(0.25f, 1.0e-6f));
+    CHECK_THAT(vm.currentSmoothedCutoff(), Catch::Matchers::WithinAbs(8000.0f, 1.0e-3f));
+    CHECK_THAT(vm.currentSmoothedGain(), Catch::Matchers::WithinAbs(0.25f, 1.0e-6f));
 }
 
 // ── 4. setStateInformation-style reapply: targets propagate after invalidate ──
@@ -213,8 +209,7 @@ TEST_CASE("Mid-playback retarget + primeSmoothers reflects new params next block
     std::vector<float> buf(512, 0.0f);
     vm.renderBlock(buf.data(), 512);
 
-    REQUIRE_THAT(vm.currentSmoothedCutoff(),
-                 Catch::Matchers::WithinAbs(2000.0f, 1.0f));
+    REQUIRE_THAT(vm.currentSmoothedCutoff(), Catch::Matchers::WithinAbs(2000.0f, 1.0f));
 
     // Reload: new state pushes new targets, smoothers snap to them.
     vm.setFilterCutoff(440.0f);
@@ -222,10 +217,8 @@ TEST_CASE("Mid-playback retarget + primeSmoothers reflects new params next block
     vm.primeSmoothers();
 
     // Next read — smoothers must reflect the restored state immediately.
-    CHECK_THAT(vm.currentSmoothedCutoff(),
-               Catch::Matchers::WithinAbs(440.0f, 1.0e-3f));
-    CHECK_THAT(vm.currentSmoothedGain(),
-               Catch::Matchers::WithinAbs(0.5f, 1.0e-6f));
+    CHECK_THAT(vm.currentSmoothedCutoff(), Catch::Matchers::WithinAbs(440.0f, 1.0e-3f));
+    CHECK_THAT(vm.currentSmoothedGain(), Catch::Matchers::WithinAbs(0.5f, 1.0e-6f));
 }
 
 // ── 5. Plugin-level integration tests (Phase 1 follow-up) ─────────────────────
@@ -425,12 +418,15 @@ TEST_CASE("AgenticSynthPlugin: getStateInformation/setStateInformation round-tri
 
     // Push distinctive values to APVTS so any failure to restore is
     // unambiguous (default cutoff = 5000, gain = 0.8).
-    plugA.getAPVTS().getParameter("filterCutoff")->setValueNotifyingHost(
-        plugA.getAPVTS().getParameter("filterCutoff")->convertTo0to1(8000.0f));
-    plugA.getAPVTS().getParameter("filterResonance")->setValueNotifyingHost(
-        plugA.getAPVTS().getParameter("filterResonance")->convertTo0to1(0.7f));
-    plugA.getAPVTS().getParameter("masterGain")->setValueNotifyingHost(
-        plugA.getAPVTS().getParameter("masterGain")->convertTo0to1(0.5f));
+    plugA.getAPVTS()
+        .getParameter("filterCutoff")
+        ->setValueNotifyingHost(plugA.getAPVTS().getParameter("filterCutoff")->convertTo0to1(8000.0f));
+    plugA.getAPVTS()
+        .getParameter("filterResonance")
+        ->setValueNotifyingHost(plugA.getAPVTS().getParameter("filterResonance")->convertTo0to1(0.7f));
+    plugA.getAPVTS()
+        .getParameter("masterGain")
+        ->setValueNotifyingHost(plugA.getAPVTS().getParameter("masterGain")->convertTo0to1(0.5f));
 
     juce::MemoryBlock state;
     plugA.getStateInformation(state);
@@ -445,19 +441,15 @@ TEST_CASE("AgenticSynthPlugin: getStateInformation/setStateInformation round-tri
     // setStateInformation → invalidateParameterShadows → applyParameters →
     // primeSmoothers; the cutoff/gain smoothers must already be snapped to
     // the restored values without any processBlock call.
-    CHECK_THAT(plugB.voiceManagerForTest().currentSmoothedCutoff(),
-               Catch::Matchers::WithinAbs(8000.0f, 1.0f));
-    CHECK_THAT(plugB.voiceManagerForTest().currentSmoothedGain(),
-               Catch::Matchers::WithinAbs(0.5f, 1.0e-3f));
+    CHECK_THAT(plugB.voiceManagerForTest().currentSmoothedCutoff(), Catch::Matchers::WithinAbs(8000.0f, 1.0f));
+    CHECK_THAT(plugB.voiceManagerForTest().currentSmoothedGain(), Catch::Matchers::WithinAbs(0.5f, 1.0e-3f));
 
     // Render one block with a note — smoothers stay on-target (no glide-up
     // from the constructor defaults).
     REQUIRE(plugB.auditionQueueForTest().push(RawMidiMsg::noteOn(60, 100)));
     (void)renderPluginPeak(plugB, 64);
-    CHECK_THAT(plugB.voiceManagerForTest().currentSmoothedCutoff(),
-               Catch::Matchers::WithinAbs(8000.0f, 5.0f));
-    CHECK_THAT(plugB.voiceManagerForTest().currentSmoothedGain(),
-               Catch::Matchers::WithinAbs(0.5f, 1.0e-3f));
+    CHECK_THAT(plugB.voiceManagerForTest().currentSmoothedCutoff(), Catch::Matchers::WithinAbs(8000.0f, 5.0f));
+    CHECK_THAT(plugB.voiceManagerForTest().currentSmoothedGain(), Catch::Matchers::WithinAbs(0.5f, 1.0e-3f));
 
     plugA.agentBridge().setMidiNoteSink(nullptr);
     plugB.agentBridge().setMidiNoteSink(nullptr);
@@ -677,10 +669,8 @@ TEST_CASE("AI patch → APVTS pump propagates to engine on next processBlock") {
     plug.pumpAgentBridgeForTest();
 
     // APVTS now reflects the AI values.
-    const float postCutoff =
-        plug.getAPVTS().getRawParameterValue("filterCutoff")->load();
-    const float postGain =
-        plug.getAPVTS().getRawParameterValue("masterGain")->load();
+    const float postCutoff = plug.getAPVTS().getRawParameterValue("filterCutoff")->load();
+    const float postGain = plug.getAPVTS().getRawParameterValue("masterGain")->load();
     CHECK_THAT(postCutoff, Catch::Matchers::WithinRel(1234.0f, 1e-3f));
     CHECK_THAT(postGain, Catch::Matchers::WithinRel(0.33f, 1e-3f));
 
@@ -690,8 +680,7 @@ TEST_CASE("AI patch → APVTS pump propagates to engine on next processBlock") {
     // target is locked in after the first block and the remainder of the
     // render just lets it glide there.
     (void)renderPluginPeak(plug, 4096);
-    CHECK_THAT(plug.voiceManagerForTest().currentSmoothedCutoff(),
-               Catch::Matchers::WithinAbs(1234.0f, 1.0f));
+    CHECK_THAT(plug.voiceManagerForTest().currentSmoothedCutoff(), Catch::Matchers::WithinAbs(1234.0f, 1.0f));
 
     plug.agentBridge().setMidiNoteSink(nullptr);
 }
@@ -716,10 +705,8 @@ TEST_CASE("Host automation: setValueNotifyingHost into APVTS reaches engine afte
     // needs ~17τ ≈ 4096 samples at 44.1 kHz to settle to within 1 Hz / 0.001
     // gain of the target.
     (void)renderPluginPeak(plug, 4096);
-    CHECK_THAT(plug.voiceManagerForTest().currentSmoothedCutoff(),
-               Catch::Matchers::WithinAbs(440.0f, 1.0f));
-    CHECK_THAT(plug.voiceManagerForTest().currentSmoothedGain(),
-               Catch::Matchers::WithinAbs(0.2f, 1e-3f));
+    CHECK_THAT(plug.voiceManagerForTest().currentSmoothedCutoff(), Catch::Matchers::WithinAbs(440.0f, 1.0f));
+    CHECK_THAT(plug.voiceManagerForTest().currentSmoothedGain(), Catch::Matchers::WithinAbs(0.2f, 1e-3f));
 
     plug.agentBridge().setMidiNoteSink(nullptr);
 }
@@ -983,27 +970,23 @@ TEST_CASE("Phase-2 follow-up: boundary round-trip for critical AudioParameterFlo
     const float recovered = paramB->convertFrom0to1(paramB->getValue());
 
     INFO("param=" << probe.id << " target=" << target << " recovered=" << recovered);
-    CHECK_THAT(recovered, Catch::Matchers::WithinRel(target, 1e-3f) ||
-                              Catch::Matchers::WithinAbs(target, 1e-4f));
+    CHECK_THAT(recovered, Catch::Matchers::WithinRel(target, 1e-3f) || Catch::Matchers::WithinAbs(target, 1e-4f));
 
     plugA.agentBridge().setMidiNoteSink(nullptr);
     plugB.agentBridge().setMidiNoteSink(nullptr);
 }
 
-
 // Phase 5: direct tests for Phase 2 follow-up additions. Previously only
 // indirect coverage existed (host channel-layout probes, bounce-tail timing).
 // Direct unit assertions prevent silent regressions.
 
-TEST_CASE("getTailLengthSeconds returns 5 seconds for reverb+delay tail",
-          "[plugin][lifecycle][tail]") {
+TEST_CASE("getTailLengthSeconds returns 5 seconds for reverb+delay tail", "[plugin][lifecycle][tail]") {
     AgenticSynthPlugin p;
     const double tail = p.getTailLengthSeconds();
     REQUIRE_THAT(tail, Catch::Matchers::WithinAbs(5.0, 1e-9));
 }
 
-TEST_CASE("isBusesLayoutSupported accepts mono and stereo main output",
-          "[plugin][lifecycle][buses]") {
+TEST_CASE("isBusesLayoutSupported accepts mono and stereo main output", "[plugin][lifecycle][buses]") {
     AgenticSynthPlugin p;
 
     juce::AudioProcessor::BusesLayout stereo;
@@ -1015,8 +998,7 @@ TEST_CASE("isBusesLayoutSupported accepts mono and stereo main output",
     CHECK(p.isBusesLayoutSupported(mono));
 }
 
-TEST_CASE("isBusesLayoutSupported rejects unsupported layouts",
-          "[plugin][lifecycle][buses]") {
+TEST_CASE("isBusesLayoutSupported rejects unsupported layouts", "[plugin][lifecycle][buses]") {
     AgenticSynthPlugin p;
 
     juce::AudioProcessor::BusesLayout fiveOne;

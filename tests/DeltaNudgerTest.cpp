@@ -9,12 +9,12 @@
 #include "mapper/ArchetypeRetriever.h"
 #include "mapper/DeltaNudger.h"
 
-using agentic_synth::PatchStruct;
 using agentic_synth::make_default_patch;
+using agentic_synth::PatchStruct;
+using agentic_synth::mapper::applyNudges;
 using agentic_synth::mapper::Archetype;
 using agentic_synth::mapper::ArchetypeLibrary;
 using agentic_synth::mapper::ArchetypeRetriever;
-using agentic_synth::mapper::applyNudges;
 using agentic_synth::mapper::DeltaNudger;
 using agentic_synth::mapper::DeltaNudgerConfig;
 using agentic_synth::mapper::Nudge;
@@ -99,7 +99,7 @@ TEST_CASE("applyNudges: unknown path is silently dropped") {
     };
     PatchStruct out = applyNudges(base, ns);
     CHECK(out.filter.cutoff_hz == 1100.0f);
-    CHECK(out.osc[0].volume == 0.5f);  // untouched
+    CHECK(out.osc[0].volume == 0.5f); // untouched
 }
 
 TEST_CASE("applyNudges: empty nudge list returns base unchanged on whitelisted axes") {
@@ -116,11 +116,10 @@ TEST_CASE("applyNudges: empty nudge list returns base unchanged on whitelisted a
 // ── parseResponse: JSON envelope round-trip ──────────────────────────────────
 
 TEST_CASE("DeltaNudger::parseResponse — bare inner JSON (test seam)") {
-    const std::string raw =
-        "{\"selected_index\":1,\"nudges\":["
-        "{\"path\":\"filter.cutoff_hz\",\"delta_percent\":-20},"
-        "{\"path\":\"reverb.mix\",\"delta_percent\":15}"
-        "],\"rationale\":\"darker and wetter\"}";
+    const std::string raw = "{\"selected_index\":1,\"nudges\":["
+                            "{\"path\":\"filter.cutoff_hz\",\"delta_percent\":-20},"
+                            "{\"path\":\"reverb.mix\",\"delta_percent\":15}"
+                            "],\"rationale\":\"darker and wetter\"}";
     NudgeResult r = DeltaNudger::parseResponse(raw, 3);
     CHECK(r.selected_index == 1);
     REQUIRE(r.nudges.size() == 2);
@@ -134,10 +133,10 @@ TEST_CASE("DeltaNudger::parseResponse — bare inner JSON (test seam)") {
 TEST_CASE("DeltaNudger::parseResponse — full Gemini envelope (escaped inner text)") {
     // Same JSON wrapped in candidates[0].content.parts[0].text the way
     // Gemini actually returns it (string-escaped).
-    const std::string envelope =
-        "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":"
-        "\"{\\\"selected_index\\\":0,\\\"nudges\\\":[{\\\"path\\\":\\\"chorus.mix\\\",\\\"delta_percent\\\":40}],\\\"rationale\\\":\\\"lusher\\\"}\""
-        "}]},\"finishReason\":\"STOP\"}]}";
+    const std::string envelope = "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":"
+                                 "\"{\\\"selected_index\\\":0,\\\"nudges\\\":[{\\\"path\\\":\\\"chorus.mix\\\","
+                                 "\\\"delta_percent\\\":40}],\\\"rationale\\\":\\\"lusher\\\"}\""
+                                 "}]},\"finishReason\":\"STOP\"}]}";
     NudgeResult r = DeltaNudger::parseResponse(envelope, 3);
     CHECK(r.selected_index == 0);
     REQUIRE(r.nudges.size() == 1);
@@ -166,15 +165,14 @@ TEST_CASE("DeltaNudger::parseResponse — selected_index out of range returns -1
 }
 
 TEST_CASE("DeltaNudger::parseResponse — caps applied nudges to max 4") {
-    const std::string raw =
-        "{\"selected_index\":0,\"nudges\":["
-        "{\"path\":\"a\",\"delta_percent\":1},"
-        "{\"path\":\"b\",\"delta_percent\":2},"
-        "{\"path\":\"c\",\"delta_percent\":3},"
-        "{\"path\":\"d\",\"delta_percent\":4},"
-        "{\"path\":\"e\",\"delta_percent\":5},"
-        "{\"path\":\"f\",\"delta_percent\":6}"
-        "]}";
+    const std::string raw = "{\"selected_index\":0,\"nudges\":["
+                            "{\"path\":\"a\",\"delta_percent\":1},"
+                            "{\"path\":\"b\",\"delta_percent\":2},"
+                            "{\"path\":\"c\",\"delta_percent\":3},"
+                            "{\"path\":\"d\",\"delta_percent\":4},"
+                            "{\"path\":\"e\",\"delta_percent\":5},"
+                            "{\"path\":\"f\",\"delta_percent\":6}"
+                            "]}";
     NudgeResult r = DeltaNudger::parseResponse(raw, 3);
     CHECK(r.selected_index == 0);
     CHECK(r.nudges.size() == 4);
@@ -190,9 +188,7 @@ public:
         : DeltaNudger(std::move(cfg)), canned_(std::move(canned)) {}
 
 protected:
-    std::string http_post(const std::string& /*url*/, const std::string& /*body*/) const override {
-        return canned_;
-    }
+    std::string http_post(const std::string& /*url*/, const std::string& /*body*/) const override { return canned_; }
 
 private:
     std::string canned_;
@@ -201,10 +197,10 @@ private:
 TEST_CASE("DeltaNudger end-to-end: mocked Gemini success picks archetype 1 and applies nudges") {
     DeltaNudgerConfig cfg;
     cfg.api_key = "test-key";
-    const std::string canned =
-        "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":"
-        "\"{\\\"selected_index\\\":1,\\\"nudges\\\":[{\\\"path\\\":\\\"filter.cutoff_hz\\\",\\\"delta_percent\\\":-20}],\\\"rationale\\\":\\\"darker\\\"}\""
-        "}]},\"finishReason\":\"STOP\"}]}";
+    const std::string canned = "{\"candidates\":[{\"content\":{\"parts\":[{\"text\":"
+                               "\"{\\\"selected_index\\\":1,\\\"nudges\\\":[{\\\"path\\\":\\\"filter.cutoff_hz\\\","
+                               "\\\"delta_percent\\\":-20}],\\\"rationale\\\":\\\"darker\\\"}\""
+                               "}]},\"finishReason\":\"STOP\"}]}";
     MockNudger d(cfg, canned);
 
     // Use any 3 archetypes from the library.

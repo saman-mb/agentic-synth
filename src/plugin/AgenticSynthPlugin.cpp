@@ -11,8 +11,7 @@ namespace {
 // ── Enum string arrays — order MUST match PatchStruct.h enum declarations ───
 
 const juce::StringArray& kOscTypeNames() {
-    static const juce::StringArray names{"Sine", "Triangle", "Sawtooth", "Square",
-                                          "Pulse", "Wavetable", "FM", "Noise"};
+    static const juce::StringArray names{"Sine", "Triangle", "Sawtooth", "Square", "Pulse", "Wavetable", "FM", "Noise"};
     return names;
 }
 
@@ -27,8 +26,8 @@ const juce::StringArray& kLfoWaveformNames() {
 }
 
 const juce::StringArray& kLfoTargetNames() {
-    static const juce::StringArray names{"None",        "Pitch",        "FilterCutoff", "Amplitude",
-                                          "Pan",         "WavetablePos", "FmRatio"};
+    static const juce::StringArray names{"None", "Pitch",        "FilterCutoff", "Amplitude",
+                                         "Pan",  "WavetablePos", "FmRatio"};
     return names;
 }
 
@@ -42,8 +41,7 @@ juce::String lfoId(int i, const char* field) { return juce::String("lfo") + juce
 // internal atomic).
 float safeFloat(float v, float fallback) noexcept { return std::isfinite(v) ? v : fallback; }
 
-template <typename Enum>
-int safeEnumIndex(Enum e, int maxIndexInclusive) noexcept {
+template <typename Enum> int safeEnumIndex(Enum e, int maxIndexInclusive) noexcept {
     const int v = static_cast<int>(e);
     return (v < 0 || v > maxIndexInclusive) ? 0 : v;
 }
@@ -64,49 +62,44 @@ APVTS::ParameterLayout AgenticSynthPlugin::createParameterLayout() {
     // ── Global ─────────────────────────────────────────────────────────────
     layout.add(std::make_unique<FloatParam>("masterGain", "Master Gain", Range(0.0f, 1.0f), defaults.master_gain));
     // Portamento: log skew so small values get more knob travel.
-    layout.add(std::make_unique<FloatParam>("portamento", "Portamento",
-                                            Range(0.0f, 5.0f, 0.0f, 0.5f), defaults.portamento_s));
+    layout.add(
+        std::make_unique<FloatParam>("portamento", "Portamento", Range(0.0f, 5.0f, 0.0f, 0.5f), defaults.portamento_s));
     // voice_count: Phase 3 wired this — VoiceManager::applyPatch caps active
     // voice allocation to voices_[0..voice_count) via activeVoiceCap_.
-    layout.add(std::make_unique<IntParam>("voice_count", "Voice Count", 1, 16,
-                                          static_cast<int>(defaults.voice_count)));
+    layout.add(std::make_unique<IntParam>("voice_count", "Voice Count", 1, 16, static_cast<int>(defaults.voice_count)));
 
     // ── Filter ─────────────────────────────────────────────────────────────
     // filter_type: Phase 3 wired this — applyPatch pointer-swaps between the
     // pre-allocated MoogLadder (LowPass) and SVFilter (HP/BP/Notch/Peak) per
     // voice. Phase 4 added a ~5ms crossfade on type change for click-free swap.
     layout.add(std::make_unique<ChoiceParam>("filter_type", "Filter Type", kFilterTypeNames(),
-                                             safeEnumIndex(defaults.filter.type,
-                                                           kFilterTypeNames().size() - 1)));
-    layout.add(std::make_unique<FloatParam>("filterCutoff", "Filter Cutoff",
-                                            Range(20.0f, 20000.0f, 0.0f, 0.25f),
+                                             safeEnumIndex(defaults.filter.type, kFilterTypeNames().size() - 1)));
+    layout.add(std::make_unique<FloatParam>("filterCutoff", "Filter Cutoff", Range(20.0f, 20000.0f, 0.0f, 0.25f),
                                             defaults.filter.cutoff_hz));
-    layout.add(std::make_unique<FloatParam>("filterResonance", "Filter Resonance",
-                                            Range(0.0f, 1.0f), defaults.filter.resonance));
-    layout.add(std::make_unique<FloatParam>("filter_env_mod", "Filter Env Mod",
-                                            Range(-1.0f, 1.0f), defaults.filter.env_mod));
-    layout.add(std::make_unique<FloatParam>("filter_key_track", "Filter Key Track",
-                                            Range(0.0f, 1.0f), defaults.filter.key_track));
-    layout.add(std::make_unique<FloatParam>("filter_drive", "Filter Drive",
-                                            Range(0.0f, 1.0f), defaults.filter.drive));
+    layout.add(std::make_unique<FloatParam>("filterResonance", "Filter Resonance", Range(0.0f, 1.0f),
+                                            defaults.filter.resonance));
+    layout.add(
+        std::make_unique<FloatParam>("filter_env_mod", "Filter Env Mod", Range(-1.0f, 1.0f), defaults.filter.env_mod));
+    layout.add(std::make_unique<FloatParam>("filter_key_track", "Filter Key Track", Range(0.0f, 1.0f),
+                                            defaults.filter.key_track));
+    layout.add(std::make_unique<FloatParam>("filter_drive", "Filter Drive", Range(0.0f, 1.0f), defaults.filter.drive));
 
     // ── Amp envelope ───────────────────────────────────────────────────────
-    layout.add(std::make_unique<FloatParam>("ampAttack", "Amp Attack",
-                                            Range(0.001f, 10.0f, 0.0f, 0.3f), defaults.amp_env.attack_s));
-    layout.add(std::make_unique<FloatParam>("ampDecay", "Amp Decay",
-                                            Range(0.001f, 10.0f, 0.0f, 0.3f), defaults.amp_env.decay_s));
-    layout.add(std::make_unique<FloatParam>("ampSustain", "Amp Sustain",
-                                            Range(0.0f, 1.0f), defaults.amp_env.sustain));
-    layout.add(std::make_unique<FloatParam>("ampRelease", "Amp Release",
-                                            Range(0.001f, 20.0f, 0.0f, 0.3f), defaults.amp_env.release_s));
+    layout.add(std::make_unique<FloatParam>("ampAttack", "Amp Attack", Range(0.001f, 10.0f, 0.0f, 0.3f),
+                                            defaults.amp_env.attack_s));
+    layout.add(std::make_unique<FloatParam>("ampDecay", "Amp Decay", Range(0.001f, 10.0f, 0.0f, 0.3f),
+                                            defaults.amp_env.decay_s));
+    layout.add(std::make_unique<FloatParam>("ampSustain", "Amp Sustain", Range(0.0f, 1.0f), defaults.amp_env.sustain));
+    layout.add(std::make_unique<FloatParam>("ampRelease", "Amp Release", Range(0.001f, 20.0f, 0.0f, 0.3f),
+                                            defaults.amp_env.release_s));
 
     // ── Filter envelope ────────────────────────────────────────────────────
-    layout.add(std::make_unique<FloatParam>("filter_env_attack", "Filter Env Attack",
-                                            Range(0.001f, 10.0f, 0.0f, 0.3f), defaults.filter_env.attack_s));
-    layout.add(std::make_unique<FloatParam>("filter_env_decay", "Filter Env Decay",
-                                            Range(0.001f, 10.0f, 0.0f, 0.3f), defaults.filter_env.decay_s));
-    layout.add(std::make_unique<FloatParam>("filter_env_sustain", "Filter Env Sustain",
-                                            Range(0.0f, 1.0f), defaults.filter_env.sustain));
+    layout.add(std::make_unique<FloatParam>("filter_env_attack", "Filter Env Attack", Range(0.001f, 10.0f, 0.0f, 0.3f),
+                                            defaults.filter_env.attack_s));
+    layout.add(std::make_unique<FloatParam>("filter_env_decay", "Filter Env Decay", Range(0.001f, 10.0f, 0.0f, 0.3f),
+                                            defaults.filter_env.decay_s));
+    layout.add(std::make_unique<FloatParam>("filter_env_sustain", "Filter Env Sustain", Range(0.0f, 1.0f),
+                                            defaults.filter_env.sustain));
     layout.add(std::make_unique<FloatParam>("filter_env_release", "Filter Env Release",
                                             Range(0.001f, 20.0f, 0.0f, 0.3f), defaults.filter_env.release_s));
 
@@ -117,10 +110,8 @@ APVTS::ParameterLayout AgenticSynthPlugin::createParameterLayout() {
     // switch dispatching to VA / Wavetable / FM / Noise paths.
     for (int i = 0; i < agentic_synth::kMaxOscillators; ++i) {
         const auto& d = defaults.osc[i];
-        layout.add(std::make_unique<ChoiceParam>(oscId(i, "type"),
-                                                 juce::String("Osc ") + juce::String(i) + " Type",
-                                                 kOscTypeNames(),
-                                                 safeEnumIndex(d.type, kOscTypeNames().size() - 1)));
+        layout.add(std::make_unique<ChoiceParam>(oscId(i, "type"), juce::String("Osc ") + juce::String(i) + " Type",
+                                                 kOscTypeNames(), safeEnumIndex(d.type, kOscTypeNames().size() - 1)));
         layout.add(std::make_unique<FloatParam>(oscId(i, "detune_cents"),
                                                 juce::String("Osc ") + juce::String(i) + " Detune",
                                                 Range(-100.0f, 100.0f), d.detune_cents));
@@ -133,70 +124,58 @@ APVTS::ParameterLayout AgenticSynthPlugin::createParameterLayout() {
         layout.add(std::make_unique<FloatParam>(oscId(i, "fm_ratio"),
                                                 juce::String("Osc ") + juce::String(i) + " FM Ratio",
                                                 Range(0.5f, 16.0f), d.fm_ratio));
-        layout.add(std::make_unique<FloatParam>(oscId(i, "fm_depth"),
-                                                juce::String("Osc ") + juce::String(i) + " FM Depth",
-                                                Range(0.0f, 1.0f), d.fm_depth));
+        layout.add(std::make_unique<FloatParam>(
+            oscId(i, "fm_depth"), juce::String("Osc ") + juce::String(i) + " FM Depth", Range(0.0f, 1.0f), d.fm_depth));
         layout.add(std::make_unique<FloatParam>(oscId(i, "pulse_width"),
                                                 juce::String("Osc ") + juce::String(i) + " Pulse Width",
                                                 Range(0.01f, 0.99f), d.pulse_width));
-        layout.add(std::make_unique<FloatParam>(oscId(i, "pan"),
-                                                juce::String("Osc ") + juce::String(i) + " Pan",
+        layout.add(std::make_unique<FloatParam>(oscId(i, "pan"), juce::String("Osc ") + juce::String(i) + " Pan",
                                                 Range(-1.0f, 1.0f), d.pan));
-        layout.add(std::make_unique<FloatParam>(oscId(i, "volume"),
-                                                juce::String("Osc ") + juce::String(i) + " Volume",
+        layout.add(std::make_unique<FloatParam>(oscId(i, "volume"), juce::String("Osc ") + juce::String(i) + " Volume",
                                                 Range(0.0f, 1.0f), d.volume));
-        layout.add(std::make_unique<BoolParam>(oscId(i, "enabled"),
-                                               juce::String("Osc ") + juce::String(i) + " Enabled",
+        layout.add(std::make_unique<BoolParam>(oscId(i, "enabled"), juce::String("Osc ") + juce::String(i) + " Enabled",
                                                d.enabled != 0));
     }
 
     // ── LFOs (2 × 6 fields) ───────────────────────────────────────────────
     for (int i = 0; i < agentic_synth::kMaxLfos; ++i) {
         const auto& d = defaults.lfo[i];
-        layout.add(std::make_unique<ChoiceParam>(lfoId(i, "waveform"),
-                                                 juce::String("LFO ") + juce::String(i) + " Waveform",
-                                                 kLfoWaveformNames(),
-                                                 safeEnumIndex(d.waveform, kLfoWaveformNames().size() - 1)));
+        layout.add(std::make_unique<ChoiceParam>(
+            lfoId(i, "waveform"), juce::String("LFO ") + juce::String(i) + " Waveform", kLfoWaveformNames(),
+            safeEnumIndex(d.waveform, kLfoWaveformNames().size() - 1)));
         // Phase 3 wired all LFO targets: Pitch / FilterCutoff / Amplitude /
         // Pan / WavetablePos / FmRatio. Phase 5 dropped the slot-0 gate so
         // Pan / WavetablePos / FmRatio modulate every enabled osc uniformly.
-        layout.add(std::make_unique<ChoiceParam>(lfoId(i, "target"),
-                                                 juce::String("LFO ") + juce::String(i) + " Target",
+        layout.add(std::make_unique<ChoiceParam>(lfoId(i, "target"), juce::String("LFO ") + juce::String(i) + " Target",
                                                  kLfoTargetNames(),
                                                  safeEnumIndex(d.target, kLfoTargetNames().size() - 1)));
-        layout.add(std::make_unique<FloatParam>(lfoId(i, "rate_hz"),
-                                                juce::String("LFO ") + juce::String(i) + " Rate",
+        layout.add(std::make_unique<FloatParam>(lfoId(i, "rate_hz"), juce::String("LFO ") + juce::String(i) + " Rate",
                                                 Range(0.01f, 20.0f, 0.0f, 0.4f), d.rate_hz));
-        layout.add(std::make_unique<FloatParam>(lfoId(i, "depth"),
-                                                juce::String("LFO ") + juce::String(i) + " Depth",
+        layout.add(std::make_unique<FloatParam>(lfoId(i, "depth"), juce::String("LFO ") + juce::String(i) + " Depth",
                                                 Range(0.0f, 1.0f), d.depth));
-        layout.add(std::make_unique<FloatParam>(lfoId(i, "phase"),
-                                                juce::String("LFO ") + juce::String(i) + " Phase",
+        layout.add(std::make_unique<FloatParam>(lfoId(i, "phase"), juce::String("LFO ") + juce::String(i) + " Phase",
                                                 Range(0.0f, 1.0f), d.phase_offset));
         layout.add(std::make_unique<BoolParam>(lfoId(i, "bpm_sync"),
-                                               juce::String("LFO ") + juce::String(i) + " BPM Sync",
-                                               d.bpm_sync != 0));
+                                               juce::String("LFO ") + juce::String(i) + " BPM Sync", d.bpm_sync != 0));
     }
 
     // ── Reverb ─────────────────────────────────────────────────────────────
     layout.add(std::make_unique<FloatParam>("reverb_size", "Reverb Size", Range(0.0f, 1.0f), defaults.reverb.size));
-    layout.add(std::make_unique<FloatParam>("reverb_damping", "Reverb Damping", Range(0.0f, 1.0f),
-                                            defaults.reverb.damping));
+    layout.add(
+        std::make_unique<FloatParam>("reverb_damping", "Reverb Damping", Range(0.0f, 1.0f), defaults.reverb.damping));
     // reverb_width: Phase 3 wired this as an M/S blend on the reverb output
     // (width=0 collapses to mono, width=1 is full stereo pass-through).
     // Smoothed via reverbWidthSmoother_ (~50ms) with snap on first apply.
-    layout.add(std::make_unique<FloatParam>("reverb_width", "Reverb Width", Range(0.0f, 1.0f),
-                                            defaults.reverb.width));
+    layout.add(std::make_unique<FloatParam>("reverb_width", "Reverb Width", Range(0.0f, 1.0f), defaults.reverb.width));
     layout.add(std::make_unique<FloatParam>("reverb_mix", "Reverb Mix", Range(0.0f, 1.0f), defaults.reverb.mix));
 
     // ── Delay ──────────────────────────────────────────────────────────────
-    layout.add(std::make_unique<FloatParam>("delay_time", "Delay Time",
-                                            Range(0.001f, 2.0f, 0.0f, 0.4f), defaults.delay.time_s));
-    layout.add(std::make_unique<FloatParam>("delay_feedback", "Delay Feedback",
-                                            Range(0.0f, 0.99f), defaults.delay.feedback));
+    layout.add(std::make_unique<FloatParam>("delay_time", "Delay Time", Range(0.001f, 2.0f, 0.0f, 0.4f),
+                                            defaults.delay.time_s));
+    layout.add(
+        std::make_unique<FloatParam>("delay_feedback", "Delay Feedback", Range(0.0f, 0.99f), defaults.delay.feedback));
     layout.add(std::make_unique<FloatParam>("delay_mix", "Delay Mix", Range(0.0f, 1.0f), defaults.delay.mix));
-    layout.add(std::make_unique<FloatParam>("delay_stereo", "Delay Stereo", Range(0.0f, 1.0f),
-                                            defaults.delay.stereo));
+    layout.add(std::make_unique<FloatParam>("delay_stereo", "Delay Stereo", Range(0.0f, 1.0f), defaults.delay.stereo));
     // delay_bpm_sync: Phase 3 wired this. When true, delay.time_s is
     // reinterpreted as beats (1.0=quarter, 0.5=eighth, etc) and converted to
     // seconds via host BPM (or 120 BPM fallback when no AudioPlayHead).
@@ -497,8 +476,7 @@ void AgenticSynthPlugin::writePatchToApvts(const agentic_synth::PatchStruct& pat
     for (int i = 0; i < kMaxOscillators; ++i) {
         const auto& o = patch.osc[i];
         const auto prefix = std::string("osc") + std::to_string(i) + "_";
-        setChoice((prefix + "type").c_str(),
-                  safeEnumIndex(o.type, kOscTypeNames().size() - 1),
+        setChoice((prefix + "type").c_str(), safeEnumIndex(o.type, kOscTypeNames().size() - 1),
                   kOscTypeNames().size() - 1);
         setFloat((prefix + "detune_cents").c_str(), o.detune_cents, 0.0f);
         setFloat((prefix + "semis").c_str(), o.semitone_offset, 0.0f);
@@ -518,11 +496,9 @@ void AgenticSynthPlugin::writePatchToApvts(const agentic_synth::PatchStruct& pat
     for (int i = 0; i < kMaxLfos; ++i) {
         const auto& l = patch.lfo[i];
         const auto prefix = std::string("lfo") + std::to_string(i) + "_";
-        setChoice((prefix + "waveform").c_str(),
-                  safeEnumIndex(l.waveform, kLfoWaveformNames().size() - 1),
+        setChoice((prefix + "waveform").c_str(), safeEnumIndex(l.waveform, kLfoWaveformNames().size() - 1),
                   kLfoWaveformNames().size() - 1);
-        setChoice((prefix + "target").c_str(),
-                  safeEnumIndex(l.target, kLfoTargetNames().size() - 1),
+        setChoice((prefix + "target").c_str(), safeEnumIndex(l.target, kLfoTargetNames().size() - 1),
                   kLfoTargetNames().size() - 1);
         setFloat((prefix + "rate_hz").c_str(), l.rate_hz, 1.0f);
         setFloat((prefix + "depth").c_str(), l.depth, 0.0f);

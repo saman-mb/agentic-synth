@@ -182,8 +182,7 @@ std::string GeminiSampler::http_post(const std::string& url, const std::string& 
     return http_post_ex(url, json_body, unused);
 }
 
-std::string GeminiSampler::http_post_ex(const std::string& url, const std::string& json_body,
-                                        int& exit_code) const {
+std::string GeminiSampler::http_post_ex(const std::string& url, const std::string& json_body, int& exit_code) const {
     // Stash the request body in a temp file so we don't have to shell-escape
     // the JSON. curl reads it via `--data-binary @file`.
     TempFile req(json_body);
@@ -194,8 +193,7 @@ std::string GeminiSampler::http_post_ex(const std::string& url, const std::strin
     // to surface on the calling process's stderr so silent failures become
     // visible. pclose() exit code is also checked below.
     cmd << "curl --silent --show-error --fail-with-body"
-        << " --max-time " << timeout_s
-        << " -H 'Content-Type: application/json'"
+        << " --max-time " << timeout_s << " -H 'Content-Type: application/json'"
         << " --data-binary @" << req.path << " '" << url << "'";
 
     std::string out;
@@ -220,8 +218,8 @@ std::string GeminiSampler::http_post_ex(const std::string& url, const std::strin
 #endif
     exit_code = rc;
     if (rc != 0) {
-        std::cerr << "[GeminiSampler] curl exited with non-zero status (raw=" << rc
-                  << ", body_bytes=" << out.size() << ")\n";
+        std::cerr << "[GeminiSampler] curl exited with non-zero status (raw=" << rc << ", body_bytes=" << out.size()
+                  << ")\n";
     }
     return out;
 }
@@ -379,9 +377,8 @@ std::optional<PatchStruct> GeminiSampler::generate(const std::string& user_promp
                 // worth a retry (transient backend).
                 const std::string status = find_string_field(resp, "\"status\"");
                 const bool transient_5xx = resp.find("\"code\": 5") != std::string::npos ||
-                                           resp.find("\"code\":5")  != std::string::npos ||
-                                           status == "UNAVAILABLE" || status == "INTERNAL" ||
-                                           status == "DEADLINE_EXCEEDED";
+                                           resp.find("\"code\":5") != std::string::npos || status == "UNAVAILABLE" ||
+                                           status == "INTERNAL" || status == "DEADLINE_EXCEEDED";
                 if (transient_5xx) {
                     retry_reason = "transient 5xx in body";
                     outcome = "curl_error";
@@ -401,8 +398,8 @@ std::optional<PatchStruct> GeminiSampler::generate(const std::string& user_promp
 
         if (attempt < kMaxAttempts) {
             const int delay = kBackoffMs[static_cast<std::size_t>(attempt - 1)];
-            std::cerr << "[GeminiSampler] retry " << attempt << "/" << kMaxAttempts
-                      << " after " << delay << "ms (reason: " << retry_reason << ")\n";
+            std::cerr << "[GeminiSampler] retry " << attempt << "/" << kMaxAttempts << " after " << delay
+                      << "ms (reason: " << retry_reason << ")\n";
             std::this_thread::sleep_for(std::chrono::milliseconds(delay));
         } else {
             std::cerr << "[GeminiSampler] giving up after " << kMaxAttempts
@@ -412,8 +409,7 @@ std::optional<PatchStruct> GeminiSampler::generate(const std::string& user_promp
 
     auto emit_telemetry = [&](const std::string& final_outcome) {
         const auto t1 = std::chrono::steady_clock::now();
-        const double latency_ms =
-            std::chrono::duration<double, std::milli>(t1 - t0).count();
+        const double latency_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
         LlmCall rec;
         rec.caller = "GeminiSampler";
         rec.model = cfg_.model;

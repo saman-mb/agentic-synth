@@ -22,8 +22,8 @@
 namespace agentic_synth::agent {
 
 struct PitchResult {
-    int midi_note{-1};       // -1 = no pitch detected
-    float confidence{0.0f};  // 0..1
+    int midi_note{-1};      // -1 = no pitch detected
+    float confidence{0.0f}; // 0..1
     float frequency_hz{0.0f};
 };
 
@@ -37,8 +37,7 @@ public:
     // Frequency search range: 60 Hz (B1 ≈ midi 35) to 1000 Hz (B5 ≈ midi 83).
     // Wider ranges produce more octave errors on humming, which is the
     // expected input. Keyboard-piano taps fall well within this band.
-    [[nodiscard]] static PitchResult detect(const std::int16_t* samples,
-                                            int numSamples,
+    [[nodiscard]] static PitchResult detect(const std::int16_t* samples, int numSamples,
                                             int sampleRate = 16000) noexcept;
 
     // MIDI note rounded from a frequency in Hz. Useful for tests and for

@@ -35,8 +35,7 @@ public:
     // Synchronous Gemini round-trip. Returns the transcript text, or empty
     // string on failure (no key, network error, empty model response). Logs
     // the failure reason to stderr in the same style as PromptEnhancer.
-    std::string transcribe(const std::int16_t* samples, int numSamples,
-                           int sampleRate = 16000) const;
+    std::string transcribe(const std::int16_t* samples, int numSamples, int sampleRate = 16000) const;
 
 private:
     std::string http_post(const std::string& url, const std::string& json_body) const;

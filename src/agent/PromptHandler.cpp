@@ -26,19 +26,76 @@ namespace {
 // "software" does not. We do NOT NLP this — a keyword sweep is enough; the
 // LLM handles the actual semantics under §5.3.
 constexpr std::array<std::string_view, 70> kRelativeKeywords = {
-    "darker", "brighter", "deeper", "wider", "tighter", "punchier", "heavier",
-    "lighter", "weirder", "softer", "thicker", "thinner", "fatter", "fuller",
-    "hollow", "hollower", "smoother", "harsher", "snappier", "slower", "faster",
-    "longer", "shorter", "drier", "wetter", "cleaner", "dirtier", "gentler",
-    "meaner", "lusher", "sparser", "bigger", "smaller", "dimmer", "ominous",
-    "evil", "ominouser",
+    "darker",
+    "brighter",
+    "deeper",
+    "wider",
+    "tighter",
+    "punchier",
+    "heavier",
+    "lighter",
+    "weirder",
+    "softer",
+    "thicker",
+    "thinner",
+    "fatter",
+    "fuller",
+    "hollow",
+    "hollower",
+    "smoother",
+    "harsher",
+    "snappier",
+    "slower",
+    "faster",
+    "longer",
+    "shorter",
+    "drier",
+    "wetter",
+    "cleaner",
+    "dirtier",
+    "gentler",
+    "meaner",
+    "lusher",
+    "sparser",
+    "bigger",
+    "smaller",
+    "dimmer",
+    "ominous",
+    "evil",
+    "ominouser",
     // Multi-word fragments — substring match handles these.
-    "more ", "less ", "also ", "and add", "with more", "with less", "less of",
-    "more of", "also make it", " but ", " just ", "slightly", "a bit", "way more",
-    "way less", "evil-er", "more X", "less Y",
+    "more ",
+    "less ",
+    "also ",
+    "and add",
+    "with more",
+    "with less",
+    "less of",
+    "more of",
+    "also make it",
+    " but ",
+    " just ",
+    "slightly",
+    "a bit",
+    "way more",
+    "way less",
+    "evil-er",
+    "more X",
+    "less Y",
     // Single-token comparatives that aren't in the dictionary but signal intent.
-    "stronger", "weaker", "quieter", "louder", "warmer", "cooler", "drier",
-    "moodier", "shimmerier", "deeper", "crispier", "crisper", "rounder",
+    "stronger",
+    "weaker",
+    "quieter",
+    "louder",
+    "warmer",
+    "cooler",
+    "drier",
+    "moodier",
+    "shimmerier",
+    "deeper",
+    "crispier",
+    "crisper",
+    "rounder",
 };
 
 // Lowercase ASCII view of `s` — allocates; only called on the cold prompt
@@ -51,9 +108,7 @@ std::string toLowerAscii(const std::string& s) {
     return out;
 }
 
-bool isWordChar(char c) noexcept {
-    return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_';
-}
+bool isWordChar(char c) noexcept { return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_'; }
 
 // Word-boundary-aware substring match. Multi-token keywords (those containing
 // a space) skip the boundary check on the side adjacent to the space because
@@ -85,49 +140,74 @@ bool containsWord(const std::string& haystack, std::string_view needle) noexcept
 // etc.).
 const char* oscTypeName(OscType t) noexcept {
     switch (t) {
-    case OscType::Sine: return "Sine";
-    case OscType::Triangle: return "Triangle";
-    case OscType::Sawtooth: return "Sawtooth";
-    case OscType::Square: return "Square";
-    case OscType::Pulse: return "Pulse";
-    case OscType::Wavetable: return "Wavetable";
-    case OscType::FM: return "FM";
-    case OscType::Noise: return "Noise";
+    case OscType::Sine:
+        return "Sine";
+    case OscType::Triangle:
+        return "Triangle";
+    case OscType::Sawtooth:
+        return "Sawtooth";
+    case OscType::Square:
+        return "Square";
+    case OscType::Pulse:
+        return "Pulse";
+    case OscType::Wavetable:
+        return "Wavetable";
+    case OscType::FM:
+        return "FM";
+    case OscType::Noise:
+        return "Noise";
     }
     return "Sawtooth";
 }
 
 const char* filterTypeName(FilterType t) noexcept {
     switch (t) {
-    case FilterType::LowPass: return "LowPass";
-    case FilterType::HighPass: return "HighPass";
-    case FilterType::BandPass: return "BandPass";
-    case FilterType::Notch: return "Notch";
-    case FilterType::Peak: return "Peak";
+    case FilterType::LowPass:
+        return "LowPass";
+    case FilterType::HighPass:
+        return "HighPass";
+    case FilterType::BandPass:
+        return "BandPass";
+    case FilterType::Notch:
+        return "Notch";
+    case FilterType::Peak:
+        return "Peak";
     }
     return "LowPass";
 }
 
 const char* lfoWaveformName(LfoWaveform w) noexcept {
     switch (w) {
-    case LfoWaveform::Sine: return "Sine";
-    case LfoWaveform::Triangle: return "Triangle";
-    case LfoWaveform::Sawtooth: return "Sawtooth";
-    case LfoWaveform::Square: return "Square";
-    case LfoWaveform::SampleAndHold: return "SampleAndHold";
+    case LfoWaveform::Sine:
+        return "Sine";
+    case LfoWaveform::Triangle:
+        return "Triangle";
+    case LfoWaveform::Sawtooth:
+        return "Sawtooth";
+    case LfoWaveform::Square:
+        return "Square";
+    case LfoWaveform::SampleAndHold:
+        return "SampleAndHold";
     }
     return "Sine";
 }
 
 const char* lfoTargetName(LfoTarget t) noexcept {
     switch (t) {
-    case LfoTarget::None: return "None";
-    case LfoTarget::Pitch: return "Pitch";
-    case LfoTarget::FilterCutoff: return "FilterCutoff";
-    case LfoTarget::Amplitude: return "Amplitude";
-    case LfoTarget::Pan: return "Pan";
-    case LfoTarget::WavetablePos: return "WavetablePos";
-    case LfoTarget::FmRatio: return "FmRatio";
+    case LfoTarget::None:
+        return "None";
+    case LfoTarget::Pitch:
+        return "Pitch";
+    case LfoTarget::FilterCutoff:
+        return "FilterCutoff";
+    case LfoTarget::Amplitude:
+        return "Amplitude";
+    case LfoTarget::Pan:
+        return "Pan";
+    case LfoTarget::WavetablePos:
+        return "WavetablePos";
+    case LfoTarget::FmRatio:
+        return "FmRatio";
     }
     return "None";
 }
@@ -140,7 +220,8 @@ std::string patchToJsonString(const PatchStruct& p) {
     o << "\"osc\":[";
     for (int i = 0; i < kMaxOscillators; ++i) {
         const auto& osc = p.osc[i];
-        if (i > 0) o << ",";
+        if (i > 0)
+            o << ",";
         o << "{\"type\":\"" << oscTypeName(osc.type) << "\","
           << "\"semitone_offset\":" << osc.semitone_offset << ","
           << "\"detune_cents\":" << osc.detune_cents << ","
@@ -167,12 +248,15 @@ std::string patchToJsonString(const PatchStruct& p) {
           << "\"sustain\":" << e.sustain << ","
           << "\"release_s\":" << e.release_s << "}";
     };
-    envOut("filter_env", p.filter_env); o << ",";
-    envOut("amp_env", p.amp_env); o << ",";
+    envOut("filter_env", p.filter_env);
+    o << ",";
+    envOut("amp_env", p.amp_env);
+    o << ",";
     o << "\"lfo\":[";
     for (int i = 0; i < kMaxLfos; ++i) {
         const auto& l = p.lfo[i];
-        if (i > 0) o << ",";
+        if (i > 0)
+            o << ",";
         o << "{\"waveform\":\"" << lfoWaveformName(l.waveform) << "\","
           << "\"target\":\"" << lfoTargetName(l.target) << "\","
           << "\"rate_hz\":" << l.rate_hz << ","
@@ -276,8 +360,8 @@ std::optional<PatchStruct> PromptHandler::generateLlmPatch(const std::string& pr
     const std::string promptForSampler =
         refinement ? buildRefinementWrapper(prompt, *previousPatch, previousPrompt.value_or("")) : prompt;
     if (refinement) {
-        std::cerr << "[PromptHandler] refinement mode (prev prompt='" << previousPrompt.value_or("")
-                  << "', new='" << prompt << "')\n";
+        std::cerr << "[PromptHandler] refinement mode (prev prompt='" << previousPrompt.value_or("") << "', new='"
+                  << prompt << "')\n";
     }
 
     // Try the local llama.cpp /completion server first; on failure (server
@@ -314,8 +398,7 @@ std::optional<PatchStruct> PromptHandler::generateLlmPatch(const std::string& pr
 
     auto result = sampler_.generate(promptForSampler, patch_id);
     if (result) {
-        std::cerr << "[PromptHandler] LLM path=local-llama.cpp ok"
-                  << (refinement ? " (refinement)" : "") << "\n";
+        std::cerr << "[PromptHandler] LLM path=local-llama.cpp ok" << (refinement ? " (refinement)" : "") << "\n";
         applyGuardrail(*result);
         refinePatch(*result);
         emitSafetyBlockIfAny();
@@ -326,8 +409,7 @@ std::optional<PatchStruct> PromptHandler::generateLlmPatch(const std::string& pr
         std::cerr << "[PromptHandler] local llama.cpp unavailable; trying Gemini fallback\n";
         result = gemini_.generate(promptForSampler, patch_id);
         if (result) {
-            std::cerr << "[PromptHandler] LLM path=gemini ok"
-                      << (refinement ? " (refinement)" : "") << "\n";
+            std::cerr << "[PromptHandler] LLM path=gemini ok" << (refinement ? " (refinement)" : "") << "\n";
             applyGuardrail(*result);
             refinePatch(*result);
             emitSafetyBlockIfAny();
@@ -358,12 +440,12 @@ std::optional<PatchStruct> PromptHandler::generateLlmPatch(const std::string& pr
             if (nres.selected_index >= 0) {
                 const auto* picked = top3[static_cast<std::size_t>(nres.selected_index)];
                 std::cerr << "[PromptHandler] DeltaNudger picked archetype '"
-                          << (picked ? picked->name : std::string("<null>"))
-                          << "' with " << nres.nudges.size() << " nudges\n";
+                          << (picked ? picked->name : std::string("<null>")) << "' with " << nres.nudges.size()
+                          << " nudges\n";
                 if (failureSink_) {
                     const std::string detail = std::string("LLM unavailable — nudged archetype '") +
-                                               (picked ? picked->name : std::string("?")) +
-                                               "' (" + std::to_string(nres.nudges.size()) + " params)";
+                                               (picked ? picked->name : std::string("?")) + "' (" +
+                                               std::to_string(nres.nudges.size()) + " params)";
                     failureSink_("llm_offline", detail);
                 }
                 PatchStruct patch = nres.patch;
@@ -397,8 +479,8 @@ std::optional<PatchStruct> PromptHandler::generateLlmPatch(const std::string& pr
                 tagList += ", ";
             tagList += arch->tags[i];
         }
-        std::cerr << "[PromptHandler] LLM unavailable; using retrieved archetype '"
-                  << arch->name << "' (tags: " << tagList << ")\n";
+        std::cerr << "[PromptHandler] LLM unavailable; using retrieved archetype '" << arch->name
+                  << "' (tags: " << tagList << ")\n";
         // ── Phase C (#269) failure-state surface ────────────────────────────
         //
         // The user MUST know the LLM was unavailable so they understand why
@@ -412,9 +494,10 @@ std::optional<PatchStruct> PromptHandler::generateLlmPatch(const std::string& pr
         if (failureSink_) {
             const bool defaultMatch = arch->name == "default_init";
             const std::string kind = defaultMatch ? "prompt_unclear" : "llm_offline";
-            const std::string detail = defaultMatch
-                ? std::string("No archetype tag matched the prompt; shipped the default init patch.")
-                : std::string("Archetype '") + arch->name + "' selected from local library (tags: " + tagList + ")";
+            const std::string detail =
+                defaultMatch
+                    ? std::string("No archetype tag matched the prompt; shipped the default init patch.")
+                    : std::string("Archetype '") + arch->name + "' selected from local library (tags: " + tagList + ")";
             failureSink_(kind, detail);
         }
         PatchStruct patch = arch->patch;
@@ -490,8 +573,7 @@ PromptHandler::SplitPrompt PromptHandler::splitSystemPrompt(const std::string& f
         std::size_t k = j;
         while (k < body.size() && std::isdigit(static_cast<unsigned char>(body[k])))
             ++k;
-        if (k + 4 >= body.size() || body[k] != '.' || body[k + 1] != ' ' ||
-            body[k + 2] != '*' || body[k + 3] != '*') {
+        if (k + 4 >= body.size() || body[k] != '.' || body[k + 1] != ' ' || body[k + 2] != '*' || body[k + 3] != '*') {
             i = nl + 1;
             continue;
         }
@@ -516,8 +598,8 @@ PromptHandler::SplitPrompt PromptHandler::splitSystemPrompt(const std::string& f
                 std::size_t mm = m;
                 while (mm < body.size() && std::isdigit(static_cast<unsigned char>(body[mm])))
                     ++mm;
-                if (mm + 4 < body.size() && body[mm] == '.' && body[mm + 1] == ' ' &&
-                    body[mm + 2] == '*' && body[mm + 3] == '*') {
+                if (mm + 4 < body.size() && body[mm] == '.' && body[mm + 1] == ' ' && body[mm + 2] == '*' &&
+                    body[mm + 3] == '*') {
                     recipe_end = nnl;
                     break;
                 }
@@ -617,21 +699,20 @@ std::string PromptHandler::generateRationale(const std::string& prompt, const Pa
     if (patch.rationale[0] != '\0')
         return std::string(patch.rationale);
 
-    static const char* kOscNames[] = {"sine", "triangle", "sawtooth", "square",
-                                       "pulse", "wavetable", "FM", "noise"};
-    auto oscName = [&](int idx) -> const char* {
-        return (idx >= 0 && idx < 8) ? kOscNames[idx] : "sawtooth";
-    };
+    static const char* kOscNames[] = {"sine", "triangle", "sawtooth", "square", "pulse", "wavetable", "FM", "noise"};
+    auto oscName = [&](int idx) -> const char* { return (idx >= 0 && idx < 8) ? kOscNames[idx] : "sawtooth"; };
 
     // Enumerate audible oscs (vol >= 0.15 + enabled) — the §0 rule 12
     // threshold. Build a sensory body description from however many made
     // it through.
-    struct AudibleOsc { const char* name; int semi; };
+    struct AudibleOsc {
+        const char* name;
+        int semi;
+    };
     std::vector<AudibleOsc> audible;
     for (const auto& o : patch.osc) {
         if (o.enabled && o.volume >= 0.15f) {
-            audible.push_back({oscName(static_cast<int>(o.type)),
-                               static_cast<int>(o.semitone_offset)});
+            audible.push_back({oscName(static_cast<int>(o.type)), static_cast<int>(o.semitone_offset)});
         }
     }
 
@@ -644,11 +725,9 @@ std::string PromptHandler::generateRationale(const std::string& prompt, const Pa
         const int spread = audible.back().semi - audible.front().semi;
         if (std::abs(spread) >= 12)
             oss << " across the octaves";
-        oss << " — " << audible[0].name << ", " << audible[1].name
-            << ", and " << audible[2].name;
+        oss << " — " << audible[0].name << ", " << audible[1].name << ", and " << audible[2].name;
     } else if (audible.size() == 2) {
-        oss << "Two " << audible[0].name << "-and-" << audible[1].name
-            << " voices breathing together";
+        oss << "Two " << audible[0].name << "-and-" << audible[1].name << " voices breathing together";
     } else if (audible.size() == 1) {
         oss << "A single " << audible[0].name << " voice";
     } else {

@@ -32,9 +32,7 @@ PresetStore& PresetStore::instance() {
     return singleton;
 }
 
-PresetStore PresetStore::withFileForTesting(juce::File file) {
-    return PresetStore{std::move(file)};
-}
+PresetStore PresetStore::withFileForTesting(juce::File file) { return PresetStore{std::move(file)}; }
 
 PresetStore::PresetStore(juce::File path) : path_(std::move(path)) {
     std::lock_guard<std::mutex> lock(mu_);
@@ -105,8 +103,7 @@ void PresetStore::save(const std::string& name, const std::string& prompt, const
         return;
 
     std::lock_guard<std::mutex> lock(mu_);
-    auto it = std::find_if(presets_.begin(), presets_.end(),
-                           [&](const StoredPreset& sp) { return sp.name == name; });
+    auto it = std::find_if(presets_.begin(), presets_.end(), [&](const StoredPreset& sp) { return sp.name == name; });
     if (it != presets_.end()) {
         // Last-write-wins on duplicate name.
         it->prompt = prompt;
@@ -130,8 +127,7 @@ std::vector<StoredPreset> PresetStore::all() const {
 
 std::optional<StoredPreset> PresetStore::getByName(const std::string& name) const {
     std::lock_guard<std::mutex> lock(mu_);
-    auto it = std::find_if(presets_.begin(), presets_.end(),
-                           [&](const StoredPreset& sp) { return sp.name == name; });
+    auto it = std::find_if(presets_.begin(), presets_.end(), [&](const StoredPreset& sp) { return sp.name == name; });
     if (it == presets_.end())
         return std::nullopt;
     return *it;
@@ -139,8 +135,7 @@ std::optional<StoredPreset> PresetStore::getByName(const std::string& name) cons
 
 void PresetStore::deleteByName(const std::string& name) {
     std::lock_guard<std::mutex> lock(mu_);
-    auto it = std::find_if(presets_.begin(), presets_.end(),
-                           [&](const StoredPreset& sp) { return sp.name == name; });
+    auto it = std::find_if(presets_.begin(), presets_.end(), [&](const StoredPreset& sp) { return sp.name == name; });
     if (it == presets_.end())
         return;
     presets_.erase(it);
