@@ -227,9 +227,8 @@ std::string GeminiSTT::http_post(const std::string& url, const std::string& json
     TempFile req(json_body);
     std::ostringstream cmd;
     const int timeout_s = std::max(1, cfg_.timeout_ms / 1000);
-    cmd << "curl --silent --show-error --fail-with-body"
-        << " --max-time " << timeout_s << " -H 'Content-Type: application/json'"
-        << " --data-binary @" << req.path << " '" << url << "' 2>/dev/null";
+    cmd << "curl --silent --show-error --fail-with-body" << " --max-time " << timeout_s
+        << " -H 'Content-Type: application/json'" << " --data-binary @" << req.path << " '" << url << "' 2>/dev/null";
     std::string out;
     std::array<char, 4096> buf{};
 #ifdef _WIN32
@@ -269,13 +268,9 @@ std::string GeminiSTT::transcribe(const std::int16_t* samples, int numSamples, i
                                            "string.";
 
     std::ostringstream body;
-    body << "{"
-         << "\"contents\":[{\"parts\":["
-         << "{\"inline_data\":{\"mime_type\":\"audio/wav\",\"data\":\"" << b64 << "\"}},"
-         << "{\"text\":\"" << json_escape(kPrompt) << "\"}"
-         << "]}],"
-         << "\"generationConfig\":{\"temperature\":0.0}"
-         << "}";
+    body << "{" << "\"contents\":[{\"parts\":[" << "{\"inline_data\":{\"mime_type\":\"audio/wav\",\"data\":\"" << b64
+         << "\"}}," << "{\"text\":\"" << json_escape(kPrompt) << "\"}" << "]}],"
+         << "\"generationConfig\":{\"temperature\":0.0}" << "}";
 
     const std::string url = "https://generativelanguage.googleapis.com/v1beta/models/" + cfg_.model +
                             ":generateContent?key=" + cfg_.api_key;

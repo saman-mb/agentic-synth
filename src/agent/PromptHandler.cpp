@@ -222,31 +222,20 @@ std::string patchToJsonString(const PatchStruct& p) {
         const auto& osc = p.osc[i];
         if (i > 0)
             o << ",";
-        o << "{\"type\":\"" << oscTypeName(osc.type) << "\","
-          << "\"semitone_offset\":" << osc.semitone_offset << ","
-          << "\"detune_cents\":" << osc.detune_cents << ","
-          << "\"wavetable_pos\":" << osc.wavetable_pos << ","
-          << "\"fm_ratio\":" << osc.fm_ratio << ","
-          << "\"fm_depth\":" << osc.fm_depth << ","
-          << "\"volume\":" << osc.volume << ","
-          << "\"pan\":" << osc.pan << ","
-          << "\"pulse_width\":" << osc.pulse_width << ","
-          << "\"enabled\":" << (osc.enabled ? "true" : "false") << "}";
+        o << "{\"type\":\"" << oscTypeName(osc.type) << "\"," << "\"semitone_offset\":" << osc.semitone_offset << ","
+          << "\"detune_cents\":" << osc.detune_cents << "," << "\"wavetable_pos\":" << osc.wavetable_pos << ","
+          << "\"fm_ratio\":" << osc.fm_ratio << "," << "\"fm_depth\":" << osc.fm_depth << ","
+          << "\"volume\":" << osc.volume << "," << "\"pan\":" << osc.pan << "," << "\"pulse_width\":" << osc.pulse_width
+          << "," << "\"enabled\":" << (osc.enabled ? "true" : "false") << "}";
     }
     o << "],";
-    o << "\"filter\":{"
-      << "\"type\":\"" << filterTypeName(p.filter.type) << "\","
-      << "\"cutoff_hz\":" << p.filter.cutoff_hz << ","
-      << "\"resonance\":" << p.filter.resonance << ","
-      << "\"env_mod\":" << p.filter.env_mod << ","
-      << "\"key_track\":" << p.filter.key_track << ","
+    o << "\"filter\":{" << "\"type\":\"" << filterTypeName(p.filter.type) << "\","
+      << "\"cutoff_hz\":" << p.filter.cutoff_hz << "," << "\"resonance\":" << p.filter.resonance << ","
+      << "\"env_mod\":" << p.filter.env_mod << "," << "\"key_track\":" << p.filter.key_track << ","
       << "\"drive\":" << p.filter.drive << "},";
     auto envOut = [&](const char* key, const EnvParams& e) {
-        o << "\"" << key << "\":{"
-          << "\"attack_s\":" << e.attack_s << ","
-          << "\"decay_s\":" << e.decay_s << ","
-          << "\"sustain\":" << e.sustain << ","
-          << "\"release_s\":" << e.release_s << "}";
+        o << "\"" << key << "\":{" << "\"attack_s\":" << e.attack_s << "," << "\"decay_s\":" << e.decay_s << ","
+          << "\"sustain\":" << e.sustain << "," << "\"release_s\":" << e.release_s << "}";
     };
     envOut("filter_env", p.filter_env);
     o << ",";
@@ -257,39 +246,25 @@ std::string patchToJsonString(const PatchStruct& p) {
         const auto& l = p.lfo[i];
         if (i > 0)
             o << ",";
-        o << "{\"waveform\":\"" << lfoWaveformName(l.waveform) << "\","
-          << "\"target\":\"" << lfoTargetName(l.target) << "\","
-          << "\"rate_hz\":" << l.rate_hz << ","
-          << "\"depth\":" << l.depth << ","
-          << "\"phase_offset\":" << l.phase_offset << ","
-          << "\"bpm_sync\":" << (l.bpm_sync ? "true" : "false") << "}";
+        o << "{\"waveform\":\"" << lfoWaveformName(l.waveform) << "\"," << "\"target\":\"" << lfoTargetName(l.target)
+          << "\"," << "\"rate_hz\":" << l.rate_hz << "," << "\"depth\":" << l.depth << ","
+          << "\"phase_offset\":" << l.phase_offset << "," << "\"bpm_sync\":" << (l.bpm_sync ? "true" : "false") << "}";
     }
     o << "],";
-    o << "\"reverb\":{"
-      << "\"size\":" << p.reverb.size << ","
-      << "\"damping\":" << p.reverb.damping << ","
-      << "\"width\":" << p.reverb.width << ","
-      << "\"mix\":" << p.reverb.mix << "},";
-    o << "\"delay\":{"
-      << "\"time_s\":" << p.delay.time_s << ","
-      << "\"feedback\":" << p.delay.feedback << ","
-      << "\"mix\":" << p.delay.mix << ","
-      << "\"stereo\":" << p.delay.stereo << ","
+    o << "\"reverb\":{" << "\"size\":" << p.reverb.size << "," << "\"damping\":" << p.reverb.damping << ","
+      << "\"width\":" << p.reverb.width << "," << "\"mix\":" << p.reverb.mix << "},";
+    o << "\"delay\":{" << "\"time_s\":" << p.delay.time_s << "," << "\"feedback\":" << p.delay.feedback << ","
+      << "\"mix\":" << p.delay.mix << "," << "\"stereo\":" << p.delay.stereo << ","
       << "\"bpm_sync\":" << (p.delay.bpm_sync ? "true" : "false") << "},";
-    o << "\"master_gain\":" << p.master_gain << ","
-      << "\"portamento_s\":" << p.portamento_s << ","
+    o << "\"master_gain\":" << p.master_gain << "," << "\"portamento_s\":" << p.portamento_s << ","
       << "\"voice_count\":" << static_cast<int>(p.voice_count);
     // Phase E (#265): emit chorus + tubesat + reverb_send_hpf_hz so the
     // refinement wrapper round-trips losslessly through
     // GrammarSampler::parse_patch_json. Order matches the parser's optional
     // dispatch (chorus → tubesat → reverb_send_hpf_hz → rationale).
-    o << ",\"chorus\":{"
-      << "\"rate_hz\":" << p.chorus.rate_hz << ","
-      << "\"depth\":" << p.chorus.depth << ","
+    o << ",\"chorus\":{" << "\"rate_hz\":" << p.chorus.rate_hz << "," << "\"depth\":" << p.chorus.depth << ","
       << "\"mix\":" << p.chorus.mix << "}";
-    o << ",\"tubesat\":{"
-      << "\"drive\":" << p.tubesat.drive << ","
-      << "\"mix\":" << p.tubesat.mix << "}";
+    o << ",\"tubesat\":{" << "\"drive\":" << p.tubesat.drive << "," << "\"mix\":" << p.tubesat.mix << "}";
     o << ",\"reverb_send_hpf_hz\":" << p.reverb_send_hpf_hz;
     o << "}";
     return o.str();
