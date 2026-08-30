@@ -68,7 +68,8 @@ Known approximations vs the native plugin:
 
 - `bpm_sync` is fixed at 120 BPM (WebAudio tempo sync)
 - Filter / effect colors differ from the C++ DSP implementations
-- Rate limits: 3 generations/minute and 200/day per IP (free-tier guard)
+- Rate limits: 3 generations/minute and 200/day per IP (soft guardrail —
+  counters reset on function cold start)
 
 The Gemini key is server-side only — it lives in the Netlify site env vars
 and is never shipped to the client.
@@ -89,12 +90,14 @@ node scripts/sync-prompts.mjs        # generates gitignored prompt constants
 cd ui && npm ci && npm run dev       # UI + browser shim on http://localhost:5173
 ```
 
-To exercise the real `/api/generate` endpoint locally, use the Netlify CLI
-from the repo root — one process serves the UI and the function together
-(see `[dev]` in `netlify.toml`):
+The Vite-only server above does **not** serve `/api/generate` — generation
+fails there. To exercise the real endpoint locally, install the Netlify CLI
+(`npm i -g netlify-cli`) and run from the repo root — one process serves the
+UI and the function together (see `[dev]` in `netlify.toml`):
 
 ```sh
 node scripts/sync-prompts.mjs
+cd ui && npm ci && cd ..
 GEMINI_KEY=your-key netlify dev      # http://localhost:8888
 ```
 

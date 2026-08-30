@@ -33,7 +33,10 @@ function getJuce(): JuceGlobal | null {
   return j ?? null;
 }
 
-const usingJuce = getJuce() !== null;
+// Evaluated per call: JUCE injects __JUCE__ before page scripts run, but
+// the web-demo shim installs after module evaluation, so a module-scope
+// capture would permanently miss it in the browser (#280).
+const usingJuce = (): boolean => getJuce() !== null;
 
 // Promise shim matching JUCE's bundled getNativeFunction wire format:
 // emit __juce__invoke with {name, params, resultId}, listen on
@@ -171,13 +174,13 @@ const INBOUND_EVENTS = [
 export function useWebSocket(url: string): UseWebSocketReturn {
   const ws = useRef<WebSocket | null>(null);
   const [readyState, setReadyState] = useState<WSReadyState>(
-    usingJuce ? (WebSocket.OPEN as WSReadyState) : WebSocket.CONNECTING,
+    usingJuce() ? (WebSocket.OPEN as WSReadyState) : WebSocket.CONNECTING,
   );
   const [lastMessage, setLastMessage] = useState<string | null>(null);
 
   // JUCE native bridge path
   useEffect(() => {
-    if (!usingJuce) return;
+    if (!usingJuce()) return;
     const juce = getJuce();
     if (!juce) return;
 
@@ -209,7 +212,7 @@ export function useWebSocket(url: string): UseWebSocketReturn {
 
   // WebSocket path (pure-browser dev only)
   useEffect(() => {
-    if (usingJuce) return;
+    if (usingJuce()) return;
     const socket = new WebSocket(url);
     ws.current = socket;
     socket.onopen = () => setReadyState(WebSocket.OPEN as WSReadyState);
@@ -222,7 +225,7 @@ export function useWebSocket(url: string): UseWebSocketReturn {
   }, [url]);
 
   const sendMessage = useCallback((msg: string) => {
-    if (usingJuce) {
+    if (usingJuce()) {
       try {
         const parsed = JSON.parse(msg) as Record<string, unknown>;
         dispatchNative(parsed);
@@ -237,7 +240,7 @@ export function useWebSocket(url: string): UseWebSocketReturn {
   }, []);
 
   const sendBinary = useCallback((data: ArrayBuffer) => {
-    if (usingJuce) {
+    if (usingJuce()) {
       // 16 kHz mono Float32 PCM → Int16 PCM → base64 string.
       // Old path passed Array<number> of doubles (~24 B/sample boxed
       // juce::var on the C++ side, ~38 KB per 100 ms chunk + JSON);

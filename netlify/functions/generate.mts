@@ -38,6 +38,11 @@ function json(payload: unknown, status: number): Response {
 }
 
 function clientIp(req: Request): string {
+  // Netlify injects x-nf-client-connection-ip at the edge; it is not
+  // client-controllable. x-forwarded-for is only a fallback and its first
+  // entry can be spoofed, so the limiter is a soft guardrail either way.
+  const nf = req.headers.get("x-nf-client-connection-ip");
+  if (nf !== null && nf.trim().length > 0) return nf.trim();
   const fwd = req.headers.get("x-forwarded-for");
   if (fwd !== null) {
     const first = fwd.split(",")[0].trim();

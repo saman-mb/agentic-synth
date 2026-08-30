@@ -39,6 +39,21 @@ jobs:
         working-directory: ui
         run: npm run build
 
+      # nwtgck/actions-netlify silently no-ops when the secrets are absent,
+      # which would show a green "Deploy" that shipped nothing (#280 review).
+      # Fail loudly on production deploys; PR previews may legitimately run
+      # without credentials (e.g. forks), so they only warn.
+      - name: Verify Netlify credentials
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        run: |
+          if [ -z "$NETLIFY_AUTH_TOKEN" ] || [ -z "$NETLIFY_SITE_ID" ]; then
+            echo "::error::NETLIFY_AUTH_TOKEN / NETLIFY_SITE_ID secrets missing — production deploy would be skipped"
+            exit 1
+          fi
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+
       # Functions are bundled from netlify/functions at deploy time; the
       # handler's repo-relative import of ui/src/demo/patchCodec.ts is
       # resolved by the bundler then (source stays in the repo).
