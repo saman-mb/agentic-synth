@@ -2,6 +2,8 @@
 
 # 🎛️ TIMBRE
 
+<img src="docs/timbre-hero.gif" alt="TIMBRE — an animated explosion of energy bursting into a waveform, purple, pink and yellow, with the wordmark TIMBRE — Say it. Hear it." width="640" />
+
 ### **Say it. Hear it.**
 
 *An agent-driven **VST3 / AU / Standalone Synthesizer** powered by Gemini 2.5, JUCE 8, and C++20.*
@@ -51,6 +53,55 @@ audio thread.
 | 🧠 **RAG + delta-nudging** | Retrieves the closest curated archetype, then asks the LLM for small parameter nudges — more reliable than one-shot generation. |
 | 💾 **Keep what you make** | Commit patches to a preset library, or bounce them to 24-bit `.wav`. |
 | 🔌 **One binary** | The React UI ships *inside* the plugin window via JUCE 8 `WebBrowserComponent`. No browser tab, no local server. |
+
+---
+
+---
+
+## 🌐 Live demo (web)
+
+The same React UI runs in a browser at the Netlify demo site, backed by a
+Netlify Function that calls Gemini 2.5 server-side. The plugin binaries are
+untouched — the browser shim swaps the JUCE native bridge for
+`fetch("/api/generate")`, and audio renders through a WebAudio approximation
+of the C++ engine.
+
+Known approximations vs the native plugin:
+
+- `bpm_sync` is fixed at 120 BPM (WebAudio tempo sync)
+- Filter / effect colors differ from the C++ DSP implementations
+- Rate limits: 3 generations/minute and 200/day per IP (soft guardrail —
+  counters reset on function cold start)
+
+The Gemini key is server-side only — it lives in the Netlify site env vars
+and is never shipped to the client.
+
+### Owner deploy checklist
+
+1. Create a Netlify site linked to this repo (deploy from `ui/dist`)
+2. Set `NETLIFY_SITE_ID` and `NETLIFY_AUTH_TOKEN` as GitHub repo secrets
+3. Set `GEMINI_KEY` in the Netlify site env vars — use a dedicated key on a
+   project where billing is never enabled (free tier only)
+4. Raise the function timeout to 26 s in the Netlify UI (free-tier default
+   is 10 s; the handler enforces its own 24 s deadline)
+
+### Run the web demo locally
+
+```sh
+node scripts/sync-prompts.mjs        # generates gitignored prompt constants
+cd ui && npm ci && npm run dev       # UI + browser shim on http://localhost:5173
+```
+
+The Vite-only server above does **not** serve `/api/generate` — generation
+fails there. To exercise the real endpoint locally, install the Netlify CLI
+(`npm i -g netlify-cli`) and run from the repo root — one process serves the
+UI and the function together (see `[dev]` in `netlify.toml`):
+
+```sh
+node scripts/sync-prompts.mjs
+cd ui && npm ci && cd ..
+GEMINI_KEY=your-key netlify dev      # http://localhost:8888
+```
 
 ---
 

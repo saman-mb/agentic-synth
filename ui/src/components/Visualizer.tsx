@@ -39,12 +39,23 @@ function getJuceForScope(): JuceGlobalForScope | null {
   return j ?? null;
 }
 
+// Evaluated per call: module-scope capture ran before demo/bootstrap.ts
+// installed the shim (#280).
+const scopeBridgeAvailable = (): boolean => getJuceForScope() !== null;
+
 // Module-scope promise plumbing for the scope pull. Module-scope (not
 // component-scope) so a remount doesn't double-register the __juce__complete
 // listener. ID offset 2_000_000 keeps our IDs distinct from both JUCE's
 // bundled handler (starts at 0) and useWebSocket's pool (starts at 1_000_000).
 const SCOPE_PROMISE_ID_OFFSET = 2_000_000;
 let nextScopePromiseId = SCOPE_PROMISE_ID_OFFSET;
+// One missed completion must not wedge the poll loop: inFlightRef only
+// clears when the pull's promise settles, so a lost __juce__complete
+// (WebView teardown mid-call, dropped native completion) would otherwise
+// stop every future pull — a frozen scope over audible audio. One missed
+// frame is invisible; that latch is not. Matches the timeout contract in
+// useWebSocket.callNative.
+const SCOPE_PULL_TIMEOUT_MS = 1_000;
 const pendingScopePromises = new Map<number, (v: unknown) => void>();
 let scopeCompleteWired = false;
 
@@ -68,7 +79,15 @@ function callGetScopeSamples(n: number): Promise<number[]> | null {
   ensureScopeCompleteListener(juce);
   const id = nextScopePromiseId++;
   return new Promise<number[]>((resolve) => {
+    const timer = window.setTimeout(() => {
+      // Settle only if the completion truly never arrived — the complete
+      // listener deletes the entry before resolving. Resolving [] makes
+      // the caller drop the frame and clear inFlightRef, so the next RAF
+      // retries the pull instead of stalling forever.
+      if (pendingScopePromises.delete(id)) resolve([]);
+    }, SCOPE_PULL_TIMEOUT_MS);
     pendingScopePromises.set(id, (result) => {
+      window.clearTimeout(timer);
       // Result may be Array<number> (typical) or undefined (provider unset).
       if (Array.isArray(result)) resolve(result as number[]);
       else resolve([]);
@@ -81,8 +100,11 @@ function callGetScopeSamples(n: number): Promise<number[]> | null {
   });
 }
 
-// Bridge presence is fixed for the page lifetime — cache once.
-const SCOPE_BRIDGE_AVAILABLE = getJuceForScope() !== null;
+// Evaluated per call, mirroring useSynthBridge.ts: the web-demo shim
+// installs at module-evaluation time (demo/bootstrap.ts), but a
+// module-scope capture here would still freeze the answer before that
+// import ran in older entry points — and per-call costs one property
+// read per frame (#280).
 
 type Mode = 'SCOPE' | 'SPECTRUM' | 'XY' | 'WT';
 const MODES: ReadonlyArray<Mode> = ['SCOPE', 'SPECTRUM', 'XY', 'WT'];
@@ -264,75 +286,83 @@ export function Visualizer({ sampleProvider }: VisualizerProps) {
 
     const draw = () => {
       if (stopped) return;
-      const tNow = performance.now() / 1000;
-      const currentMode = modeRef.current;
+      // A throw inside a frame would otherwise skip the
+      // requestAnimationFrame below and kill the loop permanently — a
+      // frozen canvas. Log and keep the loop alive instead; the next
+      // frame may well succeed.
+      try {
+        const tNow = performance.now() / 1000;
+        const currentMode = modeRef.current;
 
-      // 1. Fire-and-forget bridge pull once per frame. The promise resolves
-      //    on a future tick; while it does, the render loop reads the most
-      //    recent scopeBufRef.current synchronously. inFlightRef gates
-      //    re-entry so concurrent RAFs don't pile up requests.
-      if (SCOPE_BRIDGE_AVAILABLE && !inFlightRef.current) {
-        inFlightRef.current = true;
-        const p = callGetScopeSamples(SAMPLE_COUNT);
-        if (p) {
-          p.then((arr) => {
-            if (arr.length > 0) {
-              // Shift-and-append into the rolling window. If the producer
-              // delivered a full window's worth, do a direct copy; otherwise
-              // shift the existing tail left and append the new samples on
-              // the right so the trace appears to scroll continuously.
-              const buf = scopeBufRef.current;
-              if (arr.length >= SAMPLE_COUNT) {
-                for (let i = 0; i < SAMPLE_COUNT; i++) buf[i] = arr[arr.length - SAMPLE_COUNT + i];
-              } else {
-                const keep = SAMPLE_COUNT - arr.length;
-                buf.copyWithin(0, arr.length, SAMPLE_COUNT);
-                for (let i = 0; i < arr.length; i++) buf[keep + i] = arr[i];
+        // 1. Fire-and-forget bridge pull once per frame. The promise resolves
+        //    on a future tick; while it does, the render loop reads the most
+        //    recent scopeBufRef.current synchronously. inFlightRef gates
+        //    re-entry so concurrent RAFs don't pile up requests.
+        if (scopeBridgeAvailable() && !inFlightRef.current) {
+          inFlightRef.current = true;
+          const p = callGetScopeSamples(SAMPLE_COUNT);
+          if (p) {
+            p.then((arr) => {
+              if (arr.length > 0) {
+                // Shift-and-append into the rolling window. If the producer
+                // delivered a full window's worth, do a direct copy; otherwise
+                // shift the existing tail left and append the new samples on
+                // the right so the trace appears to scroll continuously.
+                const buf = scopeBufRef.current;
+                if (arr.length >= SAMPLE_COUNT) {
+                  for (let i = 0; i < SAMPLE_COUNT; i++) buf[i] = arr[arr.length - SAMPLE_COUNT + i];
+                } else {
+                  const keep = SAMPLE_COUNT - arr.length;
+                  buf.copyWithin(0, arr.length, SAMPLE_COUNT);
+                  for (let i = 0; i < arr.length; i++) buf[keep + i] = arr[i];
+                }
+                scopeFilledRef.current = true;
               }
-              scopeFilledRef.current = true;
-            }
-          }).finally(() => {
+            }).finally(() => {
+              inFlightRef.current = false;
+            });
+          } else {
             inFlightRef.current = false;
-          });
-        } else {
-          inFlightRef.current = false;
+          }
         }
+
+        // 2. Fill our sample buffers. Always run synthesise() first so
+        //    sampleR (used by XY) and baseline sample are populated, then
+        //    overwrite bufs.sample with real audio when available.
+        //    Priority order for bufs.sample:
+        //      a) explicit sampleProvider prop (parent wiring / tests)
+        //      b) JUCE bridge buffer (real audio from C++)
+        //      c) simulated source (already in place from synthesise)
+        synthesise(tNow, currentMode);
+        const provided = providerRef.current?.();
+        if (provided && provided.length >= SAMPLE_COUNT) {
+          bufs.sample.set(provided.subarray(0, SAMPLE_COUNT));
+        } else if (scopeBridgeAvailable() && scopeFilledRef.current) {
+          bufs.sample.set(scopeBufRef.current);
+        }
+
+        const dpr = window.devicePixelRatio || 1;
+        const W = canvas.width;
+        const H = canvas.height;
+
+        switch (currentMode) {
+          case 'SCOPE':
+            drawScope(ctx, W, H, dpr, bufs.sample, { accentPrimary, accentGlow, bgInset, gridStroke });
+            break;
+          case 'SPECTRUM':
+            drawSpectrum(ctx, W, H, dpr, bufs, { accentPrimary, accentSecondary, bgInset, gridStroke });
+            break;
+          case 'XY':
+            drawXY(ctx, W, H, dpr, bufs.sample, bufs.sampleR, { accentPrimary, accentGlow, bgInset, gridStroke });
+            break;
+          case 'WT':
+            drawWavetable(ctx, W, H, dpr, bufs.sample, tNow, { accentPrimary, bgInset, gridStroke });
+            break;
+        }
+
+      } catch (err) {
+        console.warn('[visualizer] draw frame failed:', err);
       }
-
-      // 2. Fill our sample buffers. Always run synthesise() first so
-      //    sampleR (used by XY) and baseline sample are populated, then
-      //    overwrite bufs.sample with real audio when available.
-      //    Priority order for bufs.sample:
-      //      a) explicit sampleProvider prop (parent wiring / tests)
-      //      b) JUCE bridge buffer (real audio from C++)
-      //      c) simulated source (already in place from synthesise)
-      synthesise(tNow, currentMode);
-      const provided = providerRef.current?.();
-      if (provided && provided.length >= SAMPLE_COUNT) {
-        bufs.sample.set(provided.subarray(0, SAMPLE_COUNT));
-      } else if (SCOPE_BRIDGE_AVAILABLE && scopeFilledRef.current) {
-        bufs.sample.set(scopeBufRef.current);
-      }
-
-      const dpr = window.devicePixelRatio || 1;
-      const W = canvas.width;
-      const H = canvas.height;
-
-      switch (currentMode) {
-        case 'SCOPE':
-          drawScope(ctx, W, H, dpr, bufs.sample, { accentPrimary, accentGlow, bgInset, gridStroke });
-          break;
-        case 'SPECTRUM':
-          drawSpectrum(ctx, W, H, dpr, bufs, { accentPrimary, accentSecondary, bgInset, gridStroke });
-          break;
-        case 'XY':
-          drawXY(ctx, W, H, dpr, bufs.sample, bufs.sampleR, { accentPrimary, accentGlow, bgInset, gridStroke });
-          break;
-        case 'WT':
-          drawWavetable(ctx, W, H, dpr, bufs.sample, tNow, { accentPrimary, bgInset, gridStroke });
-          break;
-      }
-
       raf = requestAnimationFrame(draw);
     };
 

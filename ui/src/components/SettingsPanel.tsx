@@ -1,7 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import './SettingsPanel.css';
 import { playTapeStop, playVoicePip } from '../data/uiAudio';
-import { audioSettingsSupported, openAudioSettings } from '../hooks/useSynthBridge';
+import {
+  audioSettingsSupported,
+  listAudioOutputDevices,
+  openAudioSettings,
+  setAudioOutputDevice,
+  type AudioOutputDevice,
+} from '../hooks/useSynthBridge';
 
 // ── SettingsPanel (Phase 10 §17 + Phase 14 expansion) ───────────────
 //
@@ -150,6 +156,15 @@ function useAudioSettingsAvailable(): boolean {
   return available;
 }
 
+// The web-demo shim adds the `web-demo` body class before React mounts,
+// so this is stable for the component's lifetime. Inside the plugin the
+// class is never present and every demo-only render below is dead —
+// the plugin panel stays pixel-identical.
+function isWebDemoMode(): boolean {
+  if (typeof document === 'undefined') return false;
+  return document.body.classList.contains('web-demo');
+}
+
 export interface SettingsPanelProps {
   voicePip: boolean;
   patchThunk: boolean;
@@ -204,11 +219,58 @@ export function SettingsPanel({
 
   // ── Audio device ──────────────────────────────────────────────
   const audioSettingsAvailable = useAudioSettingsAvailable();
+  const webDemo = isWebDemoMode();
   const [audioSettingsError, setAudioSettingsError] = useState(false);
   const handleOpenAudioSettings = () => {
     setAudioSettingsError(false);
     void openAudioSettings().then((ok) => {
       if (!ok) setAudioSettingsError(true);
+    });
+  };
+
+  // Web demo: inline output picker (enumerateDevices + setSinkId via the
+  // shim). '' is the browser default device. Labels may be blank until a
+  // mic grant — the shim substitutes "Output N" so the list is never
+  // label-less. Input selection is out of scope: push-to-talk STT is
+  // disabled in the demo, and the MIDI input section below uses Web MIDI
+  // directly, not this bridge.
+  // Deliberately NOT gated on audioSettingsSupported: setSinkId is
+  // Chrome/Edge-only, and gating on it hid the whole section on
+  // Firefox/Safari (#280 user report). Discovery works everywhere —
+  // enumeration failure leaves just the Default option — while switching
+  // on an unsupported browser fails and surfaces the error note below.
+  const [outputDevices, setOutputDevices] = useState<AudioOutputDevice[]>([]);
+  const [outputDeviceId, setOutputDeviceId] = useState('');
+  useEffect(() => {
+    if (!webDemo) return;
+    let cancelled = false;
+    listAudioOutputDevices()
+      .then((devices) => {
+        if (!cancelled) setOutputDevices(devices);
+      })
+      .catch(() => {
+        if (!cancelled) setOutputDevices([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [webDemo]);
+  const handleOutputDeviceChange = (deviceId: string) => {
+    setAudioSettingsError(false);
+    // '' is the browser default — nothing to switch, always succeeds.
+    if (deviceId === '') {
+      setOutputDeviceId('');
+      return;
+    }
+    const previous = outputDeviceId;
+    setOutputDeviceId(deviceId);
+    void setAudioOutputDevice(deviceId).then((ok) => {
+      if (!ok) {
+        // Revert the selection so the control reflects what the user
+        // is actually hearing.
+        setOutputDeviceId(previous);
+        setAudioSettingsError(true);
+      }
     });
   };
 
@@ -224,7 +286,7 @@ export function SettingsPanel({
       {/* ── Audio device ──────────────────────────────────────────
           First group on purpose: if you hear nothing, this is the
           setting you came here for. Hidden when no picker exists. */}
-      {audioSettingsAvailable && (
+      {audioSettingsAvailable && !webDemo && (
         <section className="settings-group" aria-label="Audio device">
           <h3 className="settings-group-title">Audio device</h3>
           <div className="settings-row">
@@ -247,6 +309,48 @@ export function SettingsPanel({
             >
               Open
             </button>
+          </div>
+        </section>
+      )}
+
+      {/* ── Audio device (web demo) ─────────────────────────────────
+          Output selection only — the browser has no sample-rate/buffer
+          picker and demo push-to-talk is disabled. Always shown in demo
+          mode: hiding it on setSinkId-less browsers left users with no
+          way to even see where audio plays (#280). */}
+      {webDemo && (
+        <section className="settings-group" aria-label="Audio device">
+          <h3 className="settings-group-title">Audio device</h3>
+          <div className="settings-row">
+            <div className="settings-row-text">
+              <span className="settings-row-label">Output device</span>
+              <span className="settings-row-desc">
+                Choose where the web demo plays audio. Defaults to this
+                browser&apos;s output.
+              </span>
+              <span className="settings-row-desc">
+                To hear the demo on a specific speaker, set it as the default
+                output in your OS sound settings.
+              </span>
+              {audioSettingsError && (
+                <span className="settings-row-disabled">
+                  Could not switch output device. Try Chrome or Edge.
+                </span>
+              )}
+              <select
+                className="settings-select"
+                value={outputDeviceId}
+                onChange={(e) => handleOutputDeviceChange(e.target.value)}
+                aria-label="Audio output device"
+              >
+                <option value="">Default output</option>
+                {outputDevices.map((d) => (
+                  <option key={d.deviceId || 'default'} value={d.deviceId}>
+                    {d.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </section>
       )}
@@ -339,7 +443,7 @@ export function SettingsPanel({
           <div className="settings-row-text">
             <span className="settings-row-label">Animations</span>
             <span className="settings-row-desc">
-              Full keeps all motion. Reduced honors your system's reduced-motion
+              Full keeps all motion. Reduced honors your system&apos;s reduced-motion
               setting. Off disables every animation and transition.
             </span>
             <div className="settings-radio-row">
@@ -372,7 +476,7 @@ export function SettingsPanel({
               <>
                 <span className="settings-row-desc">
                   Choose which MIDI device feeds note &amp; CC into TIMBRE.
-                  "Any" accepts events from every connected port.
+                  &quot;Any&quot; accepts events from every connected port.
                 </span>
                 <select
                   className="settings-select"

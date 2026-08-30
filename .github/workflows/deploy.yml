@@ -1,0 +1,86 @@
+name: Deploy web demo
+
+# Deploys the browser demo (ui/dist + netlify/functions) to Netlify.
+# Lint/build/test gating lives in ci.yml - this workflow only ships.
+on:
+  push:
+    branches: [master]
+  workflow_dispatch:
+  pull_request:
+
+permissions:
+  contents: read
+  pull-requests: write
+  issues: write
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+
+      # prompts.generated.mts is gitignored - it must exist before the UI
+      # build and before Netlify bundles netlify/functions at deploy time
+      # (the function imports it via lib/gemini.mts).
+      - name: Sync generated prompts
+        run: node scripts/sync-prompts.mjs
+
+      - name: Install UI dependencies
+        working-directory: ui
+        run: npm ci
+
+      - name: Build UI
+        working-directory: ui
+        run: npm run build
+
+      # nwtgck/actions-netlify silently no-ops when the secrets are absent,
+      # which would show a green "Deploy" that shipped nothing (#280 review).
+      # Fail loudly on production deploys; PR previews may legitimately run
+      # without credentials (e.g. forks), so they only warn.
+      - name: Verify Netlify credentials
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        run: |
+          if [ -z "$NETLIFY_AUTH_TOKEN" ] || [ -z "$NETLIFY_SITE_ID" ]; then
+            echo "::error::NETLIFY_AUTH_TOKEN / NETLIFY_SITE_ID secrets missing — production deploy would be skipped"
+            exit 1
+          fi
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+
+      # Functions are bundled from netlify/functions at deploy time; the
+      # handler's repo-relative import of ui/src/demo/patchCodec.ts is
+      # resolved by the bundler then (source stays in the repo).
+      # nwtgck/actions-netlify@v3.0 was dropped: its dist ships without a
+      # working esbuild binary (spawn ENOENT on current runners). The CLI
+      # deploy below is the same mechanism without the broken bundling.
+      - name: Deploy to Netlify
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+          COMMIT_MSG: ${{ github.event.pull_request.title || github.ref_name }}
+        run: |
+          PROD_FLAG=""
+          ALIAS_FLAG=""
+          if [ "${{ github.event_name == 'push' && github.ref == 'refs/heads/master' }}" = "true" ]; then
+            PROD_FLAG="--prod"
+          else
+            ALIAS_FLAG="--alias pr-${{ github.event.number || github.ref_name }}"
+          fi
+          # CI already built ui/dist and synced prompts; --no-build skips
+          # netlify.toml's build command. Redirects/functions/paths all come
+          # from netlify.toml itself.
+          npx --yes netlify-cli@latest deploy \
+            --site "$NETLIFY_SITE_ID" \
+            --dir ui/dist \
+            --functions netlify/functions \
+            --no-build \
+            --message "Deploy from GitHub Actions: $COMMIT_MSG" \
+            $PROD_FLAG $ALIAS_FLAG
+        timeout-minutes: 10

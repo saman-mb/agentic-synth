@@ -20,6 +20,14 @@ import { makeDefaultPatch, PatchParams } from '../components/KnobGrid';
 
 export type PresetTag = 'Bass' | 'Lead' | 'Pad' | 'Pluck' | 'Keys' | 'FX';
 
+// Combined catalogue: factory presets first, then user-saved ones. This
+// is the canonical "everything loadable" list — PresetsSidebar builds the
+// same shape from its reactive state (so saves re-render immediately);
+// TopBar's demo preset selector reads it fresh per patch change.
+export function loadAllPresets(): PresetEntry[] {
+  return [...STARTER_PRESETS, ...loadUserPresets()];
+}
+
 export const PRESET_TAGS: readonly PresetTag[] = [
   'Bass',
   'Lead',

@@ -669,6 +669,9 @@ export function ChatInterface({
     countdown: number;
     attempt: number;     // 1-based: 1 = first retry, 2 = second, ...
     exhausted: boolean;  // true after MAX_RETRY_ATTEMPTS — no auto retry
+    // Last error-event text, shown verbatim when retries exhaust (e.g.
+    // the 503 "not configured" copy from the web-demo generate flow).
+    message?: string;
   } | null>(null);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Focus state on the prompt input — drives the shimmer/solid border
@@ -896,6 +899,7 @@ export function ChatInterface({
                 countdown: 5,
                 attempt: 1,
                 exhausted: false,
+                message: msg.message,
               };
             });
           }, 0);
@@ -1303,7 +1307,7 @@ export function ChatInterface({
           {networkFailure.exhausted ? (
             <>
               <span className="chat-network-failure-text">
-                Still can't reach the agent. Please try again later.
+                {networkFailure.message ?? "Still can't reach the agent. Please try again later."}
               </span>
               <button
                 type="button"
