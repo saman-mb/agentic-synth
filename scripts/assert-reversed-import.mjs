@@ -24,7 +24,7 @@ try {
     process.exit(1);
   }
 
-  writeFileSync(probe, "import '../../../apps/web/src/main.tsx';\n");
+  writeFileSync(probe, "import '../../../../apps/web/src/main.tsx';\n");
   const result = spawnSync('npx', ['eslint', '--no-ignore', probe], {
     cwd: repoRoot,
     encoding: 'utf8',
