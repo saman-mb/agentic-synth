@@ -18,7 +18,7 @@ Always mounted. Visibility may dim; do not unmount for state changes.
 |---|---|---|
 | `el.brand` | Wordmark / minimal brand mark | Hero-level brand signal; not just a nav chip |
 | `el.visualizer` | Full-width visualizer plane | Aesthetic + motion owned by [#298](https://github.com/saman-mb/agentic-synth/issues/298); content shows the sound |
-| `el.macros` | 4–6 macro controls (`macro.0`…`macro.n`) | Labels, bundles, curves = [#296](https://github.com/saman-mb/agentic-synth/issues/296) (`macros.md`) |
+| `el.macros` | 4 macro controls (`macro.0`…`macro.3`) | Fixed v1 set in [macros.md](./macros.md) (#296): Brightness / Movement / Space / Body |
 | `el.play` | Play / hold / gate for audition | Primary hear affordance when sheet is peek/collapsed |
 | `el.input_cta` | Primary Say affordance | Mic + text entry point; capture patterns = [#297](https://github.com/saman-mb/agentic-synth/issues/297) (`input.md`) |
 | `el.sheet` | Bottom sheet + grabber | One sheet for all states; body swaps by `MobileState` |
@@ -121,7 +121,7 @@ Survives background; cleared after successful Keep or explicit discard:
 |---|---|---|
 | States | `MobileState` snake | `shape`, `variations` |
 | Elements | `el.*` | `el.macros` |
-| Macros | `macro.{index}` (+ later `MacroId` slug in #296) | `macro.0` |
+| Macros | `macro.{index}` + `MacroId` slug ([macros.md](./macros.md)) | `macro.0` / `brightness` |
 | Sheet slots | `sheet.{state}` | `sheet.keep` |
 | Input modes | `input.voice` \| `input.text` (#297) | — |
 | Cuts | `cut.*` | `cut.ab` |
@@ -132,13 +132,13 @@ Survives background; cleared after successful Keep or explicit discard:
 
 ## Future stubs (do not create yet)
 
-- [macros.md](./macros.md) — #296
+- [macros.md](./macros.md) — #296 (landed)
 - [input.md](./input.md) — #297
 - Visual tokens / art — #298 (`el.visualizer` only)
 
 ## v1 non-goals
 
-Pixel mockups · WCAG matrices · push-to-talk debate detail · macro param curves · Expo scaffold · offline-first agent · cloud sync · parallel audio/UI state machines · new patch schema
+Pixel mockups · WCAG matrices · push-to-talk debate detail · Expo scaffold · offline-first agent · cloud sync · parallel audio/UI state machines · new patch schema (macro bundles/curves → [macros.md](./macros.md))
 
 ## See also
 
