@@ -29,6 +29,24 @@
 # and 404 (the default URL doesn't exist for v2 functions with a custom
 # path) — #280 live finding.
 
+# Canonical domain prep (#328).
+#
+# Today the public origin is https://timbre-synth.netlify.app (200, no
+# 301). Custom domains are added in the Netlify UI after DNS — they are
+# not created by this file.
+#
+# After tambra.app (or tambra.audio) is registered, pointed at Netlify,
+# and attached to this site:
+#   1. Uncomment the host redirect below (it must stay above the SPA rule).
+#   2. Point og:image / twitter:image in ui/index.html at the canonical
+#      origin and re-check card validators.
+#
+# [[redirects]]
+#   from = "https://timbre-synth.netlify.app/*"
+#   to = "https://tambra.app/:splat"
+#   status = 301
+#   force = true
+
 # SPA catch-all: force = false, so the function route and real files
 # always win.
 [[redirects]]
