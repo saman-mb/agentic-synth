@@ -6,9 +6,21 @@ export function normaliseModDestination(target: string): string {
   return target.replace(/\[(\d+)\]/g, '.$1');
 }
 
+export type ModulationViolationCode =
+  | 'invalid_shape'
+  | 'out_of_range'
+  | 'unknown_target'
+  | 'unknown_source';
+
+export interface ModulationViolation {
+  path: string;
+  code: ModulationViolationCode;
+  message: string;
+}
+
 export type ModulationVerdict =
   | { ok: true; plan: AgentModulationPlan | undefined }
-  | { ok: false; error: string };
+  | { ok: false; errors: ModulationViolation[]; error: string };
 
 const ALLOWED_SOURCES: ReadonlySet<string> = new Set([
   'lfo1',
@@ -33,57 +45,98 @@ function isRecord(v: unknown): v is Record<string, unknown> {
   return typeof v === 'object' && v !== null && !Array.isArray(v);
 }
 
-function checkAmount(v: unknown, path: string): string | undefined {
-  if (typeof v !== 'number' || !Number.isFinite(v) || v < -1 || v > 1) {
-    return `${path}: expected finite number in [-1, 1]`;
-  }
-  return undefined;
+function fail(
+  errors: ModulationViolation[],
+  path: string,
+  code: ModulationViolationCode,
+  detail: string,
+): void {
+  errors.push({ path, code, message: `${path}: ${detail}` });
 }
 
-function checkTarget(v: unknown, path: string): string | undefined {
+function checkAmount(
+  errors: ModulationViolation[],
+  v: unknown,
+  path: string,
+): void {
+  if (typeof v !== 'number' || !Number.isFinite(v) || v < -1 || v > 1) {
+    fail(errors, path, 'out_of_range', 'expected finite number in [-1, 1]');
+  }
+}
+
+function checkTarget(
+  errors: ModulationViolation[],
+  v: unknown,
+  path: string,
+): void {
   if (typeof v !== 'string') {
-    return `${path}: expected string`;
+    fail(errors, path, 'invalid_shape', 'expected string');
+    return;
   }
   const dest = normaliseModDestination(v);
   if (!(dest in PARAM_RANGES)) {
-    return `${path}: ${dest} is not a registered destination`;
+    fail(errors, path, 'unknown_target', `${dest} is not a registered destination`);
   }
-  return undefined;
 }
 
-function checkRoute(route: unknown, path: string): string | undefined {
+function checkRoute(
+  errors: ModulationViolation[],
+  route: unknown,
+  path: string,
+): void {
   if (!isRecord(route)) {
-    return `${path}: expected object`;
+    fail(errors, path, 'invalid_shape', 'expected object');
+    return;
   }
-  const targetErr = checkTarget(route.target, `${path}.target`);
-  if (targetErr) return targetErr;
-  return checkAmount(route.amount, `${path}.amount`);
+  checkTarget(errors, route.target, `${path}.target`);
+  checkAmount(errors, route.amount, `${path}.amount`);
 }
 
+/**
+ * Validate a wire modulation plan (#286 / #301).
+ *
+ * Collects every violation (not first-error-only). `error` is a joined
+ * summary for callers that want a single string; `errors` is the typed list.
+ *
+ * Cyclic routing: NON-GOAL for the current plan shape. Macros/extras only
+ * route modulation *sources* onto PARAM_RANGES *destinations*. Destinations
+ * are engine params, not sources, so the wire graph has no source→source
+ * edges to close a cycle. If a future schema adds mod-to-mod routing,
+ * add a cycle check here and cover it with a unit test.
+ */
 export function validateModulationPlan(raw: unknown): ModulationVerdict {
   if (raw === undefined || raw === null) {
     return { ok: true, plan: undefined };
   }
   if (!isRecord(raw)) {
-    return { ok: false, error: 'modulation: expected object' };
+    const errors: ModulationViolation[] = [{
+      path: 'modulation',
+      code: 'invalid_shape',
+      message: 'modulation: expected object',
+    }];
+    return { ok: false, errors, error: errors[0].message };
   }
+
+  const errors: ModulationViolation[] = [];
 
   if (raw.macros !== undefined) {
     if (!Array.isArray(raw.macros)) {
-      return { ok: false, error: 'macros: expected array' };
-    }
-    for (let i = 0; i < raw.macros.length; i++) {
-      const macro = raw.macros[i];
-      if (!isRecord(macro)) {
-        return { ok: false, error: `macros.${i}: expected object` };
-      }
-      if (macro.routes !== undefined) {
-        if (!Array.isArray(macro.routes)) {
-          return { ok: false, error: `macros.${i}.routes: expected array` };
+      fail(errors, 'macros', 'invalid_shape', 'expected array');
+    } else {
+      for (let i = 0; i < raw.macros.length; i++) {
+        const macro = raw.macros[i];
+        if (!isRecord(macro)) {
+          fail(errors, `macros.${i}`, 'invalid_shape', 'expected object');
+          continue;
         }
-        for (let j = 0; j < macro.routes.length; j++) {
-          const err = checkRoute(macro.routes[j], `macros.${i}.routes.${j}`);
-          if (err) return { ok: false, error: err };
+        if (macro.routes !== undefined) {
+          if (!Array.isArray(macro.routes)) {
+            fail(errors, `macros.${i}.routes`, 'invalid_shape', 'expected array');
+          } else {
+            for (let j = 0; j < macro.routes.length; j++) {
+              checkRoute(errors, macro.routes[j], `macros.${i}.routes.${j}`);
+            }
+          }
         }
       }
     }
@@ -91,20 +144,28 @@ export function validateModulationPlan(raw: unknown): ModulationVerdict {
 
   if (raw.extras !== undefined) {
     if (!Array.isArray(raw.extras)) {
-      return { ok: false, error: 'extras: expected array' };
-    }
-    for (let i = 0; i < raw.extras.length; i++) {
-      const extra = raw.extras[i];
-      if (!isRecord(extra)) {
-        return { ok: false, error: `extras.${i}: expected object` };
+      fail(errors, 'extras', 'invalid_shape', 'expected array');
+    } else {
+      for (let i = 0; i < raw.extras.length; i++) {
+        const extra = raw.extras[i];
+        if (!isRecord(extra)) {
+          fail(errors, `extras.${i}`, 'invalid_shape', 'expected object');
+          continue;
+        }
+        if (typeof extra.source !== 'string' || !ALLOWED_SOURCES.has(extra.source)) {
+          fail(errors, `extras.${i}.source`, 'unknown_source', 'invalid modulation source');
+        }
+        checkRoute(errors, extra, `extras.${i}`);
       }
-      if (typeof extra.source !== 'string' || !ALLOWED_SOURCES.has(extra.source)) {
-        return { ok: false, error: `extras.${i}.source: invalid modulation source` };
-      }
-      const err = checkRoute(extra, `extras.${i}`);
-      if (err) return { ok: false, error: err };
     }
   }
 
+  if (errors.length > 0) {
+    return {
+      ok: false,
+      errors,
+      error: errors.map((e) => e.message).join('; '),
+    };
+  }
   return { ok: true, plan: raw as AgentModulationPlan };
 }

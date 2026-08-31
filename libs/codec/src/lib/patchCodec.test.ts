@@ -1,6 +1,12 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
-import { convertLlmPatch, validatePatch, type LlmOsc, type LlmPatch } from './patchCodec.ts';
+import {
+  convertLlmPatch,
+  decodeLlmPatch,
+  validatePatch,
+  type LlmOsc,
+  type LlmPatch,
+} from './patchCodec.ts';
 
 function validOsc(overrides: Partial<LlmOsc> = {}): LlmOsc {
   return {
@@ -127,5 +133,55 @@ describe('patchCodec', () => {
     const verdict = validatePatch(null);
     assert.equal(verdict.ok, false);
     if (!verdict.ok) assert.match(verdict.error, /object/);
+  });
+
+  it('rejects an unknown LLM patch version with a typed error', () => {
+    const llm = validLlmPatch({ version: 99 });
+    const decoded = decodeLlmPatch(llm);
+    assert.equal(decoded.ok, false);
+    if (!decoded.ok) {
+      assert.equal(decoded.error.code, 'unknown_version');
+      assert.equal(decoded.error.version, 99);
+      assert.match(decoded.error.message, /Unsupported LLM patch version 99/);
+      assert.match(decoded.error.message, /accepted: 1/);
+    }
+  });
+
+  it('decodes version 1 and ignores unknown LLM fields (round-trip)', () => {
+    const llm = {
+      ...validLlmPatch(),
+      future_field: 'additive-compat',
+      osc: [
+        { ...validOsc(), experimental_knob: 0.42 },
+        validOsc({ volume: 0, enabled: false }),
+        validOsc({ volume: 0, enabled: false }),
+      ],
+    };
+    const decoded = decodeLlmPatch(llm);
+    assert.equal(decoded.ok, true);
+    if (!decoded.ok) return;
+    assert.equal(validatePatch(decoded.patch).ok, true);
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(decoded.patch, 'future_field'),
+      false,
+    );
+    assert.equal(
+      Object.prototype.hasOwnProperty.call(decoded.patch.osc[0], 'experimental_knob'),
+      false,
+    );
+    // Known fields survive convert → validate unchanged in meaning.
+    assert.equal(decoded.patch.osc[0].volume, 0.8);
+    assert.equal(decoded.patch.master_gain, 0.8);
+  });
+
+  it('surfaces schema violations as typed decode errors', () => {
+    const llm = validLlmPatch();
+    llm.filter.cutoff_hz = 25000;
+    const decoded = decodeLlmPatch(llm);
+    assert.equal(decoded.ok, false);
+    if (!decoded.ok) {
+      assert.equal(decoded.error.code, 'schema');
+      assert.match(decoded.error.message, /cutoff_hz/);
+    }
   });
 });

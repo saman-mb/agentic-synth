@@ -21,9 +21,8 @@
 
 import type { AgentModulationPlan, PatchParams } from '@agentic-synth/shared-types';
 import type { SynthEngine } from '@agentic-synth/engine-bridge';
-import { validatePatch } from '@agentic-synth/codec';
-import { sanitizePrompt } from '@agentic-synth/prompt';
-import { validateModulationPlan } from '@agentic-synth/modval';
+import { sanitizePrompt, validatePrompt, parseBriefResponse } from '@agentic-synth/prompt';
+import { validateGeneratePayload } from '@agentic-synth/modval';
 
 /** What the shim hands the flow — emit fans out to every JUCE listener. */
 export interface GenerateFlowDeps {
@@ -85,12 +84,17 @@ export async function runGenerateFlow(
 ): Promise<void> {
   const { emit } = deps;
 
-  if (typeof prompt !== 'string' || prompt.trim().length === 0) {
-    emit('error', { message: 'Type a prompt first — there is nothing to generate.' });
+  const promptGate = validatePrompt(prompt);
+  if (!promptGate.ok) {
+    // Friendlier empty-prompt copy for the chat; over-length keeps the SSOT message.
+    const message = promptGate.error.includes('non-empty')
+      ? 'Type a prompt first — there is nothing to generate.'
+      : promptGate.error;
+    emit('error', { message });
     return;
   }
 
-  prompt = sanitizePrompt(prompt);
+  prompt = sanitizePrompt(promptGate.prompt);
 
   // Start the AudioContext while the generate click's user activation is
   // still fresh (a slow fetch can outlive the transient gesture window).
@@ -120,23 +124,25 @@ export async function runGenerateFlow(
     return;
   }
 
-  let briefData: { brief?: string; error?: string } = {};
+  let briefData: unknown = {};
   try {
-    briefData = JSON.parse(await briefRes.text()) as { brief?: string; error?: string };
+    briefData = JSON.parse(await briefRes.text()) as unknown;
   } catch {
     // Unparsable body — the status check below produces the error event.
   }
 
   if (!briefRes.ok) {
-    emit('error', { message: friendlyError(briefRes.status, asString(briefData.error)) });
+    const parsedErr = parseBriefResponse(briefData);
+    const detail = !parsedErr.ok ? parsedErr.error : undefined;
+    emit('error', { message: friendlyError(briefRes.status, detail) });
     return;
   }
-  const serverBriefError = asString(briefData.error);
-  if (serverBriefError) {
-    emit('error', { message: serverBriefError });
+  const briefParsed = parseBriefResponse(briefData);
+  if (!briefParsed.ok) {
+    emit('error', { message: briefParsed.error });
     return;
   }
-  const brief = asString(briefData.brief) ?? prompt.trim();
+  const brief = briefParsed.brief;
   emit('enhancement', { brief });
 
   // ── Leg 2: /api/generate — the patch generator, fed the brief.
@@ -172,27 +178,14 @@ export async function runGenerateFlow(
     return;
   }
 
-  // Defence in depth: the server already ran convertLlmPatch + validate;
-  // never trust the wire. An invalid patch is a function error, exactly
-  // like the C++ parser's fail-closed behaviour.
-  const validation = validatePatch(data.patch);
-  if (!validation.ok) {
-    emit('error', { message: `The patch service returned an invalid patch (${validation.error}).` });
+  // Defence in depth: the server already ran decodeLlmPatch; never trust
+  // the wire. Validate patch + modulation before WebAudio ingestion (#301).
+  const gated = validateGeneratePayload(data.patch, data.modulation);
+  if (!gated.ok) {
+    emit('error', { message: gated.error });
     return;
   }
-  const patch = data.patch as PatchParams;
-
-  // 1. Brief already emitted above (leg 1) — the patch frame comes next,
-  //    matching the C++ order enhancement → patch → patch_update → ….
-
-  // 2. Apply to the engine (setPatch then macros) and update the snapshot
-  //    so knob_tweak / feedback / audition keys work against this patch.
-  const modVerdict = validateModulationPlan(data.modulation);
-  if (!modVerdict.ok) {
-    emit('error', { message: `The patch service returned an invalid modulation (${modVerdict.error}).` });
-    return;
-  }
-  const modulation = modVerdict.plan;
+  const { patch, modulation } = gated;
   deps.applyServerPatch(patch, modulation);
 
   // 3. Patch frame BEFORE the rationale stream — C++ order is patch →

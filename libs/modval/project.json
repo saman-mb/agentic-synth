@@ -4,7 +4,7 @@
   "sourceRoot": "libs/modval/src",
   "projectType": "library",
   "tags": ["type:lib", "scope:shared", "layer:feature"],
-  "implicitDependencies": ["shared-types", "data"],
+  "implicitDependencies": ["shared-types", "data", "codec"],
   "targets": {
     "lint": {
       "executor": "nx:run-commands",
