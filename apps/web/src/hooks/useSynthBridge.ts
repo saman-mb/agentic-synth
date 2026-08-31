@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { WireIncoming, WireOutgoing } from '../types/chat';
+import type { WireIncoming, WireOutgoing } from '@agentic-synth/shared-types';
 
 export type BridgeStatus = 'connecting' | 'open' | 'closed' | 'error';
 

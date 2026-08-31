@@ -24,7 +24,7 @@
 //  - bpm_sync: the standalone web build has no host transport, so a
 //    synced delay snaps to a 120 BPM quarter note (0.5 s).
 
-import type { DelayParams, ReverbParams } from '../components/KnobGrid';
+import type { DelayParams, ReverbParams } from '@agentic-synth/shared-types';
 
 export interface EffectRack {
   readonly input: GainNode;

@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import type { PatchPreviewData, WireOutgoing } from '../types/chat';
+import type { PatchPreviewData, WireOutgoing } from '@agentic-synth/shared-types';
 
 // ---------------------------------------------------------------------------
 // KeepThisButton — Phase D commit-UX (#260)

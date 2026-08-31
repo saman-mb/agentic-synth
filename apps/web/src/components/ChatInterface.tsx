@@ -19,7 +19,7 @@ import type {
   ProactiveSuggestion,
   WireIncoming,
   WireOutgoing,
-} from '../types/chat';
+} from '@agentic-synth/shared-types';
 import { AuditionKeyboard } from './AuditionKeyboard';
 import { ConfidenceChips } from './ConfidenceChips';
 import { FailureBanner, type FailureKind } from './FailureBanner';

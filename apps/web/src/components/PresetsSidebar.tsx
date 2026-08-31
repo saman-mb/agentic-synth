@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import './PresetsSidebar.css';
-import { makeDefaultPatch, PatchParams } from './KnobGrid';
+import { makeDefaultPatch, type PatchParams } from '@agentic-synth/shared-types';
 import {
   loadFavorites,
   loadUserPresets,
@@ -11,7 +11,7 @@ import {
   saveFavorites,
   saveUserPresets,
   STARTER_PRESETS,
-} from '../data/presets';
+} from '@agentic-synth/data';
 
 // ── PresetsSidebar (Phase 6 — wired) ─────────────────────────────────
 //

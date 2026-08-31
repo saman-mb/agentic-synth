@@ -27,8 +27,7 @@
 // gesture — the bridge must call ensureStarted() from a click/keydown
 // handler before the first note.
 
-import type { PatchParams } from '../components/KnobGrid';
-import type { AgentModulationPlan } from '../types/chat';
+import type { AgentModulationPlan, PatchParams } from '@agentic-synth/shared-types';
 import { createEffectRack, type EffectRack } from './effects';
 import { getPatchParam, isEnvParam, macroTargetValue, setPatchParam } from './paramMap';
 import { VoiceManager } from './voices';

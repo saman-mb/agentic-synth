@@ -5,7 +5,7 @@ import {
   MOD_SOURCE_VARS,
   ModSourceId,
   setDragSource,
-} from '../data/modulation';
+} from '@agentic-synth/data';
 import './ModSourcesStrip.css';
 
 // ── ModSourcesStrip (Phase 8) ────────────────────────────────────────

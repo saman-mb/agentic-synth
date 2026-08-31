@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 
 import { fetchPresets } from '../hooks/useSynthBridge';
-import type { PatchPreviewData, WireIncoming, WireOutgoing } from '../types/chat';
+import type { PatchPreviewData, WireIncoming, WireOutgoing } from '@agentic-synth/shared-types';
 import './PresetList.css';
 
 // Phase D commit-UX (#260) — "Saved sounds" panel.

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { markOnboardingCompleted } from '../data/quickStartPreset';
+import { markOnboardingCompleted } from '@agentic-synth/data';
 import './OnboardingOverlay.css';
 
 // Phase C onboarding (#256) — 3-step guided tour for first-time users.

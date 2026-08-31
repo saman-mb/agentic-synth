@@ -16,7 +16,7 @@
 [functions]
   included_files = [
     "apps/web/src/demo/patchCodec.ts",
-    "apps/web/src/data/modulation.ts",
+    "libs/data/src/lib/paramRanges.ts",
     "netlify/functions/lib/prompts.generated.mts",
   ]
 

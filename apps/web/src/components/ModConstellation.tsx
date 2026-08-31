@@ -5,7 +5,7 @@ import {
   MOD_SOURCE_VARS,
   ModSourceId,
   destinationLabel,
-} from '../data/modulation';
+} from '@agentic-synth/data';
 import './ModConstellation.css';
 
 // ── ModConstellation (Phase 8 — REBRAND.md §12 wow #2) ──────────────

@@ -1,6 +1,6 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import './TopBar.css';
-import type { PresetEntry } from '../data/presets';
+import type { PresetEntry } from '@agentic-synth/data';
 
 // ── TopBar (Phase 6) ─────────────────────────────────────────────────
 //

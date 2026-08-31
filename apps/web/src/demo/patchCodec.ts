@@ -4,9 +4,9 @@
 // (system-prompt.md §1) and the UI's numeric PatchParams. Bundled into
 // BOTH the browser (vite) and the Netlify function (esbuild), so all
 // runtime imports here must stay React-free: PatchParams is a
-// type-only import from components/KnobGrid, and the numeric ranges
-// come from data/modulation.ts (PARAM_RANGES) rather than duplicated
-// literals.
+// type-only import from @agentic-synth/shared-types, and the numeric
+// ranges come from libs/data paramRanges.ts (PARAM_RANGES) via a
+// relative import — Netlify esbuild cannot resolve tsconfig paths.
 //
 // GrammarSampler parity (#280): reject, never coerce. convertLlmPatch
 // maps enums → ints and booleans → 0/1 but invents nothing — a missing
@@ -16,8 +16,9 @@
 // version / patch_id / rationale are LLM-transport fields and are
 // intentionally dropped during conversion.
 
-import type { PatchParams } from '../components/KnobGrid';
-import { PARAM_RANGES, type ParamRange } from '../data/modulation';
+import type { PatchParams } from '@agentic-synth/shared-types';
+// eslint-disable-next-line @nx/enforce-module-boundaries -- Netlify esbuild cannot resolve tsconfig paths
+import { PARAM_RANGES, type ParamRange } from '../../../../libs/data/src/lib/paramRanges.ts';
 
 // Numeric enum values mirror src/engine/PatchStruct.h exactly.
 export const OSC_TYPES = {

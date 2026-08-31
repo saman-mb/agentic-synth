@@ -8,7 +8,7 @@ import {
   MOD_SOURCE_VARS,
   DESTINATION_CATALOG,
   destinationLabel,
-} from '../data/modulation';
+} from '@agentic-synth/data';
 import { ModConstellation } from './ModConstellation';
 import './ModMatrixPanel.css';
 

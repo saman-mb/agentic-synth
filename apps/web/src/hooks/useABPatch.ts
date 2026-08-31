@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import type { PatchParams } from '../components/KnobGrid';
+import type { PatchParams } from '@agentic-synth/shared-types';
 
 // ── useABPatch (Phase A / #267) ──────────────────────────────────────
 //

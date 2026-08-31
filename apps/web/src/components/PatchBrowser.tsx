@@ -1,5 +1,5 @@
 import { KeyboardEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import type { PatchParams } from './KnobGrid';
+import type { PatchParams } from '@agentic-synth/shared-types';
 import './PatchBrowser.css';
 
 // ---------------------------------------------------------------------------
