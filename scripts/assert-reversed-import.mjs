@@ -4,7 +4,10 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const repoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
-const probe = path.join(repoRoot, 'libs/data/src/.boundary-probe.ts');
+// Must live inside the data sourceRoot and must NOT be gitignored /
+// nxignored / eslint-ignored, or @nx/enforce-module-boundaries skips
+// the file (CI then sees eslint exit 0). Unlinked in `finally`.
+const probe = path.join(repoRoot, 'libs/data/src/lib/__boundary_probe__.ts');
 
 let exitCode = 1;
 try {

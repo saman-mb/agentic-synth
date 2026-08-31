@@ -70,8 +70,5 @@ netlify/functions/lib/prompts.generated.mts
 .env.local
 .env.*.local
 
-# Module-boundary probe (written by scripts/assert-reversed-import.mjs)
-**/.boundary-probe.ts
-
 # Local Netlify folder
 .netlify

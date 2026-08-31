@@ -31,7 +31,6 @@ export default [
       'third_party/**',
       'apps/web/dist/**',
       'apps/web/node_modules/**',
-      '**/.boundary-probe.ts',
     ],
   },
   js.configs.recommended,
