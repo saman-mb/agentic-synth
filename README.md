@@ -12,7 +12,7 @@
 [![License: PolyForm Noncommercial](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-orange.svg?style=for-the-badge)](LICENSE)
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C.svg?style=for-the-badge&logo=cplusplus&logoColor=white)](https://en.cppreference.com/w/cpp/20)
 [![JUCE 8](https://img.shields.io/badge/JUCE-8-8DC63F.svg?style=for-the-badge&logo=juce&logoColor=white)](https://juce.com/)
-[![React 18](https://img.shields.io/badge/React-18-61DAFB.svg?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
+[![React 19](https://img.shields.io/badge/React-19-61DAFB.svg?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 
 [![Platforms](https://img.shields.io/badge/Platforms-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg?style=flat-square&logo=apple&logoColor=white)](#1-requirements)
 [![Formats](https://img.shields.io/badge/Formats-VST3%20%7C%20AU%20%7C%20Standalone-7C4DFF.svg?style=flat-square&logo=audio-technica&logoColor=white)](#-build-outputs)
@@ -78,7 +78,7 @@ and is never shipped to the client.
 
 ### Owner deploy checklist
 
-1. Create a Netlify site linked to this repo (deploy from `ui/dist`)
+1. Create a Netlify site linked to this repo (deploy from `apps/web/dist`)
 2. Set `NETLIFY_SITE_ID` and `NETLIFY_AUTH_TOKEN` as GitHub repo secrets
 3. Set `GEMINI_KEY` in the Netlify site env vars — use a dedicated key on a
    project where billing is never enabled (free tier only)
@@ -89,7 +89,7 @@ and is never shipped to the client.
 
 ```sh
 node scripts/sync-prompts.mjs        # generates gitignored prompt constants
-cd ui && npm ci && npm run dev       # UI + browser shim on http://localhost:5173
+npx nx serve web                     # UI + browser shim on http://localhost:5173
 ```
 
 The Vite-only server above does **not** serve `/api/generate` — generation
@@ -99,7 +99,7 @@ UI and the function together (see `[dev]` in `netlify.toml`):
 
 ```sh
 node scripts/sync-prompts.mjs
-cd ui && npm ci && cd ..
+npm ci
 GEMINI_KEY=your-key netlify dev      # http://localhost:8888
 ```
 
@@ -113,7 +113,7 @@ GEMINI_KEY=your-key netlify dev      # http://localhost:8888
 |---|---|
 | **CMake** ≥ 3.24 | Build system |
 | **C++20 toolchain** | Clang, MSVC, or GCC |
-| **Node.js 20** + npm | Builds the React UI |
+| **Node.js 22** + npm | Builds the React UI (`nx test` uses `--experimental-strip-types`) |
 | **Gemini API key** | Required for LLM patch generation — see [step 3](#3-configure-your-api-key) |
 | **WebView runtime** | macOS: WKWebView (built in) · Windows: [WebView2](https://developer.microsoft.com/microsoft-edge/webview2/) · Linux: `libwebkit2gtk-4.1-0` + `-dev` |
 
@@ -126,7 +126,7 @@ git submodule update --init --recursive
 
 # Build the React UI first — it is embedded into the binary, so it must
 # exist before the CMake build runs.
-cd ui && npm ci && npx vite build && cd ..
+npm ci && npx nx build web
 
 cmake -S . -B build -DAGENTIC_SYNTH_BUILD_PLUGIN=ON
 cmake --build build --parallel
@@ -185,7 +185,7 @@ Vite dev server:
 
 ```sh
 # Terminal 1
-cd ui && npm run dev            # http://localhost:5173
+npx nx serve web                # http://localhost:5173
 
 # Terminal 2
 cmake -B build -DAGENTIC_SYNTH_UI_DEV=ON
@@ -210,6 +210,9 @@ DURATION=60 scripts/record-demo.sh demo.mp4
 
 ```
 agentic-synth/
+├── apps/
+│   └── web/        # React + TypeScript + Vite (Nx project `web`)
+├── libs/           # shared-types, data, engine-bridge, codec, prompt, modval
 ├── cmake/          # CMake modules
 ├── docs/           # Architecture, guides, ADRs
 ├── scripts/        # Model download, plugin validation, demo capture
@@ -221,8 +224,7 @@ agentic-synth/
 │   ├── plugin/     # JUCE AudioProcessor + editor
 │   └── ui/         # WebView host and native↔JS bridge
 ├── tests/          # Catch2 suite
-├── third_party/    # JUCE + llama.cpp submodules
-└── ui/             # React + TypeScript + Vite front-end
+└── third_party/    # JUCE + llama.cpp submodules
 ```
 
 ---
@@ -233,6 +235,7 @@ agentic-synth/
 |---|---|
 | [Getting Started](docs/getting-started.md) | Install, launch, first patch |
 | [Architecture](docs/architecture.md) | How the pieces fit together |
+| [Nx boundaries (ADR-0008)](docs/adr/ADR-0008-nx-workspace-boundaries.md) | Apps, tagged libs, engine-bridge attach |
 | [Audio Engine](docs/audio-engine.md) | Signal flow, patch contract, DSP internals |
 | [Timbre Profile Map](docs/timbre-profile-map.md) | The sound-design range available |
 | [Mod Matrix Guide](docs/mod-matrix-guide.md) | Routing modulation |

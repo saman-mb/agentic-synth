@@ -190,22 +190,23 @@ endif()
 # ── React UI bundling ────────────────────────────────────────────────────────
 option(AGENTIC_SYNTH_UI_DEV "Hot-load Vite dev server instead of bundled assets" OFF)
 
-set(UI_SRC_DIR  "${CMAKE_SOURCE_DIR}/ui")
+set(UI_SRC_DIR  "${CMAKE_SOURCE_DIR}/apps/web")
 set(UI_DIST_DIR "${UI_SRC_DIR}/dist")
 
 # Bootstrap on fresh checkout: run npm at configure time if dist missing.
-# Note: invoke `npx vite build` directly rather than `npm run build` because
-# the npm script chains `tsc &&` and the repo currently has pre-existing
-# TypeScript errors that are out of scope for the WebView migration.
+# Note: invoke `npx nx build web` (Vite emit) rather than `npm run build`
+# because the npm script chains `tsc &&` and the repo currently has
+# pre-existing TypeScript errors that are out of scope for the WebView
+# migration. Lockfile lives at the repo root after the Nx move.
 find_program(NPM_EXECUTABLE NAMES npm npm.cmd REQUIRED)
 find_program(NPX_EXECUTABLE NAMES npx npx.cmd REQUIRED)
 
 if(NOT EXISTS "${UI_DIST_DIR}/index.html")
     execute_process(COMMAND ${NPM_EXECUTABLE} ci
-                    WORKING_DIRECTORY "${UI_SRC_DIR}"
+                    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
                     COMMAND_ERROR_IS_FATAL ANY)
-    execute_process(COMMAND ${NPX_EXECUTABLE} vite build
-                    WORKING_DIRECTORY "${UI_SRC_DIR}"
+    execute_process(COMMAND ${NPX_EXECUTABLE} nx build web
+                    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
                     COMMAND_ERROR_IS_FATAL ANY)
 endif()
 
@@ -214,12 +215,16 @@ file(GLOB_RECURSE UI_REACT_SOURCES CONFIGURE_DEPENDS
      "${UI_SRC_DIR}/src/*.ts"
      "${UI_SRC_DIR}/src/*.tsx"
      "${UI_SRC_DIR}/src/*.css"
-     "${UI_SRC_DIR}/index.html")
+     "${UI_SRC_DIR}/index.html"
+     "${CMAKE_SOURCE_DIR}/libs/engine-bridge/src/*.ts")
 add_custom_command(
     OUTPUT  "${UI_DIST_DIR}/index.html"
-    COMMAND ${NPX_EXECUTABLE} vite build
-    WORKING_DIRECTORY "${UI_SRC_DIR}"
-    DEPENDS "${UI_SRC_DIR}/package.json"
+    COMMAND ${NPX_EXECUTABLE} nx build web
+    WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}"
+    DEPENDS "${CMAKE_SOURCE_DIR}/package.json"
+            "${CMAKE_SOURCE_DIR}/nx.json"
+            "${UI_SRC_DIR}/project.json"
+            "${UI_SRC_DIR}/package.json"
             "${UI_SRC_DIR}/vite.config.ts"
             ${UI_REACT_SOURCES}
     COMMENT "Rebuilding React UI"

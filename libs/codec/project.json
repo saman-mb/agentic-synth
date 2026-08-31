@@ -1,0 +1,22 @@
+{
+  "name": "codec",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/codec/src",
+  "projectType": "library",
+  "tags": ["type:lib", "scope:shared", "layer:feature"],
+  "implicitDependencies": ["shared-types", "data"],
+  "targets": {
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx eslint libs/codec"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node --experimental-strip-types --test libs/codec/src/**/*.test.ts"
+      }
+    }
+  }
+}

@@ -14,9 +14,10 @@ Tick what you actually ran. Please don't tick something you skipped — an
 honest gap is far more useful to a reviewer than a false green.
 -->
 
+- [ ] `npx nx build web` — web dist builds
+- [ ] `npx nx run-many -t test lint` — Nx targets pass
 - [ ] `cmake --build build --parallel` — builds clean
 - [ ] `ctest --test-dir build --output-on-failure` — tests pass
-- [ ] `cd ui && npx tsc --noEmit` — typechecks
 - [ ] Listened to it — the audio actually sounds right
 - [ ] Loaded in a DAW as VST3/AU
 

@@ -1,0 +1,26 @@
+{
+  "name": "agentic-synth",
+  "version": "0.0.0",
+  "private": true,
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "devDependencies": {
+    "@eslint/js": "^9.26.0",
+    "@nx/eslint-plugin": "^21.6.11",
+    "@nx/react": "^21.4.0",
+    "@nx/vite": "^21.4.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "@vitejs/plugin-react": "^5.0.0",
+    "eslint": "^9.26.0",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "nx": "^21.4.0",
+    "typescript": "^5.8.0",
+    "typescript-eslint": "^8.32.0",
+    "vite": "^5.4.0"
+  },
+  "dependencies": {
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
+  }
+}

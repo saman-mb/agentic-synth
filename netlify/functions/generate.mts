@@ -7,10 +7,10 @@
 // (2 attempts inside a 9 s wall — see lib/gemini.mts).
 //
 // GrammarSampler parity: reject, never coerce (via the shared codec,
-// ui/src/demo/patchCodec). Free-tier safeguards: in-memory per-IP rate
+// libs/codec). Free-tier safeguards: in-memory per-IP rate
 // limit + the brief cache lives in brief.mts.
 
-import { convertLlmPatch, validatePatch, type LlmPatch } from "../../ui/src/demo/patchCodec";
+import { convertLlmPatch, validatePatch, type LlmPatch } from "../../libs/codec/src/index.ts";
 import { generatePatchText, sanitizePrompt } from "./lib/gemini.mts";
 import { checkRateLimit, createRateLimitStore } from "./lib/rateLimit.mts";
 

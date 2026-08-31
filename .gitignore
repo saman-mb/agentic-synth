@@ -30,8 +30,9 @@ CTestTestfile.cmake
 
 # UI dependencies and outputs
 node_modules/
-ui/dist/
-ui/.vite/
+apps/web/dist/
+apps/web/.vite/
+.nx/
 *.tsbuildinfo
 npm-debug.log*
 yarn-debug.log*
@@ -55,6 +56,7 @@ session.db
 JuceLibraryCode/
 scripts/*
 !scripts/sync-prompts.mjs
+!scripts/assert-reversed-import.mjs
 
 # Netlify function generated prompts (run scripts/sync-prompts.mjs)
 netlify/functions/lib/prompts.generated.mts
