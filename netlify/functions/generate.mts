@@ -10,13 +10,13 @@
 // libs/codec). Free-tier safeguards: in-memory per-IP rate
 // limit + the brief cache lives in brief.mts.
 
-import { convertLlmPatch, validatePatch, type LlmPatch } from "../../libs/codec/src/index.ts";
+import { decodeLlmPatch } from "../../libs/codec/src/index.ts";
+import { validatePrompt } from "../../libs/prompt/src/index.ts";
 import { generatePatchText, sanitizePrompt } from "./lib/gemini.mts";
 import { checkRateLimit, createRateLimitStore } from "./lib/rateLimit.mts";
 
 export const config = { path: "/api/generate" };
 
-const MAX_PROMPT_LENGTH = 2000;
 const MAX_BRIEF_LENGTH = 4000;
 // PatchStruct::rationale is char[256]; augmenter_actions entries follow
 // the same cap (PatchAugmenter.cpp appends pipe-separated 256-char
@@ -73,13 +73,11 @@ export default async function handler(req: Request): Promise<Response> {
       return json({ error: "Request body must be a JSON object." }, 400);
     }
     const obj = raw as Record<string, unknown>;
-    const prompt = obj["prompt"];
-    if (typeof prompt !== "string" || prompt.trim().length === 0) {
-      return json({ error: "prompt must be a non-empty string." }, 400);
+    const promptGate = validatePrompt(obj["prompt"]);
+    if (!promptGate.ok) {
+      return json({ error: promptGate.error }, 400);
     }
-    if (prompt.length > MAX_PROMPT_LENGTH) {
-      return json({ error: `prompt must be at most ${MAX_PROMPT_LENGTH} characters.` }, 400);
-    }
+    const prompt = promptGate.prompt;
     let patchId = 0;
     const rawPatchId = obj["patch_id"];
     if (rawPatchId !== undefined) {
@@ -120,11 +118,8 @@ export default async function handler(req: Request): Promise<Response> {
     }
 
     // GrammarSampler parity: reject, never coerce. Malformed model JSON
-    // is an error after retries. The codec contract is convert-then-
-    // validate: the LLM emits string enums, convertLlmPatch maps them
-    // to ints (an unknown name becomes NaN), and validatePatch rejects
-    // the converted patch. Structural garbage that makes conversion
-    // throw is an error too.
+    // is an error after retries. decodeLlmPatch accept-lists `version`,
+    // converts string enums → ints, then validates ranges (#299 / #284).
     let parsedPatch: unknown;
     try {
       parsedPatch = JSON.parse(generated.text);
@@ -132,17 +127,15 @@ export default async function handler(req: Request): Promise<Response> {
       return json({ error: "patch: malformed JSON from model" }, 502);
     }
 
-    let patch: ReturnType<typeof convertLlmPatch>;
-    try {
-      patch = convertLlmPatch(parsedPatch as LlmPatch);
-    } catch {
-      return json({ error: "patch: malformed patch structure" }, 502);
+    const decoded = decodeLlmPatch(parsedPatch);
+    if (!decoded.ok) {
+      const msg = decoded.error.message;
+      const error = decoded.error.code === "unknown_version" || msg.startsWith("patch:")
+        ? msg
+        : `patch: ${msg}`;
+      return json({ error }, 502);
     }
-
-    const verdict = validatePatch(patch);
-    if (!verdict.ok) {
-      return json({ error: `patch: ${verdict.error}` }, 502);
-    }
+    const patch = decoded.patch;
 
     // rationale / augmenter_actions are LLM-transport fields read off the
     // raw JSON (the codec drops them during conversion). Include only

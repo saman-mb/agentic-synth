@@ -3,6 +3,9 @@ export {
   FILTER_TYPES,
   LFO_WAVEFORMS,
   LFO_TARGETS,
+  KNOWN_LLM_PATCH_VERSIONS,
+  assertKnownLlmPatchVersion,
+  decodeLlmPatch,
   convertLlmPatch,
   validatePatch,
 } from './lib/patchCodec';
@@ -18,4 +21,8 @@ export type {
   LlmReverb,
   LlmDelay,
   LlmPatch,
+  KnownLlmPatchVersion,
+  CodecErrorCode,
+  CodecError,
+  DecodeLlmPatchResult,
 } from './lib/patchCodec';

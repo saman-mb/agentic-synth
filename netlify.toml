@@ -19,6 +19,8 @@
     "libs/codec/src/lib/patchCodec.ts",
     "libs/prompt/src/index.ts",
     "libs/prompt/src/lib/sanitizePrompt.ts",
+    "libs/prompt/src/lib/validatePrompt.ts",
+    "libs/prompt/src/lib/briefTypes.ts",
     "libs/data/src/lib/paramRanges.ts",
     "netlify/functions/lib/prompts.generated.mts",
   ]
