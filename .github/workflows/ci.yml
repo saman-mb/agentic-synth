@@ -17,6 +17,8 @@ jobs:
       - uses: actions/checkout@v4
         with:
           submodules: recursive
+          # Full history so `nx affected --base` can see the PR base SHA.
+          fetch-depth: 0
 
       # Pin clang-format-18 to match .pre-commit-config.yaml so local devs
       # and CI produce identical output. Plain `apt install clang-format`
@@ -43,8 +45,33 @@ jobs:
       - name: Install JS dependencies
         run: npm ci
 
-      - name: Nx test + lint
-        run: npx nx run-many -t test lint
+      # Local Nx cache only (no Nx Cloud). Restores task hashes across runs
+      # on the same lockfile; first miss is a cold compile like today.
+      - name: Restore Nx cache
+        uses: actions/cache@v4
+        with:
+          path: .nx/cache
+          key: nx-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+          restore-keys: |
+            nx-${{ runner.os }}-
+
+      # PRs: only projects affected vs the PR base (docs-only → empty set,
+      # Nx exits 0). Push to master/main: full run-many including build.
+      - name: Nx graph tasks
+        env:
+          NX_DAEMON: "false"
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            BASE="${{ github.event.pull_request.base.sha }}"
+            HEAD="${{ github.sha }}"
+            echo "NX affected base=${BASE} head=${HEAD}"
+            echo "Affected projects:"
+            npx nx show projects --affected --base="${BASE}" --head="${HEAD}"
+            npx nx affected -t test lint --base="${BASE}" --head="${HEAD}"
+          else
+            echo "NX run-many (push to ${GITHUB_REF_NAME})"
+            npx nx run-many -t build test lint
+          fi
 
   # Build + run the test target only. We intentionally do NOT build the
   # plugin / standalone GUI targets here — they require JUCE's WebView,
