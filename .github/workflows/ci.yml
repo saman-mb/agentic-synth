@@ -45,9 +45,6 @@ jobs:
       - name: Install JS dependencies
         run: npm ci
 
-      - name: Assert module-boundary lint
-        run: node scripts/assert-reversed-import.mjs
-
       # Local Nx cache only (no Nx Cloud). Restores task hashes across runs
       # on the same lockfile; first miss is a cold compile like today.
       - name: Restore Nx cache
@@ -60,6 +57,11 @@ jobs:
 
       # PRs: only projects affected vs the PR base (docs-only → empty set,
       # Nx exits 0). Push to master/main: full run-many including build.
+      #
+      # Run this BEFORE the reversed-import probe. The probe writes
+      # libs/data/src/lib/__boundary_probe__.ts (a data→web import). If that
+      # file is still on disk during `nx run-many -t lint`, eslint reports
+      # circular web→data→web on every web file (#329 master push).
       - name: Nx graph tasks
         env:
           NX_DAEMON: "false"
@@ -75,6 +77,11 @@ jobs:
             echo "NX run-many (push to ${GITHUB_REF_NAME})"
             npx nx run-many -t build test lint
           fi
+
+      - name: Assert module-boundary lint
+        run: |
+          node scripts/assert-reversed-import.mjs
+          rm -f libs/data/src/lib/__boundary_probe__.ts
 
   # Build + run the test target only. We intentionally do NOT build the
   # plugin / standalone GUI targets here — they require JUCE's WebView,
