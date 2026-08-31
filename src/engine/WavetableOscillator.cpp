@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <cmath>
 #include <complex>
+#include <cstdint>
 #include <cstring>
 #include <fstream>
 #include <numbers>

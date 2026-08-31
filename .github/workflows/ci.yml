@@ -145,8 +145,9 @@ jobs:
 
       # --parallel 2 caps concurrency under JUCE's heavy TUs to stay
       # inside the 16 GB ubuntu-latest free-tier RAM envelope.
+      # Build the Catch2 suite and the JUCE-free C API tests (#305).
       - name: Build test target
-        run: cmake --build build --target agentic_synth_tests --config Debug --parallel 2
+        run: cmake --build build --target agentic_synth_tests agsynth_capi_tests --config Debug --parallel 2
 
       - name: Run unit tests
         run: ctest --test-dir build --build-config Debug --output-on-failure

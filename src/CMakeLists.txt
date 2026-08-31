@@ -43,17 +43,10 @@ target_link_libraries(agentic_synth_mapper
         juce::juce_core
 )
 
-# ── Engine Library ───────────────────────────────────────────────────────────
-# Phase 2 (Item #2): PatchStateManager is removed (APVTS owns persistence), so
-# the engine library no longer needs a JUCE-flavour split — the only TU that
-# pulled juce_data_structures (PatchStateManager.cpp) is gone. We keep a single
-# engine_core target plus an INTERFACE alias `agentic_synth_engine` for
-# backwards-compat with consumers that still link by the legacy name.
-#
-# `agentic_synth_engine_core` is JUCE-light: the only juce dep is `juce_core`
-# transitively via mapper (SemanticMapper uses juce::JSON). No juce_audio_basics
-# / juce_data_structures dependency from the engine side.
-add_library(agentic_synth_engine_core STATIC
+# ── DSP (JUCE-free) + C API (#305 / RFC cpp-dsp-core §2, §10) ───────────────
+# Render-path TUs only. Offline WAV write and mapper stay off this target so
+# `agentic_synth_capi` links no JUCE / no third-party libs.
+set(AGENTIC_SYNTH_DSP_SOURCES
     engine/ADSREnvelope.cpp
     engine/WavetableOscillator.cpp
     engine/VAOscillator.cpp
@@ -63,25 +56,48 @@ add_library(agentic_synth_engine_core STATIC
     engine/ParamSmoother.cpp
     engine/VoiceManager.cpp
     engine/PatchValidator.cpp
+    engine/Reverb.cpp
+    engine/Chorus.cpp
+    engine/TubeSat.cpp
+    engine/HighPassFilter.cpp
+)
+add_library(agentic_synth_dsp OBJECT ${AGENTIC_SYNTH_DSP_SOURCES})
+target_include_directories(agentic_synth_dsp PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+agentic_synth_configure_target(agentic_synth_dsp)
+set_property(TARGET agentic_synth_dsp PROPERTY POSITION_INDEPENDENT_CODE ON)
+
+add_library(agentic_synth_capi STATIC capi/agsynth.cpp)
+target_include_directories(agentic_synth_capi PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}/capi")
+target_link_libraries(agentic_synth_capi PRIVATE agentic_synth_dsp)
+agentic_synth_configure_target(agentic_synth_capi)
+set_property(TARGET agentic_synth_capi PROPERTY POSITION_INDEPENDENT_CODE ON)
+if(NOT MSVC)
+    target_compile_options(agentic_synth_capi PRIVATE -Werror)
+endif()
+
+# ── Engine Library ───────────────────────────────────────────────────────────
+# Phase 2 (Item #2): PatchStateManager is removed (APVTS owns persistence), so
+# the engine library no longer needs a JUCE-flavour split — the only TU that
+# pulled juce_data_structures (PatchStateManager.cpp) is gone. We keep a single
+# engine_core target plus an INTERFACE alias `agentic_synth_engine` for
+# backwards-compat with consumers that still link by the legacy name.
+#
+# `agentic_synth_engine_core` is JUCE-light: DSP objects are JUCE-free; WAV
+# bounce and mapper still pull juce_core / juce_audio_formats (plugin path).
+add_library(agentic_synth_engine_core STATIC
     engine/VariationEngine.cpp
     engine/MidiHandler.cpp
     engine/MorphEngine.cpp
     engine/StyleTransfer.cpp
     engine/PresetExporter.cpp
     engine/MultiModalInput.cpp
-    engine/Reverb.cpp
-    # Phase E (#265) — pre-filter DSP modules for Vangelis-class cinematic
-    # lushness: 3-tap Juno chorus, asymmetric tanh tube saturation, 1-pole
-    # HPF on the reverb auxiliary send.
-    engine/Chorus.cpp
-    engine/TubeSat.cpp
-    engine/HighPassFilter.cpp
     # Phase D / #268 (partial) — synchronous off-thread offline bounce of a
     # patch through a fresh VoiceManager into a 24-bit stereo .wav. Powers
     # the "Bounce to wav" affordance on committed presets.
     engine/OfflineRenderer.cpp
 )
 target_include_directories(agentic_synth_engine_core PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_link_libraries(agentic_synth_engine_core PUBLIC agentic_synth_dsp)
 agentic_synth_configure_target(agentic_synth_engine_core)
 
 # mapper currently links juce::juce_core PUBLIC (SemanticMapper uses juce::JSON),

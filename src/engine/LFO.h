@@ -28,6 +28,9 @@ class LFO {
 public:
     LFO();
 
+    // Deterministic S&H draws. Default constructor seeds 1 (not random_device).
+    void seed(uint32_t seed);
+
     void setSampleRate(double sampleRate);
     void setShape(LfoShape shape);
     void setDepth(float depth);

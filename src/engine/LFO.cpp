@@ -5,7 +5,9 @@
 
 namespace agentic_synth::engine {
 
-LFO::LFO() : mRng(std::random_device{}()) {}
+LFO::LFO() { seed(1u); }
+
+void LFO::seed(uint32_t seed) { mRng.seed(seed ? seed : 1u); }
 
 void LFO::setSampleRate(double sampleRate) { mSampleRate = sampleRate; }
 

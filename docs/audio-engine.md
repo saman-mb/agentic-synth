@@ -28,6 +28,7 @@ filter with a fast amplitude envelope.
 | Patch contract | `src/engine/PatchStruct.h` | Fixed-size patch data shared by the agent, UI, plugin state, and audio engine. |
 | Plugin control path | `src/plugin/AgenticSynthPlugin.*` | JUCE processor lifecycle, APVTS parameters, MIDI adaptation, and audio callback entrypoint. |
 | Voice engine | `src/engine/VoiceManager.*` | Polyphonic allocation, patch application, per-sample voice rendering, effects bus. |
+| C API | `src/capi/agsynth.h` | Stable C ABI over the DSP core (`agentic_synth_capi`). Used by WASM and JSI bridges. |
 | VA oscillators | `src/engine/VAOscillator.*` | PolyBLEP-style saw/square, integrated triangle, analog-style drift. |
 | Wavetable oscillator | `src/engine/WavetableOscillator.*` | Multi-frame wavetable morphing with FFT-built mip levels. |
 | Envelopes | `src/engine/ADSREnvelope.*` | Exponential ADSR for amplitude and filter modulation. |
@@ -38,9 +39,17 @@ filter with a fast amplitude envelope.
 | Safety and validation | `src/engine/PatchValidator.*`, `src/engine/ParamSmoother.*`, `src/engine/SPSCQueue.h` | Parameter clamping, finite checks, smoothing, lock-free patch queue primitives. |
 | Patch utilities | `src/engine/MorphEngine.*`, `VariationEngine.*`, `StyleTransfer.*`, `PresetExporter.*`, `MultiModalInput.*` | Patch generation, interpolation, style transfer, export, and analysis helpers. |
 
-The CMake target for the DSP side is `agentic_synth_engine_core`. It is kept
-JUCE-light: the audio engine itself is ordinary C++ and is not built around
-JUCE audio classes.
+The CMake target for the DSP side is `agentic_synth_dsp` (JUCE-free object
+library) consumed by `agentic_synth_capi` (stable C ABI in `src/capi/agsynth.h`)
+and by `agentic_synth_engine_core` (plugin path: DSP + offline WAV via JUCE).
+The C API is single-thread-per-engine; `ags_engine_render` must not allocate,
+lock, or issue syscalls. Analog-style VA drift and noise/LFO S&H RNGs are
+seeded from `(patch_id, voice, slot)` so identical `(patch, events, sample rate)`
+inputs render bit-identically.
+
+The CMake target for the plugin-facing engine remains `agentic_synth_engine_core`.
+It is kept JUCE-light: the audio engine itself is ordinary C++ and is not built
+around JUCE audio classes.
 
 ## Runtime Control Flow
 

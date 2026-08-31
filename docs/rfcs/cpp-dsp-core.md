@@ -1,6 +1,6 @@
 # RFC: C++ DSP Core C API + Bridges (JSI, WASM)
 
-- **Status:** DRAFT — awaiting principal-engineer sign-off (gate story #304, epic #292)
+- **Status:** Approved — principal-engineer / captain sign-off on gate story #304 (2026-08-31)
 - **Stories built on this:** #305 (C++ core + C API), #306 (WASM → web demo), #307 (golden-file parity), #308 (JSI bridge)
 - **Supersedes nothing; grounded in:** ADR-0001 (JUCE 7), ADR-0008 (Nx boundaries, `engine-bridge` seam), `docs/audio-engine.md`
 

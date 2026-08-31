@@ -279,6 +279,12 @@ private:
     // value so the synth doesn't glide audibly from the default on load.
     bool primed_{false};
 
+    // Last patch_id we used to seed VA drift / noise / LFO S&H. Sentinel so
+    // the first applyPatch always reseeds (RFC cpp-dsp-core §4).
+    uint32_t lastSeededPatchId_{0xFFFFFFFFu};
+
+    void reseedDeterministic(uint32_t patchId) noexcept;
+
     // FX bus: voices → delay → reverb. Stereo path only — mono renderBlock
     // and renderNextSample produce dry voices × master gain. Bus state has
     // no per-voice ownership; FX run once on the summed stereo signal.
