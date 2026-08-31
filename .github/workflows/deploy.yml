@@ -53,7 +53,7 @@ jobs:
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
 
       # Functions are bundled from netlify/functions at deploy time; the
-      # handler's repo-relative import of apps/web/src/demo/patchCodec.ts is
+      # handler's repo-relative import of libs/codec (and libs/prompt) is
       # resolved by the bundler then (source stays in the repo).
       # nwtgck/actions-netlify@v3.0 was dropped: its dist ships without a
       # working esbuild binary (spawn ENOENT on current runners). The CLI

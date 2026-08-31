@@ -4,7 +4,10 @@
     "paths": {
       "@agentic-synth/shared-types": ["libs/shared-types/src/index.ts"],
       "@agentic-synth/data": ["libs/data/src/index.ts"],
-      "@agentic-synth/engine-bridge": ["libs/engine-bridge/src/index.ts"]
+      "@agentic-synth/engine-bridge": ["libs/engine-bridge/src/index.ts"],
+      "@agentic-synth/codec": ["libs/codec/src/index.ts"],
+      "@agentic-synth/prompt": ["libs/prompt/src/index.ts"],
+      "@agentic-synth/modval": ["libs/modval/src/index.ts"]
     }
   }
 }

@@ -25,8 +25,8 @@
 
 import { makeDefaultPatch, type AgentModulationPlan, type PatchParams } from '@agentic-synth/shared-types';
 import { createSynthEngine, setPatchParam, type SynthEngine } from '@agentic-synth/engine-bridge';
+import { validatePatch } from '@agentic-synth/codec';
 import { runGenerateFlow } from './generateFlow';
-import { validatePatch } from './patchCodec';
 
 // ── shapes (mirror useSynthBridge.ts / useWebSocket.ts interfaces) ──
 

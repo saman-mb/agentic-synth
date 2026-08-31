@@ -18,7 +18,7 @@
 
 import type { PatchParams } from '@agentic-synth/shared-types';
 // eslint-disable-next-line @nx/enforce-module-boundaries -- Netlify esbuild cannot resolve tsconfig paths
-import { PARAM_RANGES, type ParamRange } from '../../../../libs/data/src/lib/paramRanges.ts';
+import { PARAM_RANGES, type ParamRange } from '../../../data/src/lib/paramRanges.ts';
 
 // Numeric enum values mirror src/engine/PatchStruct.h exactly.
 export const OSC_TYPES = {
