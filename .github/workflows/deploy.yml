@@ -1,6 +1,6 @@
 name: Deploy web demo
 
-# Deploys the browser demo (ui/dist + netlify/functions) to Netlify.
+# Deploys the browser demo (apps/web/dist + netlify/functions) to Netlify.
 # Lint/build/test gating lives in ci.yml - this workflow only ships.
 on:
   push:
@@ -23,7 +23,7 @@ jobs:
         with:
           node-version: 22
           cache: npm
-          cache-dependency-path: ui/package-lock.json
+          cache-dependency-path: package-lock.json
 
       # prompts.generated.mts is gitignored - it must exist before the UI
       # build and before Netlify bundles netlify/functions at deploy time
@@ -31,13 +31,11 @@ jobs:
       - name: Sync generated prompts
         run: node scripts/sync-prompts.mjs
 
-      - name: Install UI dependencies
-        working-directory: ui
+      - name: Install JS dependencies
         run: npm ci
 
-      - name: Build UI
-        working-directory: ui
-        run: npm run build
+      - name: Build web
+        run: npx nx build web
 
       # nwtgck/actions-netlify silently no-ops when the secrets are absent,
       # which would show a green "Deploy" that shipped nothing (#280 review).
@@ -55,7 +53,7 @@ jobs:
           NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
 
       # Functions are bundled from netlify/functions at deploy time; the
-      # handler's repo-relative import of ui/src/demo/patchCodec.ts is
+      # handler's repo-relative import of apps/web/src/demo/patchCodec.ts is
       # resolved by the bundler then (source stays in the repo).
       # nwtgck/actions-netlify@v3.0 was dropped: its dist ships without a
       # working esbuild binary (spawn ENOENT on current runners). The CLI
@@ -73,13 +71,15 @@ jobs:
           else
             ALIAS_FLAG="--alias pr-${{ github.event.number || github.ref_name }}"
           fi
-          # CI already built ui/dist and synced prompts; --no-build skips
+          # CI already built apps/web/dist and synced prompts; --no-build skips
           # netlify.toml's build command. Redirects/functions/paths all come
-          # from netlify.toml itself.
+          # from netlify.toml itself. Do not pass --filter: npm workspaces
+          # make current CLI treat apps/web as a second site and skip
+          # repo-root functions.
           npx --yes netlify-cli@latest deploy \
             --site "$NETLIFY_SITE_ID" \
-            --dir ui/dist \
-            --functions netlify/functions \
+            --dir "$GITHUB_WORKSPACE/apps/web/dist" \
+            --functions "$GITHUB_WORKSPACE/netlify/functions" \
             --no-build \
             --message "Deploy from GitHub Actions: $COMMIT_MSG" \
             $PROD_FLAG $ALIAS_FLAG

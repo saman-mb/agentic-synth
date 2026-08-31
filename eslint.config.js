@@ -11,13 +11,13 @@ export default [
       'dist/**',
       'node_modules/**',
       'third_party/**',
-      'ui/dist/**',
-      'ui/node_modules/**',
+      'apps/web/dist/**',
+      'apps/web/node_modules/**',
     ],
   },
   js.configs.recommended,
   {
-    files: ['ui/**/*.{js,jsx,ts,tsx}'],
+    files: ['apps/web/**/*.{js,jsx,ts,tsx}'],
     languageOptions: {
       ecmaVersion: 'latest',
       globals: globals.browser,

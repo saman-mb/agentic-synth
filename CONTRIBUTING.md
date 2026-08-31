@@ -47,9 +47,9 @@ pre-commit install --hook-type commit-msg
 ```
 
 The React UI is bundled into the plugin via `juce_add_binary_data`, so
-the C++ build needs a fresh `ui/dist/`. On a clean checkout, CMake will
-run `npm ci && npx vite build` automatically at configure time; subsequent
-edits to `ui/src/**` trigger a rebuild via a custom command.
+the C++ build needs a fresh `apps/web/dist/`. On a clean checkout, CMake will
+run `npm ci && npx nx build web` automatically at configure time; subsequent
+edits to `apps/web/src/**` trigger a rebuild via a custom command.
 
 ### Production build
 
@@ -66,7 +66,7 @@ Vite dev server (port 5173) instead of the bundled assets:
 
 ```sh
 # Terminal 1
-cd ui && npm run dev
+npx nx serve web
 
 # Terminal 2
 cmake -B build -DAGENTIC_SYNTH_UI_DEV=ON
@@ -82,9 +82,8 @@ bridge (`window.__JUCE__.backend`) stays wired identically to production.
 Install and lint the UI:
 
 ```sh
-cd ui
 npm ci
-npm run lint
+npx nx run-many -t lint
 ```
 
 Run all configured pre-commit checks before opening a pull request:
@@ -97,7 +96,7 @@ pre-commit run --all-files
 
 C++ code lives under `src/` and `tests/`. Format it with clang-format using the root `.clang-format` file. Keep changes small, prefer clear ownership and value semantics, and avoid formatting vendored code under `third_party/`.
 
-TypeScript and React code lives under `ui/`. Lint it with ESLint using the root flat config and the UI package scripts. Prefer typed, explicit component boundaries and keep browser-specific logic isolated from reusable UI code.
+TypeScript and React code lives under `apps/web/`. Lint it with ESLint using the root flat config and `npx nx lint web`. Prefer typed, explicit component boundaries and keep browser-specific logic isolated from reusable UI code.
 
 YAML, Markdown, JavaScript, TypeScript, and C++ files should not contain trailing whitespace and should end with a single newline. The pre-commit hooks fix these automatically where possible.
 

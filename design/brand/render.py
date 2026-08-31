@@ -22,7 +22,7 @@ from PIL import Image, ImageDraw, PngImagePlugin
 ROOT = Path(__file__).resolve().parents[2]
 BRAND = Path(__file__).resolve().parent
 REFERENCE = BRAND / "reference"
-PUBLIC = ROOT / "ui" / "public"
+PUBLIC = ROOT / "apps" / "web" / "public"
 DOCS = ROOT / "docs"
 
 

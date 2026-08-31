@@ -78,7 +78,7 @@ and is never shipped to the client.
 
 ### Owner deploy checklist
 
-1. Create a Netlify site linked to this repo (deploy from `ui/dist`)
+1. Create a Netlify site linked to this repo (deploy from `apps/web/dist`)
 2. Set `NETLIFY_SITE_ID` and `NETLIFY_AUTH_TOKEN` as GitHub repo secrets
 3. Set `GEMINI_KEY` in the Netlify site env vars — use a dedicated key on a
    project where billing is never enabled (free tier only)
@@ -89,7 +89,7 @@ and is never shipped to the client.
 
 ```sh
 node scripts/sync-prompts.mjs        # generates gitignored prompt constants
-cd ui && npm ci && npm run dev       # UI + browser shim on http://localhost:5173
+npx nx serve web                     # UI + browser shim on http://localhost:5173
 ```
 
 The Vite-only server above does **not** serve `/api/generate` — generation
@@ -99,7 +99,7 @@ UI and the function together (see `[dev]` in `netlify.toml`):
 
 ```sh
 node scripts/sync-prompts.mjs
-cd ui && npm ci && cd ..
+npm ci
 GEMINI_KEY=your-key netlify dev      # http://localhost:8888
 ```
 
@@ -126,7 +126,7 @@ git submodule update --init --recursive
 
 # Build the React UI first — it is embedded into the binary, so it must
 # exist before the CMake build runs.
-cd ui && npm ci && npx vite build && cd ..
+npm ci && npx nx build web
 
 cmake -S . -B build -DAGENTIC_SYNTH_BUILD_PLUGIN=ON
 cmake --build build --parallel
@@ -210,6 +210,8 @@ DURATION=60 scripts/record-demo.sh demo.mp4
 
 ```
 agentic-synth/
+├── apps/
+│   └── web/        # React + TypeScript + Vite (Nx project `web`)
 ├── cmake/          # CMake modules
 ├── docs/           # Architecture, guides, ADRs
 ├── scripts/        # Model download, plugin validation, demo capture
@@ -221,8 +223,7 @@ agentic-synth/
 │   ├── plugin/     # JUCE AudioProcessor + editor
 │   └── ui/         # WebView host and native↔JS bridge
 ├── tests/          # Catch2 suite
-├── third_party/    # JUCE + llama.cpp submodules
-└── ui/             # React + TypeScript + Vite front-end
+└── third_party/    # JUCE + llama.cpp submodules
 ```
 
 ---
