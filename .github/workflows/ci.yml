@@ -4,7 +4,6 @@ on:
   push:
     branches: [master, main]
   pull_request:
-    branches: [master, main]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -39,15 +38,13 @@ jobs:
         with:
           node-version: "20"
           cache: npm
-          cache-dependency-path: ui/package-lock.json
+          cache-dependency-path: package-lock.json
 
-      - name: Install UI dependencies
-        working-directory: ui
+      - name: Install JS dependencies
         run: npm ci
 
-      - name: Run ESLint
-        working-directory: ui
-        run: npm run lint
+      - name: Nx test + lint
+        run: npx nx run-many -t test lint
 
   # Build + run the test target only. We intentionally do NOT build the
   # plugin / standalone GUI targets here — they require JUCE's WebView,

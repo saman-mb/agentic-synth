@@ -9,7 +9,7 @@
 //   1. `juce_add_binary_data(agentic_synth_ui_assets ...)` produced symbols
 //      that the test can link against (UiBinaryData.h is on the include path).
 //   2. The Vite build emitted an `index.html` and at least one CSS asset
-//      into `ui/dist/`, and those got picked up by the GLOB.
+//      into `apps/web/dist/`, and those got picked up by the GLOB.
 //   3. Path normalisation, basename extraction, and MIME selection match
 //      the spec in the migration plan.
 

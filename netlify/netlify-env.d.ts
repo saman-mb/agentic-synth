@@ -11,6 +11,6 @@ declare const process: {
   env: Record<string, string | undefined>;
 };
 
-// ui/src/components/Knob.tsx is pulled into the typecheck via the codec
+// apps/web/src/components/Knob.tsx is pulled into the typecheck via the codec
 // import chain and does `import "./Knob.css"`.
 declare module "*.css";

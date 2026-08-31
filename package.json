@@ -1,0 +1,14 @@
+{
+  "name": "agentic-synth",
+  "version": "0.0.0",
+  "private": true,
+  "license": "PolyForm-Noncommercial-1.0.0",
+  "workspaces": [
+    "apps/web"
+  ],
+  "devDependencies": {
+    "@nx/react": "^21.4.0",
+    "@nx/vite": "^21.4.0",
+    "nx": "^21.4.0"
+  }
+}

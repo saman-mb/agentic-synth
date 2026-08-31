@@ -1,22 +1,22 @@
 # Netlify deploy configuration for the web demo (#280).
 #
-# CI (.github/workflows/deploy.yml) prebuilds ui/dist and runs
+# CI (.github/workflows/deploy.yml) prebuilds apps/web/dist and runs
 # scripts/sync-prompts.mjs before deploying; `command` exists so manual
 # `netlify deploy` / `netlify dev` from a fresh checkout also work.
 
 [build]
-  publish = "ui/dist"
-  command = "node scripts/sync-prompts.mjs && cd ui && npm ci && npm run build"
+  publish = "apps/web/dist"
+  command = "node scripts/sync-prompts.mjs && npm ci && npx nx build web"
   functions = "netlify/functions"
 
-# generate.mts imports the shared patch codec from ui/src (outside the
+# generate.mts imports the shared patch codec from apps/web/src (outside the
 # functions directory). Netlify's server-side bundler only reaches
 # outside the functions dir for paths declared here — without them the
 # function 404s at request time (#280 live finding).
 [functions]
   included_files = [
-    "ui/src/demo/patchCodec.ts",
-    "ui/src/data/modulation.ts",
+    "apps/web/src/demo/patchCodec.ts",
+    "apps/web/src/data/modulation.ts",
     "netlify/functions/lib/prompts.generated.mts",
   ]
 
@@ -38,7 +38,7 @@
 # After tambra.app (or tambra.audio) is registered, pointed at Netlify,
 # and attached to this site:
 #   1. Uncomment the host redirect below (it must stay above the SPA rule).
-#   2. Point og:image / twitter:image in ui/index.html at the canonical
+#   2. Point og:image / twitter:image in apps/web/index.html at the canonical
 #      origin and re-check card validators.
 #
 # [[redirects]]
@@ -60,7 +60,7 @@
 # GEMINI_KEY in the environment for generation to work.
 [dev]
   framework = "#custom"
-  command = "node scripts/sync-prompts.mjs && cd ui && npm run dev"
+  command = "node scripts/sync-prompts.mjs && npx nx serve web"
   targetPort = 5173
   port = 8888
   autoLaunch = false
