@@ -151,11 +151,12 @@ Important targets and concepts:
 
 ### React UI
 
-- The UI lives in `ui/`.
-- Vite project files are present in `ui/vite.config.ts`, `ui/tsconfig.json`, and `ui/index.html`.
-- React source lives under `ui/src/`.
-- Node.js 20 or newer is expected for local development and CI.
-- UI linting runs with `npm run lint` from the `ui/` directory.
+- The Vite app lives in `apps/web/` (Nx project `web`). Shared JS is under `libs/`.
+- Path aliases `@agentic-synth/<lib>` are defined in `tsconfig.base.json` and `apps/web/vite.config.ts`.
+- Node.js 22 is expected for local development and CI (`nx test` uses `--experimental-strip-types`).
+- UI linting is `npx nx lint web` or `npx nx run-many -t lint` from the repo root.
+- Module boundaries are `@nx/enforce-module-boundaries` in `eslint.config.js` (ADR-0008).
+- How to add `apps/mobile` later is recorded in ADR-0008.
 
 ## Directory Structure
 
@@ -166,13 +167,12 @@ agentic-synth/
   docs/                    Architecture documents, diagrams, generated artifacts, and ADRs
   docs/adr/                Architecture Decision Records
   src/                     C++ application, plugin, engine, and bridge code
-  src/agent/               AgentBridge C++ boundary
-  src/engine/              SynthEngine DSP boundary
+  apps/web/                React + Vite (Nx project `web`)
+  libs/                    shared-types, data, engine-bridge, codec, prompt, modval
   tests/                   C++ test targets
-  third_party/             Reserved vendored dependencies and submodules
-  third_party/JUCE/        Expected JUCE framework dependency
-  third_party/llama.cpp/   Expected local inference dependency
-  ui/                      React, TypeScript, and Vite UI project
+  third_party/             Vendored dependencies and submodules
+  third_party/JUCE/        JUCE framework
+  third_party/llama.cpp/   Local inference dependency
   CMakeLists.txt           Root CMake entry point
   CMakePresets.json        Local configure and build presets
   CONTRIBUTING.md          Contributor workflow and standards
@@ -186,6 +186,7 @@ Architecture decisions are recorded as ADRs in `docs/adr/`.
 | ADR | Status | Decision |
 | --- | --- | --- |
 | [ADR-0001](adr/ADR-0001-initial-architecture.md) | Accepted | Use JUCE 7 as the audio plugin framework. |
+| [ADR-0008](adr/ADR-0008-nx-workspace-boundaries.md) | Accepted | Nx apps + tagged libs; engine-bridge is the WASM/JSI seam. |
 | [ADR-0007](adr/ADR-0007-option2-local-audio-generation-model.md) | Proposed | Option 2 local audio model: Stable Audio 3 (Small SFX / Medium), not the non-existent "Stable Audio Open 2". |
 
 Current guiding decisions:

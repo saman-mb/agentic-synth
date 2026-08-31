@@ -12,7 +12,7 @@
 [![License: PolyForm Noncommercial](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-orange.svg?style=for-the-badge)](LICENSE)
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C.svg?style=for-the-badge&logo=cplusplus&logoColor=white)](https://en.cppreference.com/w/cpp/20)
 [![JUCE 8](https://img.shields.io/badge/JUCE-8-8DC63F.svg?style=for-the-badge&logo=juce&logoColor=white)](https://juce.com/)
-[![React 18](https://img.shields.io/badge/React-18-61DAFB.svg?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
+[![React 19](https://img.shields.io/badge/React-19-61DAFB.svg?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 
 [![Platforms](https://img.shields.io/badge/Platforms-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg?style=flat-square&logo=apple&logoColor=white)](#1-requirements)
 [![Formats](https://img.shields.io/badge/Formats-VST3%20%7C%20AU%20%7C%20Standalone-7C4DFF.svg?style=flat-square&logo=audio-technica&logoColor=white)](#-build-outputs)
@@ -113,7 +113,7 @@ GEMINI_KEY=your-key netlify dev      # http://localhost:8888
 |---|---|
 | **CMake** ≥ 3.24 | Build system |
 | **C++20 toolchain** | Clang, MSVC, or GCC |
-| **Node.js 20** + npm | Builds the React UI |
+| **Node.js 22** + npm | Builds the React UI (`nx test` uses `--experimental-strip-types`) |
 | **Gemini API key** | Required for LLM patch generation — see [step 3](#3-configure-your-api-key) |
 | **WebView runtime** | macOS: WKWebView (built in) · Windows: [WebView2](https://developer.microsoft.com/microsoft-edge/webview2/) · Linux: `libwebkit2gtk-4.1-0` + `-dev` |
 
@@ -185,7 +185,7 @@ Vite dev server:
 
 ```sh
 # Terminal 1
-cd ui && npm run dev            # http://localhost:5173
+npx nx serve web                # http://localhost:5173
 
 # Terminal 2
 cmake -B build -DAGENTIC_SYNTH_UI_DEV=ON
@@ -212,6 +212,7 @@ DURATION=60 scripts/record-demo.sh demo.mp4
 agentic-synth/
 ├── apps/
 │   └── web/        # React + TypeScript + Vite (Nx project `web`)
+├── libs/           # shared-types, data, engine-bridge, codec, prompt, modval
 ├── cmake/          # CMake modules
 ├── docs/           # Architecture, guides, ADRs
 ├── scripts/        # Model download, plugin validation, demo capture
@@ -234,6 +235,7 @@ agentic-synth/
 |---|---|
 | [Getting Started](docs/getting-started.md) | Install, launch, first patch |
 | [Architecture](docs/architecture.md) | How the pieces fit together |
+| [Nx boundaries (ADR-0008)](docs/adr/ADR-0008-nx-workspace-boundaries.md) | Apps, tagged libs, engine-bridge attach |
 | [Audio Engine](docs/audio-engine.md) | Signal flow, patch contract, DSP internals |
 | [Timbre Profile Map](docs/timbre-profile-map.md) | The sound-design range available |
 | [Mod Matrix Guide](docs/mod-matrix-guide.md) | Routing modulation |

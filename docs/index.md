@@ -36,9 +36,10 @@ Start at the [README](../README.md) if you haven't built the project yet.
 
 ### Architecture decisions
 
-Design decisions and their rationale live in [`adr/`](adr/). Read these before
-proposing a structural change — most of the "why is it like this?" questions
-are answered there.
+Design decisions and their rationale live in [`adr/`](adr/). Start with
+[ADR-0008](adr/ADR-0008-nx-workspace-boundaries.md) for the Nx graph. Read these
+before proposing a structural change — most of the "why is it like this?"
+questions are answered there.
 
 ---
 
