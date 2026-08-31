@@ -78,8 +78,8 @@ jobs:
           # repo-root functions.
           npx --yes netlify-cli@latest deploy \
             --site "$NETLIFY_SITE_ID" \
-            --dir apps/web/dist \
-            --functions netlify/functions \
+            --dir "$GITHUB_WORKSPACE/apps/web/dist" \
+            --functions "$GITHUB_WORKSPACE/netlify/functions" \
             --no-build \
             --message "Deploy from GitHub Actions: $COMMIT_MSG" \
             $PROD_FLAG $ALIAS_FLAG
