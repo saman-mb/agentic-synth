@@ -96,18 +96,36 @@ where `f` encodes direction/curve. `base` is the patch value after generate (bef
 
 ## Prompt → macro starting values
 
-Same shape as desktop `plan.macros` after patch generate.
+**Not the same shape as desktop `plan.macros`.** Do not reuse `AgentModMacro` / `AgentModulationPlan.macros` as the mobile start payload.
+
+### Desktop (reference only)
+
+Desktop `AgentModMacro` is `{ name?, label?, routes? }` (`libs/shared-types`). Each `route.amount` is **bipolar mod depth in `[-1, 1]`** wired into the mod matrix — **not** a knob position in `[0, 1]`. Desktop apply (`apps/web`) may rename labels and install routes; it **never** sets macro knob position from the plan (knobs stay at their UI default until the user moves them).
+
+Desktop `routes` are **not** the mobile start contract. Mobile v1 uses the **fixed bundles** in this doc; the planner does not ship per-route mod matrices for mobile chrome.
+
+### Normative mobile contract
+
+Length-**4**, **index-primary** starting positions for the chrome knobs:
+
+| Slot | Mobile id | Desktop label align |
+|---|---|---|
+| 0 | `macro.0` | `macro1` |
+| 1 | `macro.1` | `macro2` |
+| 2 | `macro.2` | `macro3` |
+| 3 | `macro.3` | `macro4` |
 
 1. **Producer:** agent / plan layer (E2 orchestration + planner output), not the UI.
-2. **Emit:** after a successful generate, the plan includes macro amounts in **`0…1`** for up to four slots (aligned with desktop `plan.macros.slice(0, 4)` in `apps/web`).
-3. **Consumers:** E2 (wire into mobile session / Keep snapshot) and E3 (apply bundles when projecting to engine params).
-4. **Fields (contract):**
-   - Slot index `0…3` ↔ `macro.{i}` ↔ desktop `macro{i+1}`
-   - `amount` / value: `number` in `[0, 1]`
-   - Optional `name` / `label`: if present and non-empty, may override the default user label for that session (desktop already does this); v1 mobile may ignore rename and keep Brightness / Movement / Space / Body for chrome consistency — product choice for E5, but amounts always apply.
-5. **Missing slot:** use the **default position** from the inventory tables above.
-6. **Out-of-range amount:** clamp to `[0, 1]` before UI / projection.
-7. **Example intent:** prompt “warm analog pad” → plan might set Brightness low-mid, Space elevated, Movement low, Body mid-high; exact numbers are planner policy, not fixed in this doc — only the **who emits / who consumes / 0…1** contract is normative.
+2. **Emit:** after a successful generate, emit **four knob positions** (or omit slots — see missing rule). Field name is implementation choice: e.g. `position` or `value` — a `number` in **`[0, 1]`**.
+3. **Consumers:** E2 (wire into mobile session / Keep snapshot) and E3 (project fixed bundles from position → engine params).
+4. **Missing slot / null / omitted entry:** use the **default position** from the inventory tables above (`0.55` / `0.35` / `0.30` / `0.40`).
+5. **Out of range:** **clamp** to `[0, 1]` before UI / projection.
+6. **Labels:** mobile chrome keeps Brightness / Movement / Space / Body for v1; optional planner rename is out of this start contract (desktop `name`/`label` on `AgentModMacro` is a separate desktop concern).
+7. **Example intent:** prompt “warm analog pad” → planner might set Brightness low-mid, Space elevated, Movement low, Body mid-high; exact numbers are planner policy — only the **index ↔ knob / `[0,1]` / defaults / clamp** rules are normative here.
+
+### Keep snapshot (`preset.macros`)
+
+Align with [ia.md](./ia.md): **`preset.macros`** is an index-ordered **`[number × 4]`** of knob positions in **`0…1`** (same semantics as the start contract / chrome knobs), not desktop `routes`.
 
 ## Knob interaction (UX)
 

@@ -1,6 +1,6 @@
 # Mobile information architecture
 
-> **v1/prototype** · Part of epic [#290](https://github.com/saman-mb/agentic-synth/issues/290) · Feeds [#296](https://github.com/saman-mb/agentic-synth/issues/296) / [#297](https://github.com/saman-mb/agentic-synth/issues/297) / [#298](https://github.com/saman-mb/agentic-synth/issues/298) · Unblocks E5 [#294](https://github.com/saman-mb/agentic-synth/issues/294) · Closes [#295](https://github.com/saman-mb/agentic-synth/issues/295) AC.
+> **v1/prototype** · Part of epic [#290](https://github.com/saman-mb/agentic-synth/issues/290) · Macros: [macros.md](./macros.md) ([#296](https://github.com/saman-mb/agentic-synth/issues/296)) · Feeds [#297](https://github.com/saman-mb/agentic-synth/issues/297) / [#298](https://github.com/saman-mb/agentic-synth/issues/298) · Unblocks E5 [#294](https://github.com/saman-mb/agentic-synth/issues/294) · Closes [#295](https://github.com/saman-mb/agentic-synth/issues/295) AC.
 
 Single screen + one bottom sheet. An engineer who has never seen the desktop app should be able to name every control from this doc alone. State transitions live in [state-machine.md](./state-machine.md). Desktop deferrals live in [cut-list.md](./cut-list.md). Index: [README](./README.md).
 
@@ -96,7 +96,7 @@ Always mounted. Visibility may dim; do not unmount for state changes.
 | `preset.name` | yes | User-editable; default from prompt fragment |
 | `preset.prompt` | yes | Source utterance / text that produced the kept sound |
 | `preset.patch` | yes | Full working patch snapshot (same `PatchParams` / `PatchStruct` POD as desktop — no mobile-only schema) |
-| `preset.macros` | yes | Macro control values at Keep time (opaque `0…1`; semantics → [#296](https://github.com/saman-mb/agentic-synth/issues/296)) |
+| `preset.macros` | yes | Index-ordered `[number × 4]` knob positions in `0…1` (`macro.0`…`macro.3`; see [macros.md](./macros.md)) |
 | `preset.variation` | yes | **Chosen variation identity only:** `{ index, seed? }`. Rejected siblings are **not** stored |
 | `preset.createdAt` | yes | ISO-8601 timestamp |
 
@@ -128,11 +128,14 @@ Survives background; cleared after successful Keep or explicit discard:
 | Doc links | Relative under `docs/mobile/` | `[State machine](./state-machine.md)` |
 | Tokens (#298) | CSS-var style keys in JSON | `color.bg.0` |
 
-**Rule for later stories:** [#296](https://github.com/saman-mb/agentic-synth/issues/296)–[#298](https://github.com/saman-mb/agentic-synth/issues/298) may **add** files and fill reserved hooks. They must not rename `MobileState` values or split the single sheet.
+**Rule for later stories:** [#297](https://github.com/saman-mb/agentic-synth/issues/297)–[#298](https://github.com/saman-mb/agentic-synth/issues/298) may **add** files and fill reserved hooks. They must not rename `MobileState` values or split the single sheet. [#296](https://github.com/saman-mb/agentic-synth/issues/296) macros contract is in [macros.md](./macros.md).
+
+## Spec siblings
+
+- [macros.md](./macros.md) — #296 (landed)
 
 ## Future stubs (do not create yet)
 
-- [macros.md](./macros.md) — #296 (landed)
 - [input.md](./input.md) — #297
 - Visual tokens / art — #298 (`el.visualizer` only)
 
