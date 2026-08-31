@@ -19,6 +19,7 @@ const nxModuleBoundaries = [
       { sourceTag: 'layer:types', onlyDependOnLibsWithTags: ['layer:types'] },
       { sourceTag: 'layer:data', onlyDependOnLibsWithTags: ['layer:types', 'layer:data'] },
       { sourceTag: 'layer:engine', onlyDependOnLibsWithTags: ['layer:types', 'layer:data', 'layer:engine'] },
+      { sourceTag: 'layer:feature', onlyDependOnLibsWithTags: ['layer:types', 'layer:data', 'layer:feature'] },
     ],
   },
 ];

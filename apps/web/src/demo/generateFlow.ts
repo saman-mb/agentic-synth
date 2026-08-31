@@ -21,7 +21,9 @@
 
 import type { AgentModulationPlan, PatchParams } from '@agentic-synth/shared-types';
 import type { SynthEngine } from '@agentic-synth/engine-bridge';
-import { validatePatch } from './patchCodec';
+import { validatePatch } from '@agentic-synth/codec';
+import { sanitizePrompt } from '@agentic-synth/prompt';
+import { validateModulationPlan } from '@agentic-synth/modval';
 
 /** What the shim hands the flow — emit fans out to every JUCE listener. */
 export interface GenerateFlowDeps {
@@ -45,10 +47,6 @@ interface GenerateApiResponse {
 }
 
 // ── pure helpers (no I/O — unit-testable) ────────────────────────────
-
-function isRecord(v: unknown): v is Record<string, unknown> {
-  return typeof v === 'object' && v !== null;
-}
 
 function asString(v: unknown): string | undefined {
   return typeof v === 'string' && v.length > 0 ? v : undefined;
@@ -91,6 +89,8 @@ export async function runGenerateFlow(
     emit('error', { message: 'Type a prompt first — there is nothing to generate.' });
     return;
   }
+
+  prompt = sanitizePrompt(prompt);
 
   // Start the AudioContext while the generate click's user activation is
   // still fresh (a slow fetch can outlive the transient gesture window).
@@ -187,7 +187,12 @@ export async function runGenerateFlow(
 
   // 2. Apply to the engine (setPatch then macros) and update the snapshot
   //    so knob_tweak / feedback / audition keys work against this patch.
-  const modulation = isRecord(data.modulation) ? (data.modulation as AgentModulationPlan) : undefined;
+  const modVerdict = validateModulationPlan(data.modulation);
+  if (!modVerdict.ok) {
+    emit('error', { message: `The patch service returned an invalid modulation (${modVerdict.error}).` });
+    return;
+  }
+  const modulation = modVerdict.plan;
   deps.applyServerPatch(patch, modulation);
 
   // 3. Patch frame BEFORE the rationale stream — C++ order is patch →

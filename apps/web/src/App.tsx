@@ -25,6 +25,7 @@ import { useWebSocket } from './hooks/useWebSocket';
 import { usePatchHistory } from './hooks/usePatchHistory';
 import { useUiAudioSettings } from './hooks/useUiAudioSettings';
 import type { AgentModulationPlan, ChatMessage, PatchPreviewData } from '@agentic-synth/shared-types';
+import { normaliseModDestination } from '@agentic-synth/modval';
 import {
   PresetEntry,
   loadAllPresets,
@@ -224,10 +225,6 @@ function diffPatch(prev: PatchParams, next: PatchParams): Record<string, number>
     if (a[k] !== b[k]) out[k] = b[k];
   }
   return out;
-}
-
-function normaliseModDestination(target: string): string {
-  return target.replace(/\[(\d+)\]/g, '.$1');
 }
 
 function macroSourceForIndex(index: number): ModSourceId {

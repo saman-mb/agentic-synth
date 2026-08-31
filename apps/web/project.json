@@ -4,7 +4,7 @@
   "projectType": "application",
   "sourceRoot": "apps/web/src",
   "tags": ["type:app", "scope:web"],
-  "implicitDependencies": ["data", "shared-types", "engine-bridge"],
+  "implicitDependencies": ["data", "shared-types", "engine-bridge", "codec", "prompt", "modval"],
   "targets": {
     "build": {
       "executor": "nx:run-commands",

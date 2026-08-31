@@ -13,6 +13,9 @@ export default defineConfig({
       '@agentic-synth/shared-types': path.join(repoRoot, 'libs/shared-types/src'),
       '@agentic-synth/data': path.join(repoRoot, 'libs/data/src'),
       '@agentic-synth/engine-bridge': path.join(repoRoot, 'libs/engine-bridge/src'),
+      '@agentic-synth/codec': path.join(repoRoot, 'libs/codec/src'),
+      '@agentic-synth/prompt': path.join(repoRoot, 'libs/prompt/src'),
+      '@agentic-synth/modval': path.join(repoRoot, 'libs/modval/src'),
     },
   },
   build: {

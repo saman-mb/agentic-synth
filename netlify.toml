@@ -9,13 +9,16 @@
   command = "node scripts/sync-prompts.mjs && npm ci && npx nx build web"
   functions = "netlify/functions"
 
-# generate.mts imports the shared patch codec from apps/web/src (outside the
+# generate.mts imports the shared patch codec from libs/codec (outside the
 # functions directory). Netlify's server-side bundler only reaches
 # outside the functions dir for paths declared here — without them the
 # function 404s at request time (#280 live finding).
 [functions]
   included_files = [
-    "apps/web/src/demo/patchCodec.ts",
+    "libs/codec/src/index.ts",
+    "libs/codec/src/lib/patchCodec.ts",
+    "libs/prompt/src/index.ts",
+    "libs/prompt/src/lib/sanitizePrompt.ts",
     "libs/data/src/lib/paramRanges.ts",
     "netlify/functions/lib/prompts.generated.mts",
   ]
