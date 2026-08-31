@@ -29,6 +29,7 @@ Start at the [README](../README.md) if you haven't built the project yet.
 |---|---|
 | [Architecture](architecture.md) | System design, component boundaries, how the agent and engine talk |
 | [Audio Engine](audio-engine.md) | Signal flow, the patch contract, and DSP implementation |
+| [Mobile UX & design](mobile/README.md) | Single-screen mobile UX: IA/FSM, macros, input, dark tokens + art direction (visualizer/knobs) |
 | [Build & Release](build-release.md) | Compiling from source, packaging, signing |
 | [Local Inference](local-inference.md) | Running LLM inference on your own hardware instead of a hosted API |
 | [Contributing](../CONTRIBUTING.md) | Workflow, coding standards, commit conventions |
