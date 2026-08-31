@@ -1,0 +1,22 @@
+{
+  "name": "engine-bridge",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/engine-bridge/src",
+  "projectType": "library",
+  "tags": ["type:lib", "scope:shared", "layer:engine"],
+  "implicitDependencies": ["shared-types", "data"],
+  "targets": {
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx eslint libs/engine-bridge && node scripts/assert-reversed-import.mjs"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node -e \"console.log('engine-bridge: no unit tests yet')\""
+      }
+    }
+  }
+}
