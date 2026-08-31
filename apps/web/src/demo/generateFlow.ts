@@ -20,7 +20,7 @@
 //   400/429/502/503 { "error": string }
 
 import type { AgentModulationPlan, PatchParams } from '@agentic-synth/shared-types';
-import type { SynthEngine } from '../webaudio/engine';
+import type { SynthEngine } from '@agentic-synth/engine-bridge';
 import { validatePatch } from './patchCodec';
 
 /** What the shim hands the flow — emit fans out to every JUCE listener. */

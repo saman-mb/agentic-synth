@@ -215,7 +215,8 @@ file(GLOB_RECURSE UI_REACT_SOURCES CONFIGURE_DEPENDS
      "${UI_SRC_DIR}/src/*.ts"
      "${UI_SRC_DIR}/src/*.tsx"
      "${UI_SRC_DIR}/src/*.css"
-     "${UI_SRC_DIR}/index.html")
+     "${UI_SRC_DIR}/index.html"
+     "${CMAKE_SOURCE_DIR}/libs/engine-bridge/src/*.ts")
 add_custom_command(
     OUTPUT  "${UI_DIST_DIR}/index.html"
     COMMAND ${NPX_EXECUTABLE} nx build web

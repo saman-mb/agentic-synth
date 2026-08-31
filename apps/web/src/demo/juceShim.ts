@@ -24,8 +24,7 @@
 // guarded for private-mode / quota failures.
 
 import { makeDefaultPatch, type AgentModulationPlan, type PatchParams } from '@agentic-synth/shared-types';
-import { createSynthEngine, type SynthEngine } from '../webaudio/engine';
-import { setPatchParam } from '../webaudio/paramMap';
+import { createSynthEngine, setPatchParam, type SynthEngine } from '@agentic-synth/engine-bridge';
 import { runGenerateFlow } from './generateFlow';
 import { validatePatch } from './patchCodec';
 

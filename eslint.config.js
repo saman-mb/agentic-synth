@@ -18,6 +18,7 @@ const nxModuleBoundaries = [
       { sourceTag: 'type:app', onlyDependOnLibsWithTags: ['type:lib'] },
       { sourceTag: 'layer:types', onlyDependOnLibsWithTags: ['layer:types'] },
       { sourceTag: 'layer:data', onlyDependOnLibsWithTags: ['layer:types', 'layer:data'] },
+      { sourceTag: 'layer:engine', onlyDependOnLibsWithTags: ['layer:types', 'layer:data', 'layer:engine'] },
     ],
   },
 ];

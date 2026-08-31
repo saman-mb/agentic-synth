@@ -12,6 +12,7 @@ export default defineConfig({
     alias: {
       '@agentic-synth/shared-types': path.join(repoRoot, 'libs/shared-types/src'),
       '@agentic-synth/data': path.join(repoRoot, 'libs/data/src'),
+      '@agentic-synth/engine-bridge': path.join(repoRoot, 'libs/engine-bridge/src'),
     },
   },
   build: {
