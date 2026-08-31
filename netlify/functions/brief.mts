@@ -8,13 +8,12 @@
 // Graceful degradation (C++ parity): an enhancer failure returns the
 // sanitized raw prompt as the brief — never a 500.
 
+import { validatePrompt } from "../../libs/prompt/src/index.ts";
 import { enhanceBrief, sanitizePrompt } from "./lib/gemini.mts";
 import { BriefCache, canonicalKey } from "./lib/cache.mts";
 import { checkRateLimit, createRateLimitStore } from "./lib/rateLimit.mts";
 
 export const config = { path: "/api/brief" };
-
-const MAX_PROMPT_LENGTH = 2000;
 
 // Per-isolate singletons — reset on cold start (see rateLimit.mts for
 // the cold-start semantics this implies).
@@ -57,13 +56,11 @@ export default async function handler(req: Request): Promise<Response> {
     if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
       return json({ error: "Request body must be a JSON object." }, 400);
     }
-    const prompt = (raw as Record<string, unknown>)["prompt"];
-    if (typeof prompt !== "string" || prompt.trim().length === 0) {
-      return json({ error: "prompt must be a non-empty string." }, 400);
+    const promptGate = validatePrompt((raw as Record<string, unknown>)["prompt"]);
+    if (!promptGate.ok) {
+      return json({ error: promptGate.error }, 400);
     }
-    if (prompt.length > MAX_PROMPT_LENGTH) {
-      return json({ error: `prompt must be at most ${MAX_PROMPT_LENGTH} characters.` }, 400);
-    }
+    const prompt = promptGate.prompt;
 
     // Rate limit BEFORE any upstream work (and before the key check, so
     // a missing-key deploy never hands out unlimited free probes).

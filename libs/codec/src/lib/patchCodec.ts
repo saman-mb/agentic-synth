@@ -14,11 +14,37 @@
 // mirroring the C++ parser's fail-closed behaviour (except key ORDER,
 // which is unobservable once JSON.parse has produced an object).
 // version / patch_id / rationale are LLM-transport fields and are
-// intentionally dropped during conversion.
+// intentionally dropped during conversion. Unknown top-level / nested
+// fields on the LLM JSON are ignored the same way — convertLlmPatch only
+// reads the known schema (forward-compat for additive keys under a known
+// version). Unknown `version` values are rejected (#284 / #299).
 
 import type { PatchParams } from '@agentic-synth/shared-types';
 // eslint-disable-next-line @nx/enforce-module-boundaries -- Netlify esbuild cannot resolve tsconfig paths
 import { PARAM_RANGES, type ParamRange } from '../../../data/src/lib/paramRanges.ts';
+
+/**
+ * LLM PatchStruct JSON `version` values this codec understands.
+ * Mirrors `kPatchStructVersion` in src/engine/PatchStruct.h and the
+ * `"version": 1` examples in src/mapper/system-prompt.md. Bump the list
+ * only when convertLlmPatch + validatePatch can decode that schema.
+ */
+export const KNOWN_LLM_PATCH_VERSIONS = [1] as const;
+export type KnownLlmPatchVersion = (typeof KNOWN_LLM_PATCH_VERSIONS)[number];
+
+export type CodecErrorCode = 'unknown_version' | 'invalid_shape' | 'schema';
+
+/** Typed, user-presentable codec failure (wire / LLM boundary). */
+export interface CodecError {
+  code: CodecErrorCode;
+  message: string;
+  /** Present when `code === 'unknown_version'`. */
+  version?: unknown;
+}
+
+export type DecodeLlmPatchResult =
+  | { ok: true; patch: PatchParams; llm: LlmPatch }
+  | { ok: false; error: CodecError };
 
 // Numeric enum values mirror src/engine/PatchStruct.h exactly.
 export const OSC_TYPES = {
@@ -124,6 +150,71 @@ function enumToInt(map: Record<string, number>, name: string): number {
 // Strict boolean → 0/1. Anything but a real boolean becomes NaN.
 function boolToInt(b: boolean): number {
   return b === true ? 1 : b === false ? 0 : Number.NaN;
+}
+
+function isKnownLlmPatchVersion(v: unknown): v is KnownLlmPatchVersion {
+  return typeof v === 'number' && Number.isInteger(v)
+    && (KNOWN_LLM_PATCH_VERSIONS as readonly number[]).includes(v);
+}
+
+/**
+ * Accept-list gate for the LLM `version` field (#284). Rejects unknown
+ * versions with a clear message — never silently maps a newer schema.
+ */
+export function assertKnownLlmPatchVersion(
+  version: unknown,
+): { ok: true; version: KnownLlmPatchVersion } | { ok: false; error: CodecError } {
+  if (isKnownLlmPatchVersion(version)) {
+    return { ok: true, version };
+  }
+  const accepted = KNOWN_LLM_PATCH_VERSIONS.join(', ');
+  const shown = typeof version === 'number' || typeof version === 'string'
+    ? String(version)
+    : typeof version;
+  return {
+    ok: false,
+    error: {
+      code: 'unknown_version',
+      version,
+      message:
+        `Unsupported LLM patch version ${shown} (accepted: ${accepted}). `
+        + 'This client cannot decode that schema — regenerate or upgrade the codec.',
+    },
+  };
+}
+
+/**
+ * Wire entry: version accept-list → convert → validate. Extra LLM fields
+ * beyond the known schema are ignored (not preserved on PatchParams).
+ */
+export function decodeLlmPatch(raw: unknown): DecodeLlmPatchResult {
+  if (!isRecord(raw)) {
+    return {
+      ok: false,
+      error: { code: 'invalid_shape', message: 'patch: expected object' },
+    };
+  }
+  const versionGate = assertKnownLlmPatchVersion(raw.version);
+  if (!versionGate.ok) return versionGate;
+
+  let patch: PatchParams;
+  try {
+    patch = convertLlmPatch(raw as unknown as LlmPatch);
+  } catch {
+    return {
+      ok: false,
+      error: { code: 'invalid_shape', message: 'patch: malformed patch structure' },
+    };
+  }
+
+  const verdict = validatePatch(patch);
+  if (!verdict.ok) {
+    return {
+      ok: false,
+      error: { code: 'schema', message: verdict.error },
+    };
+  }
+  return { ok: true, patch, llm: raw as unknown as LlmPatch };
 }
 
 export function convertLlmPatch(llm: LlmPatch): PatchParams {
