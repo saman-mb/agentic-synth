@@ -68,7 +68,8 @@ Current repository status:
 
 ### React UI
 
-The React UI lives under `ui/` and is built with Vite-oriented project structure.
+The React UI lives under `apps/web/` (Nx project `web`). Shared TypeScript is
+under `libs/` and is imported as `@agentic-synth/<lib>` (ADR-0008).
 
 Target responsibilities:
 
@@ -80,8 +81,10 @@ Target responsibilities:
 
 Current repository status:
 
-- `ui/src/App.tsx` contains a placeholder UI shell.
-- `ui/package.json` currently exposes linting through `npm run lint`.
+- `apps/web/src/App.tsx` is the live UI shell.
+- Lint from the repo root: `npx nx lint web` or `npx nx run-many -t lint`.
+- Module boundaries: `@nx/enforce-module-boundaries` in `eslint.config.js`.
+- Adding `apps/mobile` later: ADR-0008.
 
 ### Plugin Processor
 
@@ -149,14 +152,7 @@ Important targets and concepts:
 - `AgenticSynth`: standalone JUCE GUI application target.
 - `AgenticSynth_Plugin`: JUCE plugin target configured for VST3, AU, and standalone formats.
 
-### React UI
-
-- The Vite app lives in `apps/web/` (Nx project `web`). Shared JS is under `libs/`.
-- Path aliases `@agentic-synth/<lib>` are defined in `tsconfig.base.json` and `apps/web/vite.config.ts`.
-- Node.js 22 is expected for local development and CI (`nx test` uses `--experimental-strip-types`).
-- UI linting is `npx nx lint web` or `npx nx run-many -t lint` from the repo root.
-- Module boundaries are `@nx/enforce-module-boundaries` in `eslint.config.js` (ADR-0008).
-- How to add `apps/mobile` later is recorded in ADR-0008.
+See [React UI](#react-ui) above and [ADR-0008](adr/ADR-0008-nx-workspace-boundaries.md).
 
 ## Directory Structure
 
@@ -207,7 +203,7 @@ Install the expected toolchain:
 - CMake 3.24 or newer.
 - A C++20-capable compiler.
 - JUCE 7 available through the expected third-party location or future dependency bootstrap flow.
-- Node.js 20 or newer and npm for UI work.
+- Node.js 22 and npm for UI work (`nx test` for codec/prompt/modval uses type stripping).
 - Python 3 and `pre-commit` for repository hooks.
 
 Set up hooks:
@@ -229,9 +225,8 @@ ctest --test-dir build --output-on-failure
 Lint UI code:
 
 ```sh
-cd ui
 npm ci
-npm run lint
+npx nx lint web
 ```
 
 Run all pre-commit checks before review:
