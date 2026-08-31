@@ -73,11 +73,10 @@ jobs:
           fi
           # CI already built apps/web/dist and synced prompts; --no-build skips
           # netlify.toml's build command. Redirects/functions/paths all come
-          # from netlify.toml itself.
-          # Pin CLI: @latest auto-detects npm workspaces as multiple
-          # "projects" (web vs web) and then --filter web skips
-          # repo-root netlify/functions. 17.x deploys dir+functions as before.
-          npx --yes netlify-cli@17.38.1 deploy \
+          # from netlify.toml itself. Do not pass --filter: npm workspaces
+          # make current CLI treat apps/web as a second site and skip
+          # repo-root functions.
+          npx --yes netlify-cli@latest deploy \
             --site "$NETLIFY_SITE_ID" \
             --dir apps/web/dist \
             --functions netlify/functions \
