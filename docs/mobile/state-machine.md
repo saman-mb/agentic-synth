@@ -1,6 +1,6 @@
 # Mobile state machine
 
-> **v1/prototype** · Part of epic [#290](https://github.com/saman-mb/agentic-synth/issues/290) · Feeds [#296](https://github.com/saman-mb/agentic-synth/issues/296) / [#297](https://github.com/saman-mb/agentic-synth/issues/297) / [#298](https://github.com/saman-mb/agentic-synth/issues/298) · Unblocks E5 [#294](https://github.com/saman-mb/agentic-synth/issues/294) · Closes [#295](https://github.com/saman-mb/agentic-synth/issues/295) AC.
+> **v1/prototype** · Part of epic [#290](https://github.com/saman-mb/agentic-synth/issues/290) · Macros [#296](https://github.com/saman-mb/agentic-synth/issues/296) · Input [input.md](./input.md) ([#297](https://github.com/saman-mb/agentic-synth/issues/297)) · Feeds [#298](https://github.com/saman-mb/agentic-synth/issues/298) · Unblocks E5 [#294](https://github.com/saman-mb/agentic-synth/issues/294) · Closes [#295](https://github.com/saman-mb/agentic-synth/issues/295) AC.
 
 Canonical product phases for the single mobile surface. Sheet contents are owned by [ia.md](./ia.md); this doc owns transitions and interrupts. Index: [README](./README.md). Cuts: [cut-list.md](./cut-list.md).
 
@@ -100,7 +100,7 @@ Session scratch fields: see [ia.md §Keep / session scratch](./ia.md#session-scr
 | | |
 |---|---|
 | **Entry** | User starts Say from `idle` or `shape` (new idea / edit prompt); or returns from `hear` to edit |
-| **Exit** | → `hear` on Send / generate; → `idle` on Cancel / clear with no pending patch intent; → `error` on mic permission hard-fail or input subsystem crash |
+| **Exit** | → `hear` on Send / generate; → `idle` on Cancel / clear with no pending patch intent; → `error` on **input subsystem crash** only — ordinary mic **deny** stays in `say` with text fallback ([input.md](./input.md)) |
 | **Audio** | No new patch audition yet. Duck or pause any prior preview when capture starts |
 | **Sheet** | `sheet.say` — expanded ([ia.md](./ia.md#say--sheetsay)) |
 | **Interrupts** | Call / background: abort capture, keep draft text, freeze in `say`. Resume: restore draft; do not auto-send. Rotation: preserve sheet expanded |

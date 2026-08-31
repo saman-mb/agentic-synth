@@ -1,6 +1,6 @@
 # Mobile information architecture
 
-> **v1/prototype** · Part of epic [#290](https://github.com/saman-mb/agentic-synth/issues/290) · Macros: [macros.md](./macros.md) ([#296](https://github.com/saman-mb/agentic-synth/issues/296)) · Feeds [#297](https://github.com/saman-mb/agentic-synth/issues/297) / [#298](https://github.com/saman-mb/agentic-synth/issues/298) · Unblocks E5 [#294](https://github.com/saman-mb/agentic-synth/issues/294) · Closes [#295](https://github.com/saman-mb/agentic-synth/issues/295) AC.
+> **v1/prototype** · Part of epic [#290](https://github.com/saman-mb/agentic-synth/issues/290) · Macros: [macros.md](./macros.md) ([#296](https://github.com/saman-mb/agentic-synth/issues/296)) · Input: [input.md](./input.md) ([#297](https://github.com/saman-mb/agentic-synth/issues/297)) · Feeds [#298](https://github.com/saman-mb/agentic-synth/issues/298) · Unblocks E5 [#294](https://github.com/saman-mb/agentic-synth/issues/294) · Closes [#295](https://github.com/saman-mb/agentic-synth/issues/295) AC.
 
 Single screen + one bottom sheet. An engineer who has never seen the desktop app should be able to name every control from this doc alone. State transitions live in [state-machine.md](./state-machine.md). Desktop deferrals live in [cut-list.md](./cut-list.md). Index: [README](./README.md).
 
@@ -20,7 +20,7 @@ Always mounted. Visibility may dim; do not unmount for state changes.
 | `el.visualizer` | Full-width visualizer plane | Aesthetic + motion owned by [#298](https://github.com/saman-mb/agentic-synth/issues/298); content shows the sound |
 | `el.macros` | 4 macro controls (`macro.0`…`macro.3`) | Fixed v1 set in [macros.md](./macros.md) (#296): Brightness / Movement / Space / Body |
 | `el.play` | Play / hold / gate for audition | Primary hear affordance when sheet is peek/collapsed |
-| `el.input_cta` | Primary Say affordance | Mic + text entry point; capture patterns = [#297](https://github.com/saman-mb/agentic-synth/issues/297) (`input.md`) |
+| `el.input_cta` | Primary Say affordance | Mic + text entry point; capture patterns in [input.md](./input.md) (#297) |
 | `el.sheet` | Bottom sheet + grabber | One sheet for all states; body swaps by `MobileState` |
 | `el.library` | Weak entry to kept presets | List / peek only — not the desktop browser |
 | `el.status` | Thin status / failure line | Calm copy; no telemetry chrome |
@@ -32,7 +32,7 @@ Always mounted. Visibility may dim; do not unmount for state changes.
 | State | Sheet id | Default | Body (engineer checklist) |
 |---|---|---|---|
 | `idle` | `sheet.idle` | Collapsed or peek | Short prompt hint (“Describe a sound”); optional recent kept row; start Say via `el.input_cta` |
-| `say` | `sheet.say` | Expanded | Transcript / text field; Cancel; Send / generate; mic in-flight affordances (detail → [#297](https://github.com/saman-mb/agentic-synth/issues/297)) |
+| `say` | `sheet.say` | Expanded | Transcript / text field; Cancel; Send / generate; mic in-flight affordances ([input.md](./input.md)) |
 | `hear` | `sheet.hear` | Peek or expanded | Progress / “Building your sound…”; Cancel generate; first-listen / skip-to-shape when patch lands |
 | `shape` | `sheet.shape` | Peek | Macro label echo + optional one-line prompt echo; actions: **Variations**, **Keep**; regenerate / new idea |
 | `variations` | `sheet.variations` | Expanded | Variant list or carousel; Select; More (→ `hear`); Back to Shape; optional Keep on selection |
@@ -50,7 +50,7 @@ Always mounted. Visibility may dim; do not unmount for state changes.
 - Editable text / live transcript
 - Cancel / clear
 - Send
-- Voice vs text mode hooks (`input.voice` \| `input.text`) — behavior owned by [#297](https://github.com/saman-mb/agentic-synth/issues/297)
+- Voice vs text mode hooks (`input.voice` \| `input.text`) — behavior in [input.md](./input.md) (#297)
 
 ### `hear` — `sheet.hear`
 
@@ -123,28 +123,29 @@ Survives background; cleared after successful Keep or explicit discard:
 | Elements | `el.*` | `el.macros` |
 | Macros | `macro.{index}` + `MacroId` slug ([macros.md](./macros.md)) | `macro.0` / `brightness` |
 | Sheet slots | `sheet.{state}` | `sheet.keep` |
-| Input modes | `input.voice` \| `input.text` (#297) | — |
+| Input modes | `input.voice` \| `input.text` + substates ([input.md](./input.md)) | `recording`, `denied` |
 | Cuts | `cut.*` | `cut.ab` |
 | Doc links | Relative under `docs/mobile/` | `[State machine](./state-machine.md)` |
 | Tokens (#298) | CSS-var style keys in JSON | `color.bg.0` |
 
-**Rule for later stories:** [#297](https://github.com/saman-mb/agentic-synth/issues/297)–[#298](https://github.com/saman-mb/agentic-synth/issues/298) may **add** files and fill reserved hooks. They must not rename `MobileState` values or split the single sheet. [#296](https://github.com/saman-mb/agentic-synth/issues/296) macros contract is in [macros.md](./macros.md).
+**Rule for later stories:** [#298](https://github.com/saman-mb/agentic-synth/issues/298) may **add** files and fill reserved hooks. Do not rename `MobileState` values or split the single sheet. [#296](https://github.com/saman-mb/agentic-synth/issues/296) → [macros.md](./macros.md); [#297](https://github.com/saman-mb/agentic-synth/issues/297) → [input.md](./input.md).
 
 ## Spec siblings
 
 - [macros.md](./macros.md) — #296 (landed)
+- [input.md](./input.md) — #297 (landed)
 
 ## Future stubs (do not create yet)
 
-- [input.md](./input.md) — #297
 - Visual tokens / art — #298 (`el.visualizer` only)
 
 ## v1 non-goals
 
-Pixel mockups · WCAG matrices · push-to-talk debate detail · Expo scaffold · offline-first agent · cloud sync · parallel audio/UI state machines · new patch schema (macro bundles/curves → [macros.md](./macros.md))
+Pixel mockups · WCAG matrices · Expo scaffold · offline-first agent · cloud sync · parallel audio/UI state machines · new patch schema (macro bundles/curves → [macros.md](./macros.md)) · reopening PTT after tap-to-record choice in [input.md](./input.md)
 
 ## See also
 
 - [State machine](./state-machine.md)
 - [Cut-list](./cut-list.md)
+- [Input](./input.md)
 - [Mobile docs index](./README.md)
