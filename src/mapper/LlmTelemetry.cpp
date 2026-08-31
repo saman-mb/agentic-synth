@@ -1,9 +1,9 @@
 #include "mapper/LlmTelemetry.h"
 
 #include <chrono>
-#include <ctime>
 #include <cstdio>
 #include <cstdlib>
+#include <ctime>
 #include <filesystem>
 #include <fstream>
 #include <sstream>
@@ -17,13 +17,27 @@ std::string jsonEscape(const std::string& s) {
     out.reserve(s.size() + 8);
     for (char c : s) {
         switch (c) {
-        case '"':  out += "\\\""; break;
-        case '\\': out += "\\\\"; break;
-        case '\n': out += "\\n";  break;
-        case '\r': out += "\\r";  break;
-        case '\t': out += "\\t";  break;
-        case '\b': out += "\\b";  break;
-        case '\f': out += "\\f";  break;
+        case '"':
+            out += "\\\"";
+            break;
+        case '\\':
+            out += "\\\\";
+            break;
+        case '\n':
+            out += "\\n";
+            break;
+        case '\r':
+            out += "\\r";
+            break;
+        case '\t':
+            out += "\\t";
+            break;
+        case '\b':
+            out += "\\b";
+            break;
+        case '\f':
+            out += "\\f";
+            break;
         default:
             if (static_cast<unsigned char>(c) < 0x20) {
                 char buf[8];
@@ -50,8 +64,8 @@ std::string iso8601_now() {
     gmtime_r(&t, &tm);
 #endif
     char buf[32];
-    std::snprintf(buf, sizeof(buf), "%04d-%02d-%02dT%02d:%02d:%02dZ", tm.tm_year + 1900,
-                  tm.tm_mon + 1, tm.tm_mday, tm.tm_hour, tm.tm_min, tm.tm_sec);
+    std::snprintf(buf, sizeof(buf), "%04d-%02d-%02dT%02d:%02d:%02dZ", tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+                  tm.tm_hour, tm.tm_min, tm.tm_sec);
     return buf;
 }
 
@@ -69,16 +83,14 @@ std::string LlmTelemetry::defaultPath() {
     dir = appdata ? (std::string(appdata) + "\\AgenticSynth") : "AgenticSynth";
 #elif defined(__APPLE__)
     const char* home = std::getenv("HOME");
-    dir = home ? (std::string(home) + "/Library/Application Support/AgenticSynth")
-               : "/tmp/AgenticSynth";
+    dir = home ? (std::string(home) + "/Library/Application Support/AgenticSynth") : "/tmp/AgenticSynth";
 #else
     const char* xdg = std::getenv("XDG_DATA_HOME");
     if (xdg && *xdg) {
         dir = std::string(xdg) + "/AgenticSynth";
     } else {
         const char* home = std::getenv("HOME");
-        dir = home ? (std::string(home) + "/.local/share/AgenticSynth")
-                   : "/tmp/AgenticSynth";
+        dir = home ? (std::string(home) + "/.local/share/AgenticSynth") : "/tmp/AgenticSynth";
     }
 #endif
     std::error_code ec;
@@ -111,18 +123,12 @@ void LlmTelemetry::log(const LlmCall& call) noexcept {
         const std::string ts = call.ts.empty() ? iso8601_now() : call.ts;
 
         std::ostringstream ss;
-        ss << "{"
-           << "\"ts\":\""               << jsonEscape(ts)               << "\","
-           << "\"caller\":\""           << jsonEscape(call.caller)      << "\","
-           << "\"model\":\""            << jsonEscape(call.model)       << "\","
-           << "\"attempts\":"           << call.attempts                << ","
-           << "\"latency_ms\":"         << call.latency_ms              << ","
-           << "\"body_size_bytes\":"    << call.body_size_bytes         << ","
-           << "\"prompt_size_bytes\":"  << call.prompt_size_bytes       << ","
-           << "\"finish_reason\":\""    << jsonEscape(call.finish_reason) << "\","
-           << "\"block_reason\":\""     << jsonEscape(call.block_reason)  << "\","
-           << "\"outcome\":\""          << jsonEscape(call.outcome)       << "\""
-           << "}\n";
+        ss << "{" << "\"ts\":\"" << jsonEscape(ts) << "\"," << "\"caller\":\"" << jsonEscape(call.caller) << "\","
+           << "\"model\":\"" << jsonEscape(call.model) << "\"," << "\"attempts\":" << call.attempts << ","
+           << "\"latency_ms\":" << call.latency_ms << "," << "\"body_size_bytes\":" << call.body_size_bytes << ","
+           << "\"prompt_size_bytes\":" << call.prompt_size_bytes << "," << "\"finish_reason\":\""
+           << jsonEscape(call.finish_reason) << "\"," << "\"block_reason\":\"" << jsonEscape(call.block_reason) << "\","
+           << "\"outcome\":\"" << jsonEscape(call.outcome) << "\"" << "}\n";
 
         f << ss.str();
         f.flush();

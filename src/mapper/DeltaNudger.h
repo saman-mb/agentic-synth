@@ -37,10 +37,10 @@ struct NudgeRequest {
 };
 
 struct NudgeResult {
-    int selected_index{-1};       // 0..top3.size()-1 on success; -1 on failure
-    PatchStruct patch{};          // selected archetype's patch + nudges applied
-    std::vector<Nudge> nudges{};  // applied nudges (post-clamp, deduped)
-    std::string rationale;        // optional sensory sentence from the model
+    int selected_index{-1};      // 0..top3.size()-1 on success; -1 on failure
+    PatchStruct patch{};         // selected archetype's patch + nudges applied
+    std::vector<Nudge> nudges{}; // applied nudges (post-clamp, deduped)
+    std::string rationale;       // optional sensory sentence from the model
 };
 
 // Apply each nudge to `base` in path order. Whitelisted paths only — unknown

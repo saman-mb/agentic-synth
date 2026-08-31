@@ -26,11 +26,13 @@ namespace {
 // fall through to the post-augment heuristic, which reads what's actually
 // audible. The audit log in augmenter_actions retains the user-facing trail.
 void appendAction(PatchStruct& p, const char* action) noexcept {
-    if (!action || !*action) return;
+    if (!action || !*action)
+        return;
     const std::size_t cap = sizeof(p.augmenter_actions);
     const std::size_t used = std::strlen(p.augmenter_actions);
     const std::size_t need = std::strlen(action) + (used > 0 ? 1 : 0);
-    if (used + need + 1 > cap) return;
+    if (used + need + 1 > cap)
+        return;
     if (used > 0) {
         p.augmenter_actions[used] = '|';
         std::strncpy(p.augmenter_actions + used + 1, action, cap - used - 2);
@@ -55,9 +57,7 @@ std::string toLowerAscii(const std::string& s) {
     return out;
 }
 
-bool isWordChar(char c) noexcept {
-    return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_';
-}
+bool isWordChar(char c) noexcept { return (c >= 'a' && c <= 'z') || (c >= '0' && c <= '9') || c == '_'; }
 
 // Word-boundary-aware substring match. Multi-token needles (any with a space)
 // skip the boundary check on the side adjacent to the space because they
@@ -146,10 +146,9 @@ bool isNoiseOnly(const PatchStruct& p) noexcept {
 // for these prompts even though it produces 3 oscs.
 bool containsCinematicIntent(const std::string& lowerPrompt) noexcept {
     static constexpr std::array<std::string_view, 18> kCinematicTokens{
-        "cinematic", "kubrick", "spooky", "ever-changing", "ever changing",
-        "evolving", "drone", "ominous pad", "horror", "dread", "foreboding",
-        "eldritch", "ambient pad", "ethereal", "atmospheric", "ambient",
-        "soundscape", "vangelis",
+        "cinematic",   "kubrick",     "spooky",      "ever-changing", "ever changing", "evolving",
+        "drone",       "ominous pad", "horror",      "dread",         "foreboding",    "eldritch",
+        "ambient pad", "ethereal",    "atmospheric", "ambient",       "soundscape",    "vangelis",
     };
     for (auto kw : kCinematicTokens) {
         if (containsWord(lowerPrompt, kw))
@@ -165,9 +164,8 @@ bool containsCinematicIntent(const std::string& lowerPrompt) noexcept {
 // shipped patch matches the named synthesis technique.
 bool containsFmIntent(const std::string& lowerPrompt) noexcept {
     static constexpr std::array<std::string_view, 16> kFmTokens{
-        "fm", "fm-style", "fm style", "dx", "dx7", "dx-style", "yamaha",
-        "operator", "fm8", "tine", "rhodes", "electric piano",
-        "bell", "marimba", "vibraphone", "ring mod",
+        "fm",   "fm-style", "fm style",       "dx",   "dx7",     "dx-style",   "yamaha",   "operator", "fm8",
+        "tine", "rhodes",   "electric piano", "bell", "marimba", "vibraphone", "ring mod",
     };
     for (auto kw : kFmTokens) {
         if (containsWord(lowerPrompt, kw))
@@ -317,8 +315,8 @@ void applyCinematicPadLayering(PatchStruct& p) noexcept {
     resetOsc(sub);
     sub.type = OscType::FM;
     sub.semitone_offset = -12.0f; // audible, not -24 sub-cellar
-    sub.fm_ratio = 2.73f;          // inharmonic
-    sub.fm_depth = 0.35f;          // low index — buzz, not bell
+    sub.fm_ratio = 2.73f;         // inharmonic
+    sub.fm_depth = 0.35f;         // low index — buzz, not bell
     sub.volume = 0.40f;
     sub.pan = 0.0f;
     sub.enabled = 1;
@@ -518,12 +516,11 @@ bool augmentPatch(PatchStruct& p, const std::string& prompt) noexcept {
         // Ratio chosen by sub-intent: "bell" / "glass" → 3.14 (inharmonic
         // bell); "tine" / "rhodes" / "electric piano" → 14.0 (classic DX
         // tine); default 2.01 (glassy carrier). Modulation index = depth.
-        if (containsWord(lower, "tine") || containsWord(lower, "rhodes")
-            || containsWord(lower, "electric piano") || containsWord(lower, "ep")) {
+        if (containsWord(lower, "tine") || containsWord(lower, "rhodes") || containsWord(lower, "electric piano") ||
+            containsWord(lower, "ep")) {
             main.fm_ratio = 14.0f;
             main.fm_depth = 0.55f;
-        } else if (containsWord(lower, "bell") || containsWord(lower, "glass")
-                   || containsWord(lower, "chime")) {
+        } else if (containsWord(lower, "bell") || containsWord(lower, "glass") || containsWord(lower, "chime")) {
             main.fm_ratio = 3.14f;
             main.fm_depth = 0.45f;
         } else {
@@ -557,9 +554,10 @@ bool augmentPatch(PatchStruct& p, const std::string& prompt) noexcept {
 
         std::cerr << "[PatchAugmenter] FM-intent coercion: prompt names FM but LLM "
                      "shipped a non-FM oscillator. Rebuilt patch with FM topology "
-                     "(ratio=" << main.fm_ratio << ", depth=" << main.fm_depth
-                  << "). prompt='" << prompt << "'\n";
-        appendAction(p, "Matched the named synthesis technique (rebuilt around an FM operator + sine body + octave shimmer; filter opened so the FM partials survive)");
+                     "(ratio="
+                  << main.fm_ratio << ", depth=" << main.fm_depth << "). prompt='" << prompt << "'\n";
+        appendAction(p, "Matched the named synthesis technique (rebuilt around an FM operator + sine body + octave "
+                        "shimmer; filter opened so the FM partials survive)");
         return true;
     }
 
@@ -601,16 +599,19 @@ bool augmentPatch(PatchStruct& p, const std::string& prompt) noexcept {
         noise.volume = noiseVol;
         noise.enabled = 1;
 
-        std::cerr << "[PatchAugmenter] Auto-fixed noise-only patch (Noise → osc[2] @ "
-                  << noiseVol << ", pitched osc[0] = "
-                  << (pitched == OscType::Sawtooth ? "Saw"
-                       : pitched == OscType::Triangle ? "Triangle"
-                       : pitched == OscType::Sine ? "Sine" : "?")
+        std::cerr << "[PatchAugmenter] Auto-fixed noise-only patch (Noise → osc[2] @ " << noiseVol
+                  << ", pitched osc[0] = "
+                  << (pitched == OscType::Sawtooth   ? "Saw"
+                      : pitched == OscType::Triangle ? "Triangle"
+                      : pitched == OscType::Sine     ? "Sine"
+                                                     : "?")
                   << "): prompt='" << prompt << "'\n";
-        appendAction(p,
-            pitched == OscType::Sawtooth ? "Gave the storm a pitched body (added saw fundamental + detuned partner; noise demoted to texture layer)"
-            : pitched == OscType::Triangle ? "Gave the noise a pitched body (added triangle fundamental + detuned partner; noise demoted to texture layer)"
-            : "Gave the noise a pitched body (added sine fundamental + 4¢ partner; noise demoted to texture layer)");
+        appendAction(p, pitched == OscType::Sawtooth ? "Gave the storm a pitched body (added saw fundamental + detuned "
+                                                       "partner; noise demoted to texture layer)"
+                        : pitched == OscType::Triangle ? "Gave the noise a pitched body (added triangle fundamental + "
+                                                         "detuned partner; noise demoted to texture layer)"
+                                                       : "Gave the noise a pitched body (added sine fundamental + 4¢ "
+                                                         "partner; noise demoted to texture layer)");
         return true;
     }
 
@@ -632,8 +633,11 @@ bool augmentPatch(PatchStruct& p, const std::string& prompt) noexcept {
                          "cinematic/spooky/Kubrick/drone but patch was "
                       << (underLayered ? "under-layered" : "bass-coded")
                       << ". Rebuilt with octave-spread + panned detune + sub anchor "
-                         "+ coprime LFOs + cathedral reverb. prompt='" << prompt << "'\n";
-            appendAction(p, "Reshaped into a cinematic pad (two saws breathing wide with asymmetric detune over an inharmonic FM anchor that buzzes unsettlingly; the filter blooms open on the attack as a slow cinematic reveal; two coprime LFOs keep it ever-changing)");
+                         "+ coprime LFOs + cathedral reverb. prompt='"
+                      << prompt << "'\n";
+            appendAction(p, "Reshaped into a cinematic pad (two saws breathing wide with asymmetric detune over an "
+                            "inharmonic FM anchor that buzzes unsettlingly; the filter blooms open on the attack as a "
+                            "slow cinematic reveal; two coprime LFOs keep it ever-changing)");
             return true;
         }
     }
@@ -656,7 +660,8 @@ bool augmentPatch(PatchStruct& p, const std::string& prompt) noexcept {
         // got a layered patch; we're just adding the missing depth.
         addThirdLayer(p);
         std::cerr << "[PatchAugmenter] Auto-layered patch (2-osc → 3-osc, "
-                     "added sub-octave sine in empty slot): prompt='" << prompt << "'\n";
+                     "added sub-octave sine in empty slot): prompt='"
+                  << prompt << "'\n";
         appendAction(p, "Thickened the low end (filled empty 3rd slot with a sub-octave sine anchor)");
         return true;
     }
@@ -694,13 +699,15 @@ bool augmentPatch(PatchStruct& p, const std::string& prompt) noexcept {
             break;
         }
         modified = true;
-        std::cerr << "[PatchAugmenter] Auto-layered patch (single-osc → "
-                  << (strategy ? strategy : "generic") << "): prompt='" << prompt << "'\n";
-        const char* userMsg =
-            seed == OscType::Sawtooth  ? "Layered the patch into a Reese (detuned saw partner + sub-octave sine for depth)"
-          : seed == OscType::Triangle ? "Layered the patch into a pad (detuned triangle partner + octave shimmer for air)"
-          : seed == OscType::FM        ? "Layered the FM tine over a clean sine fundamental (plus octave shimmer)"
-          :                              "Layered the single oscillator (detune partner + sub-octave anchor)";
+        std::cerr << "[PatchAugmenter] Auto-layered patch (single-osc → " << (strategy ? strategy : "generic")
+                  << "): prompt='" << prompt << "'\n";
+        const char* userMsg = seed == OscType::Sawtooth
+                                  ? "Layered the patch into a Reese (detuned saw partner + sub-octave sine for depth)"
+                              : seed == OscType::Triangle
+                                  ? "Layered the patch into a pad (detuned triangle partner + octave shimmer for air)"
+                              : seed == OscType::FM
+                                  ? "Layered the FM tine over a clean sine fundamental (plus octave shimmer)"
+                                  : "Layered the single oscillator (detune partner + sub-octave anchor)";
         appendAction(p, userMsg);
         return modified;
     }
@@ -716,7 +723,8 @@ bool augmentPatch(PatchStruct& p, const std::string& prompt) noexcept {
         main.enabled = 1;
         applyReeseLayering(p); // re-uses osc[1]/[2] for detune + sub
         std::cerr << "[PatchAugmenter] Auto-recovered silent patch (all oscs muted) "
-                     "with Reese topology: prompt='" << prompt << "'\n";
+                     "with Reese topology: prompt='"
+                  << prompt << "'\n";
         appendAction(p, "Rescued a silent patch with a default Reese (saw + detuned partner + sub sine)");
         return true;
     }

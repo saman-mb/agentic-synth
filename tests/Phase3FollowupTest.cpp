@@ -36,9 +36,9 @@
 using agentic_synth::FilterType;
 using agentic_synth::LfoTarget;
 using agentic_synth::LfoWaveform;
+using agentic_synth::make_default_patch;
 using agentic_synth::OscType;
 using agentic_synth::PatchStruct;
-using agentic_synth::make_default_patch;
 using agentic_synth::engine::RawMidiMsg;
 using agentic_synth::engine::VoiceManager;
 
@@ -60,8 +60,8 @@ double bufferRms(const float* p, int n) {
 // Tiny Goertzel-free peak finder: brute-force DFT over a small frequency
 // grid. Sufficient for finding the dominant tone in a few-thousand-sample
 // FM buffer when we only need ±1 Hz resolution.
-double dominantFrequencyHz(const std::vector<float>& buf, double sampleRate,
-                           double fMinHz, double fMaxHz, double stepHz) {
+double dominantFrequencyHz(const std::vector<float>& buf, double sampleRate, double fMinHz, double fMaxHz,
+                           double stepHz) {
     const int N = static_cast<int>(buf.size());
     double bestF = fMinHz;
     double bestMag = -1.0;
@@ -83,8 +83,8 @@ double dominantFrequencyHz(const std::vector<float>& buf, double sampleRate,
 
 // Render N samples through a fresh VoiceManager at the given sample rate with
 // the supplied patch. Used by FM-SR-independence test.
-std::vector<float> renderMono(double sampleRate, const PatchStruct& patch, int midiNote,
-                              int samples, int discardSamples = 0) {
+std::vector<float> renderMono(double sampleRate, const PatchStruct& patch, int midiNote, int samples,
+                              int discardSamples = 0) {
     VoiceManager vm(4);
     vm.prepare(sampleRate);
     vm.applyPatch(patch);
@@ -110,8 +110,7 @@ namespace {
 
 // Render `samples` of stereo with one osc enabled at the given pan position.
 // Caller picks osc0 type so we can stress band-limited (saw) vs the FM path.
-void renderSinglePanned(float pan, int samples, std::vector<float>& outL,
-                        std::vector<float>& outR) {
+void renderSinglePanned(float pan, int samples, std::vector<float>& outL, std::vector<float>& outR) {
     VoiceManager vm(1);
     vm.prepare(44100.0);
     PatchStruct p = make_default_patch();
@@ -232,7 +231,7 @@ double rmsForOsc0Volume(float v0) {
 } // namespace
 
 TEST_CASE("Per-osc volume: RMS scales with sum of volumes", "[phase3-followup][volume]") {
-    const double rmsAll = rmsForOsc0Volume(0.1f); // total volume 1.6
+    const double rmsAll = rmsForOsc0Volume(0.1f);    // total volume 1.6
     const double rmsNoOsc0 = rmsForOsc0Volume(0.0f); // total volume 1.5
     REQUIRE(rmsAll > 0.0);
     REQUIRE(rmsNoOsc0 > 0.0);
@@ -273,8 +272,7 @@ PatchStruct fmTestPatch() {
 
 } // namespace
 
-TEST_CASE("FM SR-independence: carrier pitch invariant across SR (FIX 1+2)",
-          "[phase3-followup][fm]") {
+TEST_CASE("FM SR-independence: carrier pitch invariant across SR (FIX 1+2)", "[phase3-followup][fm]") {
     const auto p = fmTestPatch();
     // C4 = 261.63 Hz. Search ±50 Hz at 1-Hz resolution.
     constexpr int midiNote = 60;
@@ -285,10 +283,8 @@ TEST_CASE("FM SR-independence: carrier pitch invariant across SR (FIX 1+2)",
     const auto buf44 = renderMono(44100.0, p, midiNote, analyseLen, warm);
     const auto buf48 = renderMono(48000.0, p, midiNote, analyseLen, warm);
 
-    const double peak44 = dominantFrequencyHz(buf44, 44100.0, expectedHz - 50.0,
-                                              expectedHz + 50.0, 0.5);
-    const double peak48 = dominantFrequencyHz(buf48, 48000.0, expectedHz - 50.0,
-                                              expectedHz + 50.0, 0.5);
+    const double peak44 = dominantFrequencyHz(buf44, 44100.0, expectedHz - 50.0, expectedHz + 50.0, 0.5);
+    const double peak48 = dominantFrequencyHz(buf48, 48000.0, expectedHz - 50.0, expectedHz + 50.0, 0.5);
     INFO("peak44 = " << peak44 << " peak48 = " << peak48 << " expected = " << expectedHz);
     REQUIRE(std::abs(peak44 - expectedHz) < 2.0);
     REQUIRE(std::abs(peak48 - expectedHz) < 2.0);
@@ -299,8 +295,7 @@ TEST_CASE("FM SR-independence: carrier pitch invariant across SR (FIX 1+2)",
 // TEST 4 — FilterType swap mid-render produces no click.
 // ──────────────────────────────────────────────────────────────────────────────
 
-TEST_CASE("FilterType swap mid-render: no NaN, bounded boundary delta",
-          "[phase3-followup][filter]") {
+TEST_CASE("FilterType swap mid-render: no NaN, bounded boundary delta", "[phase3-followup][filter]") {
     // Use a sine osc + open cutoff so LP and HP produce similar amplitudes
     // either side of the swap (LP passes the sine, HP kills it). Phase 4
     // adds a ~5 ms type-swap crossfade that blends old + new filter outputs
@@ -358,8 +353,7 @@ TEST_CASE("FilterType swap mid-render: no NaN, bounded boundary delta",
     const int kCrossfade = 220;
     float maxStep = 0.0f;
     for (int i = 1; i < kCrossfade && i < static_cast<int>(second.size()); ++i) {
-        const float d = std::abs(second[static_cast<std::size_t>(i)] -
-                                 second[static_cast<std::size_t>(i - 1)]);
+        const float d = std::abs(second[static_cast<std::size_t>(i)] - second[static_cast<std::size_t>(i - 1)]);
         if (d > maxStep)
             maxStep = d;
     }
@@ -379,8 +373,7 @@ TEST_CASE("FilterType swap mid-render: no NaN, bounded boundary delta",
 // crossings appear that don't exist in the baseline.
 // ──────────────────────────────────────────────────────────────────────────────
 
-TEST_CASE("LFO amp clamp: two LFOs target Amplitude don't sign-invert",
-          "[phase4][lfo][amp-clamp]") {
+TEST_CASE("LFO amp clamp: two LFOs target Amplitude don't sign-invert", "[phase4][lfo][amp-clamp]") {
     auto render = [](float depth0, float depth1) {
         VoiceManager vm(1);
         vm.prepare(44100.0);
@@ -440,8 +433,7 @@ TEST_CASE("LFO amp clamp: two LFOs target Amplitude don't sign-invert",
         for (int i = 0; i + win <= static_cast<int>(buf.size()); i += win / 2) {
             double acc = 0.0;
             for (int j = 0; j < win; ++j)
-                acc += static_cast<double>(buf[static_cast<std::size_t>(i + j)]) *
-                       buf[static_cast<std::size_t>(i + j)];
+                acc += static_cast<double>(buf[static_cast<std::size_t>(i + j)]) * buf[static_cast<std::size_t>(i + j)];
             const double rms = std::sqrt(acc / win);
             if (rms < minRms)
                 minRms = rms;
@@ -478,8 +470,7 @@ TEST_CASE("LFO amp clamp: two LFOs target Amplitude don't sign-invert",
 // when two amplitude LFOs phase-align.
 // ──────────────────────────────────────────────────────────────────────────────
 
-TEST_CASE("LFO amp clamp: negative patch depth is folded to silence (depth clamp)",
-          "[phase4][lfo][amp-clamp][edge]") {
+TEST_CASE("LFO amp clamp: negative patch depth is folded to silence (depth clamp)", "[phase4][lfo][amp-clamp][edge]") {
     auto render = [](float depth) {
         VoiceManager vm(1);
         vm.prepare(44100.0);
@@ -607,8 +598,7 @@ TEST_CASE("LFO amp clamp: two synchronous Amp LFOs hit silence (not inversion) a
 // count ≤ 2 once envelopes settle.
 // ──────────────────────────────────────────────────────────────────────────────
 
-TEST_CASE("voice_count drop mid-play: no click, active voices ≤ new cap",
-          "[phase3-followup][voice-count]") {
+TEST_CASE("voice_count drop mid-play: no click, active voices ≤ new cap", "[phase3-followup][voice-count]") {
     // Use sine oscs to avoid harmonic-rich sawtooth content swamping the
     // boundary-delta measurement with waveform-slope deltas.
     VoiceManager vm(8);
@@ -666,8 +656,7 @@ TEST_CASE("voice_count drop mid-play: no click, active voices ≤ new cap",
 // in, the wet output peak should land near sample 22050 (±50).
 // ──────────────────────────────────────────────────────────────────────────────
 
-TEST_CASE("BPM-sync delay length: 1 beat @ 120 BPM = 22050 samples (44.1 kHz)",
-          "[phase3-followup][delay][bpm-sync]") {
+TEST_CASE("BPM-sync delay length: 1 beat @ 120 BPM = 22050 samples (44.1 kHz)", "[phase3-followup][delay][bpm-sync]") {
     PluginFixture fix;
     AgenticSynthPlugin plug;
     plug.prepareToPlay(44100.0, 256);
@@ -699,7 +688,7 @@ TEST_CASE("BPM-sync delay length: 1 beat @ 120 BPM = 22050 samples (44.1 kHz)",
     auto& q = plug.auditionQueueForTest();
     (void)q.push(RawMidiMsg::noteOn(60, 100));
 
-    constexpr int kBlocks = 120;             // 120*256 = 30720 samples
+    constexpr int kBlocks = 120; // 120*256 = 30720 samples
     constexpr int kBlockSize = 256;
     std::vector<float> sumL;
     sumL.reserve(kBlocks * kBlockSize);
@@ -747,8 +736,7 @@ TEST_CASE("BPM-sync delay length: 1 beat @ 120 BPM = 22050 samples (44.1 kHz)",
 // depth=1 (full sweep).
 // ──────────────────────────────────────────────────────────────────────────────
 
-TEST_CASE("Phase-3 follow-up: LFO WavetablePos modulates audio",
-          "[phase3-followup][wavetable-pos]") {
+TEST_CASE("Phase-3 follow-up: LFO WavetablePos modulates audio", "[phase3-followup][wavetable-pos]") {
     auto renderForLfoDepth = [](float depth) {
         VoiceManager vm(1);
         vm.prepare(44100.0);

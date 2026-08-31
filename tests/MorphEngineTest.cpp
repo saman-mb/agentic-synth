@@ -336,14 +336,11 @@ TEST_CASE("MorphEngine: loglerp asymmetric zero snaps to lo (documented behavior
     morph.saveTarget(b);
 
     // t=0 (pure a): snaps to lo=20Hz, NOT 0.
-    REQUIRE_THAT(morph.morphedPatchAt(0.0f).filter.cutoff_hz,
-                 Catch::Matchers::WithinRel(20.0f, 1e-3f));
+    REQUIRE_THAT(morph.morphedPatchAt(0.0f).filter.cutoff_hz, Catch::Matchers::WithinRel(20.0f, 1e-3f));
     // t=0.5: geometric mean of (lo=20, b=1000) = sqrt(20*1000) ≈ 141.42.
-    REQUIRE_THAT(morph.morphedPatchAt(0.5f).filter.cutoff_hz,
-                 Catch::Matchers::WithinRel(141.42f, 0.05f));
+    REQUIRE_THAT(morph.morphedPatchAt(0.5f).filter.cutoff_hz, Catch::Matchers::WithinRel(141.42f, 0.05f));
     // t=1.0 (pure b): exact b.
-    REQUIRE_THAT(morph.morphedPatchAt(1.0f).filter.cutoff_hz,
-                 Catch::Matchers::WithinRel(1000.0f, 1e-3f));
+    REQUIRE_THAT(morph.morphedPatchAt(1.0f).filter.cutoff_hz, Catch::Matchers::WithinRel(1000.0f, 1e-3f));
     // All values finite (no NaN/Inf).
     for (float t : {0.0f, 0.25f, 0.5f, 0.75f, 1.0f}) {
         auto out = morph.morphedPatchAt(t);
@@ -385,8 +382,7 @@ TEST_CASE("MorphEngine: delay.time_s=0 bypass survives round-trip morph", "[morp
     }
 }
 
-TEST_CASE("MorphEngine: asymmetric-zero delay.time_s follows lo-snap convention",
-          "[morph][log][zero]") {
+TEST_CASE("MorphEngine: asymmetric-zero delay.time_s follows lo-snap convention", "[morph][log][zero]") {
     // Convention (mirrors the asymmetric-zero filter-cutoff test above): when
     // ONE endpoint of a log-interpolated field is zero, that endpoint is
     // treated as `lo` (the field's documented log-floor) and a smooth log
@@ -429,8 +425,7 @@ TEST_CASE("MorphEngine: asymmetric-zero delay.time_s follows lo-snap convention"
         REQUIRE(out.delay.time_s <= 0.1f);
     }
     // t=1.0: exact b endpoint.
-    REQUIRE_THAT(morph.morphedPatchAt(1.0f).delay.time_s,
-                 Catch::Matchers::WithinRel(0.1f, 1e-4f));
+    REQUIRE_THAT(morph.morphedPatchAt(1.0f).delay.time_s, Catch::Matchers::WithinRel(0.1f, 1e-4f));
 }
 
 TEST_CASE("MorphEngine: delay.time_s sweeps in log domain", "[morph][log]") {

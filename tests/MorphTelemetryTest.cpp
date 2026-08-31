@@ -129,9 +129,7 @@ TEST_CASE("MorphTelemetry: multiple events accumulate in append order", "[morph_
     const auto lines = readLines(path);
     REQUIRE(lines.size() == 6);
 
-    auto kindOf = [&](size_t i) {
-        return juce::JSON::parse(juce::String(lines[i]))["kind"].toString().toStdString();
-    };
+    auto kindOf = [&](size_t i) { return juce::JSON::parse(juce::String(lines[i]))["kind"].toString().toStdString(); };
     REQUIRE(kindOf(0) == "morph_requested");
     REQUIRE(kindOf(1) == "variation_picked");
     REQUIRE(kindOf(2) == "macro_tweaked");

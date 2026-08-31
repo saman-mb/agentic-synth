@@ -10,10 +10,10 @@
 
 #include <cmath>
 
-using agentic_synth::engine::BounceConfig;
-using agentic_synth::engine::renderPatchToBuffer;
 using agentic_synth::make_default_patch;
 using agentic_synth::PatchStruct;
+using agentic_synth::engine::BounceConfig;
+using agentic_synth::engine::renderPatchToBuffer;
 
 namespace {
 
@@ -71,7 +71,8 @@ TEST_CASE("OfflineRenderer: buffer size matches duration × sample_rate × chann
     cfg.sample_rate_hz = 48000;
     cfg.channels = 2;
     const auto buf = renderPatchToBuffer(brightPatch(), cfg);
-    const size_t expected = static_cast<size_t>(cfg.duration_s * cfg.sample_rate_hz) * static_cast<size_t>(cfg.channels);
+    const size_t expected =
+        static_cast<size_t>(cfg.duration_s * cfg.sample_rate_hz) * static_cast<size_t>(cfg.channels);
     CHECK(buf.size() == expected);
 }
 

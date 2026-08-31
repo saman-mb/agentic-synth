@@ -26,12 +26,12 @@ namespace agentic_synth::agent {
 //   * No transcripts, no raw audio, no PII.
 
 enum class MorphEventKind {
-    MorphRequested,   // user clicked "More variations" or sent a fresh prompt
-    VariationPicked,  // user promoted a thumbnail to dominant
-    MacroTweaked,     // user moved one of the 4 hero macros
-    ABToggled,        // user toggled A/B compare
-    PresetCommitted,  // Phase D "Keep this sound"
-    BounceToWav,      // Phase D bounce-to-wav
+    MorphRequested,  // user clicked "More variations" or sent a fresh prompt
+    VariationPicked, // user promoted a thumbnail to dominant
+    MacroTweaked,    // user moved one of the 4 hero macros
+    ABToggled,       // user toggled A/B compare
+    PresetCommitted, // Phase D "Keep this sound"
+    BounceToWav,     // Phase D bounce-to-wav
 };
 
 // Single-record envelope. Most fields are kind-specific — see the per-record
@@ -40,7 +40,7 @@ enum class MorphEventKind {
 // fields, ignoring the unset numeric defaults.
 struct MorphEvent {
     MorphEventKind kind{MorphEventKind::MorphRequested};
-    std::string ts;            // ISO-8601 UTC, filled by log() if empty
+    std::string ts; // ISO-8601 UTC, filled by log() if empty
 
     // MorphRequested.
     std::string prompt_hash;
@@ -48,12 +48,12 @@ struct MorphEvent {
     int liked_size{0};
 
     // VariationPicked.
-    int strategy_id{-1};       // 0..4 — index into MorphLoop's strategy array
-    std::string label;         // e.g. "warmer", "brighter", "A", "B"
+    int strategy_id{-1}; // 0..4 — index into MorphLoop's strategy array
+    std::string label;   // e.g. "warmer", "brighter", "A", "B"
     int time_since_arrival_ms{0};
 
     // MacroTweaked.
-    int macro_index{-1};       // 0..3 (BRIGHTNESS / WOBBLE / EDGE / AIR)
+    int macro_index{-1}; // 0..3 (BRIGHTNESS / WOBBLE / EDGE / AIR)
     float value{0.0f};
     int dwell_ms{0};
 
@@ -62,7 +62,7 @@ struct MorphEvent {
     int to_slot{-1};
 
     // PresetCommitted.
-    int name_length{0};        // anonymised — the name itself never logged
+    int name_length{0}; // anonymised — the name itself never logged
 
     // BounceToWav.
     float duration_s{0.0f};

@@ -37,8 +37,7 @@ namespace agentic_synth::mapper {
 // suitable for the FailureBanner detail disclosure. When no replacements
 // fired, `outDiff` is set to the empty string and `prompt` is returned
 // verbatim. Caller passes ownership of `outDiff`; we overwrite it.
-[[nodiscard]] std::string sanitizePromptForSafetyWithDiff(const std::string& prompt,
-                                                          std::string& outDiff);
+[[nodiscard]] std::string sanitizePromptForSafetyWithDiff(const std::string& prompt, std::string& outDiff);
 
 // Phase C failure-state UX (#269) — process-wide queue of recent
 // sanitizer modifications. Producers (GeminiSampler, PromptEnhancer)

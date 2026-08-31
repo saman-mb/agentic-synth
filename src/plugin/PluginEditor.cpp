@@ -1,16 +1,16 @@
 #include "plugin/PluginEditor.h"
 
 #if JucePlugin_Build_Standalone
-    // Pulls in juce::StandalonePluginHolder so the React SETTINGS panel can
-    // open the device dialog directly. getInstance() returns nullptr when this
-    // same shared code is loaded as a VST3/AU, so the guard below is a runtime
-    // check, not just a compile-time one.
-    // juce_audio_utils first: the standalone header uses AudioDeviceManager,
-    // AudioProcessorPlayer, and AudioDeviceSelectorComponent unqualified and
-    // does not include them itself.
-    #include <juce_audio_utils/juce_audio_utils.h>
+// Pulls in juce::StandalonePluginHolder so the React SETTINGS panel can
+// open the device dialog directly. getInstance() returns nullptr when this
+// same shared code is loaded as a VST3/AU, so the guard below is a runtime
+// check, not just a compile-time one.
+// juce_audio_utils first: the standalone header uses AudioDeviceManager,
+// AudioProcessorPlayer, and AudioDeviceSelectorComponent unqualified and
+// does not include them itself.
+#include <juce_audio_utils/juce_audio_utils.h>
 
-    #include <juce_audio_plugin_client/Standalone/juce_StandaloneFilterWindow.h>
+#include <juce_audio_plugin_client/Standalone/juce_StandaloneFilterWindow.h>
 #endif
 
 //==============================================================================
@@ -22,9 +22,7 @@ AgenticSynthPluginEditor::AgenticSynthPluginEditor(AgenticSynthPlugin& p)
     // provider on the JUCE message thread (lock-free SPSC consumer side).
     // The lambda only references the AudioProcessor, whose lifetime strictly
     // outlives this editor (host-owned), so capture-by-reference is safe.
-    web_.setScopeSampleProvider([&p](float* dest, int max) noexcept {
-        return p.pullScopeSamples(dest, max);
-    });
+    web_.setScopeSampleProvider([&p](float* dest, int max) noexcept { return p.pullScopeSamples(dest, max); });
     // Audio device picker. JUCE's standalone wrapper buries this behind an
     // "Options" text button in the title bar; surface it in the React SETTINGS
     // panel instead. Only the standalone wrapper has a device to configure —

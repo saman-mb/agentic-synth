@@ -130,8 +130,7 @@ struct Voice {
     // summed into L/R. baseCutoffHz/resonance come from VoiceManager
     // per-sample smoothers so LFO + filter-env modulation stack on top.
     // outL/outR are the post-filter, post-amp, post-DC-blocker stereo pair.
-    void renderStereo(float portamentoAlpha, float baseCutoffHz, float resonance,
-                      float& outL, float& outR) noexcept;
+    void renderStereo(float portamentoAlpha, float baseCutoffHz, float resonance, float& outL, float& outR) noexcept;
 };
 
 // N-voice polyphonic allocator with oldest-note stealing and portamento.
