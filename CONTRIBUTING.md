@@ -25,7 +25,7 @@ Install the core toolchain:
 - CMake 3.24 or newer.
 - A C++ compiler with C++20 support for the current build, even though formatting is configured for C++17 syntax compatibility.
 - clang-format for local formatting checks.
-- Node.js 20 or newer and npm for UI work.
+- Node.js 22 and npm for UI work (`nx test` for codec/prompt/modval uses Node's type stripping).
 - Python 3 with `pre-commit` installed.
 - Platform WebView runtime, matching the platform you build on:
   - **Windows**: WebView2 Runtime (preinstalled on Windows 11; auto-fetched
@@ -96,7 +96,13 @@ pre-commit run --all-files
 
 C++ code lives under `src/` and `tests/`. Format it with clang-format using the root `.clang-format` file. Keep changes small, prefer clear ownership and value semantics, and avoid formatting vendored code under `third_party/`.
 
-TypeScript and React code lives under `apps/web/`. Lint it with ESLint using the root flat config and `npx nx lint web`. Prefer typed, explicit component boundaries and keep browser-specific logic isolated from reusable UI code.
+TypeScript and React live under `apps/web/` and `libs/`. Import libs with
+`@agentic-synth/<name>` (see [ADR-0008](docs/adr/ADR-0008-nx-workspace-boundaries.md)).
+Lint with the root ESLint config (`npx nx lint web` / `npx nx run-many -t lint`).
+Do not add npm `workspaces`.
+
+Subsequent C++ UI rebuilds watch `apps/web/src/**` and `libs/engine-bridge/src`;
+edits under `libs/data` or `libs/shared-types` may need a manual `npx nx build web`.
 
 YAML, Markdown, JavaScript, TypeScript, and C++ files should not contain trailing whitespace and should end with a single newline. The pre-commit hooks fix these automatically where possible.
 
