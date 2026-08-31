@@ -187,12 +187,12 @@ export function TopBar({
       <div className="topbar-section topbar-left">
         <span
           className="topbar-wordmark"
-          aria-label="TIMBRE"
+          aria-label="Tambra"
           onDoubleClick={(e) => {
             if (e.altKey && onAltDoubleClickLogo) onAltDoubleClickLogo();
           }}
         >
-          TIMBRE
+          Tambra
         </span>
       </div>
 
