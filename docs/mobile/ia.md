@@ -17,7 +17,7 @@ Always mounted. Visibility may dim; do not unmount for state changes.
 | Element ID | What it is | Notes |
 |---|---|---|
 | `el.brand` | Wordmark / minimal brand mark | Hero-level brand signal; not just a nav chip |
-| `el.visualizer` | Full-width visualizer plane | Aesthetic + motion owned by [#298](https://github.com/saman-mb/agentic-synth/issues/298); content shows the sound |
+| `el.visualizer` | Full-width visualizer plane | Aesthetic + motion + fps budget in [art-direction.md](./art-direction.md) (#298); content shows the sound |
 | `el.macros` | 4 macro controls (`macro.0`…`macro.3`) | Fixed v1 set in [macros.md](./macros.md) (#296): Brightness / Movement / Space / Body |
 | `el.play` | Play / hold / gate for audition | Primary hear affordance when sheet is peek/collapsed |
 | `el.input_cta` | Primary Say affordance | Mic + text entry point; capture patterns in [input.md](./input.md) (#297) |
@@ -126,22 +126,19 @@ Survives background; cleared after successful Keep or explicit discard:
 | Input modes | `input.voice` \| `input.text` + substates ([input.md](./input.md)) | `recording`, `denied` |
 | Cuts | `cut.*` | `cut.ab` |
 | Doc links | Relative under `docs/mobile/` | `[State machine](./state-machine.md)` |
-| Tokens (#298) | CSS-var style keys in JSON | `color.bg.0` |
+| Tokens (#298) | Nested JSON keys ([tokens.json](./tokens.json)) | `color.bg.canvas` |
 
-**Rule for later stories:** [#298](https://github.com/saman-mb/agentic-synth/issues/298) may **add** files and fill reserved hooks. Do not rename `MobileState` values or split the single sheet. [#296](https://github.com/saman-mb/agentic-synth/issues/296) → [macros.md](./macros.md); [#297](https://github.com/saman-mb/agentic-synth/issues/297) → [input.md](./input.md).
+**Rule:** Do not rename `MobileState` values or split the single sheet. [#296](https://github.com/saman-mb/agentic-synth/issues/296) → [macros.md](./macros.md); [#297](https://github.com/saman-mb/agentic-synth/issues/297) → [input.md](./input.md); [#298](https://github.com/saman-mb/agentic-synth/issues/298) → [art-direction.md](./art-direction.md) / [tokens.json](./tokens.json).
 
 ## Spec siblings
 
 - [macros.md](./macros.md) — #296 (landed)
 - [input.md](./input.md) — #297 (landed)
-
-## Future stubs (do not create yet)
-
-- Visual tokens / art — #298 (`el.visualizer` only)
+- [art-direction.md](./art-direction.md) / [tokens.json](./tokens.json) / [tokens.md](./tokens.md) — #298 (landed; `el.visualizer` + knobs paint)
 
 ## v1 non-goals
 
-Pixel mockups · WCAG matrices · Expo scaffold · offline-first agent · cloud sync · parallel audio/UI state machines · new patch schema (macro bundles/curves → [macros.md](./macros.md)) · reopening PTT after tap-to-record choice in [input.md](./input.md)
+Pixel mockups · Expo scaffold · offline-first agent · cloud sync · parallel audio/UI state machines · new patch schema (macro bundles/curves → [macros.md](./macros.md)) · reopening PTT after tap-to-record choice in [input.md](./input.md) · light theme (dark tokens only in #298)
 
 ## See also
 

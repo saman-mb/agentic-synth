@@ -129,7 +129,7 @@ Align with [ia.md](./ia.md): **`preset.macros`** is an index-ordered **`[number 
 
 ## Knob interaction (UX)
 
-Signed off for [#296](https://github.com/saman-mb/agentic-synth/issues/296) AC at the **spec** level (prototype bar). No art tokens here (#298 owns chrome polish).
+Signed off for [#296](https://github.com/saman-mb/agentic-synth/issues/296) AC at the **spec** level (prototype bar). Visual paint + tokens: [art-direction.md](./art-direction.md) / [tokens.json](./tokens.json) (#298) — **must keep** 48–56 dp targets and vertical drag; no contradiction.
 
 | Concern | Spec |
 |---|---|
@@ -153,4 +153,4 @@ Signed off for [#296](https://github.com/saman-mb/agentic-synth/issues/296) AC a
 
 ## Out of scope
 
-App / Expo widgets, DSP projector implementation (E3 #292), design tokens / art (#298), freeform mod matrix on mobile, changing desktop `macro1`…`macro4` count.
+App / Expo widgets, DSP projector implementation (E3 #292), freeform mod matrix on mobile, changing desktop `macro1`…`macro4` count. (Art tokens landed in #298; interaction here stays authoritative.)
