@@ -76,7 +76,7 @@ jobs:
           # from netlify.toml itself.
           npx --yes netlify-cli@latest deploy \
             --site "$NETLIFY_SITE_ID" \
-            --filter web \
+            --filter agentic-synth \
             --dir apps/web/dist \
             --functions netlify/functions \
             --no-build \
