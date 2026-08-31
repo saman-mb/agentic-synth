@@ -15,7 +15,7 @@
 // brand voice (Phase 30 Brand Guardian) bans those words from the
 // first-impression surface.
 
-import type { PatchPreviewData } from '../types/chat';
+import type { PatchPreviewData } from '@agentic-synth/shared-types';
 
 export const QUICK_START_PATCH: PatchPreviewData = {
   osc: [

@@ -19,8 +19,8 @@
 //  - voice_count has no PARAM_RANGES entry (not knob-mapped), so it is
 //    clamped locally to 1..32.
 
-import type { PatchParams } from '../components/KnobGrid';
-import { PARAM_RANGES } from '../data/modulation';
+import type { PatchParams } from '@agentic-synth/shared-types';
+import { PARAM_RANGES } from '@agentic-synth/data';
 
 // Mirrors PatchStruct.h OscType.
 export const OSC_TYPE = {

@@ -56,6 +56,7 @@ session.db
 JuceLibraryCode/
 scripts/*
 !scripts/sync-prompts.mjs
+!scripts/assert-reversed-import.mjs
 
 # Netlify function generated prompts (run scripts/sync-prompts.mjs)
 netlify/functions/lib/prompts.generated.mts

@@ -45,6 +45,9 @@ jobs:
       - name: Install JS dependencies
         run: npm ci
 
+      - name: Assert module-boundary lint
+        run: node scripts/assert-reversed-import.mjs
+
       # Local Nx cache only (no Nx Cloud). Restores task hashes across runs
       # on the same lockfile; first miss is a cold compile like today.
       - name: Restore Nx cache

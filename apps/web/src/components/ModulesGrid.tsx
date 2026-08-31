@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { Knob } from './Knob';
 import type { ModSource } from './Knob';
-import type { PatchParams } from './KnobGrid';
+import type { PatchParams } from '@agentic-synth/shared-types';
+import { dominantConnection, ModMatrix, type ModConnection, type ModSourceId } from '@agentic-synth/data';
 import { KnobContextMenu } from './KnobContextMenu';
-import { dominantConnection, ModMatrix, type ModConnection, type ModSourceId } from '../data/modulation';
 import { Visualizer } from './Visualizer';
 import { ModMatrixPanel } from './ModMatrixPanel';
 import './ModulesGrid.css';

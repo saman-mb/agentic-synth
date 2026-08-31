@@ -19,8 +19,7 @@
 //         "modulation"?: AgentModulationPlan, "augmenter_actions"?: string[] }
 //   400/429/502/503 { "error": string }
 
-import type { AgentModulationPlan } from '../types/chat';
-import type { PatchParams } from '../components/KnobGrid';
+import type { AgentModulationPlan, PatchParams } from '@agentic-synth/shared-types';
 import type { SynthEngine } from '../webaudio/engine';
 import { validatePatch } from './patchCodec';
 

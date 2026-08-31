@@ -1,4 +1,4 @@
-import type { PatchPreviewData } from '../types/chat';
+import type { PatchPreviewData } from '@agentic-synth/shared-types';
 import './PatchPreview.css';
 
 interface Props {

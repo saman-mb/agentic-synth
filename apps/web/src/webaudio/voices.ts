@@ -28,7 +28,7 @@
 //    filter/wave where sensible. Envelopes re-trigger on noteOn only;
 //    live edits retarget the sustain region, not a running attack.
 
-import type { PatchParams } from '../components/KnobGrid';
+import type { PatchParams } from '@agentic-synth/shared-types';
 import { BIQUAD_TYPES, LFO_TARGET, LFO_WAVEFORM, OSC_TYPE } from './paramMap';
 
 const A4_MIDI = 69;

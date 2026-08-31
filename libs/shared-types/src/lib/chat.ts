@@ -1,5 +1,5 @@
-import type { PatchParams } from '../components/KnobGrid';
-import type { ModSourceId } from '../data/modulation';
+import type { PatchParams } from './patch';
+import type { ModSourceId } from './modSource';
 
 export type PatchPreviewData = PatchParams;
 

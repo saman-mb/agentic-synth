@@ -2,8 +2,8 @@ import { useCallback, useMemo } from 'react';
 import { Knob } from './Knob';
 import { ABToggle, type ABSide } from './ABToggle';
 import { MacroState } from './MacroBar';
-import type { PatchParams } from './KnobGrid';
-import { type ModSourceId } from '../data/modulation';
+import type { PatchParams } from '@agentic-synth/shared-types';
+import { type ModSourceId } from '@agentic-synth/data';
 import './PlaySurface.css';
 
 // ── PlaySurface (Phase A / #270) ─────────────────────────────────────

@@ -1,6 +1,6 @@
 import React from 'react';
 import { ChatInterface } from './ChatInterface';
-import type { AgentModulationPlan, ChatMessage, PatchPreviewData } from '../types/chat';
+import type { AgentModulationPlan, ChatMessage, PatchPreviewData } from '@agentic-synth/shared-types';
 import './RightColumn.css';
 
 // ── RightColumn — chat-only ──────────────────────────────────────────

@@ -3,7 +3,7 @@ import { SemanticDictionary } from './SemanticDictionary';
 import { TelemetryDashboard } from './TelemetryDashboard';
 import { PatchBrowser, BrowserEntry } from './PatchBrowser';
 import { SettingsPanel } from './SettingsPanel';
-import type { PatchParams } from './KnobGrid';
+import type { PatchParams } from '@agentic-synth/shared-types';
 import './ToolsDrawer.css';
 
 // ── ToolsDrawer (Phase 4) ────────────────────────────────────────────

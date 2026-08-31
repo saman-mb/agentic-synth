@@ -1,4 +1,4 @@
-import { makeDefaultPatch, PatchParams } from '../components/KnobGrid';
+import { makeDefaultPatch, type PatchParams } from '@agentic-synth/shared-types';
 
 // ── Starter Presets (Phase 6 + Phase 14 + sound-design spec rev) ─────
 //

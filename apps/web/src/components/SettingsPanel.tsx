@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import './SettingsPanel.css';
-import { playTapeStop, playVoicePip } from '../data/uiAudio';
+import { playTapeStop, playVoicePip } from '@agentic-synth/data';
 import {
   audioSettingsSupported,
   listAudioOutputDevices,

@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import './App.css';
 import { AuditionKeyboard } from './components/AuditionKeyboard';
 import { BootSplash } from './components/BootSplash';
-import { makeDefaultPatch, PatchParams } from './components/KnobGrid';
+import { makeDefaultPatch, type PatchParams } from '@agentic-synth/shared-types';
 import { MacroBar, MacroState } from './components/MacroBar';
 import { ModulesGrid } from './components/ModulesGrid';
 import { OnboardingOverlay } from './components/OnboardingOverlay';
@@ -24,15 +24,15 @@ import { useSynthBridge } from './hooks/useSynthBridge';
 import { useWebSocket } from './hooks/useWebSocket';
 import { usePatchHistory } from './hooks/usePatchHistory';
 import { useUiAudioSettings } from './hooks/useUiAudioSettings';
-import { PresetEntry, loadAllPresets } from './data/presets';
-import { playTapeStop, playVoicePip } from './data/uiAudio';
+import type { AgentModulationPlan, ChatMessage, PatchPreviewData } from '@agentic-synth/shared-types';
 import {
+  PresetEntry,
+  loadAllPresets,
+  playTapeStop,
+  playVoicePip,
   QUICK_START_PATCH,
   isOnboardingCompleted,
   markOnboardingCompleted,
-} from './data/quickStartPreset';
-import type { AgentModulationPlan, ChatMessage, PatchPreviewData } from './types/chat';
-import {
   ModMatrix,
   ModConnection,
   ModSourceId,
@@ -41,7 +41,7 @@ import {
   makeConnectionId,
   PARAM_RANGES,
   macroIndexOf,
-} from './data/modulation';
+} from '@agentic-synth/data';
 
 type Theme = 'dark' | 'light';
 type DrawerTab = 'dictionary' | 'telemetry' | 'history' | 'settings';

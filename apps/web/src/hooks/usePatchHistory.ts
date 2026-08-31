@@ -1,5 +1,5 @@
 import { useCallback, useReducer } from 'react';
-import type { PatchParams } from '../components/KnobGrid';
+import type { PatchParams } from '@agentic-synth/shared-types';
 
 // ─── Patch history hook ──────────────────────────────────────────────────────
 //

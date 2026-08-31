@@ -1,7 +1,7 @@
 import React, { useCallback, useState } from 'react';
 import { Knob } from './Knob';
 import { ModSourcesStrip, ModSourceDot } from './ModSourcesStrip';
-import type { ModSourceId } from '../data/modulation';
+import type { ModSourceId } from '@agentic-synth/data';
 import './MacroBar.css';
 
 // ── MacroBar (Phase 6 — visual + rename) ─────────────────────────────

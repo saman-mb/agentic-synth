@@ -23,9 +23,7 @@
 // localStorage under agentic-synth.demo.* keys — best-effort, try/catch
 // guarded for private-mode / quota failures.
 
-import { makeDefaultPatch } from '../components/KnobGrid';
-import type { AgentModulationPlan } from '../types/chat';
-import type { PatchParams } from '../components/KnobGrid';
+import { makeDefaultPatch, type AgentModulationPlan, type PatchParams } from '@agentic-synth/shared-types';
 import { createSynthEngine, type SynthEngine } from '../webaudio/engine';
 import { setPatchParam } from '../webaudio/paramMap';
 import { runGenerateFlow } from './generateFlow';
