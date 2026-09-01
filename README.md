@@ -63,13 +63,21 @@ audio thread.
 The same React UI runs in a browser at the Netlify demo site, backed by a
 Netlify Function that calls Gemini 2.5 server-side. The plugin binaries are
 untouched — the browser shim swaps the JUCE native bridge for
-`fetch("/api/generate")`, and audio renders through a WebAudio approximation
-of the C++ engine.
+`fetch("/api/generate")`, and audio renders through the C++ DSP core
+compiled to WASM (`createSynthEngine()` returns `WasmSynthEngine`). Tempo
+sync is the C++ engine's own behaviour, not a WebAudio approximation.
 
-Known approximations vs the native plugin:
+`/agsynth.js` and `/agsynth.wasm` are served from `apps/web` public after
+Vite copies `npx nx run wasm:build-wasm` (`dist/wasm/agsynth.js` +
+`dist/wasm/agsynth.wasm`).
 
-- `bpm_sync` is fixed at 120 BPM (WebAudio tempo sync)
-- Filter / effect colors differ from the C++ DSP implementations
+Known gaps vs the native plugin:
+
+- Chorus, tube saturation, and reverb-send HPF use mapper bypass defaults
+  (mix 0 / drive 0 / HPF 0). The `PatchParams` schema does not include
+  those fields, so they are not agent-addressable from the demo.
+- Missing WASM or a module-init failure: `ensureStarted()` rejects and
+  `juceShim` emits `error` — no silent WebAudio fallback, no blank screen.
 - Rate limits: 3 generations/minute and 200/day per IP (soft guardrail —
   counters reset on function cold start)
 
@@ -89,6 +97,7 @@ and is never shipped to the client.
 
 ```sh
 node scripts/sync-prompts.mjs        # generates gitignored prompt constants
+npx nx run wasm:build-wasm           # dist/wasm/agsynth.js + agsynth.wasm
 npx nx serve web                     # UI + browser shim on http://localhost:5173
 ```
 
@@ -100,6 +109,7 @@ UI and the function together (see `[dev]` in `netlify.toml`):
 ```sh
 node scripts/sync-prompts.mjs
 npm ci
+npx nx run wasm:build-wasm
 GEMINI_KEY=your-key netlify dev      # http://localhost:8888
 ```
 

@@ -1,3 +1,7 @@
+# Mapper / engine / agent / plugin all pull JUCE. Wasm links only the
+# JUCE-free C API, so that whole graph stays off the emcc compile.
+if(NOT EMSCRIPTEN)
+
 # ── Mapper Library ───────────────────────────────────────────────────────────
 # Pure C++ keyword → PatchStruct mapping; no JUCE dependency
 add_library(agentic_synth_mapper STATIC
@@ -43,6 +47,8 @@ target_link_libraries(agentic_synth_mapper
         juce::juce_core
 )
 
+endif() # NOT EMSCRIPTEN
+
 # ── DSP (JUCE-free) + C API (#305 / RFC cpp-dsp-core §2, §10) ───────────────
 # Render-path TUs only. Offline WAV write and mapper stay off this target so
 # `agentic_synth_capi` links no JUCE / no third-party libs.
@@ -74,6 +80,8 @@ set_property(TARGET agentic_synth_capi PROPERTY POSITION_INDEPENDENT_CODE ON)
 if(NOT MSVC)
     target_compile_options(agentic_synth_capi PRIVATE -Werror)
 endif()
+
+if(NOT EMSCRIPTEN)
 
 # ── Engine Library ───────────────────────────────────────────────────────────
 # Phase 2 (Item #2): PatchStateManager is removed (APVTS owns persistence), so
@@ -364,3 +372,11 @@ target_link_libraries(AgenticSynth_Plugin
 )
 
 endif() # AGENTIC_SYNTH_BUILD_PLUGIN
+
+endif() # NOT EMSCRIPTEN
+
+# Wasm glue is a separate graph so MODULARIZE / EXPORT_ES6 flags cannot
+# leak onto native plugin or test binaries.
+if(EMSCRIPTEN)
+    add_subdirectory(wasm)
+endif()

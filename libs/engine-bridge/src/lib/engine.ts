@@ -31,6 +31,9 @@ import type { AgentModulationPlan, PatchParams } from '@agentic-synth/shared-typ
 import { createEffectRack, type EffectRack } from './effects';
 import { getPatchParam, isEnvParam, macroTargetValue, setPatchParam } from './paramMap';
 import { VoiceManager } from './voices';
+import { WasmSynthEngine } from './wasmEngine';
+
+export { WasmSynthEngine };
 
 export interface SynthEngine {
   ensureStarted(): Promise<void>;
@@ -113,7 +116,7 @@ function clonePatch(patch: PatchParams): PatchParams {
   return JSON.parse(JSON.stringify(patch)) as PatchParams;
 }
 
-class WebSynthEngine implements SynthEngine {
+export class WebSynthEngine implements SynthEngine {
   private patch: PatchParams = makeFallbackPatch();
   private ctx: AudioContext | null = null;
   private manager: VoiceManager | null = null;
@@ -303,5 +306,5 @@ class WebSynthEngine implements SynthEngine {
 }
 
 export function createSynthEngine(): SynthEngine {
-  return new WebSynthEngine();
+  return new WasmSynthEngine();
 }

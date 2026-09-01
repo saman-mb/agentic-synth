@@ -29,6 +29,7 @@ filter with a fast amplitude envelope.
 | Plugin control path | `src/plugin/AgenticSynthPlugin.*` | JUCE processor lifecycle, APVTS parameters, MIDI adaptation, and audio callback entrypoint. |
 | Voice engine | `src/engine/VoiceManager.*` | Polyphonic allocation, patch application, per-sample voice rendering, effects bus. |
 | C API | `src/capi/agsynth.h` | Stable C ABI over the DSP core (`agentic_synth_capi`). Used by WASM and JSI bridges. |
+| WASM glue | `src/wasm/`, `dist/wasm/`, `libs/engine-bridge` (`wasmEngine`) | Emscripten glue (`#ifdef __EMSCRIPTEN__` here only; C API unchanged). Artefacts `agsynth.js` / `agsynth.wasm`. The web-demo factory returns `WasmSynthEngine`. |
 | VA oscillators | `src/engine/VAOscillator.*` | PolyBLEP-style saw/square, integrated triangle, analog-style drift. |
 | Wavetable oscillator | `src/engine/WavetableOscillator.*` | Multi-frame wavetable morphing with FFT-built mip levels. |
 | Envelopes | `src/engine/ADSREnvelope.*` | Exponential ADSR for amplitude and filter modulation. |
@@ -50,6 +51,9 @@ inputs render bit-identically.
 The CMake target for the plugin-facing engine remains `agentic_synth_engine_core`.
 It is kept JUCE-light: the audio engine itself is ordinary C++ and is not built
 around JUCE audio classes.
+
+The live web demo factory (`createSynthEngine()`) returns `WasmSynthEngine`.
+`WebSynthEngine` remains constructible for #307 golden extraction.
 
 ## Runtime Control Flow
 

@@ -1,0 +1,19 @@
+{
+  "name": "wasm",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "src/wasm",
+  "projectType": "library",
+  "tags": ["type:lib", "scope:shared"],
+  "targets": {
+    "build-wasm": {
+      "executor": "nx:run-commands",
+      "outputs": [
+        "{workspaceRoot}/dist/wasm/agsynth.js",
+        "{workspaceRoot}/dist/wasm/agsynth.wasm"
+      ],
+      "options": {
+        "command": "mkdir -p dist/wasm && emcmake cmake -S . -B build-wasm -DAGENTIC_SYNTH_BUILD_PLUGIN=OFF -DAGENTIC_SYNTH_BUILD_TESTS=OFF && cmake --build build-wasm --parallel 2"
+      }
+    }
+  }
+}

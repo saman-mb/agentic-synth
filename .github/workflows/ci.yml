@@ -151,3 +151,44 @@ jobs:
 
       - name: Run unit tests
         run: ctest --test-dir build --build-config Debug --output-on-failure
+
+  # Emscripten/wasm is independent of JUCE and the Catch2 suite, so it
+  # does not wait on lint. PLUGIN/TESTS stay off: the wasm graph is
+  # C API + glue only (#306).
+  build-wasm:
+    name: Build wasm
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+
+      - name: Read Emscripten version
+        id: emsdk
+        run: echo "version=$(cat cmake/emscripten-version)" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: ${{ steps.emsdk.outputs.version }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - name: Install JS dependencies
+        run: npm ci
+
+      - name: Build wasm
+        run: npx nx run wasm:build-wasm
+
+      - name: Upload wasm artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: agsynth-wasm
+          path: |
+            dist/wasm/agsynth.js
+            dist/wasm/agsynth.wasm
