@@ -380,3 +380,7 @@ endif() # NOT EMSCRIPTEN
 if(EMSCRIPTEN)
     add_subdirectory(wasm)
 endif()
+
+if(NOT EMSCRIPTEN)
+    add_subdirectory(jsi)
+endif()
