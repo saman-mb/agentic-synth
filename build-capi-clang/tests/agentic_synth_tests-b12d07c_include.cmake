@@ -1,0 +1,5 @@
+if(EXISTS "/home/saman/dev/agentic-synth/build-capi-clang/tests/agentic_synth_tests-b12d07c_tests.cmake")
+  include("/home/saman/dev/agentic-synth/build-capi-clang/tests/agentic_synth_tests-b12d07c_tests.cmake")
+else()
+  add_test(agentic_synth_tests_NOT_BUILT-b12d07c agentic_synth_tests_NOT_BUILT-b12d07c)
+endif()

@@ -11,12 +11,13 @@ import { runMobileGenerateFlow } from '../services/mobileGenerateFlow';
 import {
   createMemoryStorage,
   getAsyncStorage,
+  loadPresets,
   savePreset,
   type PresetStorage,
 } from '../services/presetStore';
 import { fetchVariation, type VariationItem } from '../services/variationFlow';
 import { INITIAL_SESSION, type MobileSession } from '../state/mobileState';
-import { bootToHear, transitionSession } from '../state/mobileStateMachine';
+import { transitionSession } from '../state/mobileStateMachine';
 import {
   defaultKeepName,
   EMPTY_SCRATCH,
@@ -34,9 +35,11 @@ function applyProjectedPatch(engine: SynthEngine, base: PatchParams, macros: num
 export function useMobileApp() {
   const engineRef = useRef<SynthEngine | null>(null);
   const crossfadeToken = useRef(0);
+  const generateToken = useRef(0);
   const storageRef = useRef<PresetStorage | null>(null);
   const [session, setSession] = useState<MobileSession>(INITIAL_SESSION);
   const [scratch, setScratch] = useState<SessionScratch>(EMPTY_SCRATCH);
+  const [libraryCount, setLibraryCount] = useState(0);
   const [backend, setBackend] = useState<EngineBackend>('mock');
   const [scopeSamples, setScopeSamples] = useState<number[]>([]);
   const [generating, setGenerating] = useState(false);
@@ -48,7 +51,10 @@ export function useMobileApp() {
 
   useEffect(() => {
     void (async () => {
-      storageRef.current = (await getAsyncStorage()) ?? createMemoryStorage();
+      const storage = (await getAsyncStorage()) ?? createMemoryStorage();
+      storageRef.current = storage;
+      const presets = await loadPresets(storage);
+      setLibraryCount(presets.length);
     })();
   }, []);
 
@@ -62,7 +68,22 @@ export function useMobileApp() {
       try {
         await bootDemoPatch(engine, demoPatch, DEMO_NOTE, 100);
         if (!disposed) {
-          setSession((s) => bootToHear(s, 'Demo patch · offline ready'));
+          macroKnobs.bindBasePatch(demoPatch);
+          setScratch({
+            prompt: 'Demo patch',
+            brief: '',
+            basePatch: demoPatch,
+            variations: [{ index: 0, patch: demoPatch, source: 'local' }],
+            selectedVariationIndex: 0,
+            keepNameDraft: 'Demo patch',
+          });
+          setSession((s) =>
+            transitionSession(
+              { ...s, isPlaying: true },
+              'shape',
+              { statusMessage: 'Demo patch · thumb the macros' },
+            ),
+          );
         }
       } catch (err) {
         if (!disposed) {
@@ -82,7 +103,7 @@ export function useMobileApp() {
       engine.dispose();
       engineRef.current = null;
     };
-  }, [demoPatch]);
+  }, [demoPatch, macroKnobs]);
 
   useEffect(() => {
     if (!session.isPlaying) {
@@ -156,12 +177,15 @@ export function useMobileApp() {
     }
 
     macroKnobs.resetDrag();
+    const token = ++generateToken.current;
     setGenerating(true);
     setSession((s) =>
       transitionSession(s, 'hear', { statusMessage: 'Building your sound…' }),
     );
 
     const result = await runMobileGenerateFlow(prompt);
+    if (token !== generateToken.current) return;
+
     setGenerating(false);
 
     if (!result.ok) {
@@ -298,6 +322,9 @@ export function useMobileApp() {
       });
       setKeeping(false);
       setScratch(EMPTY_SCRATCH);
+      const storage = storageRef.current ?? createMemoryStorage();
+      const presets = await loadPresets(storage);
+      setLibraryCount(presets.length);
       setSession((s) =>
         transitionSession(
           { ...s, isPlaying: false },
@@ -352,10 +379,60 @@ export function useMobileApp() {
     setScratch((s) => ({ ...s, keepNameDraft: name }));
   }, []);
 
+  const cancelGenerate = useCallback(() => {
+    generateToken.current += 1;
+    setGenerating(false);
+    setSession((s) => transitionSession(s, 'say', { statusMessage: 'Cancelled' }));
+  }, []);
+
+  const dismissError = useCallback(() => {
+    setSession((s) => {
+      if (s.state !== 'error') return s;
+      const target = s.returnState ?? 'idle';
+      const playing = target === 'shape' || target === 'variations' ? s.isPlaying : false;
+      if (target === 'idle') {
+        return transitionSession({ ...s, isPlaying: false }, 'idle', { statusMessage: '' });
+      }
+      return transitionSession(
+        { ...s, isPlaying: playing },
+        target,
+        { returnState: target, statusMessage: '' },
+      );
+    });
+  }, []);
+
+  const retryFromError = useCallback(() => {
+    setSession((s) => {
+      if (s.state !== 'error') return s;
+      const target = s.returnState ?? 'idle';
+      if (target === 'keep') {
+        return transitionSession(s, 'keep', { returnState: 'keep', statusMessage: 'Try saving again' });
+      }
+      if (target === 'say') {
+        return transitionSession(s, 'say', { returnState: 'say', statusMessage: '' });
+      }
+      if (target === 'shape') {
+        return transitionSession(s, 'shape', { returnState: 'shape', statusMessage: '' });
+      }
+      return transitionSession({ ...s, isPlaying: false }, 'idle', { statusMessage: '' });
+    });
+  }, []);
+
+  const openLibrary = useCallback(() => {
+    setSession((s) => ({
+      ...s,
+      statusMessage:
+        libraryCount > 0
+          ? `${libraryCount} saved preset${libraryCount === 1 ? '' : 's'} on device`
+          : 'No saved presets yet — tap Keep after shaping a sound',
+    }));
+  }, [libraryCount]);
+
   return useMemo(
     () => ({
       session,
       scratch,
+      libraryCount,
       backend,
       scopeSamples,
       togglePlay,
@@ -377,21 +454,30 @@ export function useMobileApp() {
       regenerate,
       variationLoading,
       keeping,
+      cancelGenerate,
+      dismissError,
+      retryFromError,
+      openLibrary,
     }),
     [
       backend,
+      cancelGenerate,
       cancelKeep,
       cancelSay,
       confirmKeep,
+      dismissError,
       generating,
       keeping,
+      libraryCount,
       macroKnobs,
       openKeep,
+      openLibrary,
       openSay,
       openVariations,
       backToShape,
       regenerate,
       requestMoreVariations,
+      retryFromError,
       sayCapture,
       scopeSamples,
       scratch,

@@ -14,6 +14,7 @@ export default function HomeScreen() {
   const {
     session,
     scratch,
+    libraryCount,
     backend,
     scopeSamples,
     togglePlay,
@@ -35,6 +36,10 @@ export default function HomeScreen() {
     regenerate,
     variationLoading,
     keeping,
+    cancelGenerate,
+    dismissError,
+    retryFromError,
+    openLibrary,
   } = useMobileApp();
 
   const shapeActive = session.state === 'shape' || session.state === 'variations';
@@ -44,7 +49,7 @@ export default function HomeScreen() {
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <View style={styles.chrome}>
-        <BrandHeader />
+        <BrandHeader libraryCount={libraryCount} onLibraryPress={openLibrary} />
         <Visualizer
           isPlaying={session.isPlaying}
           scopeSamples={scopeSamples}
@@ -72,7 +77,12 @@ export default function HomeScreen() {
           onCancel: cancelSay,
           generating,
         }}
+        hear={{
+          message: session.statusMessage || 'Building your sound…',
+          onCancel: generating ? cancelGenerate : undefined,
+        }}
         shape={{
+          promptEcho: scratch.prompt,
           onVariations: openVariations,
           onKeep: openKeep,
           onRegenerate: () => void regenerate(),
@@ -93,6 +103,11 @@ export default function HomeScreen() {
           onConfirm: () => void confirmKeep(),
           onCancel: cancelKeep,
           saving: keeping,
+        }}
+        error={{
+          message: session.statusMessage,
+          onRetry: session.returnState ? retryFromError : undefined,
+          onDismiss: dismissError,
         }}
       />
     </SafeAreaView>

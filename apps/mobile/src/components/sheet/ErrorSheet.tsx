@@ -1,38 +1,23 @@
 import { Pressable, StyleSheet, Text, View } from 'react-native';
-import { colors, radius, space, typeScale } from '../theme/tokens';
+import { colors, radius, space, typeScale } from '../../theme/tokens';
 
-export interface ShapeSheetProps {
-  promptEcho?: string;
-  onVariations: () => void;
-  onKeep: () => void;
-  onRegenerate: () => void;
-  onNewIdea: () => void;
+export interface ErrorSheetProps {
+  message: string;
+  onRetry?: () => void;
+  onDismiss: () => void;
 }
 
-export function ShapeSheet({
-  promptEcho,
-  onVariations,
-  onKeep,
-  onRegenerate,
-  onNewIdea,
-}: ShapeSheetProps) {
+export function ErrorSheet({ message, onRetry, onDismiss }: ErrorSheetProps) {
   return (
-    <View style={styles.root} accessibilityLabel="Shape sheet">
+    <View style={styles.root} accessibilityLabel="Error sheet">
       <View style={styles.grabber} />
-      <Text style={styles.title}>Shape</Text>
-      {promptEcho ? (
-        <Text style={styles.echo} numberOfLines={1}>
-          “{promptEcho}”
-        </Text>
-      ) : null}
-      <Text style={styles.body}>Thumb the macros above. Swipe the visualizer for variations.</Text>
+      <Text style={styles.title}>Something went wrong</Text>
+      <Text style={styles.body}>{message || 'Try again or go back.'}</Text>
       <View style={styles.row}>
-        <ActionButton label="Variations" onPress={onVariations} primary />
-        <ActionButton label="Keep" onPress={onKeep} />
-      </View>
-      <View style={styles.row}>
-        <ActionButton label="Regenerate" onPress={onRegenerate} />
-        <ActionButton label="New idea" onPress={onNewIdea} />
+        {onRetry ? (
+          <ActionButton label="Retry" onPress={onRetry} primary />
+        ) : null}
+        <ActionButton label="Dismiss" onPress={onDismiss} primary={!onRetry} />
       </View>
     </View>
   );
@@ -95,16 +80,9 @@ const styles = StyleSheet.create({
     lineHeight: typeScale.body.lineHeight,
     marginBottom: space['4'],
   },
-  echo: {
-    color: colors.text.tertiary,
-    fontSize: typeScale.caption.size,
-    lineHeight: typeScale.caption.lineHeight,
-    marginBottom: space['2'],
-  },
   row: {
     flexDirection: 'row',
     gap: space['3'],
-    marginBottom: space['3'],
   },
   btn: {
     flex: 1,

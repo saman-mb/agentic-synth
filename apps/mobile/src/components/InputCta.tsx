@@ -4,7 +4,10 @@ import { colors, radius, space, typeScale } from '../theme/tokens';
 export function InputCta({ onPress }: { onPress?: () => void }) {
   return (
     <Pressable
-      style={styles.root}
+      style={({ pressed, focused }) => [
+        styles.root,
+        (pressed || focused) && styles.focus,
+      ]}
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel="Describe a sound"
@@ -22,10 +25,15 @@ const styles = StyleSheet.create({
     gap: space['2'],
     paddingHorizontal: space['5'],
     paddingVertical: space['3'],
+    minHeight: space['9'],
     borderRadius: radius.pill,
     backgroundColor: colors.bg.raised,
     borderWidth: 1,
     borderColor: colors.border.subtle,
+  },
+  focus: {
+    borderColor: colors.border.focus,
+    borderWidth: 2,
   },
   icon: {
     fontSize: 18,

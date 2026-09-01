@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { LayoutChangeEvent, StyleSheet, View } from 'react-native';
+import { AccessibilityInfo, LayoutChangeEvent, StyleSheet, View } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import { runOnJS } from 'react-native-reanimated';
 import { Canvas, Fill, RoundedRect } from '@shopify/react-native-skia';
@@ -25,8 +25,16 @@ export function Visualizer({
 }) {
   const [phase, setPhase] = useState(0);
   const [layoutWidth, setLayoutWidth] = useState(0);
+  const [reduceMotion, setReduceMotion] = useState(false);
 
   useEffect(() => {
+    void AccessibilityInfo.isReduceMotionEnabled().then(setReduceMotion);
+    const sub = AccessibilityInfo.addEventListener('reduceMotionChanged', setReduceMotion);
+    return () => sub.remove();
+  }, []);
+
+  useEffect(() => {
+    if (reduceMotion) return undefined;
     let raf = 0;
     let last = performance.now();
     const tick = (now: number) => {
@@ -38,7 +46,7 @@ export function Visualizer({
     };
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
-  }, []);
+  }, [reduceMotion]);
 
   const pan = Gesture.Pan()
     .enabled(swipeEnabled && !!onSwipe)
@@ -51,17 +59,18 @@ export function Visualizer({
     });
 
   const bars = useMemo(() => {
-    const usable = Math.max(layoutWidth - space.chromePadX * 2, 1);
+    const usable = Math.max(layoutWidth, 1);
     const barWidth = usable / BAR_COUNT;
+    const motion = reduceMotion ? 0 : phase;
     return Array.from({ length: BAR_COUNT }, (_, i) => {
       const sample = scopeSamples?.[i % Math.max(scopeSamples?.length ?? 1, 1)] ?? 0;
       const energy = isPlaying ? Math.abs(sample) + 0.18 : 0.07;
-      const wave = Math.sin(phase + i * 0.35) * 0.22 + 0.78;
+      const wave = reduceMotion ? 0.85 : Math.sin(motion + i * 0.35) * 0.22 + 0.78;
       const h = Math.min(1, energy * wave) * (height - 20);
-      const x = space.chromePadX + i * barWidth;
+      const x = i * barWidth;
       return { x, y: height - h - 8, w: barWidth * 0.62, h: Math.max(h, 3) };
     });
-  }, [height, isPlaying, layoutWidth, phase, scopeSamples]);
+  }, [height, isPlaying, layoutWidth, phase, reduceMotion, scopeSamples]);
 
   const onLayout = (e: LayoutChangeEvent) => {
     setLayoutWidth(e.nativeEvent.layout.width);
@@ -70,7 +79,7 @@ export function Visualizer({
   return (
     <GestureDetector gesture={pan}>
       <View
-        style={[styles.root, { height }]}
+        style={[styles.root, { height, marginHorizontal: -space.chromePadX }]}
         onLayout={onLayout}
         accessibilityLabel="Audio visualizer"
         accessibilityHint={swipeEnabled ? 'Swipe left or right for variations' : undefined}
@@ -99,7 +108,7 @@ const styles = StyleSheet.create({
   root: {
     width: '100%',
     overflow: 'hidden',
-    borderRadius: 10,
-    marginVertical: space['3'],
+    borderRadius: 0,
+    marginVertical: 0,
   },
 });
