@@ -30,6 +30,7 @@ filter with a fast amplitude envelope.
 | Voice engine | `src/engine/VoiceManager.*` | Polyphonic allocation, patch application, per-sample voice rendering, effects bus. |
 | C API | `src/capi/agsynth.h` | Stable C ABI over the DSP core (`agentic_synth_capi`). Used by WASM and JSI bridges. |
 | WASM glue | `src/wasm/`, `dist/wasm/`, `libs/engine-bridge` (`wasmEngine`) | Emscripten glue (`#ifdef __EMSCRIPTEN__` here only; C API unchanged). Artefacts `agsynth.js` / `agsynth.wasm`. The web-demo factory returns `WasmSynthEngine`. |
+| JSI glue | `src/jsi/`, `libs/engine-bridge` (`jsiEngine`) | Control-rate `JsiSynthEngine` over the C API. Native AudioStream (not Expo AV) calls `ags_engine_render` on the RT thread. See [JSI / React Native](#jsi--react-native). |
 | VA oscillators | `src/engine/VAOscillator.*` | PolyBLEP-style saw/square, integrated triangle, analog-style drift. |
 | Wavetable oscillator | `src/engine/WavetableOscillator.*` | Multi-frame wavetable morphing with FFT-built mip levels. |
 | Envelopes | `src/engine/ADSREnvelope.*` | Exponential ADSR for amplitude and filter modulation. |
@@ -62,6 +63,12 @@ The live web demo factory (`createSynthEngine()`) returns `WasmSynthEngine`.
 `WebSynthEngine` remains constructible. Golden extraction for #307 uses
 Chromium `OfflineAudioContext` plus `VoiceManager` / `createEffectRack`, not
 the live `WebSynthEngine` destination path.
+
+React Native does not go through that factory. The RN harness constructs
+`JsiSynthEngine` after `install()` attaches `global.__AgsynthHost`; audio
+output is a native AudioStream, not Expo AV and not WebAudio `setSinkId`.
+The Expo app that would wire this host ([#294](https://github.com/saman-mb/agentic-synth/issues/294))
+is residual and is not in this PR.
 
 ## Runtime Control Flow
 
@@ -663,6 +670,38 @@ extending it:
   path uses `DcBlocker` from `PatchValidator.h`.
 - `docs/architecture.md` still contains older placeholder-era descriptions and
   should be refreshed separately if it is meant to be canonical again.
+
+## JSI / React Native
+
+`JsiSynthEngine` is a control-rate sibling of `WasmSynthEngine`. It implements
+the same `SynthEngine` type: `setPatch` packs `PatchParams` to `PatchStruct`
+bytes on the JS thread (`packPatchParams`), `setParam` / note events forward
+to the JSI host object, and native `ags_engine_*` return codes map to
+`AgsynthError` (`PARAM` | `SIZE` | `NULL` | `STATE` | `QUEUE`). Native never
+throws across the boundary.
+
+Audio is not on the JS thread. A native AudioStream (not Expo AV) owns the
+render callback and calls `ags_engine_render` there. That I/O choice is
+independent of the Expo app: wiring `JsiSynthEngine` into Expo
+([#294](https://github.com/saman-mb/agentic-synth/issues/294)) is residual
+and is not in this PR. `createSynthEngine()` stays on `WasmSynthEngine` for
+the web demo. On device, `NativeModules.Agsynth.install()` attaches
+`global.__AgsynthHost` and returns true; it does not return the binding.
+RN constructs `JsiSynthEngine` from that host. There is no WebAudio `sinkId`
+path — `setOutputDevice` rejects with a typed error.
+
+### Real-time budget
+
+The pass/fail method is wall-clock against the callback period, not a device
+lab number in CI:
+
+- Block size 256 frames at 48 kHz → period `256 / 48000 = 5.33 ms`.
+- Pass if `processBlock` (native `ags_engine_render` plus AudioStream
+  overhead) p99 is under 50% of that period (~2.67 ms).
+- On-device Pixel-class measurement is residual: record it when a mid-range
+  Android device is available; it is not a merge gate for this story.
+
+A Node mock of `install()` lives in `tests/jsi-harness/` (not an Nx app).
 
 ## Golden-file parity
 

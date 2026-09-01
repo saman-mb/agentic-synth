@@ -161,6 +161,7 @@ catch_discover_tests(agentic_synth_tests)
 add_executable(agsynth_capi_tests
     CapiTest.cpp
     GoldenParityTest.cpp
+    JsiBridgeTest.cpp
 )
 target_include_directories(agsynth_capi_tests PRIVATE ../src ../src/capi)
 target_compile_definitions(agsynth_capi_tests
@@ -171,6 +172,7 @@ target_link_libraries(agsynth_capi_tests
     PRIVATE
         Catch2::Catch2WithMain
         agentic_synth_capi
+        agentic_synth_jsi
 )
 agentic_synth_configure_target(agsynth_capi_tests)
 catch_discover_tests(agsynth_capi_tests)

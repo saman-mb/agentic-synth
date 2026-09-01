@@ -230,6 +230,8 @@ agentic-synth/
 │   ├── agent/      # LLM bridge, telemetry, MIDI learn, morph loop
 │   ├── cli/        # Headless patch generation
 │   ├── engine/     # DSP: oscillators, filters, envelopes, effects
+│   ├── wasm/       # Emscripten glue over the C API
+│   ├── jsi/        # React Native JSI host + native AudioStream
 │   ├── mapper/     # NL → parameters: RAG, samplers, heuristics
 │   ├── plugin/     # JUCE AudioProcessor + editor
 │   └── ui/         # WebView host and native↔JS bridge
