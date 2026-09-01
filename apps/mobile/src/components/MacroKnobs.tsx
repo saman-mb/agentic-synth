@@ -8,13 +8,16 @@ const MACROS = [
   { id: 'macro.3', label: 'Body' },
 ] as const;
 
-/** Stub macro row — interaction deferred to #317+. */
-export function MacroKnobs() {
+/** Macro row — visible after generate (#317); drag interaction in #318. */
+export function MacroKnobs({ active = false }: { active?: boolean }) {
   return (
     <View style={styles.plate} accessibilityLabel="Macro controls">
       {MACROS.map((macro) => (
         <View key={macro.id} style={styles.knobWrap}>
-          <View style={styles.knob} accessibilityState={{ disabled: true }}>
+          <View
+            style={[styles.knob, !active && styles.knobIdle]}
+            accessibilityState={{ disabled: !active }}
+          >
             <View style={styles.arc} />
           </View>
           <Text style={styles.label}>{macro.label}</Text>
@@ -46,6 +49,8 @@ const styles = StyleSheet.create({
     height: HIT,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  knobIdle: {
     opacity: 0.55,
   },
   arc: {

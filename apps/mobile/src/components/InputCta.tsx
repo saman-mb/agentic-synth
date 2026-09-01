@@ -1,7 +1,6 @@
 import { Pressable, StyleSheet, Text } from 'react-native';
 import { colors, radius, space, typeScale } from '../theme/tokens';
 
-/** Stub Say affordance — voice/text capture deferred to #317. */
 export function InputCta({ onPress }: { onPress?: () => void }) {
   return (
     <Pressable
@@ -9,7 +8,6 @@ export function InputCta({ onPress }: { onPress?: () => void }) {
       onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel="Describe a sound"
-      accessibilityState={{ disabled: true }}
     >
       <Text style={styles.icon}>🎙</Text>
       <Text style={styles.label}>Say</Text>
@@ -28,7 +26,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.bg.raised,
     borderWidth: 1,
     borderColor: colors.border.subtle,
-    opacity: 0.6,
   },
   icon: {
     fontSize: 18,

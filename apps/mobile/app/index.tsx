@@ -11,21 +11,39 @@ import { useMobileApp } from '../src/hooks/useMobileApp';
 import { colors, space } from '../src/theme/tokens';
 
 export default function HomeScreen() {
-  const { session, backend, scopeSamples, togglePlay } = useMobileApp();
+  const {
+    session,
+    backend,
+    scopeSamples,
+    togglePlay,
+    openSay,
+    cancelSay,
+    sendPrompt,
+    sayCapture,
+    generating,
+  } = useMobileApp();
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <View style={styles.chrome}>
         <BrandHeader />
         <Visualizer isPlaying={session.isPlaying} scopeSamples={scopeSamples} />
-        <MacroKnobs />
+        <MacroKnobs active={session.state === 'shape'} />
         <View style={styles.controls}>
           <PlayButton isPlaying={session.isPlaying} onPress={togglePlay} />
-          <InputCta />
+          <InputCta onPress={openSay} />
         </View>
         <StatusLine message={session.statusMessage} backend={backend} />
       </View>
-      <BottomSheet state={session.state} />
+      <BottomSheet
+        state={session.state}
+        say={{
+          capture: sayCapture,
+          onSend: () => void sendPrompt(),
+          onCancel: cancelSay,
+          generating,
+        }}
+      />
     </SafeAreaView>
   );
 }

@@ -18,11 +18,21 @@ const config: ExpoConfig = {
       backgroundColor: '#0A0B0F',
     },
   },
-  plugins: ['expo-router'],
+  plugins: [
+    'expo-router',
+    [
+      'expo-av',
+      {
+        microphonePermission:
+          'Tambra uses the microphone to capture sound descriptions you speak.',
+      },
+    ],
+  ],
   experiments: {
     typedRoutes: true,
   },
   extra: {
+    apiBaseUrl: 'https://timbra-synth.netlify.app',
     eas: {
       projectId: 'tambra-mobile-v1',
     },
