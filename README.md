@@ -95,7 +95,9 @@ Known gaps vs the native plugin:
   runbooks under `docs/runbooks/`.
 
 The Gemini key is server-side only — it lives in the Netlify site env vars
-and is never shipped to the client.
+and is never shipped to the client. Prompts are sent to Gemini; see the
+[Privacy Statement](docs/privacy-statement.md) (web demo section) for mic,
+rate-limit identity, and retention details.
 
 ### Owner deploy checklist
 
@@ -266,7 +268,7 @@ agentic-synth/
 | [Mod Matrix Guide](docs/mod-matrix-guide.md) | Routing modulation |
 | [Local Inference](docs/local-inference.md) | Running an LLM on your own hardware |
 | [Build & Release](docs/build-release.md) | Packaging and signing |
-| [Privacy Statement](docs/privacy-statement.md) | What leaves your machine |
+| [Privacy Statement](docs/privacy-statement.md) | Mic, Gemini prompts, web demo + mobile entitlement, deletion contact |
 
 Full index: [`docs/index.md`](docs/index.md)
 

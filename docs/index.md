@@ -60,7 +60,8 @@ Known issues in the [README](../README.md#-known-issues).
 
 | Guide | What it covers |
 |---|---|
-| [Privacy Statement](privacy-statement.md) | What data leaves your machine, telemetry, and how to turn it off |
+| [Privacy Statement](privacy-statement.md) | Mic, prompts → Gemini, web demo / mobile entitlement, deletion contact |
+| [App Store / Play nutrition labels](mobile/privacy-nutrition-labels.md) | Paste-ready labels aligned with the privacy statement |
 | [Naming (TIMBRE → Tambra)](REBRAND.md) | Product / company / reserved-name decision log |
 
 ---
