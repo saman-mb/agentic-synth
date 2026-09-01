@@ -156,3 +156,23 @@ target_link_libraries(agentic_synth_tests
 list(APPEND CMAKE_MODULE_PATH ${catch2_SOURCE_DIR}/extras)
 include(Catch)
 catch_discover_tests(agentic_synth_tests)
+
+# JUCE-free C API tests (#305). Links only agentic_synth_capi + Catch2.
+add_executable(agsynth_capi_tests
+    CapiTest.cpp
+    GoldenParityTest.cpp
+    JsiBridgeTest.cpp
+)
+target_include_directories(agsynth_capi_tests PRIVATE ../src ../src/capi)
+target_compile_definitions(agsynth_capi_tests
+    PRIVATE
+        GOLDEN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/golden"
+)
+target_link_libraries(agsynth_capi_tests
+    PRIVATE
+        Catch2::Catch2WithMain
+        agentic_synth_capi
+        agentic_synth_jsi
+)
+agentic_synth_configure_target(agsynth_capi_tests)
+catch_discover_tests(agsynth_capi_tests)

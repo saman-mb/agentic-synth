@@ -3,6 +3,8 @@
 #include <algorithm>
 #include <cassert>
 #include <cmath>
+#include <cstddef>
+#include <cstdint>
 
 namespace agentic_synth::engine {
 
@@ -460,13 +462,9 @@ VoiceManager::VoiceManager(int voiceCount) {
         v.oscs[0].enabled = true;
         v.oscs[0].type = OscType::Sawtooth;
         v.oscs[0].volume = 1.0f;
-        // Seed each osc-slot's noise RNG distinctly so chorused noise voices
-        // don't phase-align across slots/voices.
-        uint32_t seed = 0x9E3779B9u ^ static_cast<uint32_t>(reinterpret_cast<uintptr_t>(&v) & 0xFFFFFFFFu);
-        for (auto& o : v.oscs) {
-            o.noiseRng = seed;
-            seed = seed * 1664525u + 1013904223u;
-        }
+        // Noise/VA/LFO seeds are assigned in reseedDeterministic (patch_id +
+        // voice/osc index) — not pointer addresses, so two engines with the
+        // same patch render bit-identically (RFC cpp-dsp-core §4).
     }
     // Smoothers default to 30 Hz cutoff — see ParamSmoother.h.
     cutoffSmoother_.reset(1000.0f);
@@ -488,6 +486,7 @@ VoiceManager::VoiceManager(int voiceCount) {
     for (auto& s : lfoRateSmoothers_)
         s.setCutoffHz(kEnvRateSmoothHz);
     activeVoiceCap_ = voiceCount;
+    reseedDeterministic(0);
 }
 
 void VoiceManager::prepare(double sampleRate) {
@@ -658,11 +657,43 @@ FilterMode toSvMode(FilterType t) noexcept {
 }
 } // namespace
 
+namespace {
+
+uint32_t mixSeed(uint32_t a, uint32_t b, uint32_t c) noexcept {
+    uint32_t x = a * 0x9E3779B9u ^ (b * 1664525u + 1013904223u) ^ (c * 2246822519u);
+    x ^= x >> 16;
+    x *= 0x7feb352du;
+    x ^= x >> 15;
+    return x ? x : 1u;
+}
+
+} // namespace
+
+void VoiceManager::reseedDeterministic(uint32_t patchId) noexcept {
+    for (std::size_t vi = 0; vi < voices_.size(); ++vi) {
+        auto& v = voices_[vi];
+        for (std::size_t oi = 0; oi < v.oscs.size(); ++oi) {
+            const uint32_t seed = mixSeed(patchId, static_cast<uint32_t>(vi), static_cast<uint32_t>(oi));
+            v.oscs[oi].vaOsc.seedDrift(seed);
+            v.oscs[oi].noiseRng = seed ^ 0xA5A5A5A5u;
+            if (v.oscs[oi].noiseRng == 0)
+                v.oscs[oi].noiseRng = 1u;
+        }
+        for (std::size_t li = 0; li < v.lfos.size(); ++li) {
+            v.lfos[li].seed(mixSeed(patchId, static_cast<uint32_t>(vi), 0x1000u + static_cast<uint32_t>(li)));
+        }
+    }
+    lastSeededPatchId_ = patchId;
+}
+
 void VoiceManager::applyPatch(const PatchStruct& patch) noexcept {
     // NaN/inf guard: a malformed PatchStruct would propagate non-finite
     // values forever through the one-pole smoothers (state += k*(NaN-state)).
     // Clamp at the boundary.
     const auto safe = [](float v, float fallback) noexcept { return std::isfinite(v) ? v : fallback; };
+
+    if (patch.patch_id != lastSeededPatchId_)
+        reseedDeterministic(patch.patch_id);
 
     // Filter cutoff/resonance & master gain → smoothed targets (block-rate writers,
     // sample-rate readers). First call after prepare() snaps to avoid an

@@ -15,12 +15,18 @@ include(cmake/ProjectOptions.cmake)
 # plugin target. Engine no longer requires JUCE directly (PatchStateManager
 # removed in Phase 2 — APVTS is the persistence layer).
 # Load it whenever the plugin or tests are built so library targets are always usable.
-if(AGENTIC_SYNTH_BUILD_PLUGIN OR AGENTIC_SYNTH_BUILD_TESTS)
+#
+# Emscripten builds the JUCE-free C API + wasm glue only. Pulling JUCE
+# (or Catch2 tests) under emcc inflates the module and needs POSIX APIs
+# the browser demo does not have.
+if(EMSCRIPTEN)
+    add_subdirectory(src)
+elseif(AGENTIC_SYNTH_BUILD_PLUGIN OR AGENTIC_SYNTH_BUILD_TESTS)
     add_subdirectory(third_party/JUCE)
     add_subdirectory(src)
 endif()
 
-if(AGENTIC_SYNTH_BUILD_TESTS)
+if(AGENTIC_SYNTH_BUILD_TESTS AND NOT EMSCRIPTEN)
     enable_testing()
     add_subdirectory(tests)
 endif()

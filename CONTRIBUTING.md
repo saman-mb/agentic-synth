@@ -59,6 +59,16 @@ cmake --build build --parallel
 ctest --test-dir build --output-on-failure
 ```
 
+WASM for the web demo: Emscripten is pinned at 3.1.74 in
+`cmake/emscripten-version`. CI job `build-wasm` uses `mymindstorm/setup-emsdk`.
+
+```sh
+npx nx run wasm:build-wasm
+```
+
+emits `dist/wasm/agsynth.js` and `dist/wasm/agsynth.wasm`. Vite copies them
+into `apps/web` public as `/agsynth.js` and `/agsynth.wasm`.
+
 ### UI hot-reload dev loop
 
 For fast UI iteration inside the live JUCE host, point the WebView at the

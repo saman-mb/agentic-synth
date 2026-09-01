@@ -1,12 +1,15 @@
 # Netlify deploy configuration for the web demo (#280).
 #
-# CI (.github/workflows/deploy.yml) prebuilds apps/web/dist and runs
-# scripts/sync-prompts.mjs before deploying; `command` exists so manual
-# `netlify deploy` / `netlify dev` from a fresh checkout also work.
+# GitHub Actions (.github/workflows/deploy.yml) is the production path:
+# it installs emsdk (same pin as cmake/emscripten-version / CI), runs
+# wasm:build-wasm, then `nx build web`, and deploys with --no-build.
+# `command` exists so manual `netlify deploy` / Netlify Git builds from
+# a fresh checkout also work. wasm:build-wasm needs emcc; builds without
+# it should fail closed — do not ship a silent miss (#368).
 
 [build]
   publish = "apps/web/dist"
-  command = "node scripts/sync-prompts.mjs && npm ci && npx nx build web"
+  command = "node scripts/sync-prompts.mjs && npm ci && npx nx run wasm:build-wasm && npx nx build web"
   functions = "netlify/functions"
 
 # generate.mts imports the shared patch codec from libs/codec (outside the

@@ -1,0 +1,8 @@
+{
+  "name": "jsi",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "src/jsi",
+  "projectType": "library",
+  "tags": ["type:lib", "scope:shared"],
+  "targets": {}
+}

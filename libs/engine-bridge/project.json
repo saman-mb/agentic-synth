@@ -15,7 +15,7 @@
     "test": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "node -e \"console.log('engine-bridge: no unit tests yet')\""
+        "command": "node --experimental-strip-types --test libs/engine-bridge/src/**/*.test.ts"
       }
     }
   }

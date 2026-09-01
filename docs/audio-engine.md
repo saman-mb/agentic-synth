@@ -28,6 +28,9 @@ filter with a fast amplitude envelope.
 | Patch contract | `src/engine/PatchStruct.h` | Fixed-size patch data shared by the agent, UI, plugin state, and audio engine. |
 | Plugin control path | `src/plugin/AgenticSynthPlugin.*` | JUCE processor lifecycle, APVTS parameters, MIDI adaptation, and audio callback entrypoint. |
 | Voice engine | `src/engine/VoiceManager.*` | Polyphonic allocation, patch application, per-sample voice rendering, effects bus. |
+| C API | `src/capi/agsynth.h` | Stable C ABI over the DSP core (`agentic_synth_capi`). Used by WASM and JSI bridges. |
+| WASM glue | `src/wasm/`, `dist/wasm/`, `libs/engine-bridge` (`wasmEngine`) | Emscripten glue (`#ifdef __EMSCRIPTEN__` here only; C API unchanged). Artefacts `agsynth.js` / `agsynth.wasm`. The web-demo factory returns `WasmSynthEngine`. |
+| JSI glue | `src/jsi/`, `libs/engine-bridge` (`jsiEngine`) | Control-rate `JsiSynthEngine` over the C API. Native AudioStream (not Expo AV) calls `ags_engine_render` on the RT thread. See [JSI / React Native](#jsi--react-native). |
 | VA oscillators | `src/engine/VAOscillator.*` | PolyBLEP-style saw/square, integrated triangle, analog-style drift. |
 | Wavetable oscillator | `src/engine/WavetableOscillator.*` | Multi-frame wavetable morphing with FFT-built mip levels. |
 | Envelopes | `src/engine/ADSREnvelope.*` | Exponential ADSR for amplitude and filter modulation. |
@@ -38,9 +41,36 @@ filter with a fast amplitude envelope.
 | Safety and validation | `src/engine/PatchValidator.*`, `src/engine/ParamSmoother.*`, `src/engine/SPSCQueue.h` | Parameter clamping, finite checks, smoothing, lock-free patch queue primitives. |
 | Patch utilities | `src/engine/MorphEngine.*`, `VariationEngine.*`, `StyleTransfer.*`, `PresetExporter.*`, `MultiModalInput.*` | Patch generation, interpolation, style transfer, export, and analysis helpers. |
 
-The CMake target for the DSP side is `agentic_synth_engine_core`. It is kept
-JUCE-light: the audio engine itself is ordinary C++ and is not built around
-JUCE audio classes.
+The CMake target for the DSP side is `agentic_synth_dsp` (JUCE-free object
+library) consumed by `agentic_synth_capi` (stable C ABI in `src/capi/agsynth.h`)
+and by `agentic_synth_engine_core` (plugin path: DSP + offline WAV via JUCE).
+The C API is single-thread-per-engine; `ags_engine_render` must not allocate,
+lock, or issue syscalls. Analog-style VA drift and noise/LFO S&H RNGs are
+seeded from `(patch_id, voice, slot)` so identical `(patch, events, sample rate)`
+inputs render bit-identically.
+
+Live `ags_engine_render` treats `ags_event.sample_offset` as block-relative
+(offsets apply to the next rendered block, then the queue is cleared).
+`ags_render_offline` treats the same field as absolute from t=0 of that call
+and remaps events into each ≤8192-frame chunk before push+render. See
+[Golden-file parity](#golden-file-parity).
+
+The CMake target for the plugin-facing engine remains `agentic_synth_engine_core`.
+It is kept JUCE-light: the audio engine itself is ordinary C++ and is not built
+around JUCE audio classes.
+
+The live web demo factory (`createSynthEngine()`) returns `WasmSynthEngine`.
+Production Netlify deploys build `agsynth.js` / `agsynth.wasm` in
+`.github/workflows/deploy.yml` before `nx build web`.
+`WebSynthEngine` remains constructible. Golden extraction for #307 uses
+Chromium `OfflineAudioContext` plus `VoiceManager` / `createEffectRack`, not
+the live `WebSynthEngine` destination path.
+
+React Native does not go through that factory. The RN harness constructs
+`JsiSynthEngine` after `install()` attaches `global.__AgsynthHost`; audio
+output is a native AudioStream, not Expo AV and not WebAudio `setSinkId`.
+The Expo app that would wire this host ([#294](https://github.com/saman-mb/agentic-synth/issues/294))
+is residual and is not in this PR.
 
 ## Runtime Control Flow
 
@@ -643,6 +673,63 @@ extending it:
 - `docs/architecture.md` still contains older placeholder-era descriptions and
   should be refreshed separately if it is meant to be canonical again.
 
+## JSI / React Native
+
+`JsiSynthEngine` is a control-rate sibling of `WasmSynthEngine`. It implements
+the same `SynthEngine` type: `setPatch` packs `PatchParams` to `PatchStruct`
+bytes on the JS thread (`packPatchParams`), `setParam` / note events forward
+to the JSI host object, and native `ags_engine_*` return codes map to
+`AgsynthError` (`PARAM` | `SIZE` | `NULL` | `STATE` | `QUEUE`). Native never
+throws across the boundary.
+
+Audio is not on the JS thread. A native AudioStream (not Expo AV) owns the
+render callback and calls `ags_engine_render` there. That I/O choice is
+independent of the Expo app: wiring `JsiSynthEngine` into Expo
+([#294](https://github.com/saman-mb/agentic-synth/issues/294)) is residual
+and is not in this PR. `createSynthEngine()` stays on `WasmSynthEngine` for
+the web demo. On device, `NativeModules.Agsynth.install()` attaches
+`global.__AgsynthHost` and returns true; it does not return the binding.
+RN constructs `JsiSynthEngine` from that host. There is no WebAudio `sinkId`
+path — `setOutputDevice` rejects with a typed error.
+
+### Real-time budget
+
+The pass/fail method is wall-clock against the callback period, not a device
+lab number in CI:
+
+- Block size 256 frames at 48 kHz → period `256 / 48000 = 5.33 ms`.
+- Pass if `processBlock` (native `ags_engine_render` plus AudioStream
+  overhead) p99 is under 50% of that period (~2.67 ms).
+- On-device Pixel-class measurement is residual: record it when a mid-range
+  Android device is available; it is not a merge gate for this story.
+
+A Node mock of `install()` lives in `tests/jsi-harness/` (not an Nx app).
+
+## Golden-file parity
+
+The committed corpus is `tests/golden/`: `PatchParams` JSON, packed
+`PatchStruct` / `ags_event` blobs, and interleaved stereo little-endian
+float32 refs (`ref/<id>.f32le`) at 44100 Hz, 44100 frames. Generation is a
+one-shot Chromium `OfflineAudioContext` capture (`tests/golden/generate.mjs`).
+CI never regenerates those files.
+
+Comparison is two-tier:
+
+1. WASM ↔ native: bit-identical (`memcmp`). Same C++ source, IEEE 754 on
+   both sides.
+2. Either vs the WebAudio refs: same length; no NaN/Inf;
+   `RMS(x)/RMS(ref)` in `[0.25, 4]`; ten equal-time bucket cosine ≥ 0.85;
+   `RMS(err)/RMS(ref)` ≤ 1.6, or 2.5 for pulse/tri/wavetable/FM
+   (`PeriodicWave` / FM operator vs PolyBLEP / mipmap); peak `|err|` ≤ 2.
+   The gap is topological (OscillatorNode vs PolyBLEP, biquad vs ladder,
+   Convolver vs Freeverb), not FMA/op-ordering. WASM ↔ native stays
+   `memcmp`, except fixture `fm` (`std::sin` libm: peak `|wasm−native|` ≤
+   `1e-3`; see `tests/golden/README.md`).
+
+A deliberate DSP change that breaks these bounds fails CI (native Catch2 on
+`agsynth_capi_tests`; after `wasm:build-wasm`, `node tests/golden/compare-wasm.mjs --native-dir native-golden`).
+Playwright is not part of CI.
+
 ## Test Coverage Pointers
 
 Relevant tests live under `tests/`:
@@ -661,6 +748,10 @@ Relevant tests live under `tests/`:
   `DcBlocker` behavior.
 - `PluginLifecycleTest.cpp`: APVTS state recall, lifecycle reset, and patch
   roundtrip behavior.
+- `GoldenParityTest.cpp` (on `agsynth_capi_tests`): native `ags_render_offline`
+  vs `tests/golden/ref/*.f32le`.
+- `tests/golden/compare-wasm.mjs`: WASM `_ags_render_offline` vs the same
+  corpus (and optional native dumps).
 
 When changing DSP behavior, prefer tests that render deterministic buffers and
 assert clear properties: non-silence, relative energy, dominant frequency,

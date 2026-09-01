@@ -1,27 +1,50 @@
 #include "VAOscillator.h"
 
-#include <atomic>
 #include <cmath>
-#include <random>
+#include <cstdint>
 
 namespace agentic_synth::engine {
 
 namespace {
-// Called once per process; subsequent oscillators derive unique seeds from a counter.
-uint64_t nextOscSeed() noexcept {
-    static const uint64_t base = std::random_device{}();
-    static std::atomic<uint64_t> counter{0};
-    // Mix counter into base so each oscillator gets a different seed.
-    return base ^ (counter.fetch_add(1, std::memory_order_relaxed) * 6364136223846793005ULL + 1442695040888963407ULL);
+
+uint32_t xorshift32(uint32_t& state) noexcept {
+    uint32_t x = state ? state : 1u;
+    x ^= x << 13;
+    x ^= x >> 17;
+    x ^= x << 5;
+    state = x;
+    return x;
 }
+
+// 24-bit mantissa in (0, 1] — portable, no <random>.
+double unit01(uint32_t& state) noexcept {
+    const uint32_t r = xorshift32(state);
+    return static_cast<double>((r >> 8) + 1u) * (1.0 / 16777216.0);
+}
+
 } // namespace
 
-VAOscillator::VAOscillator() : rng_(nextOscSeed()) {}
+VAOscillator::VAOscillator() { seedDrift(1u); }
+
+void VAOscillator::seedDrift(uint32_t seed) noexcept {
+    rngState_ = seed ? seed : 1u;
+    driftCents_ = 0.0;
+    drawNewDriftTarget();
+    driftTimer_ = driftPeriod_;
+}
+
+void VAOscillator::drawNewDriftTarget() noexcept {
+    driftTarget_ = -5.0 + 10.0 * unit01(rngState_);
+    driftPeriod_ = driftPeriodMin_ + (driftPeriodMax_ - driftPeriodMin_) * unit01(rngState_);
+    if (driftPeriod_ < 1.0)
+        driftPeriod_ = 1.0;
+}
 
 void VAOscillator::prepare(double sampleRate) {
     sampleRate_ = sampleRate;
     // drift target updates every 1–5 s
-    driftPeriodDist_ = std::uniform_real_distribution<double>(sampleRate * 1.0, sampleRate * 5.0);
+    driftPeriodMin_ = sampleRate * 1.0;
+    driftPeriodMax_ = sampleRate * 5.0;
     // exponential smoothing: tau ≈ 2 s so drift moves imperceptibly fast
     constexpr double tau = 2.0;
     driftAlpha_ = 1.0 - std::exp(-1.0 / (tau * sampleRate_));
@@ -51,8 +74,7 @@ void VAOscillator::reset() noexcept {
     phase_ = 0.0;
     triAccum_ = -1.0;
     driftCents_ = 0.0;
-    driftTarget_ = 0.0;
-    driftPeriod_ = driftPeriodDist_(rng_);
+    drawNewDriftTarget();
     driftTimer_ = driftPeriod_;
     updatePhaseInc();
 }
@@ -68,8 +90,7 @@ void VAOscillator::updatePhaseInc() noexcept {
 void VAOscillator::tickDrift() noexcept {
     driftTimer_ -= 1.0;
     if (driftTimer_ <= 0.0) {
-        driftTarget_ = driftTargetDist_(rng_);
-        driftPeriod_ = driftPeriodDist_(rng_);
+        drawNewDriftTarget();
         driftTimer_ = driftPeriod_;
     }
     // Invariant: |driftCents_| ≤ 5 because |(1-a)*x + a*y| ≤ max(|x|,|y|) for a∈[0,1]

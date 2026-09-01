@@ -18,6 +18,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          submodules: recursive
 
       - uses: actions/setup-node@v4
         with:
@@ -34,8 +36,30 @@ jobs:
       - name: Install JS dependencies
         run: npm ci
 
+      # #368: ship agsynth.wasm with WasmSynthEngine (same emsdk pin as ci.yml).
+      - name: Read Emscripten version
+        id: emsdk
+        run: echo "version=$(cat cmake/emscripten-version)" >> "$GITHUB_OUTPUT"
+
+      - name: Setup Emscripten
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          version: ${{ steps.emsdk.outputs.version }}
+
+      - name: Build wasm
+        run: npx nx run wasm:build-wasm
+
       - name: Build web
         run: npx nx build web
+
+      - name: Verify wasm artefacts
+        run: |
+          for f in apps/web/dist/agsynth.js apps/web/dist/agsynth.wasm; do
+            if [ ! -f "$f" ]; then
+              echo "::error::$f missing — WasmSynthEngine would ship without wasm (#368)"
+              exit 1
+            fi
+          done
 
       # nwtgck/actions-netlify silently no-ops when the secrets are absent,
       # which would show a green "Deploy" that shipped nothing (#280 review).
