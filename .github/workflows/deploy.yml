@@ -97,10 +97,10 @@ jobs:
           fi
           # CI already built apps/web/dist and synced prompts; --no-build skips
           # netlify.toml's build command. Redirects/functions/paths all come
-          # from netlify.toml itself. --cwd . bypasses monorepo detection
-          # (mobile + web Nx apps) while keeping repo-root functions (#398).
+          # from netlify.toml itself. --filter apps/web selects the web Nx app
+          # and skips mobile; --functions still points at repo-root handlers.
           npx --yes netlify-cli@latest deploy \
-            --cwd . \
+            --filter apps/web \
             --site "$NETLIFY_SITE_ID" \
             --dir "$GITHUB_WORKSPACE/apps/web/dist" \
             --functions "$GITHUB_WORKSPACE/netlify/functions" \
