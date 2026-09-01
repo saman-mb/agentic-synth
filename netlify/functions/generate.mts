@@ -1,4 +1,4 @@
-// ── POST /api/generate — Netlify v2 function (#280 / #309) ──────────
+// ── POST /api/generate — Netlify v2 function (#280 / #309 / #311) ────
 //
 // Second leg of the split pipeline: the patch generator alone. The
 // platform kills a function at 10 s TTL on the free plan (#280 r9),
@@ -8,20 +8,21 @@
 //
 // GrammarSampler parity: reject, never coerce (via the shared codec,
 // libs/codec). Durable tiered rate limit (#309) runs before Gemini.
+// Request validation (#311): body size + validateGenerateRequest before
+// Gemini; assembleGeneratePayload (codec + modval) after.
 
-import { decodeLlmPatch } from "../../libs/codec/src/index.ts";
-import { validatePrompt } from "../../libs/prompt/src/index.ts";
-import { generatePatchText, sanitizePrompt } from "./lib/gemini.mts";
+import {
+  sanitizePrompt,
+  validateGenerateRequest,
+} from "../../libs/prompt/src/index.ts";
+import { generatePatchText } from "./lib/gemini.mts";
 import { gateRateLimit } from "./lib/rateLimitGate.mts";
+import { readJsonObject } from "./lib/requestBody.mts";
+import { assembleGeneratePayload } from "./lib/assembleGeneratePayload.mts";
 
 export const config = { path: "/api/generate" };
 
 const MAX_BRIEF_LENGTH = 4000;
-// PatchStruct::rationale is char[256]; augmenter_actions entries follow
-// the same cap (PatchAugmenter.cpp appends pipe-separated 256-char
-// strings into a char[256] buffer).
-const MAX_RATIONALE_LENGTH = 256;
-const MAX_ACTION_LENGTH = 256;
 
 const UPSTREAM_502 = "Upstream model request failed.";
 const SAFETY_400 = "This prompt was blocked by safety filters. Try rewording it.";
@@ -37,49 +38,46 @@ function truncate(s: string, max: number): string {
   return s.length > max ? s.slice(0, max) : s;
 }
 
-export default async function handler(req: Request): Promise<Response> {
+export type GenerateHandlerDeps = {
+  gateRateLimit?: typeof gateRateLimit;
+  generatePatchText?: typeof generatePatchText;
+  getApiKey?: () => string | undefined;
+};
+
+export async function handleGenerate(
+  req: Request,
+  deps: GenerateHandlerDeps = {},
+): Promise<Response> {
   if (req.method !== "POST") {
     return json({ error: "Method not allowed. Use POST." }, 405);
   }
 
   try {
-    let raw: unknown;
-    try {
-      raw = JSON.parse(await req.text());
-    } catch {
-      return json({ error: "Request body must be valid JSON." }, 400);
+    const body = await readJsonObject(req);
+    if (!body.ok) {
+      return json({ error: body.error }, 400);
     }
-    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
-      return json({ error: "Request body must be a JSON object." }, 400);
+
+    const reqGate = validateGenerateRequest(body.value);
+    if (!reqGate.ok) {
+      return json({ error: reqGate.error }, 400);
     }
-    const obj = raw as Record<string, unknown>;
-    const promptGate = validatePrompt(obj["prompt"]);
-    if (!promptGate.ok) {
-      return json({ error: promptGate.error }, 400);
-    }
-    const prompt = promptGate.prompt;
-    let patchId = 0;
-    const rawPatchId = obj["patch_id"];
-    if (rawPatchId !== undefined) {
-      if (typeof rawPatchId !== "number" || !Number.isInteger(rawPatchId) || rawPatchId < 0) {
-        return json({ error: "patch_id must be an integer >= 0." }, 400);
-      }
-      patchId = rawPatchId;
-    }
+    const { prompt, patchId } = reqGate;
+
     // The brief is client-supplied (from /api/brief) — it feeds the
     // generator prompt, so sanitize + cap it like any other text.
     let briefArg = "";
-    const rawBrief = obj["brief"];
-    if (typeof rawBrief === "string" && rawBrief.trim().length > 0) {
-      briefArg = truncate(sanitizePrompt(rawBrief), MAX_BRIEF_LENGTH);
+    if (reqGate.brief !== undefined) {
+      briefArg = truncate(sanitizePrompt(reqGate.brief), MAX_BRIEF_LENGTH);
     }
 
     // Rate limit BEFORE any upstream work (and before the key check, so
     // a missing-key deploy never hands out unlimited free probes).
-    const limited = await gateRateLimit(req, "generate");
+    const gate = deps.gateRateLimit ?? gateRateLimit;
+    const limited = await gate(req, "generate");
     if (limited !== null) return limited;
 
-    const apiKey = process.env.GEMINI_KEY;
+    const apiKey = (deps.getApiKey ?? (() => process.env.GEMINI_KEY))();
     if (typeof apiKey !== "string" || apiKey.length === 0) {
       return json({ error: "Generation is not configured (missing GEMINI_KEY)." }, 503);
     }
@@ -89,50 +87,23 @@ export default async function handler(req: Request): Promise<Response> {
     const sanitized = sanitizePrompt(prompt);
     const promptForGenerator = briefArg.length > 0 ? briefArg : sanitized;
 
-    const generated = await generatePatchText(promptForGenerator, patchId, apiKey);
+    const generate = deps.generatePatchText ?? generatePatchText;
+    const generated = await generate(promptForGenerator, patchId, apiKey);
     if (!generated.ok) {
       if (generated.reason === "blocked") return json({ error: SAFETY_400 }, 400);
       return json({ error: UPSTREAM_502 }, 502);
     }
 
-    // GrammarSampler parity: reject, never coerce. Malformed model JSON
-    // is an error after retries. decodeLlmPatch accept-lists `version`,
-    // converts string enums → ints, then validates ranges (#299 / #284).
-    let parsedPatch: unknown;
-    try {
-      parsedPatch = JSON.parse(generated.text);
-    } catch {
-      return json({ error: "patch: malformed JSON from model" }, 502);
+    const assembled = assembleGeneratePayload(generated.text, promptForGenerator);
+    if (!assembled.ok) {
+      return json({ error: assembled.error }, assembled.status);
     }
-
-    const decoded = decodeLlmPatch(parsedPatch);
-    if (!decoded.ok) {
-      const msg = decoded.error.message;
-      const error = decoded.error.code === "unknown_version" || msg.startsWith("patch:")
-        ? msg
-        : `patch: ${msg}`;
-      return json({ error }, 502);
-    }
-    const patch = decoded.patch;
-
-    // rationale / augmenter_actions are LLM-transport fields read off the
-    // raw JSON (the codec drops them during conversion). Include only
-    // when present, capped to the PatchStruct buffer conventions.
-    const payload: Record<string, unknown> = { brief: promptForGenerator, patch };
-    const llm = parsedPatch as Record<string, unknown>;
-    const rationale = llm["rationale"];
-    if (typeof rationale === "string" && rationale.length > 0) {
-      payload["rationale"] = truncate(rationale, MAX_RATIONALE_LENGTH);
-    }
-    const actions = llm["augmenter_actions"];
-    if (typeof actions === "string" && actions.length > 0) {
-      payload["augmenter_actions"] = actions
-        .split("|")
-        .filter((a) => a.length > 0)
-        .map((a) => truncate(a, MAX_ACTION_LENGTH));
-    }
-    return json(payload, 200);
+    return json(assembled.payload, 200);
   } catch {
     return json({ error: "Internal server error." }, 500);
   }
+}
+
+export default async function handler(req: Request): Promise<Response> {
+  return handleGenerate(req);
 }
