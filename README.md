@@ -103,10 +103,22 @@ rate-limit identity, and retention details.
 
 1. Create a Netlify site linked to this repo (deploy from `apps/web/dist`)
 2. Set `NETLIFY_SITE_ID` and `NETLIFY_AUTH_TOKEN` as GitHub repo secrets
-3. Set `GEMINI_KEY` in the Netlify site env vars — use a dedicated key on a
-   project where billing is never enabled (free tier only)
+3. Set `GEMINI_KEY` in the Netlify site env vars (dedicated project/key;
+   tune billing alerts to your spend tolerance)
 4. Raise the function timeout to 26 s in the Netlify UI (free-tier default
    is 10 s; the handler enforces its own 24 s deadline)
+5. Fail-closed backstops (leave unset or set explicitly):
+   `RATE_LIMIT_FAIL_MODE=closed`, `QUOTA_FAIL_MODE=closed`
+6. Global Gemini quota caps — set intentionally for prod (defaults are generous):
+   `GEMINI_DAILY_CALL_CAP`, `GEMINI_DAILY_COST_CAP_USD`,
+   `GEMINI_EST_USD_PER_BRIEF`, `GEMINI_EST_USD_PER_GENERATE`
+7. Optional ops alerts: `ALERT_WEBHOOK_URL` (see `docs/runbooks/gemini-spend.md`)
+8. Paid entitlement (before mobile paid launch — **do not enable stub in prod**):
+   - `ENTITLEMENT_SIGNING_KEY` (≥32 chars; server-only)
+   - `ENTITLEMENT_RECEIPT_MODE=apple`
+   - `APPLE_SHARED_SECRET`, `APPLE_BUNDLE_ID` (optional `APPLE_PRODUCT_ID`)
+   - **Do not set** `ENTITLEMENT_ALLOW_STUB_RECEIPTS=1` in production
+   - See `docs/runbooks/entitlement.md`
 
 ### Run the web demo locally
 
