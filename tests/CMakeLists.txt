@@ -160,8 +160,13 @@ catch_discover_tests(agentic_synth_tests)
 # JUCE-free C API tests (#305). Links only agentic_synth_capi + Catch2.
 add_executable(agsynth_capi_tests
     CapiTest.cpp
+    GoldenParityTest.cpp
 )
 target_include_directories(agsynth_capi_tests PRIVATE ../src ../src/capi)
+target_compile_definitions(agsynth_capi_tests
+    PRIVATE
+        GOLDEN_DIR="${CMAKE_CURRENT_SOURCE_DIR}/golden"
+)
 target_link_libraries(agsynth_capi_tests
     PRIVATE
         Catch2::Catch2WithMain

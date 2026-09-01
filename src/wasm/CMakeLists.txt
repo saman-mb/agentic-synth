@@ -2,6 +2,8 @@
 # Browser/demo glue around agentic_synth_capi. MODULARIZE + EXPORT_ES6 so
 # the web app can `import createAgsynthModule` without a global; memory
 # growth so offline renders are not capped at the initial heap.
+# ENVIRONMENT includes node so tests/golden/compare-wasm.mjs can load the
+# same artefact CI ships to the browser (no second wasm target).
 #
 # No pthreads: SharedArrayBuffer needs COOP/COEP headers and the demo
 # runs on a static host that does not send them.
@@ -21,7 +23,7 @@ set_target_properties(agsynth PROPERTIES
 target_link_options(agsynth PRIVATE
     "SHELL:-sMODULARIZE=1"
     "SHELL:-sEXPORT_NAME=createAgsynthModule"
-    "SHELL:-sENVIRONMENT=web,worker"
+    "SHELL:-sENVIRONMENT=web,worker,node"
     "SHELL:-sALLOW_MEMORY_GROWTH=1"
     "SHELL:-sEXPORT_ES6=1"
     "SHELL:-sEXPORTED_FUNCTIONS=_ags_engine_create,_ags_engine_destroy,_ags_engine_set_patch,_ags_engine_set_param,_ags_engine_push_events,_ags_engine_render,_ags_patch_struct_size,_ags_render_offline,_malloc,_free"
