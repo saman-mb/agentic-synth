@@ -15,7 +15,7 @@ Expo / React Native scaffold for Tambra — single-screen chrome, JSI engine bri
 npm ci
 npx nx run mobile:test    # Node smoke + unit tests (mock engine)
 npx nx run mobile:lint
-cd apps/mobile && npx expo start   # Dev server (mock engine without dev client)
+cd apps/mobile && npm install && npx expo start   # Dev server (install Expo deps locally)
 ```
 
 ### EAS dev client (device audio)

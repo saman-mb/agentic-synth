@@ -19,6 +19,20 @@ interface AgsynthNativeModule {
 
 function tryNativeBinding(): import('@agentic-synth/engine-bridge').JsiNativeBinding | null {
   try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { installNativeHost } = require('../../modules/agsynth/src/index') as {
+      installNativeHost?: () => import('@agentic-synth/engine-bridge').JsiNativeBinding | null;
+    };
+    if (typeof installNativeHost === 'function') {
+      const fromExpo = installNativeHost();
+      if (fromExpo) return fromExpo;
+    }
+  } catch {
+    // Expo runtime not available (Node tests, web)
+  }
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { NativeModules } = require('react-native') as {
       NativeModules?: { Agsynth?: AgsynthNativeModule };
     };
