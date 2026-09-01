@@ -6,6 +6,10 @@ Single-screen mobile information architecture for Tambra: one chrome surface, on
 
 **Bar:** iterative prototype; decent experience, not perfection. Captain / UX (and art) proto sign-off recorded on the epic stories (#295–#298).
 
+## Privacy
+
+Before store submission, read the product [Privacy Statement](../privacy-statement.md) and the paste-ready [App Store / Play nutrition labels](./privacy-nutrition-labels.md) (mic, Gemini prompts, entitlement retention). Keep those two docs in sync when mobile data flows change.
+
 ## Reading order
 
 1. [Information architecture](./ia.md) — screen inventory, sheet contents per state, Keep persistence, naming
@@ -15,6 +19,7 @@ Single-screen mobile information architecture for Tambra: one chrome surface, on
 5. [Input](./input.md) — voice + text capture in `say`, degraded states (#297)
 6. [Art direction](./art-direction.md) — dark theme, knobs paint, visualizer + fps budget (#298)
 7. [Tokens](./tokens.json) + [contrast companion](./tokens.md) — machine-readable color/type/space/radius/elevation (#298)
+8. [Privacy nutrition labels](./privacy-nutrition-labels.md) — store questionnaire copy (#314)
 
 ## Spec map
 
@@ -27,6 +32,7 @@ Single-screen mobile information architecture for Tambra: one chrome surface, on
 | [input.md](./input.md) | `input.voice` / `input.text`, tap-to-record, deny/offline/fail recovery |
 | [art-direction.md](./art-direction.md) | Dark instrument look, knob paint, `el.visualizer` aesthetic + fps |
 | [tokens.json](./tokens.json) / [tokens.md](./tokens.md) | Tokens + WCAG AA pairings for E5 |
+| [privacy-nutrition-labels.md](./privacy-nutrition-labels.md) | App Store / Play questionnaire copy (#314) |
 
 ## Story status
 
