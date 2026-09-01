@@ -1,20 +1,27 @@
 import { useEffect, useMemo, useState } from 'react';
 import { LayoutChangeEvent, StyleSheet, View } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import { runOnJS } from 'react-native-reanimated';
 import { Canvas, Fill, RoundedRect } from '@shopify/react-native-skia';
 import { colors, space } from '../theme/tokens';
 
 const BAR_COUNT = 48;
 const TARGET_FPS = 30;
 const FRAME_MS = 1000 / TARGET_FPS;
+const SWIPE_THRESHOLD = 48;
 
 export function Visualizer({
   isPlaying,
   scopeSamples,
   height = 160,
+  swipeEnabled = false,
+  onSwipe,
 }: {
   isPlaying: boolean;
   scopeSamples?: number[];
   height?: number;
+  swipeEnabled?: boolean;
+  onSwipe?: (direction: 1 | -1) => void;
 }) {
   const [phase, setPhase] = useState(0);
   const [layoutWidth, setLayoutWidth] = useState(0);
@@ -32,6 +39,16 @@ export function Visualizer({
     raf = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(raf);
   }, []);
+
+  const pan = Gesture.Pan()
+    .enabled(swipeEnabled && !!onSwipe)
+    .activeOffsetX([-16, 16])
+    .failOffsetY([-24, 24])
+    .onEnd((e) => {
+      if (!onSwipe) return;
+      if (e.translationX <= -SWIPE_THRESHOLD) runOnJS(onSwipe)(1);
+      else if (e.translationX >= SWIPE_THRESHOLD) runOnJS(onSwipe)(-1);
+    });
 
   const bars = useMemo(() => {
     const usable = Math.max(layoutWidth - space.chromePadX * 2, 1);
@@ -51,27 +68,30 @@ export function Visualizer({
   };
 
   return (
-    <View
-      style={[styles.root, { height }]}
-      onLayout={onLayout}
-      accessibilityLabel="Audio visualizer"
-    >
-      <Canvas style={StyleSheet.absoluteFill}>
-        <Fill color={colors.bg.inset} />
-        {bars.map((bar, i) => (
-          <RoundedRect
-            key={i}
-            x={bar.x}
-            y={bar.y}
-            width={bar.w}
-            height={bar.h}
-            r={2}
-            color={colors.accent.viz}
-            opacity={0.88}
-          />
-        ))}
-      </Canvas>
-    </View>
+    <GestureDetector gesture={pan}>
+      <View
+        style={[styles.root, { height }]}
+        onLayout={onLayout}
+        accessibilityLabel="Audio visualizer"
+        accessibilityHint={swipeEnabled ? 'Swipe left or right for variations' : undefined}
+      >
+        <Canvas style={StyleSheet.absoluteFill}>
+          <Fill color={colors.bg.inset} />
+          {bars.map((bar, i) => (
+            <RoundedRect
+              key={i}
+              x={bar.x}
+              y={bar.y}
+              width={bar.w}
+              height={bar.h}
+              r={2}
+              color={colors.accent.viz}
+              opacity={0.88}
+            />
+          ))}
+        </Canvas>
+      </View>
+    </GestureDetector>
   );
 }
 

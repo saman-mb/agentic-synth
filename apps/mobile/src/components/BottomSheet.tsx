@@ -1,31 +1,63 @@
 import { StyleSheet, Text, View } from 'react-native';
 import type { MobileState } from '../state/mobileState';
 import { colors, radius, space, typeScale } from '../theme/tokens';
+import { KeepSheet } from './sheet/KeepSheet';
 import { SaySheet, type SaySheetProps } from './sheet/SaySheet';
+import { ShapeSheet } from './sheet/ShapeSheet';
+import { VariationsSheet } from './sheet/VariationsSheet';
+import type { VariationItem } from '../services/variationFlow';
 
-const SHEET_COPY: Record<Exclude<MobileState, 'say'>, { title: string; body: string }> = {
+const SHEET_COPY: Record<'idle' | 'hear' | 'error', { title: string; body: string }> = {
   idle: {
     title: 'Describe a sound',
     body: 'Tap Say to capture voice or text. Demo patch plays on first launch.',
   },
   hear: { title: 'Hear', body: 'Building your sound…' },
-  shape: { title: 'Shape', body: 'Thumb the macros — interaction lands in #318.' },
-  variations: { title: 'Variations', body: 'Browse variants — stub (#319).' },
-  keep: { title: 'Keep', body: 'Name and save — stub (#320).' },
   error: { title: 'Something went wrong', body: 'Retry or dismiss.' },
 };
 
 export interface BottomSheetProps {
   state: MobileState;
   say?: Omit<SaySheetProps, never>;
+  shape?: {
+    onVariations: () => void;
+    onKeep: () => void;
+    onRegenerate: () => void;
+    onNewIdea: () => void;
+  };
+  variations?: {
+    items: VariationItem[];
+    selectedIndex: number;
+    loading: boolean;
+    onSelect: (index: number) => void;
+    onMore: () => void;
+    onBack: () => void;
+    onKeep: () => void;
+  };
+  keep?: {
+    name: string;
+    onNameChange: (name: string) => void;
+    onConfirm: () => void;
+    onCancel: () => void;
+    saving?: boolean;
+  };
 }
 
-export function BottomSheet({ state, say }: BottomSheetProps) {
+export function BottomSheet({ state, say, shape, variations, keep }: BottomSheetProps) {
   if (state === 'say' && say) {
     return <SaySheet {...say} />;
   }
+  if (state === 'shape' && shape) {
+    return <ShapeSheet {...shape} />;
+  }
+  if (state === 'variations' && variations) {
+    return <VariationsSheet {...variations} />;
+  }
+  if (state === 'keep' && keep) {
+    return <KeepSheet {...keep} />;
+  }
 
-  const copy = SHEET_COPY[state as Exclude<MobileState, 'say'>];
+  const copy = SHEET_COPY[state as 'idle' | 'hear' | 'error'];
   return (
     <View style={styles.root} accessibilityLabel={`Sheet ${state}`}>
       <View style={styles.grabber} />

@@ -13,6 +13,7 @@ import { colors, space } from '../src/theme/tokens';
 export default function HomeScreen() {
   const {
     session,
+    scratch,
     backend,
     scopeSamples,
     togglePlay,
@@ -21,14 +22,42 @@ export default function HomeScreen() {
     sendPrompt,
     sayCapture,
     generating,
+    macroKnobs,
+    swipeVariation,
+    openVariations,
+    backToShape,
+    selectVariation,
+    requestMoreVariations,
+    openKeep,
+    cancelKeep,
+    confirmKeep,
+    setKeepName,
+    regenerate,
+    variationLoading,
+    keeping,
   } = useMobileApp();
+
+  const shapeActive = session.state === 'shape' || session.state === 'variations';
+  const canSwipe =
+    shapeActive && scratch.prompt.length > 0 && !macroKnobs.isDragging();
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <View style={styles.chrome}>
         <BrandHeader />
-        <Visualizer isPlaying={session.isPlaying} scopeSamples={scopeSamples} />
-        <MacroKnobs active={session.state === 'shape'} />
+        <Visualizer
+          isPlaying={session.isPlaying}
+          scopeSamples={scopeSamples}
+          swipeEnabled={canSwipe}
+          onSwipe={(dir) => void swipeVariation(dir)}
+        />
+        <MacroKnobs
+          active={shapeActive}
+          positions={macroKnobs.positions}
+          onChange={macroKnobs.setMacro}
+          onDragStart={macroKnobs.onDragStart}
+          onDragEnd={macroKnobs.onDragEnd}
+        />
         <View style={styles.controls}>
           <PlayButton isPlaying={session.isPlaying} onPress={togglePlay} />
           <InputCta onPress={openSay} />
@@ -42,6 +71,28 @@ export default function HomeScreen() {
           onSend: () => void sendPrompt(),
           onCancel: cancelSay,
           generating,
+        }}
+        shape={{
+          onVariations: openVariations,
+          onKeep: openKeep,
+          onRegenerate: () => void regenerate(),
+          onNewIdea: openSay,
+        }}
+        variations={{
+          items: scratch.variations,
+          selectedIndex: scratch.selectedVariationIndex,
+          loading: variationLoading,
+          onSelect: (i) => void selectVariation(i),
+          onMore: () => void requestMoreVariations(),
+          onBack: backToShape,
+          onKeep: openKeep,
+        }}
+        keep={{
+          name: scratch.keepNameDraft,
+          onNameChange: setKeepName,
+          onConfirm: () => void confirmKeep(),
+          onCancel: cancelKeep,
+          saving: keeping,
         }}
       />
     </SafeAreaView>
