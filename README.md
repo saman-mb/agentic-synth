@@ -69,7 +69,8 @@ sync is the C++ engine's own behaviour, not a WebAudio approximation.
 
 `/agsynth.js` and `/agsynth.wasm` are served from `apps/web` public after
 Vite copies `npx nx run wasm:build-wasm` (`dist/wasm/agsynth.js` +
-`dist/wasm/agsynth.wasm`).
+`dist/wasm/agsynth.wasm`). Production Netlify deploys run that wasm
+build in `.github/workflows/deploy.yml` before `nx build web`.
 
 Known gaps vs the native plugin:
 

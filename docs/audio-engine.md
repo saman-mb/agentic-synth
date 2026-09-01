@@ -60,6 +60,8 @@ It is kept JUCE-light: the audio engine itself is ordinary C++ and is not built
 around JUCE audio classes.
 
 The live web demo factory (`createSynthEngine()`) returns `WasmSynthEngine`.
+Production Netlify deploys build `agsynth.js` / `agsynth.wasm` in
+`.github/workflows/deploy.yml` before `nx build web`.
 `WebSynthEngine` remains constructible. Golden extraction for #307 uses
 Chromium `OfflineAudioContext` plus `VoiceManager` / `createEffectRack`, not
 the live `WebSynthEngine` destination path.
