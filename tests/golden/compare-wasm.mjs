@@ -21,6 +21,11 @@ const RMS_RATIO_MAX = 4;
 const BUCKET_COSINE_MIN = 0.85;
 const ERR_RMS_RATIO_MAX = 1.6;
 const PEAK_ERR_MAX = 2;
+// 2-op FM calls std::sin per sample (VoiceManager.cpp). glibc (CI native)
+// vs emscripten's libm is not bit-identical. 1e-3 is ~60 dB below FS —
+// far above a few ULPs, far below the WebAudio peak bound of 2. Recorded
+// reason to relax memcmp for fixture id `fm` only (RFC §9).
+const WASM_NATIVE_FM_PEAK = 1e-3;
 
 const here = dirname(fileURLToPath(import.meta.url));
 const repoRoot = resolve(here, '..', '..');
@@ -170,6 +175,22 @@ function bucketCosine(a, b) {
   return dot / (Math.sqrt(nx) * Math.sqrt(nr));
 }
 
+function nativeDiffStats(a, b) {
+  const fa = asF32(a);
+  const fb = asF32(b);
+  let nDiff = 0;
+  let peak = 0;
+  let errSq = 0;
+  const n = Math.min(fa.length, fb.length);
+  for (let i = 0; i < n; i++) {
+    const e = Math.abs(fa[i] - fb[i]);
+    if (e > 0) nDiff += 1;
+    if (e > peak) peak = e;
+    errSq += e * e;
+  }
+  return { nDiff, peak, rms: n === 0 ? 0 : Math.sqrt(errSq / n) };
+}
+
 function errRmsMaxFor(id, manifest) {
   const webaudio = manifest?.tolerances?.webaudio;
   const byId = webaudio?.err_rms_ratio_by_id;
@@ -288,7 +309,18 @@ function compareFixture(id, wasmBytes, refBytes, nativeBytes, errRmsMax) {
         `${id}: native dump ${nativeBytes.byteLength} bytes != WASM ${wasmBytes.byteLength}`,
       );
     } else if (Buffer.compare(wasmBytes, nativeBytes) !== 0) {
-      errors.push(`${id}: memcmp vs --native-dir dump failed (WASM↔native must be bit-identical)`);
+      const stats = nativeDiffStats(wasmBytes, nativeBytes);
+      const summary = `n_diff=${stats.nDiff} peak=${stats.peak} rms=${stats.rms}`;
+      process.stdout.write(`  ${id}: memcmp vs --native-dir miss (${summary})\n`);
+      if (id === 'fm' && stats.peak <= WASM_NATIVE_FM_PEAK) {
+        process.stdout.write(
+          `  ${id}: wasm↔native libm sin bound OK (peak ≤ ${WASM_NATIVE_FM_PEAK})\n`,
+        );
+      } else {
+        errors.push(
+          `${id}: memcmp vs --native-dir dump failed (WASM↔native must be bit-identical) ${summary}`,
+        );
+      }
     } else {
       process.stdout.write(`  ${id}: memcmp vs --native-dir OK\n`);
     }

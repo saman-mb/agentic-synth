@@ -30,6 +30,8 @@ export const ERR_RMS_RATIO_BY_ID = {
 
 export const TOLERANCES = {
   wasm_native: "memcmp",
+  // Fixture `fm` only: glibc vs emscripten libm on per-sample std::sin.
+  wasm_native_fm_peak_abs: 1e-3,
   webaudio: {
     same_length: true,
     no_nan_inf: true,

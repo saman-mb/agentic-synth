@@ -14,6 +14,7 @@
   "engine": "WebAudio OfflineAudioContext (not WebSynthEngine)",
   "tolerances": {
     "wasm_native": "memcmp",
+    "wasm_native_fm_peak_abs": 0.001,
     "webaudio": {
       "same_length": true,
       "no_nan_inf": true,

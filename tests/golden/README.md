@@ -13,7 +13,16 @@ produced. They are not tuned against a failing comparator.
 
 Bit-identical: `memcmp` on the interleaved `f32le` buffers. Same C++ translation
 unit, IEEE 754, seeded RNGs. A divergence here is a real bug, not FMA noise —
-do not relax this without a recorded reason in the failing change.
+do not relax this without a recorded reason.
+
+**Recorded exception — `fm` only:** the 2-op FM oscillator calls `std::sin` on
+both the modulator and the carrier every sample (`VoiceManager.cpp`). glibc
+(CI `build-test`) and Emscripten's libm (CI `build-wasm`) do not share an
+argument-reduction implementation, so those two `sin` results are not
+bit-identical. Bound: `max |wasm − native| ≤ 1e-3` (~60 dB below FS). That is
+well above a few ULPs and well below the WebAudio peak bound of 2. Every other
+fixture stays `memcmp`. Do not copy this bound onto PolyBLEP / wavetable /
+noise paths.
 
 ### Native/WASM vs WebAudio reference
 

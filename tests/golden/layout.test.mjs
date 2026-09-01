@@ -95,6 +95,8 @@ describe("golden corpus layout", () => {
   it("documents a priori WebAudio bounds in the README", () => {
     const readme = readFileSync(join(here, "README.md"), "utf8");
     assert.match(readme, /memcmp/);
+    assert.match(readme, /std::sin/);
+    assert.match(readme, /1e-3/);
     assert.match(readme, /0\.25,\s*4|\[0\.25,\s*4\]/);
     assert.match(readme, /0\.85/);
     assert.match(readme, /1\.6/);
@@ -113,6 +115,7 @@ describe("golden corpus layout", () => {
 
   it("keeps PeriodicWave/FM/triangle error-energy at 2.5 and the rest at 1.6", () => {
     assert.equal(TOLERANCES.wasm_native, "memcmp");
+    assert.equal(TOLERANCES.wasm_native_fm_peak_abs, 1e-3);
     assert.equal(TOLERANCES.webaudio.err_rms_ratio, 1.6);
     assert.deepEqual(TOLERANCES.webaudio.err_rms_ratio_by_id, {
       pulse: 2.5,

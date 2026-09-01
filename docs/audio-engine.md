@@ -682,7 +682,8 @@ Comparison is two-tier:
    (`PeriodicWave` / FM operator vs PolyBLEP / mipmap); peak `|err|` ≤ 2.
    The gap is topological (OscillatorNode vs PolyBLEP, biquad vs ladder,
    Convolver vs Freeverb), not FMA/op-ordering. WASM ↔ native stays
-   `memcmp`.
+   `memcmp`, except fixture `fm` (`std::sin` libm: peak `|wasm−native|` ≤
+   `1e-3`; see `tests/golden/README.md`).
 
 A deliberate DSP change that breaks these bounds fails CI (native Catch2 on
 `agsynth_capi_tests`; after `wasm:build-wasm`, `node tests/golden/compare-wasm.mjs --native-dir native-golden`).
