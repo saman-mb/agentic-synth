@@ -1,5 +1,0 @@
-if(EXISTS "/home/saman/dev/agentic-synth/build-capi-clang/tests/agsynth_capi_tests-b12d07c_tests.cmake")
-  include("/home/saman/dev/agentic-synth/build-capi-clang/tests/agsynth_capi_tests-b12d07c_tests.cmake")
-else()
-  add_test(agsynth_capi_tests_NOT_BUILT-b12d07c agsynth_capi_tests_NOT_BUILT-b12d07c)
-endif()
