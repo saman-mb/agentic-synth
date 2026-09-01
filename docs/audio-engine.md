@@ -48,12 +48,20 @@ lock, or issue syscalls. Analog-style VA drift and noise/LFO S&H RNGs are
 seeded from `(patch_id, voice, slot)` so identical `(patch, events, sample rate)`
 inputs render bit-identically.
 
+Live `ags_engine_render` treats `ags_event.sample_offset` as block-relative
+(offsets apply to the next rendered block, then the queue is cleared).
+`ags_render_offline` treats the same field as absolute from t=0 of that call
+and remaps events into each ≤8192-frame chunk before push+render. See
+[Golden-file parity](#golden-file-parity).
+
 The CMake target for the plugin-facing engine remains `agentic_synth_engine_core`.
 It is kept JUCE-light: the audio engine itself is ordinary C++ and is not built
 around JUCE audio classes.
 
 The live web demo factory (`createSynthEngine()`) returns `WasmSynthEngine`.
-`WebSynthEngine` remains constructible for #307 golden extraction.
+`WebSynthEngine` remains constructible. Golden extraction for #307 uses
+Chromium `OfflineAudioContext` plus `VoiceManager` / `createEffectRack`, not
+the live `WebSynthEngine` destination path.
 
 ## Runtime Control Flow
 
@@ -656,6 +664,30 @@ extending it:
 - `docs/architecture.md` still contains older placeholder-era descriptions and
   should be refreshed separately if it is meant to be canonical again.
 
+## Golden-file parity
+
+The committed corpus is `tests/golden/`: `PatchParams` JSON, packed
+`PatchStruct` / `ags_event` blobs, and interleaved stereo little-endian
+float32 refs (`ref/<id>.f32le`) at 44100 Hz, 44100 frames. Generation is a
+one-shot Chromium `OfflineAudioContext` capture (`tests/golden/generate.mjs`).
+CI never regenerates those files.
+
+Comparison is two-tier:
+
+1. WASM ↔ native: bit-identical (`memcmp`). Same C++ source, IEEE 754 on
+   both sides.
+2. Either vs the WebAudio refs: same length; no NaN/Inf;
+   `RMS(x)/RMS(ref)` in `[0.25, 4]`; ten equal-time bucket cosine ≥ 0.85;
+   `RMS(err)/RMS(ref)` ≤ 1.6, or 2.5 for pulse/tri/wavetable/FM
+   (`PeriodicWave` / FM operator vs PolyBLEP / mipmap); peak `|err|` ≤ 2.
+   The gap is topological (OscillatorNode vs PolyBLEP, biquad vs ladder,
+   Convolver vs Freeverb), not FMA/op-ordering. WASM ↔ native stays
+   `memcmp`.
+
+A deliberate DSP change that breaks these bounds fails CI (native Catch2 on
+`agsynth_capi_tests`; after `wasm:build-wasm`, `node tests/golden/compare-wasm.mjs --native-dir native-golden`).
+Playwright is not part of CI.
+
 ## Test Coverage Pointers
 
 Relevant tests live under `tests/`:
@@ -674,6 +706,10 @@ Relevant tests live under `tests/`:
   `DcBlocker` behavior.
 - `PluginLifecycleTest.cpp`: APVTS state recall, lifecycle reset, and patch
   roundtrip behavior.
+- `GoldenParityTest.cpp` (on `agsynth_capi_tests`): native `ags_render_offline`
+  vs `tests/golden/ref/*.f32le`.
+- `tests/golden/compare-wasm.mjs`: WASM `_ags_render_offline` vs the same
+  corpus (and optional native dumps).
 
 When changing DSP behavior, prefer tests that render deterministic buffers and
 assert clear properties: non-silence, relative energy, dominant frequency,

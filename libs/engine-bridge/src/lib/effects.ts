@@ -90,6 +90,7 @@ export function createEffectRack(ctx: BaseAudioContext): EffectRack {
   const reverbSend = ctx.createGain();
   reverbSend.gain.value = 0;
   const convolver = ctx.createConvolver();
+  input.connect(reverbSend);
   reverbSend.connect(convolver);
   convolver.connect(output);
   let impulseKey = '';
@@ -134,6 +135,7 @@ export function createEffectRack(ctx: BaseAudioContext): EffectRack {
   const sR = ctx.createGain();
   const merge = ctx.createChannelMerger(2);
   const delayWet = ctx.createGain();
+  input.connect(delaySend);
   delaySend.connect(dl);
   delaySend.connect(drDry);
   drDry.connect(dr);

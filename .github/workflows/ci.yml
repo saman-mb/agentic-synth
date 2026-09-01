@@ -152,12 +152,25 @@ jobs:
       - name: Run unit tests
         run: ctest --test-dir build --build-config Debug --output-on-failure
 
-  # Emscripten/wasm is independent of JUCE and the Catch2 suite, so it
-  # does not wait on lint. PLUGIN/TESTS stay off: the wasm graph is
-  # C API + glue only (#306).
+      # #307: dump native f32le for WASM↔native memcmp in build-wasm.
+      - name: Dump native golden PCM
+        run: |
+          mkdir -p native-golden
+          AGS_GOLDEN_DUMP_DIR="$PWD/native-golden" ./build/tests/agsynth_capi_tests "native offline matches WebAudio goldens within U1 bounds"
+
+      - name: Upload native golden PCM
+        uses: actions/upload-artifact@v4
+        with:
+          name: native-golden-pcm
+          path: native-golden
+          if-no-files-found: error
+
+  # Emscripten/wasm is JUCE-free (PLUGIN/TESTS off; C API + glue, #306).
+  # needs build-test so WASM↔native memcmp can consume the dumped PCM (#307).
   build-wasm:
     name: Build wasm
     runs-on: ubuntu-latest
+    needs: [build-test]
     steps:
       - uses: actions/checkout@v4
         with:
@@ -184,6 +197,18 @@ jobs:
 
       - name: Build wasm
         run: npx nx run wasm:build-wasm
+
+      # #307: WASM vs committed corpus + native dump. Missing dump or
+      # memcmp fail is a job fail; no RMS fallback on the native path.
+      # Do not regenerate PCM here.
+      - name: Download native golden PCM
+        uses: actions/download-artifact@v4
+        with:
+          name: native-golden-pcm
+          path: native-golden
+
+      - name: Compare WASM goldens
+        run: node tests/golden/compare-wasm.mjs --native-dir native-golden
 
       - name: Upload wasm artifacts
         uses: actions/upload-artifact@v4

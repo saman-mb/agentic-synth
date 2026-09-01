@@ -434,6 +434,31 @@ int render_into(Engine& e, float* out, uint32_t frames, uint32_t channels) {
     return AGS_OK;
 }
 
+// Map absolute sample offsets onto one live block. render_into treats
+// sample_offset as block-relative and then clears the queue, so callers of
+// ags_engine_render must not push times ≥ the upcoming block length.
+int push_abs_events_for_chunk(ags_engine* eng, const ags_event* events, uint32_t event_count, uint32_t done,
+                              uint32_t n) {
+    if (event_count == 0)
+        return AGS_OK;
+    ags_event chunk[kMaxQueuedEvents];
+    uint32_t chunk_n = 0;
+    const uint32_t end = done + n; // half-open [done, done+n)
+    for (uint32_t i = 0; i < event_count; ++i) {
+        const uint32_t off = events[i].sample_offset;
+        if (off < done || off >= end)
+            continue;
+        if (chunk_n >= kMaxQueuedEvents)
+            return AGS_ERR_SIZE;
+        chunk[chunk_n] = events[i];
+        chunk[chunk_n].sample_offset = off - done;
+        ++chunk_n;
+    }
+    if (chunk_n == 0)
+        return AGS_OK;
+    return ags_engine_push_events(eng, chunk, chunk_n);
+}
+
 int copy_patch(Engine& e, const void* bytes, uint32_t len) {
     if (bytes == nullptr)
         return AGS_ERR_NULL;
@@ -544,17 +569,19 @@ int ags_render_offline(const void* patch_bytes, uint32_t patch_len, const ags_ev
         ags_engine_destroy(eng);
         return rc;
     }
-    if (event_count > 0) {
-        rc = ags_engine_push_events(eng, events, event_count);
-        if (rc != AGS_OK) {
-            ags_engine_destroy(eng);
-            return rc;
-        }
+    if (event_count > 0 && events == nullptr) {
+        ags_engine_destroy(eng);
+        return AGS_ERR_NULL;
     }
     auto* e = reinterpret_cast<Engine*>(eng);
     uint32_t done = 0;
     while (done < frames) {
         const uint32_t n = std::min(frames - done, e->max_block);
+        rc = push_abs_events_for_chunk(eng, events, event_count, done, n);
+        if (rc != AGS_OK) {
+            ags_engine_destroy(eng);
+            return rc;
+        }
         rc = ags_engine_render(eng, out_interleaved + done * 2u, n, 2);
         if (rc != AGS_OK) {
             ags_engine_destroy(eng);
