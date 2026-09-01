@@ -85,8 +85,8 @@ Known gaps vs the native plugin:
   local/tests). Store failure fails closed (`RATE_LIMIT_FAIL_MODE`).
   Paid access (#312): `POST /api/entitlement` exchanges a store receipt
   for a short-lived HS256 JWT (`ENTITLEMENT_SIGNING_KEY`); Bearer token
-  unlocks paid tier. Stub receipts (`test:…`) when
-  `ENTITLEMENT_RECEIPT_MODE=stub`. See `docs/runbooks/entitlement.md`.
+  unlocks paid tier. Stub receipts (`test:…`) only when explicitly enabled
+  (`ENTITLEMENT_ALLOW_STUB_RECEIPTS=1`). See `docs/runbooks/entitlement.md`.
 - Global Gemini quota (#310): UTC-day call + estimated-cost caps
   (`GEMINI_DAILY_CALL_CAP`, `GEMINI_DAILY_COST_CAP_USD`) after identity
   allow; 503 `capacity_exhausted` with no Gemini call when tripped.

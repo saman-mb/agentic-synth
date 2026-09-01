@@ -26,7 +26,7 @@ import {
   setRateLimitRuntime,
 } from "./rateLimitGate.mts";
 
-const SECRET = "test-signing-key-not-for-prod";
+const SECRET = "test-signing-key-not-for-production-use!!";
 const FIXED_NOW = Date.UTC(2026, 8, 1, 12, 0, 0); // 2026-09-01T12:00:00Z
 
 describe("entitlementToken HMAC", () => {
@@ -83,9 +83,11 @@ describe("entitlementToken HMAC", () => {
     if (!r.ok) assert.equal(r.reason, "expired");
   });
 
-  it("loadSigningKey trims and ignores empty", () => {
-    assert.equal(loadSigningKey({ ENTITLEMENT_SIGNING_KEY: "  abc  " }), "abc");
+  it("loadSigningKey trims and rejects empty/short keys", () => {
+    const longKey = "a".repeat(32);
+    assert.equal(loadSigningKey({ ENTITLEMENT_SIGNING_KEY: `  ${longKey}  ` }), longKey);
     assert.equal(loadSigningKey({ ENTITLEMENT_SIGNING_KEY: "  " }), undefined);
+    assert.equal(loadSigningKey({ ENTITLEMENT_SIGNING_KEY: "too-short" }), undefined);
     assert.equal(loadSigningKey({}), undefined);
   });
 });
@@ -200,14 +202,55 @@ describe("createEntitlementVerifier wiring", () => {
     const stubClaims = await v.verify("paidstub.local-user");
     assert.equal(stubClaims?.subject, "paid:local-user");
   });
+  it("malformed Bearer header → 401 (no demo fallthrough)", async () => {
+    const verifier = new HmacEntitlementVerifier(SECRET, () => FIXED_NOW);
+    const req = new Request("https://example.test/api/brief", {
+      headers: { Authorization: "Bearer" },
+    });
+    const r = await resolveIdentity(req, verifier);
+    assert.equal(r.ok, false);
+    if (!r.ok) assert.equal(r.status, 401);
+  });
 });
 
 describe("receiptValidate", () => {
-  it("stub mode accepts test: receipts", async () => {
-    assert.equal(loadReceiptMode({}), "stub");
+  it("default mode is unconfigured (fail closed)", async () => {
+    assert.equal(loadReceiptMode({}), "unconfigured");
     const r = await validateReceipt(
       { receipt: "test:mobile-1", platform: "ios" },
-      { ENTITLEMENT_RECEIPT_MODE: "stub" },
+      { ENTITLEMENT_SIGNING_KEY: SECRET },
+    );
+    assert.equal(r.ok, false);
+    if (!r.ok) assert.equal(r.status, 503);
+  });
+
+  it("stub mode requires ENTITLEMENT_ALLOW_STUB_RECEIPTS=1", async () => {
+    assert.equal(
+      loadReceiptMode({ ENTITLEMENT_RECEIPT_MODE: "stub" }),
+      "unconfigured",
+    );
+    const r = await validateReceipt(
+      { receipt: "test:mobile-1", platform: "ios" },
+      { ENTITLEMENT_RECEIPT_MODE: "stub", ENTITLEMENT_SIGNING_KEY: SECRET },
+    );
+    assert.equal(r.ok, false);
+    if (!r.ok) assert.equal(r.status, 503);
+  });
+
+  it("stub mode accepts test: receipts when explicitly enabled", async () => {
+    assert.equal(
+      loadReceiptMode({
+        ENTITLEMENT_RECEIPT_MODE: "stub",
+        ENTITLEMENT_ALLOW_STUB_RECEIPTS: "1",
+      }),
+      "stub",
+    );
+    const r = await validateReceipt(
+      { receipt: "test:mobile-1", platform: "ios" },
+      {
+        ENTITLEMENT_RECEIPT_MODE: "stub",
+        ENTITLEMENT_ALLOW_STUB_RECEIPTS: "1",
+      },
     );
     assert.equal(r.ok, true);
     if (r.ok) assert.equal(r.subject, "ios:mobile-1");
@@ -216,7 +259,10 @@ describe("receiptValidate", () => {
   it("stub mode rejects unknown receipts with 403", async () => {
     const r = await validateReceipt(
       { receipt: "not-a-test-receipt", platform: "ios" },
-      { ENTITLEMENT_RECEIPT_MODE: "stub" },
+      {
+        ENTITLEMENT_RECEIPT_MODE: "stub",
+        ENTITLEMENT_ALLOW_STUB_RECEIPTS: "1",
+      },
     );
     assert.equal(r.ok, false);
     if (!r.ok) {
@@ -240,11 +286,74 @@ describe("receiptValidate", () => {
     };
     const r = await validateReceipt(
       { receipt: "real-looking-receipt", platform: "ios" },
-      { ENTITLEMENT_RECEIPT_MODE: "apple", APPLE_SHARED_SECRET: "sec" },
+      {
+        ENTITLEMENT_RECEIPT_MODE: "apple",
+        APPLE_SHARED_SECRET: "sec",
+        APPLE_BUNDLE_ID: "com.example.app",
+      },
       boom as unknown as typeof fetch,
     );
     assert.equal(r.ok, false);
     if (!r.ok) assert.equal(r.status, 503);
+  });
+
+  it("apple mode validates bundle, product, and active entitlement", async () => {
+    const mockFetch = async () =>
+      new Response(
+        JSON.stringify({
+          status: 0,
+          receipt: { bundle_id: "com.example.app" },
+          latest_receipt_info: [
+            {
+              original_transaction_id: "txn-active-1",
+              product_id: "com.example.pro",
+              expires_date_ms: String(FIXED_NOW + 86_400_000),
+            },
+          ],
+        }),
+        { status: 200, headers: { "Content-Type": "application/json" } },
+      );
+    const r = await validateReceipt(
+      { receipt: "base64-receipt", platform: "ios" },
+      {
+        ENTITLEMENT_RECEIPT_MODE: "apple",
+        APPLE_SHARED_SECRET: "sec",
+        APPLE_BUNDLE_ID: "com.example.app",
+        APPLE_PRODUCT_ID: "com.example.pro",
+      },
+      mockFetch as unknown as typeof fetch,
+    );
+    assert.equal(r.ok, true);
+    if (r.ok) assert.equal(r.subject, "ios:txn-active-1");
+  });
+
+  it("apple mode rejects wrong bundle_id", async () => {
+    const mockFetch = async () =>
+      new Response(
+        JSON.stringify({
+          status: 0,
+          receipt: { bundle_id: "com.other.app" },
+          latest_receipt_info: [
+            {
+              original_transaction_id: "txn-1",
+              product_id: "com.example.pro",
+              expires_date_ms: String(FIXED_NOW + 86_400_000),
+            },
+          ],
+        }),
+        { status: 200 },
+      );
+    const r = await validateReceipt(
+      { receipt: "base64-receipt", platform: "ios" },
+      {
+        ENTITLEMENT_RECEIPT_MODE: "apple",
+        APPLE_SHARED_SECRET: "sec",
+        APPLE_BUNDLE_ID: "com.example.app",
+      },
+      mockFetch as unknown as typeof fetch,
+    );
+    assert.equal(r.ok, false);
+    if (!r.ok) assert.equal(r.status, 403);
   });
 });
 
@@ -259,8 +368,10 @@ describe("POST /api/entitlement", () => {
       env: {
         ENTITLEMENT_SIGNING_KEY: SECRET,
         ENTITLEMENT_RECEIPT_MODE: "stub",
+        ENTITLEMENT_ALLOW_STUB_RECEIPTS: "1",
         ENTITLEMENT_TOKEN_TTL_SECONDS: "3600",
       },
+      gateRateLimit: async () => null,
       nowMs: () => FIXED_NOW,
     });
     assert.equal(res.status, 200);
@@ -285,7 +396,8 @@ describe("POST /api/entitlement", () => {
       body: JSON.stringify({ receipt: "test:x", platform: "ios" }),
     });
     const res = await handleEntitlement(req, {
-      env: { ENTITLEMENT_RECEIPT_MODE: "stub" },
+      env: { ENTITLEMENT_RECEIPT_MODE: "stub", ENTITLEMENT_ALLOW_STUB_RECEIPTS: "1" },
+      gateRateLimit: async () => null,
     });
     assert.equal(res.status, 503);
     const body = (await res.json()) as { error: string };
@@ -302,7 +414,9 @@ describe("POST /api/entitlement", () => {
       env: {
         ENTITLEMENT_SIGNING_KEY: SECRET,
         ENTITLEMENT_RECEIPT_MODE: "stub",
+        ENTITLEMENT_ALLOW_STUB_RECEIPTS: "1",
       },
+      gateRateLimit: async () => null,
     });
     assert.equal(res.status, 403);
   });

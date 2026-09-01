@@ -20,6 +20,8 @@ const JWT_HEADER = base64UrlEncode(
 );
 
 const DEFAULT_TTL_SECONDS = 3600;
+/** HS256 key must be at least 256 bits of entropy (32 UTF-8 bytes). */
+const MIN_SIGNING_KEY_LENGTH = 32;
 
 export function loadSigningKey(
   env: Record<string, string | undefined> = process.env,
@@ -27,7 +29,8 @@ export function loadSigningKey(
   const key = env.ENTITLEMENT_SIGNING_KEY;
   if (typeof key !== "string") return undefined;
   const trimmed = key.trim();
-  return trimmed.length > 0 ? trimmed : undefined;
+  if (trimmed.length < MIN_SIGNING_KEY_LENGTH) return undefined;
+  return trimmed;
 }
 
 export function loadTokenTtlSeconds(

@@ -37,21 +37,31 @@ export function clientIp(req: Request): string {
   return "unknown";
 }
 
-function bearerToken(req: Request): string | undefined {
+type BearerParse =
+  | { kind: "absent" }
+  | { kind: "malformed" }
+  | { kind: "token"; token: string };
+
+function parseBearer(req: Request): BearerParse {
   const auth = req.headers.get("authorization");
-  if (auth === null) return undefined;
-  const m = /^Bearer\s+(\S+)/i.exec(auth.trim());
-  if (m === null) return undefined;
-  return m[1];
+  if (auth === null) return { kind: "absent" };
+  const trimmed = auth.trim();
+  if (!/^Bearer(\s+|$)/i.test(trimmed)) return { kind: "absent" };
+  const token = trimmed.replace(/^Bearer\s+/i, "").trim();
+  if (token.length === 0) return { kind: "malformed" };
+  return { kind: "token", token };
 }
 
 export async function resolveIdentity(
   req: Request,
   verifier: EntitlementVerifier,
 ): Promise<ResolveIdentityResult> {
-  const token = bearerToken(req);
-  if (token !== undefined) {
-    const claims = await verifier.verify(token);
+  const bearer = parseBearer(req);
+  if (bearer.kind === "malformed") {
+    return { ok: false, status: 401, error: "Invalid or expired entitlement token." };
+  }
+  if (bearer.kind === "token") {
+    const claims = await verifier.verify(bearer.token);
     if (claims === null) {
       return { ok: false, status: 401, error: "Invalid or expired entitlement token." };
     }

@@ -1,9 +1,10 @@
 // ── Store receipt validation (#312) ─────────────────────────────────
 //
-// ENTITLEMENT_RECEIPT_MODE=stub|apple (default stub).
-//   stub  — accepts known test receipts for CI / local; never calls Apple.
-//   apple — live App Store verifyReceipt path; fails closed when the
-//           dependency is unreachable or not configured (no partial grant).
+// ENTITLEMENT_RECEIPT_MODE=stub|apple (default: unconfigured / fail-closed).
+//   stub  — only when ENTITLEMENT_RECEIPT_MODE=stub AND
+//           ENTITLEMENT_ALLOW_STUB_RECEIPTS=1 (CI/local; never prod default).
+//   apple — live App Store verifyReceipt; requires APPLE_SHARED_SECRET +
+//           APPLE_BUNDLE_ID; optional APPLE_PRODUCT_ID for SKU scoping.
 //
 // Residual: production Apple verify + Android Play are wired for fail-
 // closed behaviour; full live verify against Apple's network is residual
@@ -15,16 +16,25 @@ export type ReceiptValidateResult =
   | { ok: true; subject: string; platform: ReceiptPlatform }
   | { ok: false; status: 401 | 403 | 503; error: string };
 
-export type ReceiptMode = "stub" | "apple";
+export type ReceiptMode = "stub" | "apple" | "unconfigured";
 
 const TEST_PREFIX = "test:";
+
+/** Stub receipts are opt-in — never the silent default when a signing key exists. */
+export function stubReceiptsEnabled(
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  const raw = env.ENTITLEMENT_RECEIPT_MODE?.trim().toLowerCase();
+  return raw === "stub" && env.ENTITLEMENT_ALLOW_STUB_RECEIPTS?.trim() === "1";
+}
 
 export function loadReceiptMode(
   env: Record<string, string | undefined> = process.env,
 ): ReceiptMode {
   const raw = env.ENTITLEMENT_RECEIPT_MODE?.trim().toLowerCase();
   if (raw === "apple") return "apple";
-  return "stub";
+  if (stubReceiptsEnabled(env)) return "stub";
+  return "unconfigured";
 }
 
 function parsePlatform(raw: unknown): ReceiptPlatform | null {
@@ -159,17 +169,86 @@ async function validateAppleReceipt(
     return { ok: false, status: 403, error: "Receipt was rejected." };
   }
 
-  const receiptObj = (payload as { receipt?: { original_transaction_id?: unknown } })
-    .receipt;
-  const txn =
-    typeof receiptObj?.original_transaction_id === "string"
-      ? receiptObj.original_transaction_id.trim()
-      : "";
-  if (txn.length === 0) {
+  return validateApplePayload(payload, env);
+}
+
+type AppleInAppRow = {
+  original_transaction_id?: unknown;
+  product_id?: unknown;
+  expires_date_ms?: unknown;
+  cancellation_date_ms?: unknown;
+};
+
+function validateApplePayload(
+  payload: unknown,
+  env: Record<string, string | undefined>,
+): ReceiptValidateResult {
+  if (typeof payload !== "object" || payload === null) {
     return { ok: false, status: 403, error: "Receipt was rejected." };
   }
 
-  return { ok: true, subject: `ios:${txn}`, platform: "ios" };
+  const expectedBundle = env.APPLE_BUNDLE_ID?.trim();
+  if (expectedBundle === undefined || expectedBundle.length === 0) {
+    return {
+      ok: false,
+      status: 503,
+      error: "App Store receipt validation is not configured (missing APPLE_BUNDLE_ID).",
+    };
+  }
+
+  const receiptObj = (payload as { receipt?: { bundle_id?: unknown; in_app?: unknown } })
+    .receipt;
+  const bundleId =
+    typeof receiptObj?.bundle_id === "string" ? receiptObj.bundle_id.trim() : "";
+  if (bundleId !== expectedBundle) {
+    return { ok: false, status: 403, error: "Receipt was rejected." };
+  }
+
+  const expectedProduct = env.APPLE_PRODUCT_ID?.trim();
+  const nowMs = Date.now();
+
+  const rows: AppleInAppRow[] = [];
+  const latest = (payload as { latest_receipt_info?: unknown }).latest_receipt_info;
+  if (Array.isArray(latest)) rows.push(...(latest as AppleInAppRow[]));
+  else if (Array.isArray(receiptObj?.in_app)) rows.push(...(receiptObj.in_app as AppleInAppRow[]));
+
+  let bestTxn = "";
+  let bestExp = -1;
+
+  for (const row of rows) {
+    if (row.cancellation_date_ms !== undefined && row.cancellation_date_ms !== null) {
+      continue;
+    }
+    const productId = typeof row.product_id === "string" ? row.product_id.trim() : "";
+    if (expectedProduct !== undefined && expectedProduct.length > 0 && productId !== expectedProduct) {
+      continue;
+    }
+    const txn =
+      typeof row.original_transaction_id === "string"
+        ? row.original_transaction_id.trim()
+        : "";
+    if (txn.length === 0) continue;
+
+    const expRaw = row.expires_date_ms;
+    const expMs =
+      typeof expRaw === "string" || typeof expRaw === "number"
+        ? Number(expRaw)
+        : Number.NaN;
+    // Non-subscription / missing expiry: accept if no expiry field (one-time).
+    if (Number.isFinite(expMs) && expMs <= nowMs) continue;
+
+    const sortKey = Number.isFinite(expMs) ? expMs : Number.MAX_SAFE_INTEGER;
+    if (sortKey > bestExp) {
+      bestExp = sortKey;
+      bestTxn = txn;
+    }
+  }
+
+  if (bestTxn.length === 0) {
+    return { ok: false, status: 403, error: "Receipt was rejected." };
+  }
+
+  return { ok: true, subject: `ios:${bestTxn}`, platform: "ios" };
 }
 
 export type ValidateReceiptInput = {
@@ -194,6 +273,13 @@ export async function validateReceipt(
   }
 
   const mode = loadReceiptMode(env);
+  if (mode === "unconfigured") {
+    return {
+      ok: false,
+      status: 503,
+      error: "Store receipt validation is not configured.",
+    };
+  }
   if (mode === "stub") {
     return validateStubReceipt(input.receipt, platform);
   }

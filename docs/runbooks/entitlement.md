@@ -22,18 +22,22 @@ Anonymous web demo does not use this path; behaviour is unchanged.
 |----------|------|
 | `ENTITLEMENT_SIGNING_KEY` | Required to **issue** tokens. When set, Bearer JWTs are verified for paid tier. Missing on issue → **503**. |
 | `ENTITLEMENT_TOKEN_TTL_SECONDS` | Default `3600`. |
-| `ENTITLEMENT_RECEIPT_MODE` | `stub` (default) or `apple`. |
+| `ENTITLEMENT_RECEIPT_MODE` | `apple` for production. **`stub` only with `ENTITLEMENT_ALLOW_STUB_RECEIPTS=1`** (CI/local). Unconfigured → **503**. |
+| `ENTITLEMENT_ALLOW_STUB_RECEIPTS` | Set to `1` to enable `test:…` receipts. **Never in production.** |
 | `APPLE_SHARED_SECRET` | Required for `apple` mode live `verifyReceipt`. |
+| `APPLE_BUNDLE_ID` | Required for `apple` mode — receipt bundle must match. |
+| `APPLE_PRODUCT_ID` | Optional SKU filter for subscription/product validation. |
 | `RATE_LIMIT_PAID_STUB_*` | Local-only allowlist when no signing key (or with key + stub flags for local). Leave unset in prod. |
 
 ## Receipt modes
 
-- **stub** — accepts `{"receipt":"test:<subject>","platform":"ios"|"android"}`.
-  No network. Use in CI and local.
-- **apple** — calls Apple `verifyReceipt`. Unconfigured / unreachable →
-  **503** with a clear error and **no** token (fail closed). Invalid
-  receipt → **401/403**, never 5xx. Android Play verify is residual
-  (503 until wired).
+- **stub** — accepts `{"receipt":"test:<subject>","platform":"ios"|"android"}`
+  only when `ENTITLEMENT_ALLOW_STUB_RECEIPTS=1`. No network. CI/local only.
+- **apple** — calls Apple `verifyReceipt`, checks `APPLE_BUNDLE_ID` (and
+  optional `APPLE_PRODUCT_ID`), active entitlement expiry/cancellation.
+  Unconfigured / unreachable → **503** with a clear error and **no** token
+  (fail closed). Invalid receipt → **401/403**, never 5xx. Android Play
+  verify is residual (503 until wired).
 
 ## Status map
 

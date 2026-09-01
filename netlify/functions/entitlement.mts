@@ -18,6 +18,7 @@ import {
   loadTokenTtlSeconds,
 } from "./lib/entitlementToken.mts";
 import { validateReceipt } from "./lib/receiptValidate.mts";
+import { gateRateLimit } from "./lib/rateLimitGate.mts";
 
 export const config = { path: "/api/entitlement" };
 
@@ -32,6 +33,7 @@ export type EntitlementHandlerDeps = {
   getSigningKey?: () => string | undefined;
   getTtlSeconds?: () => number;
   validateReceipt?: typeof validateReceipt;
+  gateRateLimit?: (req: Request) => Promise<Response | null>;
   nowMs?: () => number;
   env?: Record<string, string | undefined>;
 };
@@ -49,6 +51,10 @@ export async function handleEntitlement(
     if (!body.ok) {
       return json({ error: body.error }, 400);
     }
+
+    const gate = deps.gateRateLimit ?? ((r) => gateRateLimit(r, "brief"));
+    const limited = await gate(req);
+    if (limited !== null) return limited;
 
     const env = deps.env ?? process.env;
     const signingKey = (deps.getSigningKey ?? (() => loadSigningKey(env)))();
