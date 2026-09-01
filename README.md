@@ -79,8 +79,12 @@ Known gaps vs the native plugin:
   those fields, so they are not agent-addressable from the demo.
 - Missing WASM or a module-init failure: `ensureStarted()` rejects and
   `juceShim` emits `error` — no silent WebAudio fallback, no blank screen.
-- Rate limits: 3 generations/minute and 200/day per IP (soft guardrail —
-  counters reset on function cold start)
+- Rate limits (#309): durable tiered limits on `/api/brief` and
+  `/api/generate` (demo 3/min + 200/day UTC; paid 30/min + 2000/day).
+  Backed by Netlify Blobs by default (`RATE_LIMIT_STORE=memory` for
+  local/tests). Store failure fails closed (`RATE_LIMIT_FAIL_MODE`).
+  Real entitlement JWT verify is #312 — optional stub tokens documented
+  in `.env.example`.
 
 The Gemini key is server-side only — it lives in the Netlify site env vars
 and is never shipped to the client.
