@@ -217,11 +217,15 @@ describe("assembleGeneratePayload", () => {
 describe("handler fuzz — client input is 4xx, never 500", () => {
   const noGemini: {
     gateRateLimit: () => Promise<null>;
+    gateQuota: () => Promise<null>;
+    noteOutcome: () => Promise<void>;
     getApiKey: () => string;
     enhanceBrief: () => Promise<string>;
     generatePatchText: () => Promise<{ ok: true; text: string }>;
   } = {
     gateRateLimit: async () => null,
+    gateQuota: async () => null,
+    noteOutcome: async () => undefined,
     getApiKey: () => "test-key",
     enhanceBrief: async () => {
       throw new Error("Gemini must not be called for rejected input");
@@ -237,6 +241,8 @@ describe("handler fuzz — client input is 4xx, never 500", () => {
       new Request("http://local/api/brief", { method: "POST", body: huge }),
       {
         gateRateLimit: noGemini.gateRateLimit,
+        gateQuota: noGemini.gateQuota,
+        noteOutcome: noGemini.noteOutcome,
         getApiKey: noGemini.getApiKey,
         enhanceBrief: noGemini.enhanceBrief,
       },
@@ -254,6 +260,8 @@ describe("handler fuzz — client input is 4xx, never 500", () => {
       }),
       {
         gateRateLimit: noGemini.gateRateLimit,
+        gateQuota: noGemini.gateQuota,
+        noteOutcome: noGemini.noteOutcome,
         getApiKey: noGemini.getApiKey,
         enhanceBrief: noGemini.enhanceBrief,
       },
@@ -269,6 +277,8 @@ describe("handler fuzz — client input is 4xx, never 500", () => {
       }),
       {
         gateRateLimit: noGemini.gateRateLimit,
+        gateQuota: noGemini.gateQuota,
+        noteOutcome: noGemini.noteOutcome,
         getApiKey: noGemini.getApiKey,
         generatePatchText: noGemini.generatePatchText,
       },
@@ -284,6 +294,8 @@ describe("handler fuzz — client input is 4xx, never 500", () => {
       }),
       {
         gateRateLimit: async () => null,
+        gateQuota: async () => null,
+        noteOutcome: async () => undefined,
         getApiKey: () => "test-key",
         generatePatchText: async () => ({
           ok: true as const,
@@ -314,6 +326,8 @@ describe("handler fuzz — client input is 4xx, never 500", () => {
         new Request("http://local/api/brief", { method: "POST", body }),
         {
           gateRateLimit: noGemini.gateRateLimit,
+          gateQuota: noGemini.gateQuota,
+          noteOutcome: noGemini.noteOutcome,
           getApiKey: noGemini.getApiKey,
           enhanceBrief: noGemini.enhanceBrief,
         },
@@ -335,6 +349,8 @@ describe("handler fuzz — client input is 4xx, never 500", () => {
         new Request("http://local/api/generate", { method: "POST", body }),
         {
           gateRateLimit: noGemini.gateRateLimit,
+          gateQuota: noGemini.gateQuota,
+          noteOutcome: noGemini.noteOutcome,
           getApiKey: noGemini.getApiKey,
           generatePatchText: noGemini.generatePatchText,
         },

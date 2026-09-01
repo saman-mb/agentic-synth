@@ -1,4 +1,4 @@
-// ── POST /api/brief — Netlify v2 function (#280 / #309 / #311) ───────
+// ── POST /api/brief — Netlify v2 function (#280 / #309 / #310 / #311) ─
 //
 // First leg of the split pipeline: the enhancer (sound-design translator)
 // alone. The platform kills a function at 10 s TTL on the free plan
@@ -9,6 +9,8 @@
 // sanitized raw prompt as the brief — never a 500.
 //
 // Durable tiered rate limit (#309) runs before any Gemini work.
+// Global daily quota (#310) runs after rate-limit allow, only when a
+// cache miss would bill an upstream attempt.
 // Request validation (#311): body size + validateBriefRequest before Gemini.
 
 import {
@@ -17,6 +19,7 @@ import {
 } from "../../libs/prompt/src/index.ts";
 import { enhanceBrief } from "./lib/gemini.mts";
 import { BriefCache, canonicalKey } from "./lib/cache.mts";
+import { gateQuota, noteOutcome } from "./lib/quotaGate.mts";
 import { gateRateLimit } from "./lib/rateLimitGate.mts";
 import { readJsonObject } from "./lib/requestBody.mts";
 
@@ -33,6 +36,8 @@ function json(payload: unknown, status: number): Response {
 
 export type BriefHandlerDeps = {
   gateRateLimit?: typeof gateRateLimit;
+  gateQuota?: typeof gateQuota;
+  noteOutcome?: typeof noteOutcome;
   enhanceBrief?: typeof enhanceBrief;
   getApiKey?: () => string | undefined;
 };
@@ -73,7 +78,15 @@ export async function handleBrief(
     const cacheKey = canonicalKey(sanitized);
     let brief = briefCache.get(cacheKey);
     if (brief === undefined) {
+      // Global quota only when we are about to call Gemini (billable attempt).
+      const quota = deps.gateQuota ?? gateQuota;
+      const capacity = await quota("brief");
+      if (capacity !== null) return capacity;
+
       brief = await enhance(sanitized, apiKey);
+      // enhanceBrief degrades in-process; treat completed attempt as ok.
+      const note = deps.noteOutcome ?? noteOutcome;
+      await note(true);
       briefCache.set(cacheKey, brief);
     }
     return json({ brief }, 200);

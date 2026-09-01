@@ -21,6 +21,7 @@ import {
   type RateLimitResource,
   type RateLimitStore,
 } from "./rateLimitStore.mts";
+import { noteRateLimited } from "./quotaGate.mts";
 
 export interface RateLimitRuntime {
   config: RateLimitConfig;
@@ -111,6 +112,9 @@ export async function gateRateLimit(
   if (result.kind === "unavailable") {
     return json(rateLimitUnavailableBody(result), 503);
   }
+
+  // Abuse signal (#313): identity hammering 429s.
+  void noteRateLimited(identityResult.identity.subject, now);
 
   return json(rateLimitedBody(result), 429, {
     "Retry-After": String(result.retryAfterSeconds),

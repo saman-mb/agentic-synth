@@ -85,6 +85,12 @@ Known gaps vs the native plugin:
   local/tests). Store failure fails closed (`RATE_LIMIT_FAIL_MODE`).
   Real entitlement JWT verify is #312 — optional stub tokens documented
   in `.env.example`.
+- Global Gemini quota (#310): UTC-day call + estimated-cost caps
+  (`GEMINI_DAILY_CALL_CAP`, `GEMINI_DAILY_COST_CAP_USD`) after identity
+  allow; 503 `capacity_exhausted` with no Gemini call when tripped.
+- Alerts (#313): 80% spend warn, hard-cap trip, elevated error rate, and
+  429 abuse — structured logs and optional `ALERT_WEBHOOK_URL`, with
+  runbooks under `docs/runbooks/`.
 
 The Gemini key is server-side only — it lives in the Netlify site env vars
 and is never shipped to the client.
