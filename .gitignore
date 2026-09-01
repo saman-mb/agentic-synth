@@ -7,6 +7,12 @@ Thumbs.db
 
 # Build outputs
 build/
+build-wasm/
+dist/wasm/
+apps/web/public/agsynth.js
+apps/web/public/agsynth.wasm
+apps/web/public/agsynth-worklet.js
+
 cmake-build-*/
 CMakeFiles/
 CMakeCache.txt

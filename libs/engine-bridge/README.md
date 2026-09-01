@@ -1,11 +1,12 @@
 # engine-bridge
 
-WebAudio (and later WASM/JSI) implementations of the synth engine, behind one TypeScript interface. This is the seam where a C++/WASM engine (#292) will slot in; this library does not implement WASM.
+WASM and WebAudio implementations of the synth engine, behind one TypeScript interface. The factory returns the WASM engine; WebAudio stays in tree for #307 golden extraction. JSI is a later factory swap on the same `SynthEngine` type (#308).
 
 ## Public surface
 
 - `SynthEngine` — `setPatch` (loadPatch), `noteOn` / `noteOff` / `playMidiNote` (trigger), `setParam` / `applyMacros` (render-params), plus `ensureStarted`, `getScopeSamples`, `setOutputDevice`, `dispose`.
-- `createSynthEngine()` — returns the current implementation (`WebSynthEngine`).
+- `createSynthEngine()` — returns the current implementation (`WasmSynthEngine`). Missing WASM or module-init failure rejects `ensureStarted()`; there is no silent WebAudio fallback.
+- `WebSynthEngine` — still constructible for #307 golden extraction. Not the factory default.
 - `setPatchParam` — dotted-path mutation used by the demo shim's patch snapshot. Not a second engine API.
 
 `VoiceManager` and `EffectRack` are not exported.
@@ -14,10 +15,11 @@ WebAudio (and later WASM/JSI) implementations of the synth engine, behind one Ty
 
 | Backend | Status | Location |
 | --- | --- | --- |
-| WebAudio | current | `src/lib/` (`engine.ts`, `voices.ts`, `effects.ts`, `paramMap.ts`) |
-| C++ / WASM / JSI | later (#292) | same `SynthEngine` type; factory swap, not a new API |
+| C++ / WASM | current factory default | `wasmEngine`; artefacts `dist/wasm/agsynth.js` + `agsynth.wasm` from `npx nx run wasm:build-wasm` |
+| WebAudio | in tree for #307 goldens | `src/lib/` (`engine.ts`, `voices.ts`, `effects.ts`, `paramMap.ts`) |
+| JSI | later (#308) | same `SynthEngine` type; factory swap, not a new API |
 
-Today there is one factory and no impl-picker options.
+One factory, no impl-picker options.
 
 ## Dependencies
 
