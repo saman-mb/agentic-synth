@@ -33,11 +33,13 @@ export default [
       'third_party/**',
       'apps/web/dist/**',
       'apps/web/node_modules/**',
+      'apps/mobile/.expo/**',
+      'apps/mobile/node_modules/**',
     ],
   },
   js.configs.recommended,
   {
-    files: ['apps/web/**/*.{js,jsx,ts,tsx}', 'libs/**/*.{js,jsx,ts,tsx}'],
+    files: ['apps/web/**/*.{js,jsx,ts,tsx}', 'apps/mobile/**/*.{js,jsx,ts,tsx}', 'libs/**/*.{js,jsx,ts,tsx}'],
     languageOptions: {
       ecmaVersion: 'latest',
       globals: globals.browser,
@@ -66,7 +68,7 @@ export default [
     },
   },
   {
-    files: ['apps/web/**/*.{js,jsx,ts,tsx}'],
+    files: ['apps/web/**/*.{js,jsx,ts,tsx}', 'apps/mobile/**/*.{js,jsx,ts,tsx}'],
     plugins: {
       react,
       'react-hooks': reactHooks,
@@ -81,6 +83,25 @@ export default [
       react: {
         version: 'detect',
       },
+    },
+  },
+  {
+    files: ['apps/mobile/**/*.{js,jsx,ts,tsx}'],
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+        __DEV__: 'readonly',
+      },
+    },
+    rules: {
+      '@typescript-eslint/no-require-imports': 'off',
+      '@nx/enforce-module-boundaries': [
+        'error',
+        {
+          ...nxModuleBoundaries[1],
+          checkDynamicDependenciesExceptions: ['@agentic-synth/engine-bridge'],
+        },
+      ],
     },
   },
 ];

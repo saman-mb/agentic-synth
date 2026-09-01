@@ -3,6 +3,9 @@
   "version": "0.0.0",
   "private": true,
   "license": "PolyForm-Noncommercial-1.0.0",
+  "workspaces": [
+    "apps/mobile"
+  ],
   "devDependencies": {
     "@eslint/js": "^9.26.0",
     "@nx/eslint-plugin": "^21.6.11",
