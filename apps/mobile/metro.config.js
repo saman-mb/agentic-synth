@@ -16,6 +16,9 @@ config.resolver.extraNodeModules = {
   '@agentic-synth/shared-types': path.resolve(workspaceRoot, 'libs/shared-types/src/index.ts'),
   '@agentic-synth/engine-bridge': path.resolve(workspaceRoot, 'libs/engine-bridge/src/index.ts'),
   '@agentic-synth/data': path.resolve(workspaceRoot, 'libs/data/src/index.ts'),
+  '@agentic-synth/prompt': path.resolve(workspaceRoot, 'libs/prompt/src/index.ts'),
+  '@agentic-synth/modval': path.resolve(workspaceRoot, 'libs/modval/src/index.ts'),
+  '@agentic-synth/codec': path.resolve(workspaceRoot, 'libs/codec/src/index.ts'),
 };
 
 module.exports = config;
