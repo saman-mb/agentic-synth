@@ -83,8 +83,10 @@ Known gaps vs the native plugin:
   `/api/generate` (demo 3/min + 200/day UTC; paid 30/min + 2000/day).
   Backed by Netlify Blobs by default (`RATE_LIMIT_STORE=memory` for
   local/tests). Store failure fails closed (`RATE_LIMIT_FAIL_MODE`).
-  Real entitlement JWT verify is #312 — optional stub tokens documented
-  in `.env.example`.
+  Paid access (#312): `POST /api/entitlement` exchanges a store receipt
+  for a short-lived HS256 JWT (`ENTITLEMENT_SIGNING_KEY`); Bearer token
+  unlocks paid tier. Stub receipts (`test:…`) when
+  `ENTITLEMENT_RECEIPT_MODE=stub`. See `docs/runbooks/entitlement.md`.
 - Global Gemini quota (#310): UTC-day call + estimated-cost caps
   (`GEMINI_DAILY_CALL_CAP`, `GEMINI_DAILY_COST_CAP_USD`) after identity
   allow; 503 `capacity_exhausted` with no Gemini call when tripped.

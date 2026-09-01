@@ -27,6 +27,7 @@ many **429** rate-limit responses inside one UTC minute — above
 | Single scripted IP | Block / challenge at Netlify edge or CDN if available; keep fail-closed rate limits. |
 | Shared NAT false positive | Raise `ALERT_ABUSE_429_PER_MINUTE` slightly; prefer `X-Device-Id` clients. |
 | Compromised paid stub token | Rotate `RATE_LIMIT_PAID_STUB_TOKENS`; disable `RATE_LIMIT_ALLOW_PAID_STUB` in prod. |
+| Compromised entitlement JWT | Rotate `ENTITLEMENT_SIGNING_KEY`; existing tokens fail verify → 401. See [entitlement](entitlement.md). |
 | Global spend also climbing | Follow [gemini-spend](gemini-spend.md); lower daily caps. |
 
 ## Who to ping

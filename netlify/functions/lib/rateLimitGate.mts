@@ -3,7 +3,10 @@
 // Lazy singleton: config + entitlement verifier + store. Both brief.mts
 // and generate.mts call gateRateLimit before any Gemini work.
 
-import { StubEntitlementVerifier, type EntitlementVerifier } from "./entitlement.mts";
+import {
+  createEntitlementVerifier,
+  type EntitlementVerifier,
+} from "./entitlement.mts";
 import { resolveIdentity } from "./identity.mts";
 import {
   enforceRateLimit,
@@ -42,7 +45,8 @@ export function setRateLimitRuntime(runtime: RateLimitRuntime): void {
 
 async function buildRuntime(): Promise<RateLimitRuntime> {
   const config = loadRateLimitConfig();
-  const verifier = new StubEntitlementVerifier(config);
+  // HMAC when ENTITLEMENT_SIGNING_KEY is set; stub allowlist for local only.
+  const verifier = createEntitlementVerifier(config);
   let store: RateLimitStore;
   if (config.store === "memory") {
     store = new MemoryStore();
