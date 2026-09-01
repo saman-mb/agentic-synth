@@ -17,8 +17,11 @@
 //   setParam(path: string, value: number): number
 //   pushEvents(bytes: ArrayBuffer): number   // packed ags_event[]
 //   processBlock(out: ArrayBuffer, frames: number, channels: number): number
+//     AGS_ERR_STATE if AudioStream is running (RT owns processBlock).
+//     AGS_ERR_SIZE if out.byteLength < frames*channels*sizeof(float).
 //   renderOffline(patch: ArrayBuffer, events: ArrayBuffer,
 //                 sampleRate: number, frames: number, out: ArrayBuffer): number
+//     Stereo (2 ch). AGS_ERR_SIZE if out.byteLength < frames*2*sizeof(float).
 //   start(): number
 //   stop(): number
 //   stateSize(): number

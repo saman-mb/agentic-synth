@@ -51,6 +51,8 @@ public:
     int recreate(double sample_rate, int max_block = 8192);
 
     [[nodiscard]] bool alive() const;
+    // True while AudioStream owns the RT callback. JSI processBlock refuses then.
+    [[nodiscard]] bool streamRunning() const;
     [[nodiscard]] double sampleRate() const;
     [[nodiscard]] int maxBlock() const;
 

@@ -320,9 +320,11 @@ TEST_CASE("JSI host Linux AudioStream start/stop pairs", "[jsi]") {
 
     uint8_t state[2048];
     REQUIRE(host->start() == AGS_OK);
+    REQUIRE(host->streamRunning());
     REQUIRE(host->saveState(state, sizeof(state)) == AGS_ERR_STATE);
     std::this_thread::sleep_for(std::chrono::milliseconds(20));
     REQUIRE(host->stop() == AGS_OK);
+    REQUIRE_FALSE(host->streamRunning());
 
     std::vector<float> buf(kRtFrames * 2u, 0.0f);
     REQUIRE(host->processBlock(buf.data(), kRtFrames, 2) == AGS_OK);

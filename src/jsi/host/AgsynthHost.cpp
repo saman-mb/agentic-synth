@@ -75,6 +75,8 @@ void AgsynthHost::destroy(AgsynthHost* host) { delete host; }
 
 bool AgsynthHost::alive() const { return impl_ != nullptr && impl_->engine != nullptr; }
 
+bool AgsynthHost::streamRunning() const { return impl_ != nullptr && impl_->stream.running(); }
+
 double AgsynthHost::sampleRate() const { return impl_ != nullptr ? impl_->sample_rate : 0.0; }
 
 int AgsynthHost::maxBlock() const { return impl_ != nullptr ? impl_->max_block : 0; }

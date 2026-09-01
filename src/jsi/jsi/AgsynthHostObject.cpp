@@ -44,6 +44,11 @@ uint8_t* ab_data_mut(Runtime& rt, const Value& v, size_t& len) {
     return ab.data(rt);
 }
 
+bool pcm_buffer_short(size_t byte_len, uint32_t frames, uint32_t channels) {
+    const size_t need = static_cast<size_t>(frames) * static_cast<size_t>(channels) * sizeof(float);
+    return byte_len < need;
+}
+
 class AgsynthHostObject final : public HostObject {
 public:
     ~AgsynthHostObject() override { AgsynthHost::destroy(host_); }
@@ -118,6 +123,8 @@ public:
                 rt, name, 3, [this](Runtime& rt, const Value&, const Value* args, size_t count) {
                     if (host_ == nullptr)
                         return Value(AGS_ERR_NULL);
+                    if (host_->streamRunning())
+                        return Value(AGS_ERR_STATE);
                     if (count < 3 || !args[1].isNumber() || !args[2].isNumber())
                         return Value(AGS_ERR_PARAM);
                     size_t len = 0;
@@ -126,6 +133,8 @@ public:
                         return Value(AGS_ERR_NULL);
                     const auto frames = static_cast<uint32_t>(args[1].asNumber());
                     const auto channels = static_cast<uint32_t>(args[2].asNumber());
+                    if (pcm_buffer_short(len, frames, channels))
+                        return Value(AGS_ERR_SIZE);
                     return Value(host_->processBlock(reinterpret_cast<float*>(data), frames, channels));
                 });
         }
@@ -145,10 +154,12 @@ public:
                     if (elen % sizeof(ags_event) != 0)
                         return Value(AGS_ERR_SIZE);
                     const auto n = static_cast<uint32_t>(elen / sizeof(ags_event));
+                    const auto frames = static_cast<uint32_t>(args[3].asNumber());
+                    if (pcm_buffer_short(olen, frames, 2))
+                        return Value(AGS_ERR_SIZE);
                     const auto* ev = (n == 0) ? nullptr : reinterpret_cast<const ags_event*>(events);
-                    return Value(AgsynthHost::renderOffline(
-                        patch, static_cast<uint32_t>(plen), ev, n, args[2].asNumber(),
-                        static_cast<uint32_t>(args[3].asNumber()), reinterpret_cast<float*>(out)));
+                    return Value(AgsynthHost::renderOffline(patch, static_cast<uint32_t>(plen), ev, n,
+                                                            args[2].asNumber(), frames, reinterpret_cast<float*>(out)));
                 });
         }
         if (key == "start") {
