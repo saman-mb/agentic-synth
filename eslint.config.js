@@ -95,6 +95,13 @@ export default [
     },
     rules: {
       '@typescript-eslint/no-require-imports': 'off',
+      '@nx/enforce-module-boundaries': [
+        'error',
+        {
+          ...nxModuleBoundaries[1],
+          checkDynamicDependenciesExceptions: ['@agentic-synth/engine-bridge'],
+        },
+      ],
     },
   },
 ];

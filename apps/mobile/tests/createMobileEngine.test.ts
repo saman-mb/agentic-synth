@@ -39,6 +39,7 @@ const { createMobileEngine, bootDemoPatch, shouldUseMockEngine } = await import(
   '../src/engine/createMobileEngine.ts'
 );
 const { createMockAgsynthHost } = await import('../src/engine/mockAgsynthHost.ts');
+
 const demoPatch = JSON.parse(
   readFileSync(path.join(repoRoot, 'apps/mobile/assets/demo-patch.json'), 'utf8'),
 );

@@ -10,7 +10,6 @@ export interface MobileEngineResult {
 }
 
 declare global {
-  // eslint-disable-next-line no-var
   var __AgsynthHost: import('@agentic-synth/engine-bridge').JsiNativeBinding | undefined;
 }
 
@@ -20,7 +19,6 @@ interface AgsynthNativeModule {
 
 function tryNativeBinding(): import('@agentic-synth/engine-bridge').JsiNativeBinding | null {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { NativeModules } = require('react-native') as {
       NativeModules?: { Agsynth?: AgsynthNativeModule };
     };
