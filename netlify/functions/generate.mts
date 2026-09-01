@@ -1,4 +1,4 @@
-// ── POST /api/generate — Netlify v2 function (#280 / #309 / #311) ────
+// ── POST /api/generate — Netlify v2 function (#280 / #309–#311) ──────
 //
 // Second leg of the split pipeline: the patch generator alone. The
 // platform kills a function at 10 s TTL on the free plan (#280 r9),
@@ -8,6 +8,7 @@
 //
 // GrammarSampler parity: reject, never coerce (via the shared codec,
 // libs/codec). Durable tiered rate limit (#309) runs before Gemini.
+// Global daily quota (#310) after rate-limit allow, before Gemini.
 // Request validation (#311): body size + validateGenerateRequest before
 // Gemini; assembleGeneratePayload (codec + modval) after.
 
@@ -16,6 +17,7 @@ import {
   validateGenerateRequest,
 } from "../../libs/prompt/src/index.ts";
 import { generatePatchText } from "./lib/gemini.mts";
+import { gateQuota, noteOutcome } from "./lib/quotaGate.mts";
 import { gateRateLimit } from "./lib/rateLimitGate.mts";
 import { readJsonObject } from "./lib/requestBody.mts";
 import { assembleGeneratePayload } from "./lib/assembleGeneratePayload.mts";
@@ -40,6 +42,8 @@ function truncate(s: string, max: number): string {
 
 export type GenerateHandlerDeps = {
   gateRateLimit?: typeof gateRateLimit;
+  gateQuota?: typeof gateQuota;
+  noteOutcome?: typeof noteOutcome;
   generatePatchText?: typeof generatePatchText;
   getApiKey?: () => string | undefined;
 };
@@ -82,22 +86,33 @@ export async function handleGenerate(
       return json({ error: "Generation is not configured (missing GEMINI_KEY)." }, 503);
     }
 
+    // Global quota: count this attempt before Gemini (billable-start).
+    const quota = deps.gateQuota ?? gateQuota;
+    const capacity = await quota("generate");
+    if (capacity !== null) return capacity;
+
     // C++ parity: the generator receives the sonic brief when one exists,
     // otherwise the sanitized raw prompt.
     const sanitized = sanitizePrompt(prompt);
     const promptForGenerator = briefArg.length > 0 ? briefArg : sanitized;
 
     const generate = deps.generatePatchText ?? generatePatchText;
+    const note = deps.noteOutcome ?? noteOutcome;
     const generated = await generate(promptForGenerator, patchId, apiKey);
     if (!generated.ok) {
+      // Upstream / safety failures count toward error-rate monitoring.
+      // Validation 4xx above never reach here.
+      await note(false);
       if (generated.reason === "blocked") return json({ error: SAFETY_400 }, 400);
       return json({ error: UPSTREAM_502 }, 502);
     }
 
     const assembled = assembleGeneratePayload(generated.text, promptForGenerator);
     if (!assembled.ok) {
+      await note(false);
       return json({ error: assembled.error }, assembled.status);
     }
+    await note(true);
     return json(assembled.payload, 200);
   } catch {
     return json({ error: "Internal server error." }, 500);
