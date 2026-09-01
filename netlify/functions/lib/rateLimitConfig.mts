@@ -3,7 +3,7 @@
 // Env-driven limits and fail/store modes for /api/brief and /api/generate.
 // Defaults match the demo soft guardrail (3/min, 200/day) and a paid tier
 // (30/min, 2000/day). FAIL_MODE defaults closed — store errors never open
-// unlimited free probes. Real App Store JWT verify is #312; see entitlement.
+// unlimited free probes. Entitlement JWT verify (#312): see entitlement.mts.
 
 export type RateLimitTier = "demo" | "paid";
 export type FailMode = "closed" | "open";
