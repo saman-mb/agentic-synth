@@ -1,73 +1,28 @@
-import { StyleSheet, Text, View } from 'react-native';
-import { colors, radius, space, typeScale } from '../theme/tokens';
+import { MacroKnobRow } from './MacroKnob';
 
-const MACROS = [
-  { id: 'macro.0', label: 'Brightness' },
-  { id: 'macro.1', label: 'Movement' },
-  { id: 'macro.2', label: 'Space' },
-  { id: 'macro.3', label: 'Body' },
-] as const;
-
-/** Macro row — visible after generate (#317); drag interaction in #318. */
-export function MacroKnobs({ active = false }: { active?: boolean }) {
-  return (
-    <View style={styles.plate} accessibilityLabel="Macro controls">
-      {MACROS.map((macro) => (
-        <View key={macro.id} style={styles.knobWrap}>
-          <View
-            style={[styles.knob, !active && styles.knobIdle]}
-            accessibilityState={{ disabled: !active }}
-          >
-            <View style={styles.arc} />
-          </View>
-          <Text style={styles.label}>{macro.label}</Text>
-        </View>
-      ))}
-    </View>
-  );
+export interface MacroKnobsProps {
+  active?: boolean;
+  positions: number[];
+  onChange: (index: number, value: number) => void;
+  onDragStart?: () => void;
+  onDragEnd?: () => void;
 }
 
-const KNOB = 44;
-const HIT = 56;
-
-const styles = StyleSheet.create({
-  plate: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    backgroundColor: colors.bg.knobPlate,
-    borderRadius: radius.lg,
-    paddingHorizontal: space.chromePadX,
-    paddingVertical: space['4'],
-    gap: space.macrosGap,
-  },
-  knobWrap: {
-    alignItems: 'center',
-    width: HIT,
-  },
-  knob: {
-    width: HIT,
-    height: HIT,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  knobIdle: {
-    opacity: 0.55,
-  },
-  arc: {
-    width: KNOB,
-    height: KNOB,
-    borderRadius: radius.knob,
-    borderWidth: 3,
-    borderColor: colors.control.knobRing,
-    borderTopColor: colors.control.knobArc,
-    borderRightColor: colors.control.knobArc,
-  },
-  label: {
-    marginTop: space['2'],
-    color: colors.text.secondary,
-    fontSize: typeScale.macroLabel.size,
-    lineHeight: typeScale.macroLabel.lineHeight,
-    fontWeight: typeScale.macroLabel.weight as '500',
-    textTransform: 'uppercase',
-  },
-});
+/** Macro row — interactive in shape (#318). */
+export function MacroKnobs({
+  active = false,
+  positions,
+  onChange,
+  onDragStart,
+  onDragEnd,
+}: MacroKnobsProps) {
+  return (
+    <MacroKnobRow
+      positions={positions}
+      enabled={active}
+      onChange={onChange}
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+    />
+  );
+}
