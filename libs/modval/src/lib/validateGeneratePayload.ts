@@ -8,8 +8,9 @@ export type GeneratePayloadVerdict =
   | { ok: false; error: string };
 
 /**
- * Defence-in-depth gate for generateFlow: validate patch + modulation
- * before WebAudio ingestion (#301 / #286).
+ * Defence-in-depth gate for generateFlow and Netlify /api/generate:
+ * validate patch + modulation before WebAudio ingestion or client
+ * response (#301 / #286 / #311). Shared SSOT — do not fork in netlify/.
  */
 export function validateGeneratePayload(
   patch: unknown,

@@ -1,4 +1,4 @@
-// ── POST /api/brief — Netlify v2 function (#280 / #309) ─────────────
+// ── POST /api/brief — Netlify v2 function (#280 / #309 / #311) ───────
 //
 // First leg of the split pipeline: the enhancer (sound-design translator)
 // alone. The platform kills a function at 10 s TTL on the free plan
@@ -9,11 +9,16 @@
 // sanitized raw prompt as the brief — never a 500.
 //
 // Durable tiered rate limit (#309) runs before any Gemini work.
+// Request validation (#311): body size + validateBriefRequest before Gemini.
 
-import { validatePrompt } from "../../libs/prompt/src/index.ts";
-import { enhanceBrief, sanitizePrompt } from "./lib/gemini.mts";
+import {
+  sanitizePrompt,
+  validateBriefRequest,
+} from "../../libs/prompt/src/index.ts";
+import { enhanceBrief } from "./lib/gemini.mts";
 import { BriefCache, canonicalKey } from "./lib/cache.mts";
 import { gateRateLimit } from "./lib/rateLimitGate.mts";
+import { readJsonObject } from "./lib/requestBody.mts";
 
 export const config = { path: "/api/brief" };
 
@@ -26,22 +31,27 @@ function json(payload: unknown, status: number): Response {
   });
 }
 
-export default async function handler(req: Request): Promise<Response> {
+export type BriefHandlerDeps = {
+  gateRateLimit?: typeof gateRateLimit;
+  enhanceBrief?: typeof enhanceBrief;
+  getApiKey?: () => string | undefined;
+};
+
+export async function handleBrief(
+  req: Request,
+  deps: BriefHandlerDeps = {},
+): Promise<Response> {
   if (req.method !== "POST") {
     return json({ error: "Method not allowed. Use POST." }, 405);
   }
 
   try {
-    let raw: unknown;
-    try {
-      raw = JSON.parse(await req.text());
-    } catch {
-      return json({ error: "Request body must be valid JSON." }, 400);
+    const body = await readJsonObject(req);
+    if (!body.ok) {
+      return json({ error: body.error }, 400);
     }
-    if (typeof raw !== "object" || raw === null || Array.isArray(raw)) {
-      return json({ error: "Request body must be a JSON object." }, 400);
-    }
-    const promptGate = validatePrompt((raw as Record<string, unknown>)["prompt"]);
+
+    const promptGate = validateBriefRequest(body.value);
     if (!promptGate.ok) {
       return json({ error: promptGate.error }, 400);
     }
@@ -49,23 +59,31 @@ export default async function handler(req: Request): Promise<Response> {
 
     // Rate limit BEFORE any upstream work (and before the key check, so
     // a missing-key deploy never hands out unlimited free probes).
-    const limited = await gateRateLimit(req, "brief");
+    const gate = deps.gateRateLimit ?? gateRateLimit;
+    const limited = await gate(req, "brief");
     if (limited !== null) return limited;
 
-    const apiKey = process.env.GEMINI_KEY;
+    const apiKey = (deps.getApiKey ?? (() => process.env.GEMINI_KEY))();
     if (typeof apiKey !== "string" || apiKey.length === 0) {
       return json({ error: "Generation is not configured (missing GEMINI_KEY)." }, 503);
     }
 
+    const enhance = deps.enhanceBrief ?? enhanceBrief;
     const sanitized = sanitizePrompt(prompt);
     const cacheKey = canonicalKey(sanitized);
     let brief = briefCache.get(cacheKey);
     if (brief === undefined) {
-      brief = await enhanceBrief(sanitized, apiKey);
+      brief = await enhance(sanitized, apiKey);
       briefCache.set(cacheKey, brief);
     }
     return json({ brief }, 200);
   } catch {
+    // Hostile input should already be 400 above; this is for unexpected
+    // runtime failures only.
     return json({ error: "Internal server error." }, 500);
   }
+}
+
+export default async function handler(req: Request): Promise<Response> {
+  return handleBrief(req);
 }
