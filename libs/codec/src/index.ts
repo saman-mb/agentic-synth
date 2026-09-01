@@ -8,7 +8,7 @@ export {
   decodeLlmPatch,
   convertLlmPatch,
   validatePatch,
-} from './lib/patchCodec';
+} from './lib/patchCodec.ts';
 export type {
   OscTypeName,
   FilterTypeName,
@@ -25,4 +25,4 @@ export type {
   CodecErrorCode,
   CodecError,
   DecodeLlmPatchResult,
-} from './lib/patchCodec';
+} from './lib/patchCodec.ts';

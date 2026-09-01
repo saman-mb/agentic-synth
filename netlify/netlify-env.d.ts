@@ -6,7 +6,8 @@
 // and friends come from the DOM lib via the tsconfig "lib" array —
 // prefer widening "lib" over growing this file.
 
-// Node runtime env access (generate.mts reads GEMINI_KEY only).
+// Node runtime env access (handlers read GEMINI_KEY, RATE_LIMIT_*,
+// ENTITLEMENT_*, QUOTA_*, ALERT_*).
 declare const process: {
   env: Record<string, string | undefined>;
 };

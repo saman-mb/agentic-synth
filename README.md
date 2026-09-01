@@ -79,20 +79,46 @@ Known gaps vs the native plugin:
   those fields, so they are not agent-addressable from the demo.
 - Missing WASM or a module-init failure: `ensureStarted()` rejects and
   `juceShim` emits `error` — no silent WebAudio fallback, no blank screen.
-- Rate limits: 3 generations/minute and 200/day per IP (soft guardrail —
-  counters reset on function cold start)
+- Rate limits (#309): durable tiered limits on `/api/brief` and
+  `/api/generate` (demo 3/min + 200/day UTC; paid 30/min + 2000/day).
+  Backed by Netlify Blobs by default (`RATE_LIMIT_STORE=memory` for
+  local/tests). Store failure fails closed (`RATE_LIMIT_FAIL_MODE`).
+  Paid access (#312): `POST /api/entitlement` exchanges a store receipt
+  for a short-lived HS256 JWT (`ENTITLEMENT_SIGNING_KEY`); Bearer token
+  unlocks paid tier. Stub receipts (`test:…`) only when explicitly enabled
+  (`ENTITLEMENT_ALLOW_STUB_RECEIPTS=1`). See `docs/runbooks/entitlement.md`.
+- Global Gemini quota (#310): UTC-day call + estimated-cost caps
+  (`GEMINI_DAILY_CALL_CAP`, `GEMINI_DAILY_COST_CAP_USD`) after identity
+  allow; 503 `capacity_exhausted` with no Gemini call when tripped.
+- Alerts (#313): 80% spend warn, hard-cap trip, elevated error rate, and
+  429 abuse — structured logs and optional `ALERT_WEBHOOK_URL`, with
+  runbooks under `docs/runbooks/`.
 
 The Gemini key is server-side only — it lives in the Netlify site env vars
-and is never shipped to the client.
+and is never shipped to the client. Prompts are sent to Gemini; see the
+[Privacy Statement](docs/privacy-statement.md) (web demo section) for mic,
+rate-limit identity, and retention details.
 
 ### Owner deploy checklist
 
 1. Create a Netlify site linked to this repo (deploy from `apps/web/dist`)
 2. Set `NETLIFY_SITE_ID` and `NETLIFY_AUTH_TOKEN` as GitHub repo secrets
-3. Set `GEMINI_KEY` in the Netlify site env vars — use a dedicated key on a
-   project where billing is never enabled (free tier only)
+3. Set `GEMINI_KEY` in the Netlify site env vars (dedicated project/key;
+   tune billing alerts to your spend tolerance)
 4. Raise the function timeout to 26 s in the Netlify UI (free-tier default
    is 10 s; the handler enforces its own 24 s deadline)
+5. Fail-closed backstops (leave unset or set explicitly):
+   `RATE_LIMIT_FAIL_MODE=closed`, `QUOTA_FAIL_MODE=closed`
+6. Global Gemini quota caps — set intentionally for prod (defaults are generous):
+   `GEMINI_DAILY_CALL_CAP`, `GEMINI_DAILY_COST_CAP_USD`,
+   `GEMINI_EST_USD_PER_BRIEF`, `GEMINI_EST_USD_PER_GENERATE`
+7. Optional ops alerts: `ALERT_WEBHOOK_URL` (see `docs/runbooks/gemini-spend.md`)
+8. Paid entitlement (before mobile paid launch — **do not enable stub in prod**):
+   - `ENTITLEMENT_SIGNING_KEY` (≥32 chars; server-only)
+   - `ENTITLEMENT_RECEIPT_MODE=apple`
+   - `APPLE_SHARED_SECRET`, `APPLE_BUNDLE_ID` (optional `APPLE_PRODUCT_ID`)
+   - **Do not set** `ENTITLEMENT_ALLOW_STUB_RECEIPTS=1` in production
+   - See `docs/runbooks/entitlement.md`
 
 ### Run the web demo locally
 
@@ -254,7 +280,7 @@ agentic-synth/
 | [Mod Matrix Guide](docs/mod-matrix-guide.md) | Routing modulation |
 | [Local Inference](docs/local-inference.md) | Running an LLM on your own hardware |
 | [Build & Release](docs/build-release.md) | Packaging and signing |
-| [Privacy Statement](docs/privacy-statement.md) | What leaves your machine |
+| [Privacy Statement](docs/privacy-statement.md) | Mic, Gemini prompts, web demo + mobile entitlement, deletion contact |
 
 Full index: [`docs/index.md`](docs/index.md)
 

@@ -14,8 +14,10 @@ export function canonicalKey(prompt: string): string {
 
 export class BriefCache {
   private entries: Map<string, string>;
+  private readonly capacity: number;
 
-  constructor(private readonly capacity: number = BRIEF_CACHE_CAPACITY) {
+  constructor(capacity: number = BRIEF_CACHE_CAPACITY) {
+    this.capacity = capacity;
     this.entries = new Map();
   }
 

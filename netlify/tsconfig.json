@@ -20,5 +20,8 @@
   "include": [
     "functions/**/*.mts",
     "netlify-env.d.ts"
+  ],
+  "exclude": [
+    "functions/**/*.test.mts"
   ]
 }
