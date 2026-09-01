@@ -1,19 +1,18 @@
-// ── POST /api/generate — Netlify v2 function (#280) ─────────────────
+// ── POST /api/generate — Netlify v2 function (#280 / #309) ──────────
 //
 // Second leg of the split pipeline: the patch generator alone. The
-// platform kills a function at 10 s TOTAL on the free plan (#280 r9),
+// platform kills a function at 10 s TTL on the free plan (#280 r9),
 // so the enhancer runs in /api/brief and hands its brief to the browser,
 // which posts it here. Generator ≈3 s on flash-lite; retries are slim
 // (2 attempts inside a 9 s wall — see lib/gemini.mts).
 //
 // GrammarSampler parity: reject, never coerce (via the shared codec,
-// libs/codec). Free-tier safeguards: in-memory per-IP rate
-// limit + the brief cache lives in brief.mts.
+// libs/codec). Durable tiered rate limit (#309) runs before Gemini.
 
 import { decodeLlmPatch } from "../../libs/codec/src/index.ts";
 import { validatePrompt } from "../../libs/prompt/src/index.ts";
 import { generatePatchText, sanitizePrompt } from "./lib/gemini.mts";
-import { checkRateLimit, createRateLimitStore } from "./lib/rateLimit.mts";
+import { gateRateLimit } from "./lib/rateLimitGate.mts";
 
 export const config = { path: "/api/generate" };
 
@@ -24,33 +23,14 @@ const MAX_BRIEF_LENGTH = 4000;
 const MAX_RATIONALE_LENGTH = 256;
 const MAX_ACTION_LENGTH = 256;
 
-const MINUTE_429 = "The demo is busy right now. Please wait a minute and try again.";
-const DAY_429 =
-  "You have reached the daily generation limit for the demo. Please come back tomorrow (UTC).";
 const UPSTREAM_502 = "Upstream model request failed.";
 const SAFETY_400 = "This prompt was blocked by safety filters. Try rewording it.";
-
-const rateStore = createRateLimitStore();
 
 function json(payload: unknown, status: number): Response {
   return new Response(JSON.stringify(payload), {
     status,
     headers: { "Content-Type": "application/json" },
   });
-}
-
-function clientIp(req: Request): string {
-  // Netlify injects x-nf-client-connection-ip at the edge; it is not
-  // client-controllable. x-forwarded-for is only a fallback and its first
-  // entry can be spoofed, so the limiter is a soft guardrail either way.
-  const nf = req.headers.get("x-nf-client-connection-ip");
-  if (nf !== null && nf.trim().length > 0) return nf.trim();
-  const fwd = req.headers.get("x-forwarded-for");
-  if (fwd !== null) {
-    const first = fwd.split(",")[0].trim();
-    if (first.length > 0) return first;
-  }
-  return "unknown";
 }
 
 function truncate(s: string, max: number): string {
@@ -96,10 +76,8 @@ export default async function handler(req: Request): Promise<Response> {
 
     // Rate limit BEFORE any upstream work (and before the key check, so
     // a missing-key deploy never hands out unlimited free probes).
-    const limit = checkRateLimit(rateStore, clientIp(req), Date.now());
-    if (!limit.allowed) {
-      return json({ error: limit.window === "day" ? DAY_429 : MINUTE_429 }, 429);
-    }
+    const limited = await gateRateLimit(req, "generate");
+    if (limited !== null) return limited;
 
     const apiKey = process.env.GEMINI_KEY;
     if (typeof apiKey !== "string" || apiKey.length === 0) {

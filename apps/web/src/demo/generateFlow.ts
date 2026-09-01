@@ -56,10 +56,15 @@ export function friendlyError(status: number, detail?: string): string {
   const suffix = detail ? ` (${detail})` : '';
   switch (status) {
     case 400: return `The prompt was rejected${suffix}. Try rephrasing it.`;
-    case 429: return 'Rate limited (429) — too many generations in a row. Wait a moment and try again.';
+    // Prefer the server's rate-limit copy (#309) — includes Retry-After context
+    // already baked into the JSON `error` string when present.
+    case 429:
+      return detail ??
+        'Rate limited (429) — too many generations in a row. Wait a moment and try again.';
     case 502: return 'Patch service unavailable (502) — the upstream model could not be reached.';
     case 503:
-      return 'Generation is not configured on this server — set GEMINI_KEY and restart (local) or ask the site owner (deployed).';
+      return detail ??
+        'Generation is not configured on this server — set GEMINI_KEY and restart (local) or ask the site owner (deployed).';
     default: return `Generation failed (HTTP ${status}).${suffix}`;
   }
 }
