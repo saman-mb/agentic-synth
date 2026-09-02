@@ -356,7 +356,7 @@ std::string PromptEnhancer::enhance(const std::string& userPrompt) const {
 
     const std::string base_prompt =
         cfg_.system_prompt.empty()
-            ? std::string("You are TIMBRE, a translator that rewrites a terse sound description into a 9-section "
+            ? std::string("You are Tambra, a translator that rewrites a terse sound description into a 9-section "
                           "plain-text sound-design brief. No JSON, no markdown.")
             : cfg_.system_prompt;
 
