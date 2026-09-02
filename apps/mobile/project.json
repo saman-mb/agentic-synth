@@ -1,0 +1,35 @@
+{
+  "name": "mobile",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/mobile/src",
+  "tags": ["type:app", "scope:mobile"],
+  "implicitDependencies": ["shared-types", "engine-bridge", "data"],
+  "targets": {
+    "start": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx expo start",
+        "cwd": "apps/mobile"
+      }
+    },
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx eslint apps/mobile --ignore-pattern 'apps/mobile/tests/**'"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node --experimental-strip-types --test apps/mobile/tests/**/*.test.ts apps/mobile/src/boot.test.ts"
+      }
+    },
+    "smoke": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node --experimental-strip-types --test apps/mobile/tests/smoke.test.ts"
+      }
+    }
+  }
+}
