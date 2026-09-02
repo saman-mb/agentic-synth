@@ -9,6 +9,7 @@
     "build": {
       "executor": "nx:run-commands",
       "outputs": ["{projectRoot}/dist"],
+      "inputs": ["default", "^default", { "env": "AGSYNTH_REQUIRE_WASM" }],
       "options": {
         "command": "npx vite build",
         "cwd": "apps/web"

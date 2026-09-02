@@ -10,6 +10,16 @@ const wasmSrcDir = path.join(repoRoot, 'dist/wasm');
 const workletSrc = path.join(repoRoot, 'libs/engine-bridge/src/lib/agsynth-worklet.js');
 const WASM_FILES = ['agsynth.js', 'agsynth.wasm'] as const;
 
+// The wasm engine only backs the browser demo: in the JUCE desktop/plugin
+// WebView, `window.__JUCE__` is present so `src/demo/bootstrap.ts` never
+// installs the shim, and CMake's UI_BINARY_ASSETS glob never embeds
+// agsynth.{js,wasm}. Requiring Emscripten to produce the bundle the native
+// build embeds would block `cmake --build` on any machine without emsdk, so
+// missing wasm is a warning unless the consumer explicitly asks for it.
+// Deploys set AGSYNTH_REQUIRE_WASM=1 (see .github/workflows/deploy.yml).
+const onMissingWasm: 'warn' | 'throw' =
+  process.env.AGSYNTH_REQUIRE_WASM === '1' ? 'throw' : 'warn';
+
 function copyAgsynthAssets(onMissing: 'warn' | 'throw'): void {
   fs.mkdirSync(publicDir, { recursive: true });
   for (const name of WASM_FILES) {
@@ -38,10 +48,10 @@ function copyAgsynthPlugin(): Plugin {
       copyAgsynthAssets('warn');
     },
     buildStart() {
-      copyAgsynthAssets('throw');
+      copyAgsynthAssets(onMissingWasm);
     },
     closeBundle() {
-      copyAgsynthAssets('throw');
+      copyAgsynthAssets(onMissingWasm);
       const outDir = path.join(repoRoot, 'apps/web/dist');
       if (!fs.existsSync(outDir)) {
         throw new Error('agsynth: apps/web/dist missing after build');
@@ -52,9 +62,10 @@ function copyAgsynthPlugin(): Plugin {
       }
       for (const name of WASM_FILES) {
         const dest = path.join(outDir, name);
-        if (!fs.existsSync(dest)) {
-          throw new Error(`agsynth: ${dest} missing after build`);
-        }
+        if (fs.existsSync(dest)) continue;
+        const message = `agsynth: ${dest} missing after build; run npx nx run wasm:build-wasm`;
+        if (onMissingWasm === 'throw') throw new Error(message);
+        console.warn(`${message} (browser demo will have no audio engine)`);
       }
     },
   };
