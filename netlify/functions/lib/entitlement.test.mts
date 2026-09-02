@@ -27,7 +27,13 @@ import {
 } from "./rateLimitGate.mts";
 
 const SECRET = "test-signing-key-not-for-production-use!!";
-const FIXED_NOW = Date.UTC(2026, 8, 1, 12, 0, 0); // 2026-09-01T12:00:00Z
+// Every use below injects this value except the two apple-mode receipt fixtures,
+// which build `expires_date_ms` from it and are then checked by validateReceipt
+// against the real clock. That makes the date load-bearing: once it passes, the
+// receipt is genuinely expired and the suite fails forever. It did, on
+// 2026-09-02T12:00Z. This is pushed out as a stopgap only — the fix is to thread
+// nowMs through validateReceipt, as verifyEntitlementToken already does. See #405.
+const FIXED_NOW = Date.UTC(2035, 0, 1, 12, 0, 0); // 2035-01-01T12:00:00Z
 
 describe("entitlementToken HMAC", () => {
   it("issues a JWT with sub/tier/exp and no secret fields", async () => {
