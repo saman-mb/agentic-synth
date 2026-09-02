@@ -1,9 +1,13 @@
 #!/usr/bin/env python3
-"""Rebuild TIMBRE brand assets with a TAMBRA pixel-art wordmark.
+"""Rebuild Tambra brand assets with a TAMBRA pixel-art wordmark.
 
 Reads design/brand/wordmark.json (5x7 glyphs, whole-number scale, nearest-
 neighbour only) and composites the word onto copies of the existing burst
-art so og-image.png and timbre-hero.gif keep palette, size, and GIF timing.
+art so og-image.png and tambra-hero.gif keep palette, size, and GIF timing.
+
+The sources under design/brand/reference/ are the pre-rebrand originals and
+still carry the TIMBRE wordmark; letter_mask() erases it before the new
+wordmark is composited on top.
 
 Favicons have no wordmark (waveform mark). They are re-exported unchanged
 from the committed sources so the pipeline still produces every AC path.
@@ -131,7 +135,7 @@ def render_gif(spec: dict, word: Image.Image, mask: list[tuple[int, int]], bg: t
     out_frames = [pal]
     for fr in rgb_frames[1:]:
         out_frames.append(fr.quantize(palette=pal, dither=Image.NONE))
-    dest = PUBLIC / "timbre-hero.gif"
+    dest = PUBLIC / "tambra-hero.gif"
     out_frames[0].save(
         dest,
         format="GIF",
@@ -142,9 +146,9 @@ def render_gif(spec: dict, word: Image.Image, mask: list[tuple[int, int]], bg: t
         optimize=False,
         disposal=2,
     )
-    shutil.copyfile(dest, DOCS / "timbre-hero.gif")
+    shutil.copyfile(dest, DOCS / "tambra-hero.gif")
     total_ms = sum(durations)
-    print(f"wrote {dest} {n} frames {total_ms}ms; copied docs/timbre-hero.gif")
+    print(f"wrote {dest} {n} frames {total_ms}ms; copied docs/tambra-hero.gif")
 
 
 def reexport_favicons() -> None:

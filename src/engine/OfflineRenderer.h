@@ -13,7 +13,7 @@ namespace agentic_synth::engine {
 // Drives a fresh VoiceManager instance through a synchronous off-thread render
 // of a single MIDI note with a sustained body + release tail, returning the
 // resulting interleaved stereo buffer. Used by the "Bounce to wav" affordance
-// on a committed preset (#260) so producers can take TIMBRE sounds into a
+// on a committed preset (#260) so producers can take Tambra sounds into a
 // track without involving the realtime audio engine.
 //
 // The renderer never touches the live VoiceManager — it constructs its own
@@ -23,7 +23,7 @@ struct BounceConfig {
     int bit_depth{24};
     int channels{2};
     float duration_s{4.0f};
-    int midi_note{60};       // C3 = MIDI 60 in note-numbering used by TIMBRE
+    int midi_note{60};       // C3 = MIDI 60 in note-numbering used by Tambra
     int velocity{100};       // 1..127 (mapped to 0..1 inside)
     float note_hold_s{3.0f}; // note-on for N seconds, then release for the remainder
 };

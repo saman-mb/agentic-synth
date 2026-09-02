@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import './BootSplash.css';
 
-// Splash plays the branded hero animation (/timbre-hero.gif — 3.6s seamless
+// Splash plays the branded hero animation (/tambra-hero.gif — 3.6s seamless
 // loop) for a guaranteed MIN_DISPLAY_MS before the app reveals. Reduced-motion
 // users get the static poster frame instead (a GIF cannot be paused, so we
 // swap the source rather than pretend).
@@ -9,7 +9,7 @@ import './BootSplash.css';
 const MIN_DISPLAY_MS = 3000;
 const FADE_MS = 400;
 
-const HERO_GIF = '/timbre-hero.gif';
+const HERO_GIF = '/tambra-hero.gif';
 const HERO_POSTER = '/og-image.png';
 
 interface BootSplashProps {

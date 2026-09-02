@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 
 // ── UI Audio Settings (Phase 10 §17) ────────────────────────────────
 //
-// Two opt-in confirmation sounds. Both default OFF — TIMBRE is mostly
+// Two opt-in confirmation sounds. Both default OFF — Tambra is mostly
 // silent. Persisted to localStorage so user preference survives reload.
 
 const VOICE_KEY = 'timbre:ui-audio-voice';

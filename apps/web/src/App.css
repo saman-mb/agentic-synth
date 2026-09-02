@@ -1,7 +1,7 @@
-/* ── TIMBRE Design Tokens (Phase 1 rebrand) ─────────────────────────
-   Foundation tokens for the TIMBRE rebrand. Components inside
+/* ── Tambra Design Tokens (Phase 1 rebrand) ─────────────────────────
+   Foundation tokens for the Tambra rebrand. Components inside
    `ui/src/components/*.css` continue to reference the legacy token
-   names; those are aliased to the new TIMBRE palette at the bottom of
+   names; those are aliased to the new Tambra palette at the bottom of
    `:root` so the whole app re-skins automatically.
 
    Dark is default. `[data-theme="light"]` is a warmer "dark-light"
@@ -87,7 +87,7 @@
 
   /* ── Legacy token aliases ─────────────────────────────────────────
      Component CSS in `ui/src/components/*.css` still references these
-     names. Aliasing here re-skins those components onto the TIMBRE
+     names. Aliasing here re-skins those components onto the Tambra
      palette without touching component files (Engineer B's surface). */
 
   /* Surfaces */
@@ -183,7 +183,7 @@
   --color-key-active-black-bot: #4A2DCC;
   --color-key-strip-bg: var(--bg-inset);
 
-  /* Gradient stops — violet → magenta (signature TIMBRE sweep) */
+  /* Gradient stops — violet → magenta (signature Tambra sweep) */
   --grad-accent-a: var(--accent-primary);
   --grad-accent-b: var(--accent-secondary);
 
@@ -265,7 +265,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* ── TIMBRE app shell (Phase 4 layout) ─────────────────────────────
+/* ── Tambra app shell (Phase 4 layout) ─────────────────────────────
    Three rows: TopBar (48px), Body (1fr — three-column grid), MIDI
    audition keyboard (auto-height). Body splits into PresetsSidebar
    (240px) | ModulesGrid (1fr) | RightColumn (minmax 380, 32%).
@@ -310,7 +310,7 @@ body {
 }
 
 /* Sub-1000px: collapse PresetsSidebar (hidden), stack right column under
-   modules. Mobile-resize is best-effort — TIMBRE targets 1280×800 default. */
+   modules. Mobile-resize is best-effort — Tambra targets 1280×800 default. */
 @media (max-width: 1000px) {
   .app-body {
     grid-template-columns: minmax(0, 1fr);
@@ -322,7 +322,7 @@ body {
   .right-column { grid-column: 1; }
 }
 
-/* ── TIMBRE global utility motions (Phase 9) ───────────────────────
+/* ── Tambra global utility motions (Phase 9) ───────────────────────
    Reusable affordances: cyan confirmation sweep, paper-fold section
    collapse, breathing badge for muted/disabled states, radar sweep
    indicator for unseen telemetry events, and a wordless head-shake

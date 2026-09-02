@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 
 import './Knob.css';
 
 // ---------------------------------------------------------------------------
-// TIMBRE Knob — SVG-based, accessible, fully themed via design tokens.
+// Tambra Knob — SVG-based, accessible, fully themed via design tokens.
 // See design/REBRAND.md §4 (Knob Anatomy) for spec.
 //
 // Value semantics: this component is 0..1 normalized. The caller is

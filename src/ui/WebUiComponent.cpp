@@ -237,7 +237,7 @@ juce::String WebUiComponent::buildFallbackMessage(const juce::String& errorInfo)
     // string stays in sync with project(... VERSION X.Y.Z) at root level.
     // Test target also defines these (see tests/CMakeLists.txt).
 #ifndef AGENTIC_SYNTH_PROJECT_NAME
-#define AGENTIC_SYNTH_PROJECT_NAME "TIMBRE"
+#define AGENTIC_SYNTH_PROJECT_NAME "Tambra"
 #endif
 #ifndef AGENTIC_SYNTH_VERSION_STRING
 #define AGENTIC_SYNTH_VERSION_STRING "0.0.0"
@@ -928,7 +928,7 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
         // commit_preset). Promise resolves immediately; the actual render
         // emits `bounce_complete` when the wav is on disk.
         const auto& patchVar = argOr(args, 0, juce::var{});
-        const auto suggested = argOr(args, 1, juce::var{"timbre-bounce"}).toString();
+        const auto suggested = argOr(args, 1, juce::var{"tambra-bounce"}).toString();
         completion(juce::var{});
 
         PatchStruct patch = make_default_patch();
@@ -946,11 +946,11 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
         // FileChooser must run on the message thread; we're already there.
         auto safeName = suggested.replaceCharacters(" /\\:?*\"<>|", "__________");
         if (safeName.isEmpty())
-            safeName = "timbre-bounce";
+            safeName = "tambra-bounce";
         auto defaultLoc =
             juce::File::getSpecialLocation(juce::File::userMusicDirectory).getChildFile(safeName + ".wav");
         auto chooser =
-            std::make_shared<juce::FileChooser>(juce::String("Save TIMBRE bounce"), defaultLoc, juce::String("*.wav"));
+            std::make_shared<juce::FileChooser>(juce::String("Save Tambra bounce"), defaultLoc, juce::String("*.wav"));
         chooser->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles |
                                  juce::FileBrowserComponent::warnAboutOverwriting,
                              [this, chooser, patch](const juce::FileChooser& fc) {

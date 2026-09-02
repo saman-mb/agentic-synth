@@ -43,7 +43,7 @@ GrammarSampler::GrammarSampler(GrammarSamplerConfig cfg) : cfg_(std::move(cfg)) 
 }
 
 // ---------------------------------------------------------------------------
-// loadSystemPromptFile — pulls the bundled TIMBRE briefing from disk.
+// loadSystemPromptFile — pulls the bundled Tambra briefing from disk.
 //
 // The system prompt lives in source control (src/mapper/system-prompt.md) so
 // it can be reviewed like code. At runtime we need an absolute path to it.

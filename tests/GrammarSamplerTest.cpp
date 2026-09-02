@@ -226,7 +226,7 @@ TEST_CASE("parse_patch_json: 100 structurally identical patches all parse correc
 
 // ─── system-prompt.md presence + non-triviality ──────────────────────────────
 //
-// The TIMBRE sound-designer briefing (src/mapper/system-prompt.md) is the
+// The Tambra sound-designer briefing (src/mapper/system-prompt.md) is the
 // foundational context for both the local llama.cpp sampler and the Gemini
 // fallback. If it's missing or has shrunk to a stub, the LLM emits flat,
 // characterless patches with no DSP depth. This test guards against
