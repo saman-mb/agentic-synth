@@ -1,0 +1,22 @@
+{
+  "name": "data",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/data/src",
+  "projectType": "library",
+  "tags": ["type:lib", "scope:shared", "layer:data"],
+  "implicitDependencies": ["shared-types"],
+  "targets": {
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx eslint libs/data && node scripts/assert-reversed-import.mjs"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node -e \"console.log('data: no unit tests yet')\""
+      }
+    }
+  }
+}

@@ -28,10 +28,7 @@ struct MorphResult {
 //   4. Crossover with most recent history patch (lerp t=0.5)
 //   5. Archetype bounce — pull from ArchetypeRetriever top-3
 // Deterministic given the same (base, history, liked, prompt, seed).
-MorphResult morph(const PatchStruct& base,
-                  const std::vector<PatchStruct>& history,
-                  const std::vector<PatchStruct>& liked,
-                  const std::string& prompt,
-                  uint32_t seed);
+MorphResult morph(const PatchStruct& base, const std::vector<PatchStruct>& history,
+                  const std::vector<PatchStruct>& liked, const std::string& prompt, uint32_t seed);
 
 } // namespace agentic_synth::agent

@@ -1,0 +1,1035 @@
+/* ── TIMBRE Design Tokens (Phase 1 rebrand) ─────────────────────────
+   Foundation tokens for the TIMBRE rebrand. Components inside
+   `ui/src/components/*.css` continue to reference the legacy token
+   names; those are aliased to the new TIMBRE palette at the bottom of
+   `:root` so the whole app re-skins automatically.
+
+   Dark is default. `[data-theme="light"]` is a warmer "dark-light"
+   variant (bone-white) — never harsh pure white.
+
+   TODO Phase 2: Inter Display isn't on Google Fonts. We approximate
+   with Inter 700+. Replace with self-hosted Söhne / Inter Display
+   when the wordmark work lands. */
+
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* Backgrounds */
+  --bg-void: #0A0B0F;
+  --bg-panel: #14161D;
+  --bg-raised: #1E2129;
+  --bg-inset: #07080B;
+
+  /* Accents */
+  --accent-primary: #7C4DFF;
+  --accent-secondary: #FF3D88;
+  --accent-glow: rgba(124, 77, 255, 0.45);
+
+  /* Text */
+  --text-primary: #FFFFFF;
+  --text-secondary: #C8D1E0;
+  --text-tertiary: #A4B2C6;
+  --text-disabled: #525968;
+  --text-accent: #C49CFF;
+
+  /* State */
+  --state-success: #00E676;
+  --state-warning: #FFB300;
+  --state-error: #FF5252;
+  --state-info: #40C4FF;
+  --state-ai-active: #FF3D88;
+
+  /* Modulation source palette */
+  --mod-lfo1: #00E5FF;
+  --mod-lfo2: #00FFAA;
+  --mod-env1: #FFB300;
+  --mod-env2: #FF6B35;
+  --mod-macro1: #E040FB;
+  --mod-macro2: #76FF03;
+  --mod-macro3: #FFD740;
+  --mod-macro4: #40C4FF;
+  --mod-velocity: #FFFFFF;
+  --mod-keytrack: #B0BEC5;
+
+  /* Typography */
+  --font-display: 'Inter Display', 'Söhne', 'Inter', system-ui, sans-serif;
+  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'SF Mono', Menlo, monospace;
+
+  /* Spacing — 4px base */
+  --sp-1: 4px;
+  --sp-2: 8px;
+  --sp-3: 12px;
+  --sp-4: 16px;
+  --sp-6: 24px;
+  --sp-8: 32px;
+  --sp-12: 48px;
+  --sp-16: 64px;
+
+  /* Radius */
+  --r-1: 2px;
+  --r-2: 4px;
+  --r-3: 8px;
+  --r-4: 12px;
+  --r-5: 16px;
+
+  /* Depth */
+  --depth-inset: inset 0 1px 0 rgba(0,0,0,0.6), inset 0 -1px 0 rgba(255,255,255,0.03);
+  --depth-raised: 0 1px 0 rgba(255,255,255,0.04), 0 8px 24px rgba(0,0,0,0.4);
+  --depth-card: 0 2px 12px rgba(0,0,0,0.5);
+
+  /* Motion */
+  --ease-considered: cubic-bezier(0.22, 0.61, 0.36, 1);
+  --dur-micro: 180ms;
+  --dur-state: 320ms;
+  --dur-patch: 1100ms;
+  --dur-boot: 1800ms;
+
+  /* ── Legacy token aliases ─────────────────────────────────────────
+     Component CSS in `ui/src/components/*.css` still references these
+     names. Aliasing here re-skins those components onto the TIMBRE
+     palette without touching component files (Engineer B's surface). */
+
+  /* Surfaces */
+  --color-bg-app: var(--bg-void);
+  --color-bg-panel: var(--bg-panel);
+  --color-bg-elevated: var(--bg-raised);
+
+  /* Foreground text */
+  --color-fg-primary: var(--text-primary);
+  --color-fg-secondary: var(--text-secondary);
+  --color-fg-muted: var(--text-tertiary);
+
+  /* Brand / accent */
+  --color-accent: var(--accent-primary);
+  --color-accent-hot: var(--accent-secondary);
+  --color-accent-soft: var(--text-accent);
+  --color-accent-strong: var(--text-accent);
+  --color-accent-deep: var(--accent-primary);
+
+  /* Status */
+  --color-success: var(--state-success);
+  --color-success-soft: var(--state-success);
+  --color-warning: var(--state-warning);
+  --color-error: var(--state-error);
+  --color-error-soft: var(--state-error);
+  --color-error-dot: var(--state-error);
+
+  /* Status tints */
+  --success-tint-15: rgb(0 230 118 / 15%);
+  --success-tint-40: rgb(0 230 118 / 40%);
+  --error-tint-08: rgb(255 82 82 / 8%);
+  --error-tint-12: rgb(255 82 82 / 12%);
+  --error-tint-15: rgb(255 82 82 / 15%);
+  --error-tint-30: rgb(255 82 82 / 30%);
+  --error-tint-40: rgb(255 82 82 / 40%);
+
+  /* Knob readout value */
+  --color-knob-value: var(--text-primary);
+  --color-accent-hot-glow: rgb(255 61 136 / 55%);
+
+  /* Semantic context colours (dictionary badges) — mapped to mod palette */
+  --color-ctx-bass-fg: var(--mod-env2);
+  --color-ctx-bass-bg: rgb(255 107 53 / 15%);
+  --color-ctx-pad-fg: var(--mod-lfo1);
+  --color-ctx-pad-bg: rgb(0 229 255 / 15%);
+  --color-ctx-lead-fg: var(--mod-env1);
+  --color-ctx-lead-bg: rgb(255 179 0 / 15%);
+  --color-ctx-keys-fg: var(--mod-macro2);
+  --color-ctx-keys-bg: rgb(118 255 3 / 15%);
+  --color-ctx-perc-fg: var(--mod-env2);
+  --color-ctx-perc-bg: rgb(255 107 53 / 15%);
+  --color-ctx-arp-fg: var(--mod-macro1);
+  --color-ctx-arp-bg: rgb(224 64 251 / 15%);
+  --color-ctx-texture-fg: var(--mod-lfo2);
+  --color-ctx-texture-bg: rgb(0 255 170 / 15%);
+  --color-ctx-generic-fg: var(--text-secondary);
+  --color-ctx-generic-bg: rgb(255 255 255 / 6%);
+
+  /* Borders / lines */
+  --color-border: rgb(255 255 255 / 6%);
+  --color-border-strong: rgb(255 255 255 / 12%);
+  --color-focus-ring: var(--accent-primary);
+
+  /* Translucent fills */
+  --fill-soft: rgb(255 255 255 / 2%);
+  --fill-medium: rgb(255 255 255 / 4%);
+  --fill-strong: rgb(255 255 255 / 8%);
+  --fill-stronger: rgb(255 255 255 / 12%);
+
+  /* Accent tints — built around violet primary */
+  --accent-tint-12: rgb(124 77 255 / 12%);
+  --accent-tint-15: rgb(124 77 255 / 15%);
+  --accent-tint-18: rgb(124 77 255 / 18%);
+  --accent-tint-25: rgb(124 77 255 / 25%);
+  --accent-tint-35: rgb(124 77 255 / 35%);
+  --accent-tint-40: rgb(124 77 255 / 40%);
+  --accent-tint-60: rgb(124 77 255 / 60%);
+
+  /* Keyboard / piano */
+  --color-key-white-top: #F5F7FA;
+  --color-key-white-bot: #C9CDD8;
+  --color-key-white-hover-top: #FFFFFF;
+  --color-key-white-hover-bot: #D9DDE8;
+  --color-key-white-label: #14161D;
+  --color-key-black-top: #14161D;
+  --color-key-black-bot: #1E2129;
+  --color-key-black-hover-top: #1E2129;
+  --color-key-black-hover-bot: #2A2E39;
+  --color-key-black-label: #F5F7FA;
+  --color-key-active-white-top: #B388FF;
+  --color-key-active-white-bot: #7C4DFF;
+  --color-key-active-black-top: #7C4DFF;
+  --color-key-active-black-bot: #4A2DCC;
+  --color-key-strip-bg: var(--bg-inset);
+
+  /* Gradient stops — violet → magenta (signature TIMBRE sweep) */
+  --grad-accent-a: var(--accent-primary);
+  --grad-accent-b: var(--accent-secondary);
+
+  /* Legacy radii → map to new scale */
+  --radius-sm: var(--r-2);
+  --radius-md: var(--r-3);
+  --radius-lg: var(--r-4);
+
+  /* Legacy type scale */
+  --font-size-xs: 0.75rem;
+  --font-size-sm: 0.875rem;
+  --font-size-base: 1rem;
+}
+
+/* ── Light theme: warm "dark-light" variant, never harsh white ──── */
+[data-theme="light"],
+:root[data-theme="light"] {
+  --bg-void: #F5F4F0;        /* bone */
+  --bg-panel: #FAFAF6;
+  --bg-raised: #FFFFFF;
+  --bg-inset: #ECEBE5;
+
+  --text-primary: #14161D;
+  --text-secondary: #4A4E5C;
+  --text-tertiary: #6B7280;
+  --text-disabled: #B0B4BD;
+  /* accents unchanged — they pop on both dark and light */
+
+  /* Re-derive legacy aliases for light theme */
+  --color-bg-app: var(--bg-void);
+  --color-bg-panel: var(--bg-panel);
+  --color-bg-elevated: var(--bg-raised);
+  --color-fg-primary: var(--text-primary);
+  --color-fg-secondary: var(--text-secondary);
+  --color-fg-muted: var(--text-tertiary);
+  --color-knob-value: var(--text-primary);
+
+  --color-border: rgb(0 0 0 / 10%);
+  --color-border-strong: rgb(0 0 0 / 16%);
+
+  --fill-soft: rgb(0 0 0 / 2%);
+  --fill-medium: rgb(0 0 0 / 4%);
+  --fill-strong: rgb(0 0 0 / 6%);
+  --fill-stronger: rgb(0 0 0 / 10%);
+
+  /* Piano keys: invert relationship on light bg */
+  --color-key-white-top: #FFFFFF;
+  --color-key-white-bot: #E8E6DE;
+  --color-key-white-hover-top: #FAFAF6;
+  --color-key-white-hover-bot: #D8D5CB;
+  --color-key-white-label: #14161D;
+  --color-key-black-top: #2A2E39;
+  --color-key-black-bot: #14161D;
+  --color-key-black-hover-top: #3A3F4B;
+  --color-key-black-hover-bot: #1E2129;
+  --color-key-black-label: #F5F7FA;
+  --color-key-strip-bg: #ECEBE5;
+}
+
+/* ── Body baseline ──────────────────────────────────────────────── */
+:root {
+  color: var(--text-primary);
+  background: var(--bg-void);
+  font-family: var(--font-sans);
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  background: var(--bg-void);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* ── TIMBRE app shell (Phase 4 layout) ─────────────────────────────
+   Three rows: TopBar (48px), Body (1fr — three-column grid), MIDI
+   audition keyboard (auto-height). Body splits into PresetsSidebar
+   (240px) | ModulesGrid (1fr) | RightColumn (minmax 380, 32%).
+
+   .panel-knobs / .panel-chat / .panel-tabs / .theme-toggle classes
+   below are retained as legacy selectors — no longer rendered by
+   App.tsx but referenced by stray tests/screenshots. Removing them
+   churns more diff than this phase needs. */
+
+.app-layout {
+  display: grid;
+  grid-template-rows: 48px auto 1fr auto;
+  height: 100vh;
+  overflow: hidden;
+  background: var(--bg-void);
+}
+
+.app-body {
+  grid-row: 3;
+  display: grid;
+  /* Live-resizable: --col-left-width + --col-right-width are set by
+     useColumnLayout. Two 6px handle tracks sit between the panels.
+     Falls back to sensible defaults so the layout is sane on first
+     paint before the hook hydrates. */
+  --col-left-width: 220px;
+  --col-right-width: 40%;
+  grid-template-columns:
+    var(--col-left-width)
+    6px
+    minmax(480px, 1fr)
+    6px
+    var(--col-right-width);
+  overflow: hidden;
+  min-height: 0;
+}
+
+.app-keyboard {
+  grid-row: 4;
+  border-top: 1px solid var(--color-border);
+  background: var(--bg-panel);
+  flex-shrink: 0;
+}
+
+/* Sub-1000px: collapse PresetsSidebar (hidden), stack right column under
+   modules. Mobile-resize is best-effort — TIMBRE targets 1280×800 default. */
+@media (max-width: 1000px) {
+  .app-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto;
+  }
+  .presets-sidebar { display: none; }
+  .resize-handle { display: none; } /* handles are meaningless when stacked */
+  .modules-grid { grid-column: 1; }
+  .right-column { grid-column: 1; }
+}
+
+/* ── TIMBRE global utility motions (Phase 9) ───────────────────────
+   Reusable affordances: cyan confirmation sweep, paper-fold section
+   collapse, breathing badge for muted/disabled states, radar sweep
+   indicator for unseen telemetry events, and a wordless head-shake
+   on the prompt send arrow when the user submits an empty prompt.
+
+   All animations respect prefers-reduced-motion (overrides at the
+   bottom of this block). */
+
+/* Cyan underline sweep — signature confirmation flourish. Applied as
+   a 1px pseudo-element at the bottom of the host that scales in from
+   the left (600ms), holds (200ms), then fades out (200ms).
+
+   Host needs position: relative; if it doesn't already have one, the
+   class adds it. We use overflow: visible on host by default but the
+   sweep is also clipped via transform-origin so it doesn't bleed. */
+.confirm-sweep {
+  position: relative;
+}
+
+.confirm-sweep::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: -2px;
+  height: 1px;
+  background: var(--mod-lfo1, #00E5FF);
+  transform: scaleX(0);
+  transform-origin: left center;
+  opacity: 1;
+  pointer-events: none;
+  animation: timbre-confirm-sweep 1000ms var(--ease-considered) forwards;
+}
+
+@keyframes timbre-confirm-sweep {
+  0%   { transform: scaleX(0); opacity: 1; }
+  60%  { transform: scaleX(1); opacity: 1; }  /* 600ms sweep */
+  80%  { transform: scaleX(1); opacity: 1; }  /* 200ms hold  */
+  100% { transform: scaleX(1); opacity: 0; }  /* 200ms fade  */
+}
+
+/* Paper-fold section collapse — used by collapsible sections that opt
+   into rotateX-on-bottom-edge instead of a vanilla height crossfade.
+   Toggle .is-folded on the host (or just unmount the body); when the
+   class is present, the .fold-target inside collapses to 0deg with
+   transform-origin pinned to the bottom edge. */
+.fold-host {
+  perspective: 800px;
+}
+
+.fold-target {
+  transform-origin: bottom center;
+  transform: rotateX(0deg);
+  opacity: 1;
+  transition:
+    transform 220ms var(--ease-considered),
+    opacity 220ms var(--ease-considered);
+}
+
+.fold-host.is-folded .fold-target {
+  transform: rotateX(-92deg);
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Muted badge breathing — for disabled badges/pills/labels that should
+   read as "waiting" not "switched off". Slow 4s opacity pulse. */
+.muted-breathing {
+  animation: timbre-muted-breathe 4s ease-in-out infinite;
+}
+
+@keyframes timbre-muted-breathe {
+  0%, 100% { opacity: 0.5; }
+  50%      { opacity: 0.7; }
+}
+
+/* Telemetry tab radar sweep — a 1px underline that translates from
+   100% → -100% on a 2s linear loop, drawing the eye to the tab while
+   there are unseen events. Cleared by removing the modifier class. */
+.tools-drawer-tab.has-unseen {
+  position: relative;
+  overflow: hidden;
+}
+
+.tools-drawer-tab.has-unseen::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    var(--mod-lfo1, #00E5FF) 40%,
+    var(--mod-lfo1, #00E5FF) 60%,
+    transparent 100%
+  );
+  transform: translateX(100%);
+  animation: timbre-radar-sweep 2s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes timbre-radar-sweep {
+  from { transform: translateX(100%); }
+  to   { transform: translateX(-100%); }
+}
+
+/* Wordless head-shake — used by the send arrow on an empty submit.
+   180ms total: -3 → 3 → -3 → 3 → 0. */
+.head-shake {
+  animation: timbre-head-shake 180ms var(--ease-considered);
+}
+
+@keyframes timbre-head-shake {
+  0%   { transform: translateX(0); }
+  20%  { transform: translateX(-3px); }
+  40%  { transform: translateX(3px); }
+  60%  { transform: translateX(-3px); }
+  80%  { transform: translateX(3px); }
+  100% { transform: translateX(0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .confirm-sweep::after,
+  .fold-target,
+  .muted-breathing,
+  .tools-drawer-tab.has-unseen::before,
+  .head-shake {
+    animation: none !important;
+    transition: none !important;
+  }
+  /* Keep folded sections actually hidden when motion is disabled. */
+  .fold-host.is-folded .fold-target {
+    transform: none;
+    opacity: 0;
+  }
+  /* Confirm sweep must still be momentarily visible — clamp it on
+     screen so the success cue isn't completely silent. */
+  .confirm-sweep::after {
+    transform: scaleX(1);
+    opacity: 0.6;
+  }
+}
+
+/* ── Phase 14 — Motion override (Settings → Motion → Off) ─────────
+   Set globally by SettingsPanel on document.documentElement. Strips
+   every animation + transition site-wide. Heavier than the
+   prefers-reduced-motion overrides above (which target named hot
+   spots); this is the nuclear option for users who want a fully
+   static UI. */
+[data-motion="off"] *,
+[data-motion="off"] *::before,
+[data-motion="off"] *::after {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* ── Legacy panel classes (retained, unused by Phase 4) ──────────── */
+
+.panel-knobs {
+  overflow-y: auto;
+  border-right: 1px solid var(--color-border);
+  background: var(--bg-panel);
+  padding: var(--sp-3);
+}
+
+.panel-chat {
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+/* ── Knob grid ────────────────────────────────────────────────────── */
+
+.knob-grid {
+  display: flex;
+  flex-direction: column;
+  gap: var(--sp-2);
+}
+
+.knob-section {
+  border: 1px solid var(--color-border);
+  border-radius: var(--r-3);
+  overflow: hidden;
+  background: var(--bg-panel);
+  box-shadow: var(--depth-card);
+}
+
+.knob-section-collapsed {
+  background: var(--bg-panel);
+}
+
+/* Section header is a button so it gets proper keyboard semantics */
+.knob-section-header {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  width: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background var(--dur-micro) var(--ease-considered);
+}
+
+.knob-section-header:hover {
+  background: var(--fill-medium);
+}
+
+.knob-section-header:focus { outline: none; }
+.knob-section-header:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: -2px;
+}
+
+.knob-section-chevron {
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  transition: transform var(--dur-micro) var(--ease-considered);
+  display: inline-block;
+  width: 0.7rem;
+}
+
+.knob-section-chevron.open {
+  transform: rotate(90deg);
+  color: var(--accent-primary);
+}
+
+.knob-section-title {
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+}
+
+.knob-section-summary {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 60%;
+}
+
+.knob-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--sp-2);
+  padding: 0 var(--sp-3) var(--sp-3);
+}
+
+/* Expand/collapse-all toolbar */
+.knob-grid-toolbar {
+  display: flex;
+  gap: var(--sp-1);
+  padding-bottom: var(--sp-1);
+}
+
+.knob-grid-tool {
+  flex: 1;
+  background: var(--bg-raised);
+  border: 1px solid var(--color-border);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  padding: var(--sp-1) var(--sp-2);
+  border-radius: var(--r-2);
+  cursor: pointer;
+  transition: background var(--dur-micro) var(--ease-considered),
+              border-color var(--dur-micro) var(--ease-considered),
+              color var(--dur-micro) var(--ease-considered);
+}
+
+.knob-grid-tool:hover {
+  background: var(--accent-tint-15);
+  border-color: var(--accent-tint-40);
+  color: var(--text-accent);
+}
+
+.knob-grid-tool:focus { outline: none; }
+.knob-grid-tool:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 1px;
+}
+
+/* Persistent agent-edit indicator — small violet "AI" badge in the corner
+   of the knob. Stays visible until the next agent generation replaces the set. */
+.knob-slot {
+  position: relative;
+}
+
+.knob-agent-badge {
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  z-index: 2;
+  background: var(--accent-secondary);
+  color: #fff;
+  font-size: 0.5rem;
+  font-weight: 800;
+  letter-spacing: 0.06em;
+  padding: 1px 4px;
+  border-radius: var(--r-3);
+  pointer-events: none;
+  font-family: var(--font-mono);
+  box-shadow: 0 0 0 1px var(--bg-void), 0 0 6px var(--accent-glow);
+}
+
+/* ── Individual knob ──────────────────────────────────────────────── */
+
+.knob-wrap {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  cursor: ns-resize;
+  user-select: none;
+  gap: 2px;
+}
+
+.knob-label {
+  font-size: 10px;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-family: var(--font-sans);
+  font-weight: 500;
+}
+
+.knob-value {
+  font-size: 11px;
+  color: var(--text-primary);
+  font-family: var(--font-mono);
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+}
+
+.knob-agent svg {
+  animation: knob-flash var(--dur-state) var(--ease-considered);
+}
+
+@keyframes knob-flash {
+  0%   { filter: drop-shadow(0 0 6px var(--accent-secondary)); }
+  100% { filter: none; }
+}
+
+/* Active user drag — violet glow so the user knows the knob is live */
+.knob-editing svg {
+  filter: drop-shadow(0 0 5px var(--accent-glow));
+}
+
+/* ── Left panel tabs ──────────────────────────────────────────────────── */
+
+.panel-tabs {
+  display: flex;
+  align-items: center;
+  border-bottom: 1px solid var(--color-border);
+  margin-bottom: var(--sp-2);
+}
+
+.panel-tab {
+  flex: 1;
+  padding: var(--sp-2) 0;
+  background: transparent;
+  border: none;
+  border-bottom: 2px solid transparent;
+  color: var(--text-tertiary);
+  font-family: var(--font-sans);
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  cursor: pointer;
+  transition: color var(--dur-micro) var(--ease-considered),
+              border-color var(--dur-micro) var(--ease-considered);
+}
+
+.panel-tab:hover {
+  color: var(--text-secondary);
+}
+
+.panel-tab-active {
+  color: var(--text-primary);
+  border-bottom-color: var(--accent-primary);
+}
+
+/* Theme toggle button — sits at the end of the tablist */
+.theme-toggle {
+  flex: 0 0 auto;
+  margin-left: var(--sp-1);
+  padding: var(--sp-1) var(--sp-2);
+  background: transparent;
+  border: 1px solid var(--color-border);
+  border-radius: var(--r-3);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  line-height: 1;
+  cursor: pointer;
+  transition: background var(--dur-micro) var(--ease-considered),
+              color var(--dur-micro) var(--ease-considered),
+              border-color var(--dur-micro) var(--ease-considered);
+}
+
+.theme-toggle:hover {
+  background: var(--fill-medium);
+  color: var(--text-accent);
+  border-color: var(--color-border-strong);
+}
+
+.theme-toggle:focus { outline: none; }
+.theme-toggle:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* ── Push-to-talk ─────────────────────────────────────────────────── */
+
+.ptt-btn {
+  width: 100%;
+  padding: var(--sp-2) var(--sp-3);
+  border: 1px solid var(--accent-tint-40);
+  border-radius: var(--r-3);
+  background: transparent;
+  color: var(--text-accent);
+  font-family: var(--font-sans);
+  font-size: 0.85rem;
+  cursor: pointer;
+  transition: background var(--dur-micro) var(--ease-considered),
+              border-color var(--dur-micro) var(--ease-considered);
+  touch-action: none;
+}
+
+.ptt-btn:hover:not(:disabled) {
+  background: var(--accent-tint-12);
+}
+
+.ptt-btn.ptt-active {
+  background: var(--accent-tint-25);
+  border-color: var(--accent-primary);
+  color: var(--text-primary);
+  box-shadow: 0 0 12px var(--accent-glow);
+}
+
+.ptt-btn:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+
+/* Phase 9 — failure-state mic affordance. Calm grey, never red. The
+   struck-through icon stays visible so the user knows *what* isn't
+   working (the mic), while the subtitle explains what to do next.
+   The "Open Settings" link is inline and underlined on hover only. */
+.ptt-btn.ptt-mic-off {
+  opacity: 1; /* don't fade — we want the strike-through readable */
+  color: var(--text-secondary);
+  border-color: var(--color-border-strong);
+  background: transparent;
+  cursor: default;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+}
+
+.ptt-mic-icon {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 14px;
+  height: 14px;
+  font-size: 12px;
+  line-height: 1;
+  filter: grayscale(1);
+  opacity: 0.6;
+}
+
+.ptt-mic-glyph {
+  display: inline-block;
+  font-size: 12px;
+  line-height: 1;
+}
+
+.ptt-mic-strike {
+  position: absolute;
+  inset: 0;
+  display: block;
+  pointer-events: none;
+  /* 1px diagonal slash from bottom-left to top-right. Drawn via a thin
+     rotated div so we don't depend on emoji-with-overlay support. */
+}
+.ptt-mic-strike::after {
+  content: '';
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  top: 50%;
+  height: 1px;
+  background: var(--text-secondary);
+  transform: rotate(-30deg);
+  transform-origin: center;
+}
+
+.ptt-btn-label {
+  white-space: nowrap;
+}
+
+/* Host wraps the PTT button + optional failure subtitle into a single
+ * column so the parent .input-bar (flex row) sees ONE child instead of
+ * the button + subtitle as siblings — prevents the subtitle from
+ * stealing flex space and squashing the prompt textarea. */
+.ptt-host {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 4px;
+  flex: 0 0 auto;
+  max-width: 220px;
+}
+
+.ptt-subtitle {
+  margin-top: 0;
+  font-family: var(--font-sans);
+  font-size: 0.72rem;
+  line-height: 1.35;
+  color: var(--text-secondary); /* calm grey, NOT red */
+  text-align: left;
+}
+
+.ptt-open-settings {
+  background: transparent;
+  border: none;
+  padding: 0;
+  font: inherit;
+  color: var(--text-accent);
+  cursor: pointer;
+  text-decoration: none;
+}
+.ptt-open-settings:hover { text-decoration: underline; }
+.ptt-open-settings:focus { outline: none; }
+.ptt-open-settings:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--r-1);
+}
+
+/* ── Accessibility: focus-visible outlines ────────────────────────────
+   Only show the focus ring for keyboard focus; pointer focus stays
+   clean. 2px solid var(--color-focus-ring) matches the brand accent. */
+
+.panel-tab:focus { outline: none; }
+.panel-tab:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--r-1);
+}
+
+.knob-wrap { outline: none; }
+.knob-wrap:focus { outline: none; }
+.knob-wrap:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--r-3);
+}
+
+/* Slider role applied to knob-wrap — covers any future container too */
+[role="slider"]:focus { outline: none; }
+[role="slider"]:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--r-3);
+}
+
+.ptt-btn:focus { outline: none; }
+.ptt-btn:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+.send-btn:focus,
+.feedback-btn:focus,
+.copy-btn:focus,
+.mic-btn:focus { outline: none; }
+
+.send-btn:focus-visible,
+.feedback-btn:focus-visible,
+.copy-btn:focus-visible,
+.mic-btn:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--r-2);
+}
+
+/* ── Web-demo-only layout overrides (issue #280 / PR #281) ──────────
+   The shell above was designed for the plugin's WebView: .app-layout
+   pins to 100vh with overflow:hidden and .app-body's single implicit
+   grid row sizes to its tallest content, so on real browser viewports
+   the presets sidebar / play surface spill UP over the macro strip and
+   DOWN past the keyboard dock, and the unstyled .saved-sounds-fab
+   becomes a clipped full-width bar in an implicit fifth grid row.
+
+   Every rule below is scoped under body.web-demo — a class the web
+   demo bootstrap (installWebDemoShim in ui/src/demo/) adds to <body>
+   and that is NEVER present inside the JUCE WebView — so the plugin's
+   rendering is untouched, pixel for pixel. Do not add unscoped rules
+   to this section. */
+
+body.web-demo .app-layout {
+  /* Keep a definite height (so the 1fr body row resolves against the
+     viewport, not against content) but drop overflow:hidden so a
+     genuinely too-short viewport scrolls the page instead of silently
+     clipping rows. Dynamic-viewport unit avoids mobile browser chrome
+     overshoot; plain 100vh first as a fallback. */
+  height: 100vh;
+  height: 100dvh;
+  overflow: visible;
+}
+
+body.web-demo .app-body {
+  /* Pin the row to the band: children stretch to it instead of the
+     implicit auto row growing to content height and overflowing the
+     hidden container (the overlap seen over the macro strip). The
+     320px floor keeps the app usable and lets the page scroll on
+     very short viewports instead of collapsing to nothing. */
+  grid-template-rows: minmax(320px, 1fr);
+}
+
+body.web-demo .play-surface,
+body.web-demo .right-column-chat-only {
+  /* These resolve height:100% against the stretched band, but the
+     codebase has no global box-sizing reset — content-box adds their
+     padding on top (56px / 24px), overflowing the row and turning
+     .app-body into an unexpectedly scrollable container. Border-box
+     keeps them exactly band-sized. */
+  box-sizing: border-box;
+}
+
+body.web-demo .app-center-column {
+  /* Was auto-placed (correct column by accident, no size constraint).
+     Place it explicitly and let it shrink so PlaySurface's own
+     overflow-y: auto takes over inside the band. */
+  grid-column: 3;
+  grid-row: 1;
+  min-width: 0;
+  min-height: 0;
+}
+
+body.web-demo .right-column {
+  /* Graceful degradation on short viewports: the cards' min-heights
+     (visualiser 200px + prompt dock 320px) can exceed the band; scroll
+     inside the column instead of silently clipping the chat input. */
+  overflow-y: auto;
+}
+
+body.web-demo .saved-sounds-fab {
+  /* Unstyled in the plugin build (it sits in an implicit grid row that
+     .app-layout's overflow:hidden clips off-viewport). In the browser
+     it rendered as a cut-off full-width bar at the viewport bottom —
+     style it here as the floating affordance Phase D intended. */
+  position: fixed;
+  right: var(--sp-6);
+  bottom: var(--sp-6);
+  z-index: 40; /* below ToolsDrawer (50) and PresetList (7000) */
+  padding: 10px 18px;
+  border: 1px solid var(--color-border-strong);
+  border-radius: 999px;
+  background: var(--bg-raised);
+  color: var(--text-secondary);
+  font-family: var(--font-sans);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  box-shadow: var(--depth-card);
+  transition: background var(--dur-micro) var(--ease-considered),
+              color var(--dur-micro) var(--ease-considered);
+}
+
+body.web-demo .saved-sounds-fab:hover {
+  background: var(--accent-tint-15);
+  color: var(--text-accent);
+}
+
+body.web-demo .saved-sounds-fab:focus { outline: none; }
+body.web-demo .saved-sounds-fab:focus-visible {
+  outline: 2px solid var(--color-focus-ring);
+  outline-offset: 2px;
+}
+
+/* Demo-only: keep the hood open while playing. The slide-over's dimmed
+   backdrop is a click-to-close modal in the plugin; in the web demo the
+   user wants to keep tweaking knobs and hitting keys underneath (#280
+   feedback), so the backdrop passes clicks through and shows no dim.
+   Close paths stay: the Close button and Esc. */
+body.web-demo .hood-slide-over .hood-slide-over-backdrop {
+  pointer-events: none;
+  background: transparent;
+}

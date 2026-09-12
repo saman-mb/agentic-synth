@@ -1,4 +1,4 @@
-# TIMBRE Documentation
+# Tambra Documentation
 
 Describe a sound in plain English, get a playable synth patch.
 Start at the [README](../README.md) if you haven't built the project yet.
@@ -29,6 +29,7 @@ Start at the [README](../README.md) if you haven't built the project yet.
 |---|---|
 | [Architecture](architecture.md) | System design, component boundaries, how the agent and engine talk |
 | [Audio Engine](audio-engine.md) | Signal flow, the patch contract, and DSP implementation |
+| [Mobile UX & design](mobile/README.md) | Single-screen mobile UX: IA/FSM, macros, input, dark tokens + art direction (visualizer/knobs) |
 | [Build & Release](build-release.md) | Compiling from source, packaging, signing |
 | [Local Inference](local-inference.md) | Running LLM inference on your own hardware instead of a hosted API |
 | [Contributing](../CONTRIBUTING.md) | Workflow, coding standards, commit conventions |
@@ -36,9 +37,10 @@ Start at the [README](../README.md) if you haven't built the project yet.
 
 ### Architecture decisions
 
-Design decisions and their rationale live in [`adr/`](adr/). Read these before
-proposing a structural change — most of the "why is it like this?" questions
-are answered there.
+Design decisions and their rationale live in [`adr/`](adr/). Start with
+[ADR-0008](adr/ADR-0008-nx-workspace-boundaries.md) for the Nx graph. Read these
+before proposing a structural change — most of the "why is it like this?"
+questions are answered there.
 
 ---
 
@@ -58,7 +60,9 @@ Known issues in the [README](../README.md#-known-issues).
 
 | Guide | What it covers |
 |---|---|
-| [Privacy Statement](privacy-statement.md) | What data leaves your machine, telemetry, and how to turn it off |
+| [Privacy Statement](privacy-statement.md) | Mic, prompts → Gemini, web demo / mobile entitlement, deletion contact |
+| [App Store / Play nutrition labels](mobile/privacy-nutrition-labels.md) | Paste-ready labels aligned with the privacy statement |
+| [Naming (TIMBRE → Tambra)](REBRAND.md) | Product / company / reserved-name decision log |
 
 ---
 

@@ -219,11 +219,8 @@ std::string labelForDelta(const PatchStruct& base, const PatchStruct& variant, c
 
 } // namespace
 
-MorphResult morph(const PatchStruct& base,
-                  const std::vector<PatchStruct>& history,
-                  const std::vector<PatchStruct>& liked,
-                  const std::string& prompt,
-                  uint32_t seed) {
+MorphResult morph(const PatchStruct& base, const std::vector<PatchStruct>& history,
+                  const std::vector<PatchStruct>& liked, const std::string& prompt, uint32_t seed) {
     MorphResult result;
 
     // Validate the base once so the validators don't bias the labels with
@@ -267,7 +264,8 @@ MorphResult morph(const PatchStruct& base,
     // (falls back to default_init) so this is total.
     {
         const auto top = mapper::ArchetypeRetriever::retrieveTopN(prompt, 3);
-        const PatchStruct archetypePatch = top.empty() ? make_default_patch() : validate_patch(top[seed % top.size()]->patch);
+        const PatchStruct archetypePatch =
+            top.empty() ? make_default_patch() : validate_patch(top[seed % top.size()]->patch);
         // Light blend so we keep some flavour of the user's current patch
         // (0.5 lerp = even mix) — pure-archetype was too aggressive in user
         // tests; this matches the rest of the strategies' "morph at 0.5" feel.

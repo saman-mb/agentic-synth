@@ -24,7 +24,7 @@ repos:
         name: ESLint TypeScript and React sources
         entry: eslint --fix
         language: node
-        files: ^ui/.*\.(js|jsx|ts|tsx)$
+        files: ^apps/web/.*\.(js|jsx|ts|tsx)$
         types_or: [javascript, jsx, ts, tsx]
         additional_dependencies:
           - '@eslint/js@^9.26.0'

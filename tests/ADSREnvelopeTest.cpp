@@ -293,8 +293,7 @@ TEST_CASE("ADSREnvelope zero-time attack is sample-accurate") {
     REQUIRE(env.process() >= 1.0F);
 }
 
-TEST_CASE("ADSREnvelope re-noteOff during release is idempotent",
-          "[adsr][release][idempotent]") {
+TEST_CASE("ADSREnvelope re-noteOff during release is idempotent", "[adsr][release][idempotent]") {
     // Phase 5: guard against re-rescaling release trajectory on repeated
     // noteOff during the release stage. Without the guard, the second
     // noteOff re-measures output_ (now lower) and re-rescales the coeff so

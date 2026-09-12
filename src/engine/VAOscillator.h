@@ -1,6 +1,6 @@
 #pragma once
 
-#include <random>
+#include <cstdint>
 
 namespace agentic_synth::engine {
 
@@ -15,6 +15,11 @@ public:
     void setFrequency(double hz) noexcept;
     void setDetuneCents(double cents) noexcept;
 
+    // Seed analog-style drift from (patch_id, voice, osc). Replaces
+    // std::random_device so identical (patch, events, SR) renders are
+    // bit-identical (RFC cpp-dsp-core §4).
+    void seedDrift(uint32_t seed) noexcept;
+
     [[nodiscard]] float processSample() noexcept;
     [[nodiscard]] double getDriftCents() const noexcept;
 
@@ -28,6 +33,7 @@ private:
     static double polyBlep(double t, double dt) noexcept;
     void updatePhaseInc() noexcept;
     void tickDrift() noexcept;
+    void drawNewDriftTarget() noexcept;
 
     double sampleRate_ = 44100.0;
     double frequency_ = 440.0;
@@ -42,16 +48,15 @@ private:
     double triAccum_ = -1.0;
     double triLeak_ = 0.0;
 
-    // Analog drift modulator
+    // Analog drift modulator — xorshift32, seeded (not random_device).
     double driftCents_ = 0.0;
     double driftTarget_ = 0.0;
     double driftAlpha_ = 0.0;  // per-sample smoothing coefficient
     double driftTimer_ = 0.0;  // samples until next target draw
     double driftPeriod_ = 0.0; // samples between target draws
-
-    std::mt19937_64 rng_;
-    std::uniform_real_distribution<double> driftTargetDist_{-5.0, 5.0};
-    std::uniform_real_distribution<double> driftPeriodDist_{44100.0, 220500.0};
+    double driftPeriodMin_ = 44100.0;
+    double driftPeriodMax_ = 220500.0;
+    uint32_t rngState_ = 1u;
 };
 
 } // namespace agentic_synth::engine

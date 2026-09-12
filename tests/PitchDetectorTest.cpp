@@ -83,8 +83,8 @@ TEST_CASE("PitchDetector: silence reports no pitch", "[pitch]") {
 }
 
 TEST_CASE("PitchDetector: frequencyToMidi covers reference notes", "[pitch]") {
-    CHECK(PitchDetector::frequencyToMidi(440.0f) == 69); // A4
+    CHECK(PitchDetector::frequencyToMidi(440.0f) == 69);   // A4
     CHECK(PitchDetector::frequencyToMidi(261.626f) == 60); // C4
-    CHECK(PitchDetector::frequencyToMidi(880.0f) == 81); // A5
+    CHECK(PitchDetector::frequencyToMidi(880.0f) == 81);   // A5
     CHECK(PitchDetector::frequencyToMidi(0.0f) == -1);
 }

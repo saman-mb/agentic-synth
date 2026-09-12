@@ -423,20 +423,13 @@ constexpr const char* kDefaultInit = R"json(
 
 // All archetype source literals — order is the canonical library order.
 constexpr const char* kAllArchetypeJson[] = {
-    kCinematicKubrickPad,
-    kVangelisBladeRunnerPad,
-    kAmbientDronePad,
-    kReeseDubstepBass,
-    kSub808Bass,
-    kAcid303Bass,
-    kSupersawLead,
-    kDx7TineEp,
-    kGlassBell,
-    kWarmAnalogPad,
-    kPluckKeys,
-    kGrittyLead,
-    kEtherealChoirPad,
-    kRiserSwell,
+    kCinematicKubrickPad, kVangelisBladeRunnerPad,
+    kAmbientDronePad,     kReeseDubstepBass,
+    kSub808Bass,          kAcid303Bass,
+    kSupersawLead,        kDx7TineEp,
+    kGlassBell,           kWarmAnalogPad,
+    kPluckKeys,           kGrittyLead,
+    kEtherealChoirPad,    kRiserSwell,
     kDefaultInit,
 };
 
@@ -571,7 +564,8 @@ std::vector<Archetype> buildLibrary() {
         auto parsed = GrammarSampler::parse_patch_json(sr.patchJson);
         if (!parsed) {
             std::cerr << "[ArchetypeLibrary] Failed to parse PatchStruct for "
-                         "archetype '" << sr.name << "'\n";
+                         "archetype '"
+                      << sr.name << "'\n";
             continue;
         }
         Archetype a;

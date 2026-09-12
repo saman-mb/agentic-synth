@@ -121,8 +121,8 @@ struct ChorusParams {
 static_assert(sizeof(ChorusParams) == 20);
 
 struct TubeSatParams {
-    float drive;   // 0 .. 0.5 (default 0.0 — bit-exact bypass when off)
-    float mix;     // 0 .. 1   (default 1.0 when active — full wet)
+    float drive; // 0 .. 0.5 (default 0.0 — bit-exact bypass when off)
+    float mix;   // 0 .. 1   (default 1.0 when active — full wet)
     uint8_t _pad[8];
 };
 static_assert(sizeof(TubeSatParams) == 16);

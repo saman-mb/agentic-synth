@@ -20,9 +20,7 @@ MidiLearnStore& MidiLearnStore::instance() {
     return singleton;
 }
 
-MidiLearnStore MidiLearnStore::withFileForTesting(juce::File file) {
-    return MidiLearnStore{std::move(file)};
-}
+MidiLearnStore MidiLearnStore::withFileForTesting(juce::File file) { return MidiLearnStore{std::move(file)}; }
 
 MidiLearnStore::MidiLearnStore(juce::File path) : path_(std::move(path)) {
     std::lock_guard<std::mutex> lock(mu_);
@@ -122,8 +120,7 @@ std::optional<std::string> MidiLearnStore::captureIfLearning(int cc, int channel
         // directions are 1:1 so the user can re-learn / re-assign cleanly.
         mappings_.erase(std::remove_if(mappings_.begin(), mappings_.end(),
                                        [&](const MidiMapping& m) {
-                                           return m.knob_id == captured ||
-                                                  (m.cc == cc && m.channel == channel);
+                                           return m.knob_id == captured || (m.cc == cc && m.channel == channel);
                                        }),
                         mappings_.end());
 
@@ -152,9 +149,9 @@ std::optional<std::string> MidiLearnStore::findKnobFor(int cc, int channel) cons
 void MidiLearnStore::clearMapping(const std::string& knob_id) {
     std::lock_guard<std::mutex> lock(mu_);
     auto before = mappings_.size();
-    mappings_.erase(std::remove_if(mappings_.begin(), mappings_.end(),
-                                   [&](const MidiMapping& m) { return m.knob_id == knob_id; }),
-                    mappings_.end());
+    mappings_.erase(
+        std::remove_if(mappings_.begin(), mappings_.end(), [&](const MidiMapping& m) { return m.knob_id == knob_id; }),
+        mappings_.end());
     if (mappings_.size() != before)
         persistLocked();
 }

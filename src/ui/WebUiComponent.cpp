@@ -330,9 +330,7 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
       // drain pending/active jobs via removeAllJobs(interrupt=true) before
       // bridge_ goes away, eliminating the use-after-free that
       // `juce::Thread::launch` had (architect P1 #15).
-      workerPool_(juce::ThreadPool::Options{}
-                      .withNumberOfThreads(2)
-                      .withThreadName("WebUiWorker")) {
+      workerPool_(juce::ThreadPool::Options{}.withNumberOfThreads(2).withThreadName("WebUiWorker")) {
     using Options = juce::WebBrowserComponent::Options;
     using NativeFnCompletion = juce::WebBrowserComponent::NativeFunctionCompletion;
 
@@ -363,168 +361,162 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
             completion(juce::var{});
         });
 
-    options = options.withNativeFunction(juce::Identifier{"generate"},
-                                         [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
-                                             const auto prompt = argOr(args, 0, juce::var{""}).toString().toStdString();
-                                             // Resolve the JS promise immediately so the UI stays responsive.
-                                             // The actual heuristic + rationale work runs on a worker; results
-                                             // arrive at the UI via the onPatch / onRationale / onDone events.
-                                             completion(juce::var{});
+    options = options.withNativeFunction(
+        juce::Identifier{"generate"}, [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
+            const auto prompt = argOr(args, 0, juce::var{""}).toString().toStdString();
+            // Resolve the JS promise immediately so the UI stays responsive.
+            // The actual heuristic + rationale work runs on a worker; results
+            // arrive at the UI via the onPatch / onRationale / onDone events.
+            completion(juce::var{});
 
-                                             // Architect P1 #15: switched from juce::Thread::launch to the
-                                             // component-owned juce::ThreadPool so ~WebUiComponent can
-                                             // drain in-flight work (removeAllJobs(interrupt=true)) before
-                                             // bridge_ disappears, fixing a use-after-free when the editor
-                                             // closes mid-submitPrompt.
-                                             //
-                                             // The job checks shouldExit() at each natural step boundary so
-                                             // a dtor-issued signalJobShouldExit() can short-circuit the
-                                             // rationale step and the subsequent notify*() calls.
-                                             workerPool_.addJob([this, prompt]() {
-                                                 auto* const self = juce::ThreadPoolJob::getCurrentThreadPoolJob();
-                                                 const auto cancelled = [self]() noexcept {
-                                                     return self != nullptr && self->shouldExit();
-                                                 };
+            // Architect P1 #15: switched from juce::Thread::launch to the
+            // component-owned juce::ThreadPool so ~WebUiComponent can
+            // drain in-flight work (removeAllJobs(interrupt=true)) before
+            // bridge_ disappears, fixing a use-after-free when the editor
+            // closes mid-submitPrompt.
+            //
+            // The job checks shouldExit() at each natural step boundary so
+            // a dtor-issued signalJobShouldExit() can short-circuit the
+            // rationale step and the subsequent notify*() calls.
+            workerPool_.addJob([this, prompt]() {
+                auto* const self = juce::ThreadPoolJob::getCurrentThreadPoolJob();
+                const auto cancelled = [self]() noexcept { return self != nullptr && self->shouldExit(); };
 
-                                                 if (cancelled())
-                                                     return;
-                                                 // Heuristic patch first — instant local fallback.
-                                                 PatchStruct patch = bridge_.submitPrompt(prompt);
+                if (cancelled())
+                    return;
+                // Heuristic patch first — instant local fallback.
+                PatchStruct patch = bridge_.submitPrompt(prompt);
 
-                                                 if (cancelled())
-                                                     return;
-                                                 // ── Phase 22: snapshot prior patch + decide refinement ──
-                                                 // Pull the last successful patch + prompt under the lock,
-                                                 // then release it. We must NOT hold the mutex across the
-                                                 // LLM call (it can take seconds). isRelativePrompt is a
-                                                 // free static; no allocation on the audio thread, no
-                                                 // dependency on bridge_ state.
-                                                 std::optional<PatchStruct> priorPatch;
-                                                 std::string priorPrompt;
-                                                 {
-                                                     std::lock_guard<std::mutex> lock(lastPatchMutex_);
-                                                     priorPatch = lastSuccessfulPatch_;
-                                                     priorPrompt = lastPrompt_;
-                                                 }
-                                                 const bool isRefinement =
-                                                     agent::PromptHandler::isRelativePrompt(prompt) && priorPatch.has_value();
+                if (cancelled())
+                    return;
+                // ── Phase 22: snapshot prior patch + decide refinement ──
+                // Pull the last successful patch + prompt under the lock,
+                // then release it. We must NOT hold the mutex across the
+                // LLM call (it can take seconds). isRelativePrompt is a
+                // free static; no allocation on the audio thread, no
+                // dependency on bridge_ state.
+                std::optional<PatchStruct> priorPatch;
+                std::string priorPrompt;
+                {
+                    std::lock_guard<std::mutex> lock(lastPatchMutex_);
+                    priorPatch = lastSuccessfulPatch_;
+                    priorPrompt = lastPrompt_;
+                }
+                const bool isRefinement = agent::PromptHandler::isRelativePrompt(prompt) && priorPatch.has_value();
 
-                                                 if (cancelled())
-                                                     return;
-                                                 // ── Step 1 of the 2-step LLM flow: ENHANCER ─────────────
-                                                 // Phase 22: skip the enhancer entirely for refinement
-                                                 // prompts. The enhancer rewrites a terse user prompt into
-                                                 // a 9-section sensory brief — useful for cold-start
-                                                 // ("warm pad") but actively harmful for ("darker"), where
-                                                 // the directional intent must reach §5.3 verbatim. The
-                                                 // refinement wrapper inside PromptHandler carries the
-                                                 // previous patch instead, so the brief isn't needed.
-                                                 std::string brief;
-                                                 if (!isRefinement) {
-                                                     std::cerr << "[WebUI] enhancing prompt='" << prompt << "'\n";
-                                                     brief = bridge_.enhancePrompt(prompt);
-                                                     if (cancelled())
-                                                         return;
-                                                     if (!brief.empty()) {
-                                                         auto* eobj = new juce::DynamicObject{};
-                                                         eobj->setProperty("brief", juce::String(brief));
-                                                         bridge_.notifyEnhancement(juce::var{eobj});
-                                                     }
-                                                 } else {
-                                                     std::cerr << "[WebUI] refinement prompt detected ('" << prompt
-                                                               << "') — skipping enhancer, passing raw to LLM\n";
-                                                 }
-                                                 const std::string& promptForGen = brief.empty() ? prompt : brief;
+                if (cancelled())
+                    return;
+                // ── Step 1 of the 2-step LLM flow: ENHANCER ─────────────
+                // Phase 22: skip the enhancer entirely for refinement
+                // prompts. The enhancer rewrites a terse user prompt into
+                // a 9-section sensory brief — useful for cold-start
+                // ("warm pad") but actively harmful for ("darker"), where
+                // the directional intent must reach §5.3 verbatim. The
+                // refinement wrapper inside PromptHandler carries the
+                // previous patch instead, so the brief isn't needed.
+                std::string brief;
+                if (!isRefinement) {
+                    std::cerr << "[WebUI] enhancing prompt='" << prompt << "'\n";
+                    brief = bridge_.enhancePrompt(prompt);
+                    if (cancelled())
+                        return;
+                    if (!brief.empty()) {
+                        auto* eobj = new juce::DynamicObject{};
+                        eobj->setProperty("brief", juce::String(brief));
+                        bridge_.notifyEnhancement(juce::var{eobj});
+                    }
+                } else {
+                    std::cerr << "[WebUI] refinement prompt detected ('" << prompt
+                              << "') — skipping enhancer, passing raw to LLM\n";
+                }
+                const std::string& promptForGen = brief.empty() ? prompt : brief;
 
-                                                 if (cancelled())
-                                                     return;
-                                                 // ── Step 2 of the 2-step LLM flow: GENERATOR ────────────
-                                                 // Local llama.cpp → Gemini fallback. Feed the brief if we
-                                                 // have one; otherwise feed the raw prompt verbatim. For
-                                                 // refinement prompts, also forward the previous patch +
-                                                 // prompt so PromptHandler wraps the request in §5.3
-                                                 // refinement frame.
-                                                 std::cerr << "[WebUI] generate prompt (post-enhance, " << promptForGen.size()
-                                                           << " bytes) — invoking LLM"
-                                                           << (isRefinement ? " (refinement)" : "") << "\n";
-                                                 if (auto llm = bridge_.generateLlmPatch(promptForGen, /*patch_id=*/0,
-                                                                                          priorPatch, priorPrompt)) {
-                                                     patch = *llm;
-                                                     // Stash the new patch as the next refinement seed.
-                                                     std::lock_guard<std::mutex> lock(lastPatchMutex_);
-                                                     lastSuccessfulPatch_ = patch;
-                                                     lastPrompt_ = prompt;
-                                                 } else {
-                                                     // Phase 31 — LLM failed. The heuristic patch from
-                                                     // submitPrompt() (line above) has NOT been through the
-                                                     // PatchAugmenter, so all the Phase 23/27/30 cinematic
-                                                     // guardrails (3-osc layering, FM coercion, cinematic
-                                                     // pad recipe, noise-only fix) are bypassed exactly when
-                                                     // they're needed most. Fire the augmenter now, applying
-                                                     // the same refinement-skip rule generateLlmPatch uses
-                                                     // internally — if the user typed a relative prompt and
-                                                     // we have a prior patch, leave the heuristic patch
-                                                     // alone so the bare topology survives.
-                                                     std::cerr << "[WebUI] LLM failed — applying heuristic-patch guardrail"
-                                                               << (isRefinement ? " (skipped: refinement)" : "") << "\n";
-                                                     bridge_.applyGuardrailIfNotRefinement(patch, prompt,
-                                                                                            priorPatch.has_value());
-                                                 }
+                if (cancelled())
+                    return;
+                // ── Step 2 of the 2-step LLM flow: GENERATOR ────────────
+                // Local llama.cpp → Gemini fallback. Feed the brief if we
+                // have one; otherwise feed the raw prompt verbatim. For
+                // refinement prompts, also forward the previous patch +
+                // prompt so PromptHandler wraps the request in §5.3
+                // refinement frame.
+                std::cerr << "[WebUI] generate prompt (post-enhance, " << promptForGen.size()
+                          << " bytes) — invoking LLM" << (isRefinement ? " (refinement)" : "") << "\n";
+                if (auto llm = bridge_.generateLlmPatch(promptForGen, /*patch_id=*/0, priorPatch, priorPrompt)) {
+                    patch = *llm;
+                    // Stash the new patch as the next refinement seed.
+                    std::lock_guard<std::mutex> lock(lastPatchMutex_);
+                    lastSuccessfulPatch_ = patch;
+                    lastPrompt_ = prompt;
+                } else {
+                    // Phase 31 — LLM failed. The heuristic patch from
+                    // submitPrompt() (line above) has NOT been through the
+                    // PatchAugmenter, so all the Phase 23/27/30 cinematic
+                    // guardrails (3-osc layering, FM coercion, cinematic
+                    // pad recipe, noise-only fix) are bypassed exactly when
+                    // they're needed most. Fire the augmenter now, applying
+                    // the same refinement-skip rule generateLlmPatch uses
+                    // internally — if the user typed a relative prompt and
+                    // we have a prior patch, leave the heuristic patch
+                    // alone so the bare topology survives.
+                    std::cerr << "[WebUI] LLM failed — applying heuristic-patch guardrail"
+                              << (isRefinement ? " (skipped: refinement)" : "") << "\n";
+                    bridge_.applyGuardrailIfNotRefinement(patch, prompt, priorPatch.has_value());
+                }
 
-                                                 if (cancelled())
-                                                     return;
-                                                 const std::string rationale = bridge_.generateRationale(prompt, patch);
+                if (cancelled())
+                    return;
+                const std::string rationale = bridge_.generateRationale(prompt, patch);
 
-                                                 if (cancelled())
-                                                     return;
-                                                 auto* pobj = new juce::DynamicObject{};
-                                                 pobj->setProperty("variation", juce::String("A"));
-                                                 pobj->setProperty("data", agent::AgentBridge::patchToVar(patch));
-                                                 pobj->setProperty("modulation", agent::AgentBridge::modulationPlanForPatch(patch));
-                                                 // Phase 26: surface PatchAugmenter mutations so the UI can render
-                                                 // a transparency banner ("Patch adjusted: …"). Pipe-separated
-                                                 // buffer → array of strings; empty buffer → empty array which
-                                                 // the UI treats as "no banner".
-                                                 if (patch.augmenter_actions[0] != '\0') {
-                                                     juce::Array<juce::var> actions;
-                                                     juce::String raw{patch.augmenter_actions};
-                                                     for (auto& tok : juce::StringArray::fromTokens(raw, "|", "")) {
-                                                         if (!tok.trim().isEmpty())
-                                                             actions.add(juce::var{tok.trim()});
-                                                     }
-                                                     pobj->setProperty("augmenter_actions", juce::var{actions});
-                                                 }
-                                                 bridge_.notifyPatch(juce::var{pobj});
+                if (cancelled())
+                    return;
+                auto* pobj = new juce::DynamicObject{};
+                pobj->setProperty("variation", juce::String("A"));
+                pobj->setProperty("data", agent::AgentBridge::patchToVar(patch));
+                pobj->setProperty("modulation", agent::AgentBridge::modulationPlanForPatch(patch));
+                // Phase 26: surface PatchAugmenter mutations so the UI can render
+                // a transparency banner ("Patch adjusted: …"). Pipe-separated
+                // buffer → array of strings; empty buffer → empty array which
+                // the UI treats as "no banner".
+                if (patch.augmenter_actions[0] != '\0') {
+                    juce::Array<juce::var> actions;
+                    juce::String raw{patch.augmenter_actions};
+                    for (auto& tok : juce::StringArray::fromTokens(raw, "|", "")) {
+                        if (!tok.trim().isEmpty())
+                            actions.add(juce::var{tok.trim()});
+                    }
+                    pobj->setProperty("augmenter_actions", juce::var{actions});
+                }
+                bridge_.notifyPatch(juce::var{pobj});
 
-                                                 auto* update = new juce::DynamicObject{};
-                                                 update->setProperty("patch", agent::AgentBridge::patchToVar(patch));
-                                                 update->setProperty("modulation", agent::AgentBridge::modulationPlanForPatch(patch));
-                                                 bridge_.notifyPatchUpdate(juce::var{update});
+                auto* update = new juce::DynamicObject{};
+                update->setProperty("patch", agent::AgentBridge::patchToVar(patch));
+                update->setProperty("modulation", agent::AgentBridge::modulationPlanForPatch(patch));
+                bridge_.notifyPatchUpdate(juce::var{update});
 
-                                                 if (cancelled())
-                                                     return;
-                                                 // Emit rationale as a token frame too so it appears as the
-                                                 // primary chat bubble text. Without this, the bubble stays
-                                                 // visually empty and the rationale only shows when the user
-                                                 // clicks the collapsed "Why this patch?" details element.
-                                                 // JS handler reads msg.content (not msg.text).
-                                                 {
-                                                     auto* tobj = new juce::DynamicObject{};
-                                                     tobj->setProperty("content", juce::String(rationale));
-                                                     bridge_.notifyToken(juce::var{tobj});
-                                                 }
+                if (cancelled())
+                    return;
+                // Emit rationale as a token frame too so it appears as the
+                // primary chat bubble text. Without this, the bubble stays
+                // visually empty and the rationale only shows when the user
+                // clicks the collapsed "Why this patch?" details element.
+                // JS handler reads msg.content (not msg.text).
+                {
+                    auto* tobj = new juce::DynamicObject{};
+                    tobj->setProperty("content", juce::String(rationale));
+                    bridge_.notifyToken(juce::var{tobj});
+                }
 
-                                                 if (cancelled())
-                                                     return;
-                                                 auto* robj = new juce::DynamicObject{};
-                                                 robj->setProperty("text", juce::String(rationale));
-                                                 bridge_.notifyRationale(juce::var{robj});
+                if (cancelled())
+                    return;
+                auto* robj = new juce::DynamicObject{};
+                robj->setProperty("text", juce::String(rationale));
+                bridge_.notifyRationale(juce::var{robj});
 
-                                                 if (cancelled())
-                                                     return;
-                                                 bridge_.notifyDone(juce::var{});
-                                             });
-                                         });
+                if (cancelled())
+                    return;
+                bridge_.notifyDone(juce::var{});
+            });
+        });
 
     // Phase B / simple-view #249 — "more variations" inbound. UI clicks the
     // "More variations" affordance on the dominant tile; we snapshot the
@@ -533,8 +525,9 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
     // worker, then emit a single `variations_ready` event with the 5-tile
     // payload. Deterministic per (base, history, liked, prompt, seed) — the
     // seed advances per call so successive clicks generate a fresh family.
-    options = options.withNativeFunction(
-        juce::Identifier{"morph_request"}, [this](const juce::Array<juce::var>& /*args*/, NativeFnCompletion completion) {
+    options =
+        options.withNativeFunction(juce::Identifier{"morph_request"}, [this](const juce::Array<juce::var>& /*args*/,
+                                                                             NativeFnCompletion completion) {
             // Resolve the JS promise immediately; the worker fires the
             // variations_ready event when the morph is ready.
             completion(juce::var{});
@@ -565,8 +558,7 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
                 // Phase H / #261 — log "More variations" click before kicking
                 // off the morph. Capture history/liked sizes pre-morph so the
                 // event reflects what the loop actually saw.
-                bridge_.recordMorphRequest(promptSnapshot,
-                                           static_cast<int>(history.size()),
+                bridge_.recordMorphRequest(promptSnapshot, static_cast<int>(history.size()),
                                            static_cast<int>(liked.size()));
 
                 if (cancelled())
@@ -606,20 +598,20 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
     // MorphEvent kinds. All resolve their promise immediately; the actual
     // JSONL append is no-throw on the calling thread (cheap — one file
     // append under a mutex, mirrors mapper::LlmTelemetry).
-    options = options.withNativeFunction(
-        juce::Identifier{"record_variation_picked"},
-        [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
-            // Args: [strategy_id (int 0..4), label (string), time_since_arrival_ms (int)].
-            const int strategyId = static_cast<int>(argOr(args, 0, juce::var{-1}));
-            const auto label = argOr(args, 1, juce::var{""}).toString().toStdString();
-            const int dtMs = static_cast<int>(argOr(args, 2, juce::var{0}));
-            bridge_.recordVariationPicked(strategyId, label, dtMs);
-            completion(juce::var{});
-        });
+    options = options.withNativeFunction(juce::Identifier{"record_variation_picked"},
+                                         [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
+                                             // Args: [strategy_id (int 0..4), label (string), time_since_arrival_ms
+                                             // (int)].
+                                             const int strategyId = static_cast<int>(argOr(args, 0, juce::var{-1}));
+                                             const auto label = argOr(args, 1, juce::var{""}).toString().toStdString();
+                                             const int dtMs = static_cast<int>(argOr(args, 2, juce::var{0}));
+                                             bridge_.recordVariationPicked(strategyId, label, dtMs);
+                                             completion(juce::var{});
+                                         });
 
-    options = options.withNativeFunction(
-        juce::Identifier{"record_macro_tweak"},
-        [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
+    options =
+        options.withNativeFunction(juce::Identifier{"record_macro_tweak"}, [this](const juce::Array<juce::var>& args,
+                                                                                  NativeFnCompletion completion) {
             // Args: [macro_index (0..3), value (0..1 float), dwell_ms (int)].
             const int macroIndex = static_cast<int>(argOr(args, 0, juce::var{-1}));
             const float value = static_cast<float>(static_cast<double>(argOr(args, 1, juce::var{0.0})));
@@ -628,16 +620,15 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
             completion(juce::var{});
         });
 
-    options = options.withNativeFunction(
-        juce::Identifier{"record_ab_toggle"},
-        [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
-            // Args: [from_slot (int), to_slot (int)]. Slot codes are
-            // UI-defined (0/1 for A/B today); we pass through opaquely.
-            const int fromSlot = static_cast<int>(argOr(args, 0, juce::var{-1}));
-            const int toSlot = static_cast<int>(argOr(args, 1, juce::var{-1}));
-            bridge_.recordABToggle(fromSlot, toSlot);
-            completion(juce::var{});
-        });
+    options = options.withNativeFunction(juce::Identifier{"record_ab_toggle"},
+                                         [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
+                                             // Args: [from_slot (int), to_slot (int)]. Slot codes are
+                                             // UI-defined (0/1 for A/B today); we pass through opaquely.
+                                             const int fromSlot = static_cast<int>(argOr(args, 0, juce::var{-1}));
+                                             const int toSlot = static_cast<int>(argOr(args, 1, juce::var{-1}));
+                                             bridge_.recordABToggle(fromSlot, toSlot);
+                                             completion(juce::var{});
+                                         });
 
     options = options.withNativeFunction(
         juce::Identifier{"feedback"}, [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
@@ -747,12 +738,12 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
             completion(juce::var{});
         });
 
-    options = options.withNativeFunction(
-        juce::Identifier{"note_off"}, [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
-            const int note = static_cast<int>(argOr(args, 0, juce::var{60}));
-            bridge_.postMidiNoteOff(note);
-            completion(juce::var{});
-        });
+    options = options.withNativeFunction(juce::Identifier{"note_off"},
+                                         [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
+                                             const int note = static_cast<int>(argOr(args, 0, juce::var{60}));
+                                             bridge_.postMidiNoteOff(note);
+                                             completion(juce::var{});
+                                         });
 
     options = options.withNativeFunction(
         juce::Identifier{"play_midi_note"}, [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
@@ -772,8 +763,7 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
         });
 
     options = options.withNativeFunction(
-        juce::Identifier{"open_external_url"},
-        [](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
+        juce::Identifier{"open_external_url"}, [](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
             // Phase 15 fix: window.open('x-apple.systempreferences:…', '_self')
             // navigates the WKWebView itself to a scheme it can't handle →
             // "unsupported URL" fallback page. Route external URLs through
@@ -803,7 +793,8 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
             if (!bridge_.sttEnabled()) {
                 DBG("push_audio_pcm received but GeminiSTT disabled (no GEMINI_KEY)");
                 auto* err = new juce::DynamicObject{};
-                err->setProperty("text", juce::String("[mic ready but speech-to-text disabled — GEMINI_KEY not configured]"));
+                err->setProperty("text",
+                                 juce::String("[mic ready but speech-to-text disabled — GEMINI_KEY not configured]"));
                 bridge_.notifyTranscript(juce::var{err});
                 return;
             }
@@ -873,23 +864,22 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
             completion(juce::var{});
         });
 
-    options = options.withNativeFunction(
-        juce::Identifier{"get_presets"}, [this](const juce::Array<juce::var>& /*args*/, NativeFnCompletion completion) {
-            const auto json = bridge_.getPresetsJson();
-            completion(juce::JSON::parse(juce::String(json)));
-        });
+    options = options.withNativeFunction(juce::Identifier{"get_presets"},
+                                         [this](const juce::Array<juce::var>& /*args*/, NativeFnCompletion completion) {
+                                             const auto json = bridge_.getPresetsJson();
+                                             completion(juce::JSON::parse(juce::String(json)));
+                                         });
 
-    options = options.withNativeFunction(
-        juce::Identifier{"delete_preset"}, [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
-            const auto name = argOr(args, 0, juce::var{""}).toString().toStdString();
-            bridge_.deletePreset(name);
-            completion(juce::var{});
-        });
+    options = options.withNativeFunction(juce::Identifier{"delete_preset"},
+                                         [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
+                                             const auto name = argOr(args, 0, juce::var{""}).toString().toStdString();
+                                             bridge_.deletePreset(name);
+                                             completion(juce::var{});
+                                         });
 
     // ── Phase G / #262 — MIDI learn ──────────────────────────────────────────
     options = options.withNativeFunction(
-        juce::Identifier{"start_midi_learn"},
-        [](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
+        juce::Identifier{"start_midi_learn"}, [](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
             // Arg: [knob_id (string)]. Empty-string cancels.
             const auto knobId = argOr(args, 0, juce::var{""}).toString().toStdString();
             if (knobId.empty()) {
@@ -900,98 +890,93 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
             completion(juce::var{});
         });
 
-    options = options.withNativeFunction(
-        juce::Identifier{"cancel_midi_learn"},
-        [](const juce::Array<juce::var>&, NativeFnCompletion completion) {
-            agentic_synth::agent::MidiLearnStore::instance().cancelLearnMode();
-            completion(juce::var{});
-        });
+    options = options.withNativeFunction(juce::Identifier{"cancel_midi_learn"},
+                                         [](const juce::Array<juce::var>&, NativeFnCompletion completion) {
+                                             agentic_synth::agent::MidiLearnStore::instance().cancelLearnMode();
+                                             completion(juce::var{});
+                                         });
 
-    options = options.withNativeFunction(
-        juce::Identifier{"clear_midi_mapping"},
-        [](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
-            const auto knobId = argOr(args, 0, juce::var{""}).toString().toStdString();
-            agentic_synth::agent::MidiLearnStore::instance().clearMapping(knobId);
-            completion(juce::var{});
-        });
+    options = options.withNativeFunction(juce::Identifier{"clear_midi_mapping"},
+                                         [](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
+                                             const auto knobId = argOr(args, 0, juce::var{""}).toString().toStdString();
+                                             agentic_synth::agent::MidiLearnStore::instance().clearMapping(knobId);
+                                             completion(juce::var{});
+                                         });
 
-    options = options.withNativeFunction(
-        juce::Identifier{"get_midi_mappings"},
-        [](const juce::Array<juce::var>&, NativeFnCompletion completion) {
-            const auto all = agentic_synth::agent::MidiLearnStore::instance().all();
-            juce::Array<juce::var> arr;
-            arr.ensureStorageAllocated(static_cast<int>(all.size()));
-            for (const auto& m : all) {
-                auto* obj = new juce::DynamicObject{};
-                obj->setProperty("knob_id", juce::String(m.knob_id));
-                obj->setProperty("cc", m.cc);
-                obj->setProperty("channel", m.channel);
-                arr.add(juce::var{obj});
-            }
-            auto* root = new juce::DynamicObject{};
-            root->setProperty("mappings", juce::var{arr});
-            completion(juce::var{root});
-        });
+    options = options.withNativeFunction(juce::Identifier{"get_midi_mappings"},
+                                         [](const juce::Array<juce::var>&, NativeFnCompletion completion) {
+                                             const auto all = agentic_synth::agent::MidiLearnStore::instance().all();
+                                             juce::Array<juce::var> arr;
+                                             arr.ensureStorageAllocated(static_cast<int>(all.size()));
+                                             for (const auto& m : all) {
+                                                 auto* obj = new juce::DynamicObject{};
+                                                 obj->setProperty("knob_id", juce::String(m.knob_id));
+                                                 obj->setProperty("cc", m.cc);
+                                                 obj->setProperty("channel", m.channel);
+                                                 arr.add(juce::var{obj});
+                                             }
+                                             auto* root = new juce::DynamicObject{};
+                                             root->setProperty("mappings", juce::var{arr});
+                                             completion(juce::var{root});
+                                         });
 
     // ── Phase D / #268 (partial) — audio bounce ──────────────────────────────
+    options = options.withNativeFunction(juce::Identifier{"bounce_patch"}, [this](const juce::Array<juce::var>& args,
+                                                                                  NativeFnCompletion completion) {
+        // Args: [patch (object|null), suggestedName (string?)]. Patch null
+        // → fall back to lastSuccessfulPatch_ (same fallback as
+        // commit_preset). Promise resolves immediately; the actual render
+        // emits `bounce_complete` when the wav is on disk.
+        const auto& patchVar = argOr(args, 0, juce::var{});
+        const auto suggested = argOr(args, 1, juce::var{"timbre-bounce"}).toString();
+        completion(juce::var{});
+
+        PatchStruct patch = make_default_patch();
+        bool gotPatch = false;
+        if (auto* obj = patchVar.getDynamicObject(); obj != nullptr && obj->hasProperty("osc")) {
+            patch = agent::AgentBridge::patchFromVar(patchVar);
+            gotPatch = true;
+        }
+        if (!gotPatch) {
+            std::lock_guard<std::mutex> lock(lastPatchMutex_);
+            if (lastSuccessfulPatch_)
+                patch = *lastSuccessfulPatch_;
+        }
+
+        // FileChooser must run on the message thread; we're already there.
+        auto safeName = suggested.replaceCharacters(" /\\:?*\"<>|", "__________");
+        if (safeName.isEmpty())
+            safeName = "timbre-bounce";
+        auto defaultLoc =
+            juce::File::getSpecialLocation(juce::File::userMusicDirectory).getChildFile(safeName + ".wav");
+        auto chooser =
+            std::make_shared<juce::FileChooser>(juce::String("Save TIMBRE bounce"), defaultLoc, juce::String("*.wav"));
+        chooser->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles |
+                                 juce::FileBrowserComponent::warnAboutOverwriting,
+                             [this, chooser, patch](const juce::FileChooser& fc) {
+                                 const auto result = fc.getResult();
+                                 if (result == juce::File{}) {
+                                     // User cancelled — emit a non-error, non-ok frame so
+                                     // the UI can clear any spinner without showing a
+                                     // success toast.
+                                     auto* obj = new juce::DynamicObject{};
+                                     obj->setProperty("ok", false);
+                                     obj->setProperty("error", juce::String("cancelled"));
+                                     bridge_.notifyBounceComplete(juce::var{obj});
+                                     return;
+                                 }
+                                 auto dest = result.hasFileExtension("wav") ? result : result.withFileExtension("wav");
+                                 workerPool_.addJob([this, dest, patch]() {
+                                     auto* self = juce::ThreadPoolJob::getCurrentThreadPoolJob();
+                                     if (self != nullptr && self->shouldExit())
+                                         return;
+                                     bridge_.bouncePatchToFile(patch, dest);
+                                 });
+                             });
+    });
+
     options = options.withNativeFunction(
-        juce::Identifier{"bounce_patch"}, [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
-            // Args: [patch (object|null), suggestedName (string?)]. Patch null
-            // → fall back to lastSuccessfulPatch_ (same fallback as
-            // commit_preset). Promise resolves immediately; the actual render
-            // emits `bounce_complete` when the wav is on disk.
-            const auto& patchVar = argOr(args, 0, juce::var{});
-            const auto suggested = argOr(args, 1, juce::var{"timbre-bounce"}).toString();
-            completion(juce::var{});
-
-            PatchStruct patch = make_default_patch();
-            bool gotPatch = false;
-            if (auto* obj = patchVar.getDynamicObject(); obj != nullptr && obj->hasProperty("osc")) {
-                patch = agent::AgentBridge::patchFromVar(patchVar);
-                gotPatch = true;
-            }
-            if (!gotPatch) {
-                std::lock_guard<std::mutex> lock(lastPatchMutex_);
-                if (lastSuccessfulPatch_)
-                    patch = *lastSuccessfulPatch_;
-            }
-
-            // FileChooser must run on the message thread; we're already there.
-            auto safeName = suggested.replaceCharacters(" /\\:?*\"<>|", "__________");
-            if (safeName.isEmpty())
-                safeName = "timbre-bounce";
-            auto defaultLoc = juce::File::getSpecialLocation(juce::File::userMusicDirectory)
-                                  .getChildFile(safeName + ".wav");
-            auto chooser = std::make_shared<juce::FileChooser>(
-                juce::String("Save TIMBRE bounce"), defaultLoc, juce::String("*.wav"));
-            chooser->launchAsync(
-                juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles |
-                    juce::FileBrowserComponent::warnAboutOverwriting,
-                [this, chooser, patch](const juce::FileChooser& fc) {
-                    const auto result = fc.getResult();
-                    if (result == juce::File{}) {
-                        // User cancelled — emit a non-error, non-ok frame so
-                        // the UI can clear any spinner without showing a
-                        // success toast.
-                        auto* obj = new juce::DynamicObject{};
-                        obj->setProperty("ok", false);
-                        obj->setProperty("error", juce::String("cancelled"));
-                        bridge_.notifyBounceComplete(juce::var{obj});
-                        return;
-                    }
-                    auto dest = result.hasFileExtension("wav") ? result : result.withFileExtension("wav");
-                    workerPool_.addJob([this, dest, patch]() {
-                        auto* self = juce::ThreadPoolJob::getCurrentThreadPoolJob();
-                        if (self != nullptr && self->shouldExit())
-                            return;
-                        bridge_.bouncePatchToFile(patch, dest);
-                    });
-                });
-        });
-
-    options = options.withNativeFunction(
-        juce::Identifier{"getScopeSamples"},
-        [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
+        juce::Identifier{"getScopeSamples"}, [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
             // Phase 12: visualizer audio tap. JS asks for up to N samples
             // (default 1024); we pull lock-free from the plugin's SPSC scope
             // queue on the message thread, pack into a juce::var Array of
@@ -1139,13 +1124,9 @@ WebUiComponent::~WebUiComponent() {
     subs_.clear();
 }
 
-void WebUiComponent::submitWorkerForTesting(std::function<void()> job) {
-    workerPool_.addJob(std::move(job));
-}
+void WebUiComponent::submitWorkerForTesting(std::function<void()> job) { workerPool_.addJob(std::move(job)); }
 
-int WebUiComponent::pendingWorkerJobsForTesting() const noexcept {
-    return workerPool_.getNumJobs();
-}
+int WebUiComponent::pendingWorkerJobsForTesting() const noexcept { return workerPool_.getNumJobs(); }
 
 void WebUiComponent::resized() {
     if (browser_)

@@ -579,32 +579,60 @@ std::optional<PatchStruct> GrammarSampler::parse_patch_json(const std::string& j
         }
         (void)keyStart;
         if (key == "chorus") {
-            if (!r.expect('{')) return -1;
-            if (!r.expect_key("rate_hz")) return -1;
-            auto v1 = r.read_float(); if (!v1) return -1; p.chorus.rate_hz = *v1;
-            if (!r.comma() || !r.expect_key("depth")) return -1;
-            auto v2 = r.read_float(); if (!v2) return -1; p.chorus.depth = *v2;
-            if (!r.comma() || !r.expect_key("mix")) return -1;
-            auto v3 = r.read_float(); if (!v3) return -1; p.chorus.mix = *v3;
-            if (!r.expect('}')) return -1;
+            if (!r.expect('{'))
+                return -1;
+            if (!r.expect_key("rate_hz"))
+                return -1;
+            auto v1 = r.read_float();
+            if (!v1)
+                return -1;
+            p.chorus.rate_hz = *v1;
+            if (!r.comma() || !r.expect_key("depth"))
+                return -1;
+            auto v2 = r.read_float();
+            if (!v2)
+                return -1;
+            p.chorus.depth = *v2;
+            if (!r.comma() || !r.expect_key("mix"))
+                return -1;
+            auto v3 = r.read_float();
+            if (!v3)
+                return -1;
+            p.chorus.mix = *v3;
+            if (!r.expect('}'))
+                return -1;
             return 1;
         }
         if (key == "tubesat") {
-            if (!r.expect('{')) return -1;
-            if (!r.expect_key("drive")) return -1;
-            auto v1 = r.read_float(); if (!v1) return -1; p.tubesat.drive = *v1;
-            if (!r.comma() || !r.expect_key("mix")) return -1;
-            auto v2 = r.read_float(); if (!v2) return -1; p.tubesat.mix = *v2;
-            if (!r.expect('}')) return -1;
+            if (!r.expect('{'))
+                return -1;
+            if (!r.expect_key("drive"))
+                return -1;
+            auto v1 = r.read_float();
+            if (!v1)
+                return -1;
+            p.tubesat.drive = *v1;
+            if (!r.comma() || !r.expect_key("mix"))
+                return -1;
+            auto v2 = r.read_float();
+            if (!v2)
+                return -1;
+            p.tubesat.mix = *v2;
+            if (!r.expect('}'))
+                return -1;
             return 1;
         }
         if (key == "reverb_send_hpf_hz") {
-            auto v = r.read_float(); if (!v) return -1; p.reverb_send_hpf_hz = *v;
+            auto v = r.read_float();
+            if (!v)
+                return -1;
+            p.reverb_send_hpf_hz = *v;
             return 1;
         }
         if (key == "rationale") {
             auto rs = r.read_string();
-            if (!rs) return -1;
+            if (!rs)
+                return -1;
             const size_t n = std::min(rs->size(), sizeof(p.rationale) - 1);
             std::memcpy(p.rationale, rs->data(), n);
             p.rationale[n] = '\0';
@@ -614,8 +642,8 @@ std::optional<PatchStruct> GrammarSampler::parse_patch_json(const std::string& j
     };
     // Try each optional in defined order. Each may be absent; once we hit
     // a closing brace or an unknown comma key we stop.
-    for (auto key : {std::string_view{"chorus"}, std::string_view{"tubesat"},
-                     std::string_view{"reverb_send_hpf_hz"}, std::string_view{"rationale"}}) {
+    for (auto key : {std::string_view{"chorus"}, std::string_view{"tubesat"}, std::string_view{"reverb_send_hpf_hz"},
+                     std::string_view{"rationale"}}) {
         const int rc = parseOptional(key);
         if (rc < 0)
             return std::nullopt;

@@ -224,7 +224,7 @@ std::vector<float> renderWithLfoTarget(int targetIndex, int oscType = -1) {
 
 bool lfoTargetChangesAudio(int targetIndex, int oscType = -1) {
     PluginFixture fix;
-    const auto off = renderWithLfoTarget(0, oscType);    // LfoTarget::None
+    const auto off = renderWithLfoTarget(0, oscType); // LfoTarget::None
     const auto on = renderWithLfoTarget(targetIndex, oscType);
     if (off.size() != on.size())
         return true;

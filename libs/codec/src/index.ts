@@ -1,0 +1,28 @@
+export {
+  OSC_TYPES,
+  FILTER_TYPES,
+  LFO_WAVEFORMS,
+  LFO_TARGETS,
+  KNOWN_LLM_PATCH_VERSIONS,
+  assertKnownLlmPatchVersion,
+  decodeLlmPatch,
+  convertLlmPatch,
+  validatePatch,
+} from './lib/patchCodec.ts';
+export type {
+  OscTypeName,
+  FilterTypeName,
+  LfoWaveformName,
+  LfoTargetName,
+  LlmOsc,
+  LlmFilter,
+  LlmEnv,
+  LlmLfo,
+  LlmReverb,
+  LlmDelay,
+  LlmPatch,
+  KnownLlmPatchVersion,
+  CodecErrorCode,
+  CodecError,
+  DecodeLlmPatchResult,
+} from './lib/patchCodec.ts';

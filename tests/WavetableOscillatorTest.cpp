@@ -520,8 +520,7 @@ std::vector<double> windowedMagnitudeSpectrum(const std::vector<float>& buf, int
     const int N = static_cast<int>(buf.size());
     std::vector<double> win(N);
     for (int i = 0; i < N; ++i)
-        win[i] = static_cast<double>(buf[i]) *
-                 (0.5 - 0.5 * std::cos(2.0 * std::numbers::pi * i / (N - 1)));
+        win[i] = static_cast<double>(buf[i]) * (0.5 - 0.5 * std::cos(2.0 * std::numbers::pi * i / (N - 1)));
     std::vector<double> mag(maxBins, 0.0);
     for (int k = 1; k < maxBins; ++k) {
         std::complex<double> acc(0.0, 0.0);
@@ -536,8 +535,7 @@ std::vector<double> windowedMagnitudeSpectrum(const std::vector<float>& buf, int
 
 } // namespace
 
-TEST_CASE("Default wavetable is multi-frame (frame 0 vs frame 1 differ audibly)",
-          "[wavetable][default][multi-frame]") {
+TEST_CASE("Default wavetable is multi-frame (frame 0 vs frame 1 differ audibly)", "[wavetable][default][multi-frame]") {
     // Pure static-morph delta — no LFO involved. Frame 0 (sine) vs frame 3
     // (square) must produce sample-for-sample different output and an
     // appreciable RMS difference.
@@ -561,8 +559,7 @@ TEST_CASE("Default wavetable is multi-frame (frame 0 vs frame 1 differ audibly)"
     REQUIRE(rmsDelta > 0.05);
 }
 
-TEST_CASE("Default wavetable frame 0 spectrum dominated by fundamental (sine)",
-          "[wavetable][default][spectrum]") {
+TEST_CASE("Default wavetable frame 0 spectrum dominated by fundamental (sine)", "[wavetable][default][spectrum]") {
     constexpr double kSampleRate = 44100.0;
     constexpr int N = 4096;
     const auto buf = renderDefaultAtMorph(0.0f, N);
@@ -697,8 +694,7 @@ TEST_CASE("Default wavetable square frame at MIDI 96 keeps aliasing well below f
     REQUIRE(db < -40.0);
 }
 
-TEST_CASE("Default wavetable saw frame has roughly 1/h harmonic decay",
-          "[wavetable][default][spectrum][saw]") {
+TEST_CASE("Default wavetable saw frame has roughly 1/h harmonic decay", "[wavetable][default][spectrum][saw]") {
     constexpr double kSampleRate = 44100.0;
     constexpr int N = 4096;
     // morphPos 2/3 lands exactly on frame 2 (the sawtooth) — framePos =

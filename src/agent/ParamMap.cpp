@@ -14,27 +14,17 @@ int roundedInt(float v) noexcept {
     return static_cast<int>(std::lround(v));
 }
 
-OscType oscTypeFromFloat(float v) noexcept {
-    return static_cast<OscType>(std::clamp(roundedInt(v), 0, 7));
-}
+OscType oscTypeFromFloat(float v) noexcept { return static_cast<OscType>(std::clamp(roundedInt(v), 0, 7)); }
 
-FilterType filterTypeFromFloat(float v) noexcept {
-    return static_cast<FilterType>(std::clamp(roundedInt(v), 0, 4));
-}
+FilterType filterTypeFromFloat(float v) noexcept { return static_cast<FilterType>(std::clamp(roundedInt(v), 0, 4)); }
 
-LfoWaveform lfoWaveformFromFloat(float v) noexcept {
-    return static_cast<LfoWaveform>(std::clamp(roundedInt(v), 0, 4));
-}
+LfoWaveform lfoWaveformFromFloat(float v) noexcept { return static_cast<LfoWaveform>(std::clamp(roundedInt(v), 0, 4)); }
 
-LfoTarget lfoTargetFromFloat(float v) noexcept {
-    return static_cast<LfoTarget>(std::clamp(roundedInt(v), 0, 6));
-}
+LfoTarget lfoTargetFromFloat(float v) noexcept { return static_cast<LfoTarget>(std::clamp(roundedInt(v), 0, 6)); }
 
 bool boolFromFloat(float v) noexcept { return v >= 0.5f; }
 
-uint8_t voiceCountFromFloat(float v) noexcept {
-    return static_cast<uint8_t>(std::clamp(roundedInt(v), 1, 16));
-}
+uint8_t voiceCountFromFloat(float v) noexcept { return static_cast<uint8_t>(std::clamp(roundedInt(v), 1, 16)); }
 
 // One row per UI param path. This is the C++ side of the React PatchParams
 // control surface: every editable synth field gets one literal dotted path.

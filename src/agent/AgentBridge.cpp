@@ -2,8 +2,8 @@
 
 #include <algorithm>
 #include <cmath>
-#include <iostream>
 #include <initializer_list>
+#include <iostream>
 #include <juce_core/juce_core.h>
 #include <juce_events/juce_events.h>
 #include <string_view>
@@ -156,7 +156,8 @@ PatchStruct AgentBridge::patchFromVar(const juce::var& payload) {
             auto* o = oscs->getReference(i).getDynamicObject();
             if (o == nullptr)
                 continue;
-            p.osc[i].type = static_cast<OscType>(enumIndex(static_cast<float>(propNumber(o, "type", static_cast<int>(p.osc[i].type))), 0, 7));
+            p.osc[i].type = static_cast<OscType>(
+                enumIndex(static_cast<float>(propNumber(o, "type", static_cast<int>(p.osc[i].type))), 0, 7));
             p.osc[i].semitone_offset = static_cast<float>(propNumber(o, "semitone_offset", p.osc[i].semitone_offset));
             p.osc[i].detune_cents = static_cast<float>(propNumber(o, "detune_cents", p.osc[i].detune_cents));
             p.osc[i].wavetable_pos = static_cast<float>(propNumber(o, "wavetable_pos", p.osc[i].wavetable_pos));
@@ -170,7 +171,8 @@ PatchStruct AgentBridge::patchFromVar(const juce::var& payload) {
     }
 
     if (auto* f = propObject(obj, "filter")) {
-        p.filter.type = static_cast<FilterType>(enumIndex(static_cast<float>(propNumber(f, "type", static_cast<int>(p.filter.type))), 0, 4));
+        p.filter.type = static_cast<FilterType>(
+            enumIndex(static_cast<float>(propNumber(f, "type", static_cast<int>(p.filter.type))), 0, 4));
         p.filter.cutoff_hz = static_cast<float>(propNumber(f, "cutoff_hz", p.filter.cutoff_hz));
         p.filter.resonance = static_cast<float>(propNumber(f, "resonance", p.filter.resonance));
         p.filter.env_mod = static_cast<float>(propNumber(f, "env_mod", p.filter.env_mod));
@@ -195,8 +197,10 @@ PatchStruct AgentBridge::patchFromVar(const juce::var& payload) {
             auto* l = lfos->getReference(i).getDynamicObject();
             if (l == nullptr)
                 continue;
-            p.lfo[i].waveform = static_cast<LfoWaveform>(enumIndex(static_cast<float>(propNumber(l, "waveform", static_cast<int>(p.lfo[i].waveform))), 0, 4));
-            p.lfo[i].target = static_cast<LfoTarget>(enumIndex(static_cast<float>(propNumber(l, "target", static_cast<int>(p.lfo[i].target))), 0, 6));
+            p.lfo[i].waveform = static_cast<LfoWaveform>(
+                enumIndex(static_cast<float>(propNumber(l, "waveform", static_cast<int>(p.lfo[i].waveform))), 0, 4));
+            p.lfo[i].target = static_cast<LfoTarget>(
+                enumIndex(static_cast<float>(propNumber(l, "target", static_cast<int>(p.lfo[i].target))), 0, 6));
             p.lfo[i].rate_hz = static_cast<float>(propNumber(l, "rate_hz", p.lfo[i].rate_hz));
             p.lfo[i].depth = static_cast<float>(propNumber(l, "depth", p.lfo[i].depth));
             p.lfo[i].phase_offset = static_cast<float>(propNumber(l, "phase_offset", p.lfo[i].phase_offset));
@@ -235,7 +239,8 @@ PatchStruct AgentBridge::patchFromVar(const juce::var& payload) {
 
     p.master_gain = static_cast<float>(propNumber(obj, "master_gain", p.master_gain));
     p.portamento_s = static_cast<float>(propNumber(obj, "portamento_s", p.portamento_s));
-    p.voice_count = static_cast<uint8_t>(enumIndex(static_cast<float>(propNumber(obj, "voice_count", p.voice_count)), 1, 16));
+    p.voice_count =
+        static_cast<uint8_t>(enumIndex(static_cast<float>(propNumber(obj, "voice_count", p.voice_count)), 1, 16));
     return p;
 }
 
@@ -249,8 +254,8 @@ juce::var AgentBridge::modulationPlanForPatch(const PatchStruct& p) {
 
     macros.add(macroVar(dark ? "GRIP" : "BRIGHTNESS",
                         {routeVar("filter.cutoff_hz", dark ? 0.65 : 0.8), routeVar("filter.resonance", 0.2)}));
-    macros.add(macroVar(hasMotion ? "WOBBLE" : "MOTION",
-                        {routeVar("lfo.0.depth", 0.65), routeVar("lfo.0.rate_hz", 0.25)}));
+    macros.add(
+        macroVar(hasMotion ? "WOBBLE" : "MOTION", {routeVar("lfo.0.depth", 0.65), routeVar("lfo.0.rate_hz", 0.25)}));
     if (hasFm) {
         macros.add(macroVar("EDGE", {routeVar("osc.0.fm_depth", 0.55), routeVar("filter.drive", 0.35)}));
     } else if (hasWavetable) {
@@ -258,7 +263,8 @@ juce::var AgentBridge::modulationPlanForPatch(const PatchStruct& p) {
     } else {
         macros.add(macroVar("WIDTH", {routeVar("osc.1.detune_cents", 0.25), routeVar("osc.2.detune_cents", -0.25)}));
     }
-    macros.add(macroVar("SPACE", {routeVar("reverb.mix", 0.45), routeVar("delay.mix", 0.3), routeVar("delay.stereo", 0.35)}));
+    macros.add(
+        macroVar("SPACE", {routeVar("reverb.mix", 0.45), routeVar("delay.mix", 0.3), routeVar("delay.stereo", 0.35)}));
 
     auto* mod = new juce::DynamicObject{};
     mod->setProperty("macros", juce::var{macros});
@@ -467,9 +473,7 @@ AgentBridge::SubscriberHandle AgentBridge::onEnhancement(Callback cb) {
 AgentBridge::SubscriberHandle AgentBridge::onVariationsReady(Callback cb) {
     return subscribe(variationsReadySlots_, std::move(cb));
 }
-AgentBridge::SubscriberHandle AgentBridge::onFailure(Callback cb) {
-    return subscribe(failureSlots_, std::move(cb));
-}
+AgentBridge::SubscriberHandle AgentBridge::onFailure(Callback cb) { return subscribe(failureSlots_, std::move(cb)); }
 AgentBridge::SubscriberHandle AgentBridge::onPresetCommitted(Callback cb) {
     return subscribe(presetCommittedSlots_, std::move(cb));
 }
@@ -479,9 +483,7 @@ AgentBridge::SubscriberHandle AgentBridge::onBounceComplete(Callback cb) {
 AgentBridge::SubscriberHandle AgentBridge::onMidiLearned(Callback cb) {
     return subscribe(midiLearnedSlots_, std::move(cb));
 }
-AgentBridge::SubscriberHandle AgentBridge::onHumPitch(Callback cb) {
-    return subscribe(humPitchSlots_, std::move(cb));
-}
+AgentBridge::SubscriberHandle AgentBridge::onHumPitch(Callback cb) { return subscribe(humPitchSlots_, std::move(cb)); }
 
 void AgentBridge::notifyToken(const juce::var& payload) { dispatch(tokenSlots_, payload); }
 void AgentBridge::notifyPatch(const juce::var& payload) { dispatch(patchSlots_, payload); }
@@ -535,14 +537,12 @@ std::string AgentBridge::getPresetsJson() const {
     return juce::JSON::toString(juce::var{root}).toStdString();
 }
 
-void AgentBridge::deletePreset(const std::string& name) {
-    PresetStore::instance().deleteByName(name);
-}
+void AgentBridge::deletePreset(const std::string& name) { PresetStore::instance().deleteByName(name); }
 
 // ── Phase D / #268 (partial) — audio bounce ──────────────────────────────────
 
 void AgentBridge::bouncePatchToFile(const PatchStruct& patch, const juce::File& dest) {
-    engine::BounceConfig cfg;  // defaults: 4s @ 48k/24-bit stereo, C3, hold 3s
+    engine::BounceConfig cfg; // defaults: 4s @ 48k/24-bit stereo, C3, hold 3s
     const bool ok = engine::renderPatchToWav(patch, dest, cfg);
     auto* obj = new juce::DynamicObject{};
     obj->setProperty("ok", ok);
@@ -781,32 +781,46 @@ void AgentBridge::postMidiNote(int note, float velocity, int durationMs) {
 }
 
 void AgentBridge::postMidiNoteOn(int note, float velocity) {
-    if (note < 0) note = 0;
-    if (note > 127) note = 127;
-    if (velocity < 0.0f) velocity = 0.0f;
-    if (velocity > 1.0f) velocity = 1.0f;
+    if (note < 0)
+        note = 0;
+    if (note > 127)
+        note = 127;
+    if (velocity < 0.0f)
+        velocity = 0.0f;
+    if (velocity > 1.0f)
+        velocity = 1.0f;
     MidiNoteSink sinkCopy;
     {
         std::lock_guard<std::mutex> lock(midiSinkMutex_);
         sinkCopy = midiNoteSink_;
     }
-    if (!sinkCopy) return;
+    if (!sinkCopy)
+        return;
     auto* mm = juce::MessageManager::getInstanceWithoutCreating();
-    if (mm == nullptr) { sinkCopy(note, velocity, true); return; }
+    if (mm == nullptr) {
+        sinkCopy(note, velocity, true);
+        return;
+    }
     juce::MessageManager::callAsync([sinkCopy, note, velocity]() { sinkCopy(note, velocity, true); });
 }
 
 void AgentBridge::postMidiNoteOff(int note) {
-    if (note < 0) note = 0;
-    if (note > 127) note = 127;
+    if (note < 0)
+        note = 0;
+    if (note > 127)
+        note = 127;
     MidiNoteSink sinkCopy;
     {
         std::lock_guard<std::mutex> lock(midiSinkMutex_);
         sinkCopy = midiNoteSink_;
     }
-    if (!sinkCopy) return;
+    if (!sinkCopy)
+        return;
     auto* mm = juce::MessageManager::getInstanceWithoutCreating();
-    if (mm == nullptr) { sinkCopy(note, 0.0f, false); return; }
+    if (mm == nullptr) {
+        sinkCopy(note, 0.0f, false);
+        return;
+    }
     juce::MessageManager::callAsync([sinkCopy, note]() { sinkCopy(note, 0.0f, false); });
 }
 

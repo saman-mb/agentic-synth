@@ -15,3 +15,5 @@
 *.png binary
 *.vst3 binary
 *.wav binary
+*.f32le binary
+tests/golden/ref/*.bin binary

@@ -37,8 +37,7 @@ struct GuiFixture {
 };
 } // namespace
 
-TEST_CASE("WebUiComponent dtor drains a long-running worker without UAF",
-          "[WebUiComponent][WorkerPool][Lifecycle]") {
+TEST_CASE("WebUiComponent dtor drains a long-running worker without UAF", "[WebUiComponent][WorkerPool][Lifecycle]") {
     GuiFixture fix;
     AgentBridge bridge;
 
@@ -81,7 +80,8 @@ TEST_CASE("WebUiComponent dtor drains a long-running worker without UAF",
         const auto destroyStart = std::chrono::steady_clock::now();
         component.reset();
         const auto destroyMs =
-            std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - destroyStart).count();
+            std::chrono::duration_cast<std::chrono::milliseconds>(std::chrono::steady_clock::now() - destroyStart)
+                .count();
 
         // The dtor must NOT block for the worker's natural duration (30 s);
         // cancellation should kick in within tens of ms. Allow a generous
@@ -129,8 +129,7 @@ TEST_CASE("WebUiComponent worker pool runs multiple concurrent jobs cleanly",
     component.reset();
 }
 
-TEST_CASE("WebUiComponent worker pool does not regress subscriber wiring",
-          "[WebUiComponent][WorkerPool][Regression]") {
+TEST_CASE("WebUiComponent worker pool does not regress subscriber wiring", "[WebUiComponent][WorkerPool][Regression]") {
     // Cheap sanity ping that the worker-pool refactor did not perturb the
     // existing subscriber-count contract pinned by WebUiComponentEmissionTest.
     GuiFixture fix;

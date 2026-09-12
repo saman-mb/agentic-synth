@@ -1,0 +1,350 @@
+{
+  "sample_rate": 44100,
+  "frames": 44100,
+  "channels": 2,
+  "format": "f32le_interleaved",
+  "patch_struct_size": 828,
+  "event_size": 12,
+  "event_endian": "le",
+  "event_kinds": {
+    "NOTE_ON": 1,
+    "NOTE_OFF": 2
+  },
+  "graph": "VoiceManager → createEffectRack → GainNode → OfflineAudioContext.destination",
+  "engine": "WebAudio OfflineAudioContext (not WebSynthEngine)",
+  "tolerances": {
+    "wasm_native": "memcmp",
+    "wasm_native_fm_peak_abs": 0.001,
+    "webaudio": {
+      "same_length": true,
+      "no_nan_inf": true,
+      "rms_ratio": [
+        0.25,
+        4
+      ],
+      "bucket_cosine": {
+        "buckets": 10,
+        "min": 0.85
+      },
+      "err_rms_ratio": 1.6,
+      "err_rms_ratio_by_id": {
+        "pulse": 2.5,
+        "tri": 2.5,
+        "wavetable": 2.5,
+        "fm": 2.5
+      },
+      "peak_abs_err": 2
+    }
+  },
+  "pcm_generated": [
+    "sine",
+    "tri",
+    "saw",
+    "square",
+    "pulse",
+    "wavetable",
+    "fm",
+    "noise",
+    "lp-filter-env",
+    "lfo-pitch-cutoff",
+    "delay-reverb-wet",
+    "acid-303-like"
+  ],
+  "patches": [
+    {
+      "id": "sine",
+      "title": "Sine oscillator",
+      "pcm": "ref/sine.f32le",
+      "patch": "ref/sine.patch.bin",
+      "events": "ref/sine.events.bin",
+      "json": "patches/sine.json",
+      "event_list": [
+        {
+          "kind": 1,
+          "note": 60,
+          "velocity": 100,
+          "cc": 0,
+          "sample_offset": 0
+        },
+        {
+          "kind": 1,
+          "note": 60,
+          "velocity": 100,
+          "cc": 0,
+          "sample_offset": 10000
+        },
+        {
+          "kind": 2,
+          "note": 60,
+          "velocity": 0,
+          "cc": 0,
+          "sample_offset": 22050
+        }
+      ]
+    },
+    {
+      "id": "tri",
+      "title": "Triangle oscillator",
+      "pcm": "ref/tri.f32le",
+      "patch": "ref/tri.patch.bin",
+      "events": "ref/tri.events.bin",
+      "json": "patches/tri.json",
+      "event_list": [
+        {
+          "kind": 1,
+          "note": 60,
+          "velocity": 100,
+          "cc": 0,
+          "sample_offset": 0
+        },
+        {
+          "kind": 2,
+          "note": 60,
+          "velocity": 0,
+          "cc": 0,
+          "sample_offset": 22050
+        }
+      ]
+    },
+    {
+      "id": "saw",
+      "title": "Sawtooth oscillator",
+      "pcm": "ref/saw.f32le",
+      "patch": "ref/saw.patch.bin",
+      "events": "ref/saw.events.bin",
+      "json": "patches/saw.json",
+      "event_list": [
+        {
+          "kind": 1,
+          "note": 60,
+          "velocity": 100,
+          "cc": 0,
+          "sample_offset": 0
+        },
+        {
+          "kind": 2,
+          "note": 60,
+          "velocity": 0,
+          "cc": 0,
+          "sample_offset": 22050
+        }
+      ]
+    },
+    {
+      "id": "square",
+      "title": "Square oscillator",
+      "pcm": "ref/square.f32le",
+      "patch": "ref/square.patch.bin",
+      "events": "ref/square.events.bin",
+      "json": "patches/square.json",
+      "event_list": [
+        {
+          "kind": 1,
+          "note": 60,
+          "velocity": 100,
+          "cc": 0,
+          "sample_offset": 0
+        },
+        {
+          "kind": 2,
+          "note": 60,
+          "velocity": 0,
+          "cc": 0,
+          "sample_offset": 22050
+        }
+      ]
+    },
+    {
+      "id": "pulse",
+      "title": "Pulse oscillator",
+      "pcm": "ref/pulse.f32le",
+      "patch": "ref/pulse.patch.bin",
+      "events": "ref/pulse.events.bin",
+      "json": "patches/pulse.json",
+      "event_list": [
+        {
+          "kind": 1,
+          "note": 60,
+          "velocity": 100,
+          "cc": 0,
+          "sample_offset": 0
+        },
+        {
+          "kind": 2,
+          "note": 60,
+          "velocity": 0,
+          "cc": 0,
+          "sample_offset": 22050
+        }
+      ]
+    },
+    {
+      "id": "wavetable",
+      "title": "Wavetable oscillator",
+      "pcm": "ref/wavetable.f32le",
+      "patch": "ref/wavetable.patch.bin",
+      "events": "ref/wavetable.events.bin",
+      "json": "patches/wavetable.json",
+      "event_list": [
+        {
+          "kind": 1,
+          "note": 60,
+          "velocity": 100,
+          "cc": 0,
+          "sample_offset": 0
+        },
+        {
+          "kind": 2,
+          "note": 60,
+          "velocity": 0,
+          "cc": 0,
+          "sample_offset": 22050
+        }
+      ]
+    },
+    {
+      "id": "fm",
+      "title": "Two-operator FM",
+      "pcm": "ref/fm.f32le",
+      "patch": "ref/fm.patch.bin",
+      "events": "ref/fm.events.bin",
+      "json": "patches/fm.json",
+      "event_list": [
+        {
+          "kind": 1,
+          "note": 60,
+          "velocity": 100,
+          "cc": 0,
+          "sample_offset": 0
+        },
+        {
+          "kind": 2,
+          "note": 60,
+          "velocity": 0,
+          "cc": 0,
+          "sample_offset": 22050
+        }
+      ]
+    },
+    {
+      "id": "noise",
+      "title": "Noise oscillator",
+      "pcm": "ref/noise.f32le",
+      "patch": "ref/noise.patch.bin",
+      "events": "ref/noise.events.bin",
+      "json": "patches/noise.json",
+      "event_list": [
+        {
+          "kind": 1,
+          "note": 60,
+          "velocity": 100,
+          "cc": 0,
+          "sample_offset": 0
+        },
+        {
+          "kind": 2,
+          "note": 60,
+          "velocity": 0,
+          "cc": 0,
+          "sample_offset": 22050
+        }
+      ]
+    },
+    {
+      "id": "lp-filter-env",
+      "title": "Low-pass + filter envelope",
+      "pcm": "ref/lp-filter-env.f32le",
+      "patch": "ref/lp-filter-env.patch.bin",
+      "events": "ref/lp-filter-env.events.bin",
+      "json": "patches/lp-filter-env.json",
+      "event_list": [
+        {
+          "kind": 1,
+          "note": 60,
+          "velocity": 100,
+          "cc": 0,
+          "sample_offset": 0
+        },
+        {
+          "kind": 2,
+          "note": 60,
+          "velocity": 0,
+          "cc": 0,
+          "sample_offset": 22050
+        }
+      ]
+    },
+    {
+      "id": "lfo-pitch-cutoff",
+      "title": "LFO → pitch and cutoff",
+      "pcm": "ref/lfo-pitch-cutoff.f32le",
+      "patch": "ref/lfo-pitch-cutoff.patch.bin",
+      "events": "ref/lfo-pitch-cutoff.events.bin",
+      "json": "patches/lfo-pitch-cutoff.json",
+      "event_list": [
+        {
+          "kind": 1,
+          "note": 60,
+          "velocity": 100,
+          "cc": 0,
+          "sample_offset": 0
+        },
+        {
+          "kind": 2,
+          "note": 60,
+          "velocity": 0,
+          "cc": 0,
+          "sample_offset": 22050
+        }
+      ]
+    },
+    {
+      "id": "delay-reverb-wet",
+      "title": "Delay + reverb wet",
+      "pcm": "ref/delay-reverb-wet.f32le",
+      "patch": "ref/delay-reverb-wet.patch.bin",
+      "events": "ref/delay-reverb-wet.events.bin",
+      "json": "patches/delay-reverb-wet.json",
+      "event_list": [
+        {
+          "kind": 1,
+          "note": 60,
+          "velocity": 100,
+          "cc": 0,
+          "sample_offset": 0
+        },
+        {
+          "kind": 2,
+          "note": 60,
+          "velocity": 0,
+          "cc": 0,
+          "sample_offset": 22050
+        }
+      ]
+    },
+    {
+      "id": "acid-303-like",
+      "title": "Acid 303-like",
+      "pcm": "ref/acid-303-like.f32le",
+      "patch": "ref/acid-303-like.patch.bin",
+      "events": "ref/acid-303-like.events.bin",
+      "json": "patches/acid-303-like.json",
+      "event_list": [
+        {
+          "kind": 1,
+          "note": 60,
+          "velocity": 100,
+          "cc": 0,
+          "sample_offset": 0
+        },
+        {
+          "kind": 2,
+          "note": 60,
+          "velocity": 0,
+          "cc": 0,
+          "sample_offset": 22050
+        }
+      ]
+    }
+  ]
+}

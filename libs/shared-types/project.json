@@ -1,0 +1,21 @@
+{
+  "name": "shared-types",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/shared-types/src",
+  "projectType": "library",
+  "tags": ["type:lib", "scope:shared", "layer:types"],
+  "targets": {
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx eslint libs/shared-types"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node -e \"console.log('shared-types: no unit tests yet')\""
+      }
+    }
+  }
+}

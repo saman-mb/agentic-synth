@@ -1,0 +1,22 @@
+{
+  "name": "prompt",
+  "$schema": "../../node_modules/nx/schemas/project-schema.json",
+  "sourceRoot": "libs/prompt/src",
+  "projectType": "library",
+  "tags": ["type:lib", "scope:shared", "layer:feature"],
+  "implicitDependencies": [],
+  "targets": {
+    "lint": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "npx eslint libs/prompt"
+      }
+    },
+    "test": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node --experimental-strip-types --test libs/prompt/src/**/*.test.ts"
+      }
+    }
+  }
+}

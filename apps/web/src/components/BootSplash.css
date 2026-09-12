@@ -1,0 +1,46 @@
+/* BootSplash — hero-animation opening moment (REBRAND.md §10).
+   The splash plays /timbre-hero.gif for a guaranteed 3s floor (the GIF is a
+   3.6s seamless loop, so the floor lands mid-loop and the crossfade away
+   never reads as "the animation ended"). Reduced-motion users see the static
+   poster instead. */
+
+.boot-splash {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: #0A0714; /* matches the GIF's card edge so it blends edge-to-edge */
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none; /* never blocks anything; auto-dismounts at 3400ms */
+  opacity: 1;
+  transition: opacity 400ms var(--ease-considered);
+}
+
+.boot-splash-fade {
+  opacity: 0;
+}
+
+.boot-splash-stage {
+  position: relative;
+  width: min(960px, 90vw);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.boot-splash-hero {
+  width: 100%;
+  height: auto;
+  display: block;
+  user-select: none;
+  /* the GIF's own radial-fade card blends into the splash background */
+  border-radius: 12px;
+  box-shadow: 0 0 80px rgba(124, 77, 255, 0.18);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boot-splash {
+    transition-duration: 1ms;
+  }
+}

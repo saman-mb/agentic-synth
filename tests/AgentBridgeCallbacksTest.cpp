@@ -512,4 +512,3 @@ TEST_CASE("AgentBridge: generateRationale falls back to heuristic when patch.rat
     CHECK_FALSE(out.empty());
     CHECK(out.find("I chose a") == std::string::npos);
 }
-

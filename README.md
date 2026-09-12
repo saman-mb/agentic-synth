@@ -1,16 +1,18 @@
 <div align="center">
 
-# 🎛️ TIMBRE
+# 🎛️ Tambra
+
+<img src="docs/timbre-hero.gif" alt="Tambra — an animated explosion of energy bursting into a waveform, purple, pink and yellow, with the wordmark Tambra — Say it. Hear it." width="640" />
 
 ### **Say it. Hear it.**
 
 *An agent-driven **VST3 / AU / Standalone Synthesizer** powered by Gemini 2.5, JUCE 8, and C++20.*
 
 [![CI Status](https://img.shields.io/github/actions/workflow/status/saman-mb/agentic-synth/ci.yml?branch=main&style=for-the-badge&logo=github&logoColor=white&label=CI)](https://github.com/saman-mb/agentic-synth/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=for-the-badge&logo=opensourceinitiative&logoColor=white)](LICENSE)
+[![License: PolyForm Noncommercial](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-orange.svg?style=for-the-badge)](LICENSE)
 [![C++20](https://img.shields.io/badge/C%2B%2B-20-00599C.svg?style=for-the-badge&logo=cplusplus&logoColor=white)](https://en.cppreference.com/w/cpp/20)
 [![JUCE 8](https://img.shields.io/badge/JUCE-8-8DC63F.svg?style=for-the-badge&logo=juce&logoColor=white)](https://juce.com/)
-[![React 18](https://img.shields.io/badge/React-18-61DAFB.svg?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
+[![React 19](https://img.shields.io/badge/React-19-61DAFB.svg?style=for-the-badge&logo=react&logoColor=black)](https://react.dev/)
 
 [![Platforms](https://img.shields.io/badge/Platforms-macOS%20%7C%20Windows%20%7C%20Linux-lightgrey.svg?style=flat-square&logo=apple&logoColor=white)](#1-requirements)
 [![Formats](https://img.shields.io/badge/Formats-VST3%20%7C%20AU%20%7C%20Standalone-7C4DFF.svg?style=flat-square&logo=audio-technica&logoColor=white)](#-build-outputs)
@@ -54,6 +56,92 @@ audio thread.
 
 ---
 
+---
+
+## 🌐 Live demo (web)
+
+The same React UI runs in a browser at the Netlify demo site, backed by a
+Netlify Function that calls Gemini 2.5 server-side. The plugin binaries are
+untouched — the browser shim swaps the JUCE native bridge for
+`fetch("/api/generate")`, and audio renders through the C++ DSP core
+compiled to WASM (`createSynthEngine()` returns `WasmSynthEngine`). Tempo
+sync is the C++ engine's own behaviour, not a WebAudio approximation.
+
+`/agsynth.js` and `/agsynth.wasm` are served from `apps/web` public after
+Vite copies `npx nx run wasm:build-wasm` (`dist/wasm/agsynth.js` +
+`dist/wasm/agsynth.wasm`). Production Netlify deploys run that wasm
+build in `.github/workflows/deploy.yml` before `nx build web`.
+
+Known gaps vs the native plugin:
+
+- Chorus, tube saturation, and reverb-send HPF use mapper bypass defaults
+  (mix 0 / drive 0 / HPF 0). The `PatchParams` schema does not include
+  those fields, so they are not agent-addressable from the demo.
+- Missing WASM or a module-init failure: `ensureStarted()` rejects and
+  `juceShim` emits `error` — no silent WebAudio fallback, no blank screen.
+- Rate limits (#309): durable tiered limits on `/api/brief` and
+  `/api/generate` (demo 3/min + 200/day UTC; paid 30/min + 2000/day).
+  Backed by Netlify Blobs by default (`RATE_LIMIT_STORE=memory` for
+  local/tests). Store failure fails closed (`RATE_LIMIT_FAIL_MODE`).
+  Paid access (#312): `POST /api/entitlement` exchanges a store receipt
+  for a short-lived HS256 JWT (`ENTITLEMENT_SIGNING_KEY`); Bearer token
+  unlocks paid tier. Stub receipts (`test:…`) only when explicitly enabled
+  (`ENTITLEMENT_ALLOW_STUB_RECEIPTS=1`). See `docs/runbooks/entitlement.md`.
+- Global Gemini quota (#310): UTC-day call + estimated-cost caps
+  (`GEMINI_DAILY_CALL_CAP`, `GEMINI_DAILY_COST_CAP_USD`) after identity
+  allow; 503 `capacity_exhausted` with no Gemini call when tripped.
+- Alerts (#313): 80% spend warn, hard-cap trip, elevated error rate, and
+  429 abuse — structured logs and optional `ALERT_WEBHOOK_URL`, with
+  runbooks under `docs/runbooks/`.
+
+The Gemini key is server-side only — it lives in the Netlify site env vars
+and is never shipped to the client. Prompts are sent to Gemini; see the
+[Privacy Statement](docs/privacy-statement.md) (web demo section) for mic,
+rate-limit identity, and retention details.
+
+### Owner deploy checklist
+
+1. Create a Netlify site linked to this repo (deploy from `apps/web/dist`)
+2. Set `NETLIFY_SITE_ID` and `NETLIFY_AUTH_TOKEN` as GitHub repo secrets
+3. Set `GEMINI_KEY` in the Netlify site env vars (dedicated project/key;
+   tune billing alerts to your spend tolerance)
+4. Raise the function timeout to 26 s in the Netlify UI (free-tier default
+   is 10 s; the handler enforces its own 24 s deadline)
+5. Fail-closed backstops (leave unset or set explicitly):
+   `RATE_LIMIT_FAIL_MODE=closed`, `QUOTA_FAIL_MODE=closed`
+6. Global Gemini quota caps — set intentionally for prod (defaults are generous):
+   `GEMINI_DAILY_CALL_CAP`, `GEMINI_DAILY_COST_CAP_USD`,
+   `GEMINI_EST_USD_PER_BRIEF`, `GEMINI_EST_USD_PER_GENERATE`
+7. Optional ops alerts: `ALERT_WEBHOOK_URL` (see `docs/runbooks/gemini-spend.md`)
+8. Paid entitlement (before mobile paid launch — **do not enable stub in prod**):
+   - `ENTITLEMENT_SIGNING_KEY` (≥32 chars; server-only)
+   - `ENTITLEMENT_RECEIPT_MODE=apple`
+   - `APPLE_SHARED_SECRET`, `APPLE_BUNDLE_ID` (optional `APPLE_PRODUCT_ID`)
+   - **Do not set** `ENTITLEMENT_ALLOW_STUB_RECEIPTS=1` in production
+   - See `docs/runbooks/entitlement.md`
+
+### Run the web demo locally
+
+```sh
+node scripts/sync-prompts.mjs        # generates gitignored prompt constants
+npx nx run wasm:build-wasm           # dist/wasm/agsynth.js + agsynth.wasm
+npx nx serve web                     # UI + browser shim on http://localhost:5173
+```
+
+The Vite-only server above does **not** serve `/api/generate` — generation
+fails there. To exercise the real endpoint locally, install the Netlify CLI
+(`npm i -g netlify-cli`) and run from the repo root — one process serves the
+UI and the function together (see `[dev]` in `netlify.toml`):
+
+```sh
+node scripts/sync-prompts.mjs
+npm ci
+npx nx run wasm:build-wasm
+GEMINI_KEY=your-key netlify dev      # http://localhost:8888
+```
+
+---
+
 ## 🚀 Quick start
 
 ### 1. Requirements
@@ -62,9 +150,10 @@ audio thread.
 |---|---|
 | **CMake** ≥ 3.24 | Build system |
 | **C++20 toolchain** | Clang, MSVC, or GCC |
-| **Node.js 20** + npm | Builds the React UI |
+| **Node.js 22** + npm | Builds the React UI (`nx test` uses `--experimental-strip-types`) |
 | **Gemini API key** | Required for LLM patch generation — see [step 3](#3-configure-your-api-key) |
 | **WebView runtime** | macOS: WKWebView (built in) · Windows: [WebView2](https://developer.microsoft.com/microsoft-edge/webview2/) · Linux: `libwebkit2gtk-4.1-0` + `-dev` |
+| **Emscripten** | Only for the browser demo — the desktop app and plugin run the C++ engine natively. Version pinned in `cmake/emscripten-version`. |
 
 ### 2. Build
 
@@ -75,7 +164,7 @@ git submodule update --init --recursive
 
 # Build the React UI first — it is embedded into the binary, so it must
 # exist before the CMake build runs.
-cd ui && npm ci && npx vite build && cd ..
+npm ci && npx nx build web
 
 cmake -S . -B build -DAGENTIC_SYNTH_BUILD_PLUGIN=ON
 cmake --build build --parallel
@@ -84,7 +173,7 @@ ctest --test-dir build --output-on-failure
 
 ### 3. Configure your API key
 
-TIMBRE calls Google Gemini to turn language into patches. Without a key the
+Tambra calls Google Gemini to turn language into patches. Without a key the
 agent falls back to a keyword heuristic — it works, but it is much blunter.
 
 ```sh
@@ -134,7 +223,7 @@ Vite dev server:
 
 ```sh
 # Terminal 1
-cd ui && npm run dev            # http://localhost:5173
+npx nx serve web                # http://localhost:5173
 
 # Terminal 2
 cmake -B build -DAGENTIC_SYNTH_UI_DEV=ON
@@ -159,6 +248,9 @@ DURATION=60 scripts/record-demo.sh demo.mp4
 
 ```
 agentic-synth/
+├── apps/
+│   └── web/        # React + TypeScript + Vite (Nx project `web`)
+├── libs/           # shared-types, data, engine-bridge, codec, prompt, modval
 ├── cmake/          # CMake modules
 ├── docs/           # Architecture, guides, ADRs
 ├── scripts/        # Model download, plugin validation, demo capture
@@ -166,12 +258,13 @@ agentic-synth/
 │   ├── agent/      # LLM bridge, telemetry, MIDI learn, morph loop
 │   ├── cli/        # Headless patch generation
 │   ├── engine/     # DSP: oscillators, filters, envelopes, effects
+│   ├── wasm/       # Emscripten glue over the C API
+│   ├── jsi/        # React Native JSI host + native AudioStream
 │   ├── mapper/     # NL → parameters: RAG, samplers, heuristics
 │   ├── plugin/     # JUCE AudioProcessor + editor
 │   └── ui/         # WebView host and native↔JS bridge
 ├── tests/          # Catch2 suite
-├── third_party/    # JUCE + llama.cpp submodules
-└── ui/             # React + TypeScript + Vite front-end
+└── third_party/    # JUCE + llama.cpp submodules
 ```
 
 ---
@@ -182,12 +275,13 @@ agentic-synth/
 |---|---|
 | [Getting Started](docs/getting-started.md) | Install, launch, first patch |
 | [Architecture](docs/architecture.md) | How the pieces fit together |
+| [Nx boundaries (ADR-0008)](docs/adr/ADR-0008-nx-workspace-boundaries.md) | Apps, tagged libs, engine-bridge attach |
 | [Audio Engine](docs/audio-engine.md) | Signal flow, patch contract, DSP internals |
 | [Timbre Profile Map](docs/timbre-profile-map.md) | The sound-design range available |
 | [Mod Matrix Guide](docs/mod-matrix-guide.md) | Routing modulation |
 | [Local Inference](docs/local-inference.md) | Running an LLM on your own hardware |
 | [Build & Release](docs/build-release.md) | Packaging and signing |
-| [Privacy Statement](docs/privacy-statement.md) | What leaves your machine |
+| [Privacy Statement](docs/privacy-statement.md) | Mic, Gemini prompts, web demo + mobile entitlement, deletion contact |
 
 Full index: [`docs/index.md`](docs/index.md)
 
@@ -225,7 +319,9 @@ and pre-commit hooks (`pre-commit install`).
 
 ## 📄 License
 
-[MIT](LICENSE) © Nous Research
+Tambra by Tambra Labs — [PolyForm Noncommercial License 1.0.0](LICENSE). Free to use, study, modify, and share for **noncommercial** purposes.
+
+Commercial use — including forking the project to build a paid product or selling apps derived from it — requires a separate commercial license from the copyright holder. See the [LICENSE](LICENSE) for details and contact info.
 
 ---
 

@@ -18,15 +18,24 @@ namespace {
 // exact bytewise match (which would also depend on padding bytes).
 bool patchesEquivalent(const PatchStruct& a, const PatchStruct& b) noexcept {
     auto same = [](float x, float y) noexcept { return std::fabs(x - y) < 1e-4f; };
-    if (!same(a.filter.cutoff_hz, b.filter.cutoff_hz)) return false;
-    if (!same(a.filter.resonance, b.filter.resonance)) return false;
-    if (!same(a.amp_env.attack_s, b.amp_env.attack_s)) return false;
-    if (!same(a.amp_env.release_s, b.amp_env.release_s)) return false;
-    if (!same(a.reverb.size, b.reverb.size)) return false;
-    if (!same(a.reverb.mix, b.reverb.mix)) return false;
-    if (!same(a.master_gain, b.master_gain)) return false;
-    if (!same(a.osc[0].detune_cents, b.osc[0].detune_cents)) return false;
-    if (!same(a.osc[1].detune_cents, b.osc[1].detune_cents)) return false;
+    if (!same(a.filter.cutoff_hz, b.filter.cutoff_hz))
+        return false;
+    if (!same(a.filter.resonance, b.filter.resonance))
+        return false;
+    if (!same(a.amp_env.attack_s, b.amp_env.attack_s))
+        return false;
+    if (!same(a.amp_env.release_s, b.amp_env.release_s))
+        return false;
+    if (!same(a.reverb.size, b.reverb.size))
+        return false;
+    if (!same(a.reverb.mix, b.reverb.mix))
+        return false;
+    if (!same(a.master_gain, b.master_gain))
+        return false;
+    if (!same(a.osc[0].detune_cents, b.osc[0].detune_cents))
+        return false;
+    if (!same(a.osc[1].detune_cents, b.osc[1].detune_cents))
+        return false;
     return true;
 }
 
@@ -98,8 +107,8 @@ TEST_CASE("MorphLoop: heavy mutation perturbs at least one param by > 5%") {
     const float ampAttackPct = pctDelta(r.variations[0].amp_env.attack_s, base.amp_env.attack_s);
     const float gainPct = pctDelta(r.variations[0].master_gain, base.master_gain);
 
-    const bool somethingMovedHeavy = (cutoffPct > 0.05f) || (reverbSizePct > 0.05f) ||
-                                      (ampAttackPct > 0.05f) || (gainPct > 0.05f);
+    const bool somethingMovedHeavy =
+        (cutoffPct > 0.05f) || (reverbSizePct > 0.05f) || (ampAttackPct > 0.05f) || (gainPct > 0.05f);
     CHECK(somethingMovedHeavy);
 }
 
@@ -167,8 +176,7 @@ TEST_CASE("MorphLoop labeler: cutoff doubled → 'brighter'") {
     // labels are nonempty strings drawn from the expected vocabulary.
     const auto r = morph(base, {}, {}, "anything", 13u);
     static const std::vector<std::string> kVocab = {
-        "brighter", "warmer", "longer", "snappier", "wider", "drier",
-        "spread",   "tighter", "A",      "B",        "C",     "D", "E"};
+        "brighter", "warmer", "longer", "snappier", "wider", "drier", "spread", "tighter", "A", "B", "C", "D", "E"};
     for (int i = 0; i < 5; ++i) {
         bool ok = false;
         for (const auto& w : kVocab) {

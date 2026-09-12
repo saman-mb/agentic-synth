@@ -44,9 +44,7 @@ void TubeSat::setDrive(float drive01) noexcept {
     normNeg_ = (tanhNeg > 1e-6f) ? tanhNeg : 1.0f;
 }
 
-void TubeSat::setMix(float mix01) noexcept {
-    mix_ = std::clamp(mix01, 0.0f, 1.0f);
-}
+void TubeSat::setMix(float mix01) noexcept { mix_ = std::clamp(mix01, 0.0f, 1.0f); }
 
 void TubeSat::reset() noexcept {
     blockL_ = DcBlock{};

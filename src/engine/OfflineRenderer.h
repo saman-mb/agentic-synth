@@ -23,9 +23,9 @@ struct BounceConfig {
     int bit_depth{24};
     int channels{2};
     float duration_s{4.0f};
-    int midi_note{60};          // C3 = MIDI 60 in note-numbering used by TIMBRE
-    int velocity{100};          // 1..127 (mapped to 0..1 inside)
-    float note_hold_s{3.0f};    // note-on for N seconds, then release for the remainder
+    int midi_note{60};       // C3 = MIDI 60 in note-numbering used by TIMBRE
+    int velocity{100};       // 1..127 (mapped to 0..1 inside)
+    float note_hold_s{3.0f}; // note-on for N seconds, then release for the remainder
 };
 
 // Render the given patch through a fresh VoiceManager + FX chain into an

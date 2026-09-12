@@ -105,8 +105,7 @@ TEST_CASE("augmentPatch: single Sawtooth + 'warm pad' → Reese topology", "[aug
     REQUIRE(p.osc[2].volume >= 0.15f);
 }
 
-TEST_CASE("augmentPatch: noise-only + 'dark texture' → Triangle + Noise@2",
-          "[augmenter][phase23]") {
+TEST_CASE("augmentPatch: noise-only + 'dark texture' → Triangle + Noise@2", "[augmenter][phase23]") {
     // Phase 30: avoid cinematic-trigger tokens here so the noise-only path
     // is what we're exercising. "atmospheric" was reclassified as cinematic
     // intent in Phase 30; a separate test (Phase 30 noise-only-then-
@@ -143,8 +142,7 @@ TEST_CASE("augmentPatch: noise-only + 'ambient warm' → Sine fundamental", "[au
     REQUIRE(p.osc[2].type == OscType::Noise);
 }
 
-TEST_CASE("augmentPatch: single Sine + 'pure sub' → NOT modified (simple-prompt exemption)",
-          "[augmenter][phase23]") {
+TEST_CASE("augmentPatch: single Sine + 'pure sub' → NOT modified (simple-prompt exemption)", "[augmenter][phase23]") {
     PatchStruct p = singleOscPatch(OscType::Sine);
     const auto before = p;
     REQUIRE_FALSE(augmentPatch(p, "pure sub"));
@@ -248,8 +246,7 @@ TEST_CASE("augmentPatch: single Square + 'hollow lead' → generic layering", "[
     REQUIRE(p.osc[2].type == OscType::Sine);
 }
 
-TEST_CASE("augmentPatch: enabled but inaudible osc (vol < 0.15) counts as silent",
-          "[augmenter][phase23]") {
+TEST_CASE("augmentPatch: enabled but inaudible osc (vol < 0.15) counts as silent", "[augmenter][phase23]") {
     // The §0 rule 12 audibility threshold is 0.15 — an osc marked enabled
     // with volume=0.05 contributes nothing the producer can hear, so the
     // augmenter must treat it as a silent slot.
@@ -272,8 +269,7 @@ TEST_CASE("augmentPatch: enabled but inaudible osc (vol < 0.15) counts as silent
 // (currently the augmenter only fires one strategy per call, so the
 // buffer holds one entry).
 
-TEST_CASE("augmenter_actions: noise-only fix writes a user-facing description",
-          "[augmenter][phase26]") {
+TEST_CASE("augmenter_actions: noise-only fix writes a user-facing description", "[augmenter][phase26]") {
     PatchStruct p = noiseOnlyPatch();
     REQUIRE(augmentPatch(p, "electric storm bass"));
     REQUIRE(p.augmenter_actions[0] != '\0');
@@ -282,8 +278,7 @@ TEST_CASE("augmenter_actions: noise-only fix writes a user-facing description",
     REQUIRE(actions.find("|") == std::string::npos);
 }
 
-TEST_CASE("augmenter_actions: single-saw → Reese writes layering description",
-          "[augmenter][phase26]") {
+TEST_CASE("augmenter_actions: single-saw → Reese writes layering description", "[augmenter][phase26]") {
     PatchStruct p = singleOscPatch(OscType::Sawtooth);
     REQUIRE(augmentPatch(p, "huge dubstep bass"));
     REQUIRE(p.augmenter_actions[0] != '\0');
@@ -291,15 +286,13 @@ TEST_CASE("augmenter_actions: single-saw → Reese writes layering description",
     REQUIRE(actions.find("Reese") != std::string::npos);
 }
 
-TEST_CASE("augmenter_actions: simple prompt produces empty action buffer",
-          "[augmenter][phase26]") {
+TEST_CASE("augmenter_actions: simple prompt produces empty action buffer", "[augmenter][phase26]") {
     PatchStruct p = singleOscPatch(OscType::Sine);
     REQUIRE_FALSE(augmentPatch(p, "pure sine sub"));
     REQUIRE(p.augmenter_actions[0] == '\0');
 }
 
-TEST_CASE("augmenter_actions: already-3-osc patch leaves action buffer empty",
-          "[augmenter][phase26]") {
+TEST_CASE("augmenter_actions: already-3-osc patch leaves action buffer empty", "[augmenter][phase26]") {
     PatchStruct p = make_default_patch();
     for (auto& o : p.osc) {
         o.enabled = 1;
@@ -317,35 +310,31 @@ TEST_CASE("augmenter_actions: already-3-osc patch leaves action buffer empty",
 // augmenter rebuilds the patch around a canonical FM topology before the
 // engine sees it.
 
-TEST_CASE("augmenter FM-intent: 'classic FM aerie sound' on Saw → osc[0] becomes FM",
-          "[augmenter][phase27]") {
+TEST_CASE("augmenter FM-intent: 'classic FM aerie sound' on Saw → osc[0] becomes FM", "[augmenter][phase27]") {
     PatchStruct p = singleOscPatch(OscType::Sawtooth);
     REQUIRE(augmentPatch(p, "classic FM aerie sound"));
     REQUIRE(p.osc[0].type == OscType::FM);
     REQUIRE(p.osc[0].volume >= 0.15f);
-    REQUIRE(p.osc[1].type == OscType::Sine);   // body
-    REQUIRE(p.osc[2].type == OscType::Sine);   // shimmer
+    REQUIRE(p.osc[1].type == OscType::Sine); // body
+    REQUIRE(p.osc[2].type == OscType::Sine); // shimmer
     REQUIRE(p.osc[2].semitone_offset == 12.0f);
 }
 
-TEST_CASE("augmenter FM-intent: 'tine' / 'rhodes' → DX-tine ratio 14.0",
-          "[augmenter][phase27]") {
+TEST_CASE("augmenter FM-intent: 'tine' / 'rhodes' → DX-tine ratio 14.0", "[augmenter][phase27]") {
     PatchStruct p = singleOscPatch(OscType::Sawtooth);
     REQUIRE(augmentPatch(p, "rhodes tine sound"));
     REQUIRE(p.osc[0].type == OscType::FM);
     REQUIRE(p.osc[0].fm_ratio == 14.0f);
 }
 
-TEST_CASE("augmenter FM-intent: 'bell' / 'glass' → inharmonic ratio 3.14",
-          "[augmenter][phase27]") {
+TEST_CASE("augmenter FM-intent: 'bell' / 'glass' → inharmonic ratio 3.14", "[augmenter][phase27]") {
     PatchStruct p = singleOscPatch(OscType::Sawtooth);
     REQUIRE(augmentPatch(p, "classic bell tone with shimmer"));
     REQUIRE(p.osc[0].type == OscType::FM);
     REQUIRE(p.osc[0].fm_ratio == 3.14f);
 }
 
-TEST_CASE("augmenter FM-intent: filter must stay open (FM is the timbre)",
-          "[augmenter][phase27]") {
+TEST_CASE("augmenter FM-intent: filter must stay open (FM is the timbre)", "[augmenter][phase27]") {
     PatchStruct p = singleOscPatch(OscType::Sawtooth);
     // Simulate the LLM closing the filter on top of FM (the classic mistake).
     p.filter.cutoff_hz = 600.0f;
@@ -355,8 +344,7 @@ TEST_CASE("augmenter FM-intent: filter must stay open (FM is the timbre)",
     REQUIRE(p.filter.resonance <= 0.2f);
 }
 
-TEST_CASE("augmenter FM-intent: already-FM osc[0] is left alone (no double-coerce)",
-          "[augmenter][phase27]") {
+TEST_CASE("augmenter FM-intent: already-FM osc[0] is left alone (no double-coerce)", "[augmenter][phase27]") {
     PatchStruct p = singleOscPatch(OscType::FM);
     p.osc[0].fm_ratio = 7.0f;
     p.osc[0].fm_depth = 0.6f;
@@ -366,16 +354,14 @@ TEST_CASE("augmenter FM-intent: already-FM osc[0] is left alone (no double-coerc
     REQUIRE(p.osc[0].fm_depth == 0.6f);
 }
 
-TEST_CASE("augmenter FM-intent: prompt without FM tokens does not coerce",
-          "[augmenter][phase27]") {
+TEST_CASE("augmenter FM-intent: prompt without FM tokens does not coerce", "[augmenter][phase27]") {
     PatchStruct p = singleOscPatch(OscType::Sawtooth);
     REQUIRE(augmentPatch(p, "warm pad"));
     // Reese layering should have fired; osc[0] type stays Saw.
     REQUIRE(p.osc[0].type == OscType::Sawtooth);
 }
 
-TEST_CASE("augmenter FM-intent: 'format' / 'platform' do not false-positive on 'fm'",
-          "[augmenter][phase27]") {
+TEST_CASE("augmenter FM-intent: 'format' / 'platform' do not false-positive on 'fm'", "[augmenter][phase27]") {
     PatchStruct p = singleOscPatch(OscType::Sawtooth);
     REQUIRE(augmentPatch(p, "warm pad platform"));
     REQUIRE(p.osc[0].type == OscType::Sawtooth);
@@ -416,8 +402,7 @@ TEST_CASE("augmenter cinematic: 'deep dark cinematic Kubrick pad' on single Saw 
     REQUIRE(p.reverb.mix <= 0.45f);
 }
 
-TEST_CASE("augmenter cinematic: 'spooky drone ever-changing soundscape' routes to cinematic",
-          "[augmenter][phase30]") {
+TEST_CASE("augmenter cinematic: 'spooky drone ever-changing soundscape' routes to cinematic", "[augmenter][phase30]") {
     PatchStruct p = singleOscPatch(OscType::Sawtooth);
     p.filter.cutoff_hz = 350.0f;
     REQUIRE(augmentPatch(p, "spooky drone ever-changing soundscape"));
@@ -427,8 +412,7 @@ TEST_CASE("augmenter cinematic: 'spooky drone ever-changing soundscape' routes t
     REQUIRE(p.lfo[1].rate_hz < 0.5f);
 }
 
-TEST_CASE("augmenter cinematic: bass prompt does NOT trigger cinematic path",
-          "[augmenter][phase30]") {
+TEST_CASE("augmenter cinematic: bass prompt does NOT trigger cinematic path", "[augmenter][phase30]") {
     PatchStruct p = singleOscPatch(OscType::Sawtooth);
     p.filter.cutoff_hz = 250.0f;
     REQUIRE(augmentPatch(p, "deep dark dubstep bass"));
@@ -437,24 +421,21 @@ TEST_CASE("augmenter cinematic: bass prompt does NOT trigger cinematic path",
     REQUIRE(p.filter.env_mod >= 0.0f); // Reese doesn't set negative env_mod
 }
 
-TEST_CASE("augmenter Reese cutoff guard: closed filter is opened to 800+ Hz",
-          "[augmenter][phase30]") {
+TEST_CASE("augmenter Reese cutoff guard: closed filter is opened to 800+ Hz", "[augmenter][phase30]") {
     PatchStruct p = singleOscPatch(OscType::Sawtooth);
     p.filter.cutoff_hz = 200.0f; // would silence layers
     REQUIRE(augmentPatch(p, "thick bass"));
     REQUIRE(p.filter.cutoff_hz >= 800.0f);
 }
 
-TEST_CASE("augmenter Pad cutoff guard: closed filter is opened to 1500+ Hz",
-          "[augmenter][phase30]") {
+TEST_CASE("augmenter Pad cutoff guard: closed filter is opened to 1500+ Hz", "[augmenter][phase30]") {
     PatchStruct p = singleOscPatch(OscType::Triangle);
     p.filter.cutoff_hz = 400.0f;
     REQUIRE(augmentPatch(p, "lush warm pad"));
     REQUIRE(p.filter.cutoff_hz >= 1500.0f);
 }
 
-TEST_CASE("augmenter rationale invalidation: stale LLM rationale cleared on mutation",
-          "[augmenter][phase30]") {
+TEST_CASE("augmenter rationale invalidation: stale LLM rationale cleared on mutation", "[augmenter][phase30]") {
     PatchStruct p = singleOscPatch(OscType::Sawtooth);
     // Simulate LLM having written a rationale that talks about a single saw.
     std::strncpy(p.rationale, "I chose a sawtooth oscillator with a closed filter.", sizeof(p.rationale) - 1);
@@ -467,8 +448,7 @@ TEST_CASE("augmenter rationale invalidation: stale LLM rationale cleared on muta
     REQUIRE(p.augmenter_actions[0] != '\0');
 }
 
-TEST_CASE("augmenter cinematic: already-good cinematic patch passes through",
-          "[augmenter][phase30]") {
+TEST_CASE("augmenter cinematic: already-good cinematic patch passes through", "[augmenter][phase30]") {
     // 3-osc patch with cinematic structure already in place.
     PatchStruct p = make_default_patch();
     for (auto& o : p.osc) {
@@ -493,8 +473,7 @@ TEST_CASE("augmenter cinematic: already-good cinematic patch passes through",
 // inharmonic FM (2.73 ratio at low index — Vangelis monolith move), and
 // shift to asymmetric -11c/+13c so the beating never resolves.
 
-TEST_CASE("augmenter cinematic phase32: filter env_mod is POSITIVE (bloom opens on attack)",
-          "[augmenter][phase32]") {
+TEST_CASE("augmenter cinematic phase32: filter env_mod is POSITIVE (bloom opens on attack)", "[augmenter][phase32]") {
     PatchStruct p = singleOscPatch(OscType::Sawtooth);
     p.filter.cutoff_hz = 400.0f;
     REQUIRE(augmentPatch(p, "deep dark cinematic Kubrick pad"));
@@ -502,8 +481,7 @@ TEST_CASE("augmenter cinematic phase32: filter env_mod is POSITIVE (bloom opens 
     REQUIRE(p.filter.env_mod >= 0.3f); // meaningful depth, not a token positive
 }
 
-TEST_CASE("augmenter cinematic phase32: osc[2] is inharmonic FM, not plain sine",
-          "[augmenter][phase32]") {
+TEST_CASE("augmenter cinematic phase32: osc[2] is inharmonic FM, not plain sine", "[augmenter][phase32]") {
     PatchStruct p = singleOscPatch(OscType::Sawtooth);
     p.filter.cutoff_hz = 400.0f;
     REQUIRE(augmentPatch(p, "ominous cinematic drone"));
@@ -514,8 +492,7 @@ TEST_CASE("augmenter cinematic phase32: osc[2] is inharmonic FM, not plain sine"
     REQUIRE(p.osc[2].volume >= 0.15f);
 }
 
-TEST_CASE("augmenter cinematic phase32: detune is asymmetric (beating never centers)",
-          "[augmenter][phase32]") {
+TEST_CASE("augmenter cinematic phase32: detune is asymmetric (beating never centers)", "[augmenter][phase32]") {
     PatchStruct p = singleOscPatch(OscType::Sawtooth);
     p.filter.cutoff_hz = 400.0f;
     REQUIRE(augmentPatch(p, "evolving cinematic pad"));
@@ -526,8 +503,7 @@ TEST_CASE("augmenter cinematic phase32: detune is asymmetric (beating never cent
     REQUIRE(std::abs(p.osc[1].detune_cents) >= 10.0f);
 }
 
-TEST_CASE("augmenter cinematic phase32: reverb mix is capped at 0.45 (no mud)",
-          "[augmenter][phase32]") {
+TEST_CASE("augmenter cinematic phase32: reverb mix is capped at 0.45 (no mud)", "[augmenter][phase32]") {
     PatchStruct p = singleOscPatch(OscType::Sawtooth);
     p.filter.cutoff_hz = 400.0f;
     // Simulate the LLM picking an over-wet reverb.
@@ -537,8 +513,7 @@ TEST_CASE("augmenter cinematic phase32: reverb mix is capped at 0.45 (no mud)",
     REQUIRE(p.reverb.mix >= 0.30f);
 }
 
-TEST_CASE("augmenter cinematic phase32: filter drive bumped to >= 0.35 (Vangelis glue)",
-          "[augmenter][phase32]") {
+TEST_CASE("augmenter cinematic phase32: filter drive bumped to >= 0.35 (Vangelis glue)", "[augmenter][phase32]") {
     PatchStruct p = singleOscPatch(OscType::Sawtooth);
     p.filter.cutoff_hz = 400.0f;
     p.filter.drive = 0.05f; // low LLM value
@@ -546,8 +521,7 @@ TEST_CASE("augmenter cinematic phase32: filter drive bumped to >= 0.35 (Vangelis
     REQUIRE(p.filter.drive >= 0.35f);
 }
 
-TEST_CASE("augmenter cinematic phase32: filter env attack shortened to ~1.8s for bloom",
-          "[augmenter][phase32]") {
+TEST_CASE("augmenter cinematic phase32: filter env attack shortened to ~1.8s for bloom", "[augmenter][phase32]") {
     PatchStruct p = singleOscPatch(OscType::Sawtooth);
     p.filter.cutoff_hz = 400.0f;
     p.filter_env.attack_s = 0.1f;
@@ -556,8 +530,7 @@ TEST_CASE("augmenter cinematic phase32: filter env attack shortened to ~1.8s for
     REQUIRE(p.filter_env.decay_s >= 5.0f);
 }
 
-TEST_CASE("augmenter cinematic phase32: wavetable mainosc retargets LFO1 to WavetablePos",
-          "[augmenter][phase32]") {
+TEST_CASE("augmenter cinematic phase32: wavetable mainosc retargets LFO1 to WavetablePos", "[augmenter][phase32]") {
     PatchStruct p = singleOscPatch(OscType::Wavetable);
     p.filter.cutoff_hz = 400.0f;
     REQUIRE(augmentPatch(p, "ever-changing cinematic soundscape"));
@@ -574,8 +547,7 @@ TEST_CASE("augmenter cinematic phase32: wavetable mainosc retargets LFO1 to Wave
 //   • chorus.mix >= 0.40 (Juno-ensemble)
 //   • reverb_send_hpf_hz == 100 (cathedral tail loses sub energy)
 
-TEST_CASE("augmenter cinematic phaseE: tubesat.drive set to >= 0.30 for harmonic glue",
-          "[augmenter][phaseE]") {
+TEST_CASE("augmenter cinematic phaseE: tubesat.drive set to >= 0.30 for harmonic glue", "[augmenter][phaseE]") {
     PatchStruct p = singleOscPatch(OscType::Sawtooth);
     p.filter.cutoff_hz = 400.0f;
     p.tubesat.drive = 0.0f;
@@ -584,8 +556,7 @@ TEST_CASE("augmenter cinematic phaseE: tubesat.drive set to >= 0.30 for harmonic
     REQUIRE(p.tubesat.mix > 0.0f);
 }
 
-TEST_CASE("augmenter cinematic phaseE: chorus.mix set to >= 0.40 for Juno ensemble",
-          "[augmenter][phaseE]") {
+TEST_CASE("augmenter cinematic phaseE: chorus.mix set to >= 0.40 for Juno ensemble", "[augmenter][phaseE]") {
     PatchStruct p = singleOscPatch(OscType::Sawtooth);
     p.filter.cutoff_hz = 400.0f;
     p.chorus.mix = 0.0f;
@@ -595,8 +566,7 @@ TEST_CASE("augmenter cinematic phaseE: chorus.mix set to >= 0.40 for Juno ensemb
     REQUIRE(p.chorus.depth > 0.0f);
 }
 
-TEST_CASE("augmenter cinematic phaseE: reverb_send_hpf_hz set to 100 (no sub smear)",
-          "[augmenter][phaseE]") {
+TEST_CASE("augmenter cinematic phaseE: reverb_send_hpf_hz set to 100 (no sub smear)", "[augmenter][phaseE]") {
     PatchStruct p = singleOscPatch(OscType::Sawtooth);
     p.filter.cutoff_hz = 400.0f;
     p.reverb_send_hpf_hz = 0.0f;

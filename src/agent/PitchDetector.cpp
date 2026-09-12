@@ -31,9 +31,7 @@ std::vector<float> normalizeAndDCBlock(const std::int16_t* samples, int numSampl
 
 } // namespace
 
-PitchResult PitchDetector::detect(const std::int16_t* samples,
-                                  int numSamples,
-                                  int sampleRate) noexcept {
+PitchResult PitchDetector::detect(const std::int16_t* samples, int numSamples, int sampleRate) noexcept {
     PitchResult result{};
     if (samples == nullptr || numSamples <= 0 || sampleRate <= 0)
         return result;
@@ -72,8 +70,7 @@ PitchResult PitchDetector::detect(const std::int16_t* samples,
     for (int lag = minLag; lag <= maxLag && lag + 1 < N; ++lag) {
         double acc = 0.0;
         for (int i = 0; i + lag < N; ++i)
-            acc += static_cast<double>(buf[static_cast<size_t>(i)]) *
-                   buf[static_cast<size_t>(i + lag)];
+            acc += static_cast<double>(buf[static_cast<size_t>(i)]) * buf[static_cast<size_t>(i + lag)];
 
         // Test cur as local max against prev (one step back) and acc (next).
         if (lag > minLag + 1 && cur > prev && cur > acc && cur > bestPeak) {
@@ -98,8 +95,7 @@ PitchResult PitchDetector::detect(const std::int16_t* samples,
             return 0.0;
         double acc = 0.0;
         for (int i = 0; i + lag < N; ++i)
-            acc += static_cast<double>(buf[static_cast<size_t>(i)]) *
-                   buf[static_cast<size_t>(i + lag)];
+            acc += static_cast<double>(buf[static_cast<size_t>(i)]) * buf[static_cast<size_t>(i + lag)];
         return acc;
     };
     const double yL = acAt(bestLag - 1);

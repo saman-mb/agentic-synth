@@ -130,8 +130,7 @@ struct Voice {
     // summed into L/R. baseCutoffHz/resonance come from VoiceManager
     // per-sample smoothers so LFO + filter-env modulation stack on top.
     // outL/outR are the post-filter, post-amp, post-DC-blocker stereo pair.
-    void renderStereo(float portamentoAlpha, float baseCutoffHz, float resonance,
-                      float& outL, float& outR) noexcept;
+    void renderStereo(float portamentoAlpha, float baseCutoffHz, float resonance, float& outL, float& outR) noexcept;
 };
 
 // N-voice polyphonic allocator with oldest-note stealing and portamento.
@@ -279,6 +278,12 @@ private:
     // First applyPatch after prepare() snaps the smoothers to the target
     // value so the synth doesn't glide audibly from the default on load.
     bool primed_{false};
+
+    // Last patch_id we used to seed VA drift / noise / LFO S&H. Sentinel so
+    // the first applyPatch always reseeds (RFC cpp-dsp-core §4).
+    uint32_t lastSeededPatchId_{0xFFFFFFFFu};
+
+    void reseedDeterministic(uint32_t patchId) noexcept;
 
     // FX bus: voices → delay → reverb. Stereo path only — mono renderBlock
     // and renderNextSample produce dry voices × master gain. Bus state has

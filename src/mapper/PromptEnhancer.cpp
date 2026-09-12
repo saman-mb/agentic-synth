@@ -28,13 +28,27 @@ std::string json_escape(const std::string& s) {
     out.reserve(s.size() + 8);
     for (char c : s) {
         switch (c) {
-        case '"':  out += "\\\""; break;
-        case '\\': out += "\\\\"; break;
-        case '\n': out += "\\n"; break;
-        case '\r': out += "\\r"; break;
-        case '\t': out += "\\t"; break;
-        case '\b': out += "\\b"; break;
-        case '\f': out += "\\f"; break;
+        case '"':
+            out += "\\\"";
+            break;
+        case '\\':
+            out += "\\\\";
+            break;
+        case '\n':
+            out += "\\n";
+            break;
+        case '\r':
+            out += "\\r";
+            break;
+        case '\t':
+            out += "\\t";
+            break;
+        case '\b':
+            out += "\\b";
+            break;
+        case '\f':
+            out += "\\f";
+            break;
         default:
             if (static_cast<unsigned char>(c) < 0x20) {
                 char buf[8];
@@ -62,14 +76,30 @@ std::string json_unescape(const std::string& s) {
             break;
         const char n = s[++i];
         switch (n) {
-        case '"':  out += '"'; break;
-        case '\\': out += '\\'; break;
-        case '/':  out += '/'; break;
-        case 'n':  out += '\n'; break;
-        case 't':  out += '\t'; break;
-        case 'r':  out += '\r'; break;
-        case 'b':  out += '\b'; break;
-        case 'f':  out += '\f'; break;
+        case '"':
+            out += '"';
+            break;
+        case '\\':
+            out += '\\';
+            break;
+        case '/':
+            out += '/';
+            break;
+        case 'n':
+            out += '\n';
+            break;
+        case 't':
+            out += '\t';
+            break;
+        case 'r':
+            out += '\r';
+            break;
+        case 'b':
+            out += '\b';
+            break;
+        case 'f':
+            out += '\f';
+            break;
         case 'u': {
             if (i + 4 >= s.size())
                 return out;
@@ -84,7 +114,9 @@ std::string json_unescape(const std::string& s) {
             }
             break;
         }
-        default: out += n; break;
+        default:
+            out += n;
+            break;
         }
     }
     return out;
@@ -195,16 +227,13 @@ std::string PromptEnhancer::http_post(const std::string& url, const std::string&
     return http_post_ex(url, json_body, unused);
 }
 
-std::string PromptEnhancer::http_post_ex(const std::string& url, const std::string& json_body,
-                                         int& exit_code) const {
+std::string PromptEnhancer::http_post_ex(const std::string& url, const std::string& json_body, int& exit_code) const {
     TempFile req(json_body);
 
     std::ostringstream cmd;
     const int timeout_s = std::max(1, cfg_.timeout_ms / 1000);
-    cmd << "curl --silent --show-error --fail-with-body"
-        << " --max-time " << timeout_s
-        << " -H 'Content-Type: application/json'"
-        << " --data-binary @" << req.path << " '" << url << "' 2>/dev/null";
+    cmd << "curl --silent --show-error --fail-with-body" << " --max-time " << timeout_s
+        << " -H 'Content-Type: application/json'" << " --data-binary @" << req.path << " '" << url << "' 2>/dev/null";
 
     std::string out;
     std::array<char, 4096> buf{};
@@ -331,19 +360,17 @@ std::string PromptEnhancer::enhance(const std::string& userPrompt) const {
                           "plain-text sound-design brief. No JSON, no markdown.")
             : cfg_.system_prompt;
 
-    const std::string composed = base_prompt + "\n\nProducer prompt: " + sanitized +
-                                 "\n\nEmit the brief now, starting at SONIC CHARACTER:";
+    const std::string composed =
+        base_prompt + "\n\nProducer prompt: " + sanitized + "\n\nEmit the brief now, starting at SONIC CHARACTER:";
 
     std::ostringstream body;
-    body << "{"
-         << "\"contents\":[{\"parts\":[{\"text\":\"" << json_escape(composed) << "\"}]}],"
-         << "\"generationConfig\":{"
-         << "\"temperature\":" << cfg_.temperature
+    body << "{" << "\"contents\":[{\"parts\":[{\"text\":\"" << json_escape(composed) << "\"}]}],"
+         << "\"generationConfig\":{" << "\"temperature\":"
+         << cfg_.temperature
          // Deliberately NO responseMimeType — translator output is free-form
          // plain text, not JSON. Setting application/json here would make
          // the model wrap the brief in a quoted string and fight us.
-         << "}"
-         << "}";
+         << "}" << "}";
     const std::string bodyStr = body.str();
 
     const std::string url = "https://generativelanguage.googleapis.com/v1beta/models/" + cfg_.model +
@@ -394,9 +421,8 @@ std::string PromptEnhancer::enhance(const std::string& userPrompt) const {
             } else if (has_error_envelope) {
                 const std::string status = find_string_field(resp, "\"status\"");
                 const bool transient_5xx = resp.find("\"code\": 5") != std::string::npos ||
-                                           resp.find("\"code\":5")  != std::string::npos ||
-                                           status == "UNAVAILABLE" || status == "INTERNAL" ||
-                                           status == "DEADLINE_EXCEEDED";
+                                           resp.find("\"code\":5") != std::string::npos || status == "UNAVAILABLE" ||
+                                           status == "INTERNAL" || status == "DEADLINE_EXCEEDED";
                 if (transient_5xx) {
                     retry_reason = "transient 5xx in body";
                     outcome = "curl_error";
@@ -414,8 +440,8 @@ std::string PromptEnhancer::enhance(const std::string& userPrompt) const {
 
         if (attempt < kMaxAttempts) {
             const int delay = kBackoffMs[static_cast<std::size_t>(attempt - 1)];
-            std::cerr << "[PromptEnhancer] retry " << attempt << "/" << kMaxAttempts
-                      << " after " << delay << "ms (reason: " << retry_reason << ")\n";
+            std::cerr << "[PromptEnhancer] retry " << attempt << "/" << kMaxAttempts << " after " << delay
+                      << "ms (reason: " << retry_reason << ")\n";
             std::this_thread::sleep_for(std::chrono::milliseconds(delay));
         } else {
             std::cerr << "[PromptEnhancer] giving up after " << kMaxAttempts
@@ -425,8 +451,7 @@ std::string PromptEnhancer::enhance(const std::string& userPrompt) const {
 
     auto emit_telemetry = [&](const std::string& final_outcome) {
         const auto t1 = std::chrono::steady_clock::now();
-        const double latency_ms =
-            std::chrono::duration<double, std::milli>(t1 - t0).count();
+        const double latency_ms = std::chrono::duration<double, std::milli>(t1 - t0).count();
         LlmCall rec;
         rec.caller = "PromptEnhancer";
         rec.model = cfg_.model;
