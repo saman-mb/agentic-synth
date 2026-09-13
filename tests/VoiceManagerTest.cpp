@@ -674,6 +674,90 @@ TEST_CASE("VoiceManager reverb mix=1 produces decaying tail after note off") {
     CHECK(dryRms < 1e-3);
 }
 
+// ── Pre-filter chorus placement (#265) ───────────────────────────────────────
+
+namespace {
+
+// Render a one-voice saw patch at the given cutoff with `chorusMix` set and
+// return the stereo voice output. Used to compare the voice's L/R width with
+// chorus off vs on.
+void renderChorusProbe(float chorusMix, float cutoffHz, std::vector<float>& left, std::vector<float>& right) {
+    VoiceManager vm(1);
+    vm.prepare(44100.0);
+    PatchStruct p = make_default_patch();
+    p.osc[0].enabled = 1;
+    p.osc[0].type = agentic_synth::OscType::Sawtooth;
+    p.osc[0].volume = 1.0f;
+    p.osc[1].enabled = 0;
+    p.osc[2].enabled = 0;
+    p.filter.cutoff_hz = cutoffHz;
+    p.filter.resonance = 0.0f;
+    p.filter.env_mod = 0.0f;
+    p.filter.drive = 0.0f;
+    p.tubesat.drive = 0.0f; // isolate chorus
+    p.amp_env.attack_s = 0.001f;
+    p.amp_env.decay_s = 0.001f;
+    p.amp_env.sustain = 1.0f;
+    p.amp_env.release_s = 0.5f;
+    p.master_gain = 1.0f;
+    p.delay.mix = 0.0f;
+    p.reverb.mix = 0.0f;
+    p.chorus.rate_hz = 0.4f;
+    p.chorus.depth = 0.35f;
+    p.chorus.mix = chorusMix;
+    vm.applyPatch(p);
+    vm.noteOn(60, 1.0f);
+    const int n = 44100; // 1 s: chorus delay line fully filled
+    left.assign(static_cast<std::size_t>(n), 0.0f);
+    right.assign(static_cast<std::size_t>(n), 0.0f);
+    vm.renderBlock(left.data(), right.data(), n);
+}
+
+} // namespace
+
+TEST_CASE("VoiceManager chorus stays pre-filter: it must not change the voice's stereo width", "[chorus][phaseE]") {
+    // Cutoff above the 261 Hz saw fundamental so the filter is not the variable
+    // under test; this test probes the placement-driven L/R image, not the
+    // spectrum.
+    const float cutoff = 2000.0f;
+    std::vector<float> dryL, dryR, wetL, wetR;
+    renderChorusProbe(0.0f, cutoff, dryL, dryR);
+    renderChorusProbe(1.0f, cutoff, wetL, wetR);
+
+    // Discard the first 250 ms so the chorus delay line has filled and the amp
+    // envelope has settled. Width = side RMS / mid RMS is independent of the
+    // overall level, so it isolates a change in the stereo image from a change
+    // in gain. side = L-R, mid = L+R (the 0.5 scaling cancels in the ratio).
+    const int start = 11025;
+    double drySide = 0.0;
+    double dryMid = 0.0;
+    double wetSide = 0.0;
+    double wetMid = 0.0;
+    for (int i = start; i < static_cast<int>(dryL.size()); ++i) {
+        const auto idx = static_cast<std::size_t>(i);
+        const double dl = dryL[idx];
+        const double dr = dryR[idx];
+        const double wl = wetL[idx];
+        const double wr = wetR[idx];
+        drySide += (dl - dr) * (dl - dr);
+        dryMid += (dl + dr) * (dl + dr);
+        wetSide += (wl - wr) * (wl - wr);
+        wetMid += (wl + wr) * (wl + wr);
+    }
+    const double dryWidth = std::sqrt(drySide / dryMid);
+    const double wetWidth = std::sqrt(wetSide / wetMid);
+
+    // #265 places chorus BEFORE the mono filter, which mono-sums the ensemble:
+    // the voice's L/R split is re-derived solely from the per-osc/voice pan
+    // weights AFTER the filter, so switching the chorus on cannot alter the
+    // width. The old post-filter placement ran the stereo chorus on the
+    // pan-split L/R with a π-offset LFO, which widened the voice (~2.5x on this
+    // probe) — this bound fails loudly on that ordering.
+    CHECK(dryMid > 1e-3); // guard against a trivially-zero width ratio
+    CHECK(wetMid > 1e-3);
+    CHECK(wetWidth <= dryWidth * 1.1);
+}
+
 TEST_CASE("VoiceManager delay mix=1 produces echoes after note off") {
     PatchStruct wet = make_default_patch();
     wet.amp_env.release_s = 0.01f;
