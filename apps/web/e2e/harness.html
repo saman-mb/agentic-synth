@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>agentic-synth audio harness</title>
+  </head>
+  <body>
+    <!-- Clicking this button is what gives the page user activation; every
+         browser refuses to start an AudioContext without it. -->
+    <button id="start" type="button">Start audio</button>
+    <pre id="out">idle</pre>
+    <script type="module" src="./harness.ts"></script>
+  </body>
+</html>

@@ -33,6 +33,8 @@ export default [
       'third_party/**',
       'apps/web/dist/**',
       'apps/web/node_modules/**',
+      // Bundled function output written by `netlify dev`.
+      '**/.netlify/**',
     ],
   },
   js.configs.recommended,

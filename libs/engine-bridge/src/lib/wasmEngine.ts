@@ -2,10 +2,33 @@ import type { AgentModulationPlan, PatchParams } from '@agentic-synth/shared-typ
 import type { SynthEngine } from './engine';
 import { packPatchParams } from './patchAbi';
 import { getPatchParam, macroTargetValue, setPatchParam } from './paramMap';
+import { createAudioContext, keepAudioContextRunning, resumeAudioContext } from './audioEnvironment';
 
-const WORKLET_URL = '/agsynth-worklet.js';
-const PROCESSOR_NAME = 'agsynth-worklet';
+const WORKLET_FILE = 'agsynth-worklet.js';
+const GLUE_FILE = 'agsynth.js';
+const WASM_FILE = 'agsynth.wasm';
+export const WASM_PROCESSOR_NAME = 'agsynth-worklet';
 const SCOPE_FFT_SIZE = 2048;
+
+// Resolved against the document base, not the origin root, so the demo
+// also works when deployed under a sub-path. AudioWorkletGlobalScope has
+// no `location` and (outside WebKit) no `URL`, so the worklet cannot work
+// these out for itself — they are handed to it via processorOptions.
+export function assetUrl(file: string): string {
+  const base =
+    typeof document !== 'undefined' && document.baseURI
+      ? document.baseURI
+      : `${globalThis.location?.origin ?? ''}/`;
+  try {
+    return new URL(file, base).href;
+  } catch {
+    return `/${file}`;
+  }
+}
+
+export function wasmWorkletUrl(): string {
+  return assetUrl(WORKLET_FILE);
+}
 
 function makeFallbackPatch(): PatchParams {
   const osc = {
@@ -45,15 +68,6 @@ function asError(err: unknown): Error {
   return err instanceof Error ? err : new Error(String(err));
 }
 
-async function addWorkletModule(ctx: AudioContext, url: string): Promise<void> {
-  const worklet = ctx.audioWorklet;
-  const addModule = worklet.addModule.bind(worklet) as (
-    moduleURL: string,
-    options?: { type?: string },
-  ) => Promise<void>;
-  await addModule(url, { type: 'module' });
-}
-
 function waitForWorkletReady(node: AudioWorkletNode): Promise<void> {
   return new Promise((resolve, reject) => {
     const onMessage = (ev: MessageEvent) => {
@@ -80,13 +94,14 @@ export class WasmSynthEngine implements SynthEngine {
   private node: AudioWorkletNode | null = null;
   private analyser: AnalyserNode | null = null;
   private startPromise: Promise<void> | null = null;
+  private stopKeepAlive: (() => void) | null = null;
   private readonly pendingNoteOffs = new Set<number>();
   private disposed = false;
 
   async ensureStarted(): Promise<void> {
     if (this.disposed) return;
     if (this.ctx) {
-      if (this.ctx.state === 'suspended') await this.ctx.resume();
+      await resumeAudioContext(this.ctx);
       return;
     }
     if (!this.startPromise) {
@@ -99,9 +114,9 @@ export class WasmSynthEngine implements SynthEngine {
   }
 
   private async start(): Promise<void> {
-    const ctx = new AudioContext({ latencyHint: 'interactive' });
+    const ctx = createAudioContext({ latencyHint: 'interactive' });
     try {
-      await addWorkletModule(ctx, WORKLET_URL);
+      await ctx.audioWorklet.addModule(wasmWorkletUrl());
     } catch (err) {
       await ctx.close().catch(() => undefined);
       throw asError(err);
@@ -109,10 +124,11 @@ export class WasmSynthEngine implements SynthEngine {
 
     let node: AudioWorkletNode;
     try {
-      node = new AudioWorkletNode(ctx, PROCESSOR_NAME, {
+      node = new AudioWorkletNode(ctx, WASM_PROCESSOR_NAME, {
         numberOfInputs: 0,
         numberOfOutputs: 1,
         outputChannelCount: [2],
+        processorOptions: { glueUrl: assetUrl(GLUE_FILE), wasmUrl: assetUrl(WASM_FILE) },
       });
     } catch (err) {
       await ctx.close().catch(() => undefined);
@@ -135,6 +151,7 @@ export class WasmSynthEngine implements SynthEngine {
     this.ctx = ctx;
     this.node = node;
     this.analyser = analyser;
+    this.stopKeepAlive = keepAudioContextRunning(ctx);
     this.postPatch(this.patch);
   }
 
@@ -215,6 +232,8 @@ export class WasmSynthEngine implements SynthEngine {
 
   dispose(): void {
     this.disposed = true;
+    this.stopKeepAlive?.();
+    this.stopKeepAlive = null;
     for (const id of this.pendingNoteOffs) globalThis.clearTimeout(id);
     this.pendingNoteOffs.clear();
     this.node?.port.postMessage({ type: 'dispose' });

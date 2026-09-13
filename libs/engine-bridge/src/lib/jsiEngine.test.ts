@@ -31,8 +31,7 @@ registerHooks({
 
 const { JsiSynthEngine, AgsynthError, AGS_ERR_SIZE, AGS_ERR_QUEUE } = await import('./jsiEngine.ts');
 const { packPatchParams, PATCH_STRUCT_SIZE } = await import('./patchAbi.ts');
-const { createSynthEngine } = await import('./engine.ts');
-const { WasmSynthEngine } = await import('./wasmEngine.ts');
+const { createSynthEngine } = await import('./resilientEngine.ts');
 
 function fallbackPatch() {
   const osc = {
@@ -203,9 +202,8 @@ describe('JsiSynthEngine', () => {
     assert.deepEqual(calls[2]?.args, [48000]);
   });
 
-  it('createSynthEngine still returns WasmSynthEngine', () => {
+  it('createSynthEngine returns the resilient engine', () => {
     const engine = createSynthEngine();
-    assert.equal(engine.constructor.name, 'WasmSynthEngine');
-    assert.ok(engine instanceof WasmSynthEngine);
+    assert.equal(engine.constructor.name, 'ResilientSynthEngine');
   });
 });

@@ -44,8 +44,13 @@ function copyAgsynthAssets(onMissing: 'warn' | 'throw'): void {
 function copyAgsynthPlugin(): Plugin {
   return {
     name: 'copy-agsynth-wasm',
-    configureServer() {
-      copyAgsynthAssets('warn');
+    // `config` is the last hook that runs before the dev server builds its
+    // static-file handler for publicDir. Copying any later (configureServer,
+    // buildStart) leaves the new files invisible to the running server,
+    // which then answers them with the SPA fallback HTML — and an
+    // AudioWorklet fed index.html fails with a MIME type error.
+    config(_userConfig, env) {
+      copyAgsynthAssets(env.command === 'serve' ? 'warn' : onMissingWasm);
     },
     buildStart() {
       copyAgsynthAssets(onMissingWasm);
@@ -65,7 +70,7 @@ function copyAgsynthPlugin(): Plugin {
         if (fs.existsSync(dest)) continue;
         const message = `agsynth: ${dest} missing after build; run npx nx run wasm:build-wasm`;
         if (onMissingWasm === 'throw') throw new Error(message);
-        console.warn(`${message} (browser demo will have no audio engine)`);
+        console.warn(`${message} (browser demo falls back to the WebAudio engine)`);
       }
     },
   };

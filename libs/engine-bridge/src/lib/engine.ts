@@ -32,6 +32,7 @@ import { createEffectRack, type EffectRack } from './effects';
 import { getPatchParam, isEnvParam, macroTargetValue, setPatchParam } from './paramMap';
 import { VoiceManager } from './voices';
 import { WasmSynthEngine } from './wasmEngine';
+import { createAudioContext, keepAudioContextRunning, resumeAudioContext } from './audioEnvironment';
 
 export { WasmSynthEngine };
 
@@ -125,13 +126,14 @@ export class WebSynthEngine implements SynthEngine {
   private analyser: AnalyserNode | null = null;
   private tap: AudioWorkletNode | null = null;
   private startPromise: Promise<void> | null = null;
+  private stopKeepAlive: (() => void) | null = null;
   private readonly pendingNoteOffs = new Set<number>();
   private disposed = false;
 
   async ensureStarted(): Promise<void> {
     if (this.disposed) return;
     if (this.ctx) {
-      if (this.ctx.state === 'suspended') await this.ctx.resume();
+      await resumeAudioContext(this.ctx);
       return;
     }
     if (!this.startPromise) {
@@ -146,7 +148,7 @@ export class WebSynthEngine implements SynthEngine {
   }
 
   private async start(): Promise<void> {
-    const ctx = new AudioContext({ latencyHint: 'interactive' });
+    const ctx = createAudioContext({ latencyHint: 'interactive' });
     const manager = new VoiceManager(ctx, () => this.patch);
     const rack = createEffectRack(ctx);
     const masterGain = ctx.createGain();
@@ -180,6 +182,7 @@ export class WebSynthEngine implements SynthEngine {
     this.rack = rack;
     this.masterGain = masterGain;
     this.analyser = analyser;
+    this.stopKeepAlive = keepAudioContextRunning(ctx);
     this.applyPatchToGraph();
   }
 
@@ -284,6 +287,8 @@ export class WebSynthEngine implements SynthEngine {
 
   dispose(): void {
     this.disposed = true;
+    this.stopKeepAlive?.();
+    this.stopKeepAlive = null;
     for (const id of this.pendingNoteOffs) window.clearTimeout(id);
     this.pendingNoteOffs.clear();
     this.manager?.dispose();
@@ -303,8 +308,4 @@ export class WebSynthEngine implements SynthEngine {
       void ctx.close().catch(() => undefined);
     }
   }
-}
-
-export function createSynthEngine(): SynthEngine {
-  return new WasmSynthEngine();
 }
