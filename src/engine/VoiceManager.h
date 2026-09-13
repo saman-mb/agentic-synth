@@ -105,12 +105,16 @@ struct Voice {
     // (render). Kills zipper noise on knob-driven drive moves.
     ParamSmoother driveSmoother;
 
-    // Phase E (#265): per-voice pre-filter saturation + post-filter chorus.
-    // TubeSat is mono (memoryless waveshape — runs on the mono osc sum before
-    // the filter so saw stack harmonics get glued before LP attenuation).
-    // Chorus is stereo (runs on the post-filter pan-split L/R so the wet
-    // width is preserved). Both default to bypass (no allocations either way
-    // — prepare() sized their buffers once in VoiceManager::prepare).
+    // Phase E (#265): per-voice pre-filter chorus + saturation. #265 places
+    // both BEFORE the filter in the order oscillators → chorus → saturation →
+    // filter. Chorus is a stereo DSP block but runs on the mono osc sum
+    // (replicated to L/R, then folded back to mono) because the filter is
+    // mono and intentionally mono-sums the ensemble; stereo width is
+    // re-derived post-filter from the per-osc pan weights. TubeSat is mono
+    // (memoryless waveshape) and follows chorus so saw-stack harmonics get
+    // glued before LP attenuation. Both default to bypass (no allocations
+    // either way — prepare() sized their buffers once in
+    // VoiceManager::prepare).
     TubeSat tubeSat;
     Chorus chorus;
 

@@ -108,6 +108,8 @@ static_assert(sizeof(ReverbParams) == 16);
 
 // Phase E (#265): pre-filter chorus + tube saturation + reverb-send HPF.
 //
+// #265 places chorus and saturation BEFORE the filter, in the order
+// oscillators → chorus → saturation → filter (see VoiceManager::renderStereo).
 // The augmenter writes these for the cinematic recipe; LLM grammar emits
 // them as well so the same patch JSON round-trips. All POD, fixed size,
 // trivially copyable — no allocation, no juce::var, no std::string.
@@ -180,9 +182,11 @@ struct PatchStruct {
     DelayParams delay;
 
     // Phase E (#265): pre-filter chorus + tube saturation. Inserted in the
-    // per-voice signal chain BEFORE the filter (see VoiceManager.cpp). Both
-    // default to bypass (chorus.mix==0, tubesat.drive==0) so older patches
-    // and the augmenter's non-cinematic paths leave the audio untouched.
+    // per-voice signal chain BEFORE the filter, chorus first, then saturation
+    // (oscillators → chorus → saturation → filter — see VoiceManager.cpp).
+    // Both default to bypass (chorus.mix==0, tubesat.drive==0) so older
+    // patches and the augmenter's non-cinematic paths leave the audio
+    // untouched.
     ChorusParams chorus;
     TubeSatParams tubesat;
     // Reverb auxiliary-send HPF cutoff (Hz). 0 = bypass; 60..200 Hz = clean

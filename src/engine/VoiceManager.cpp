@@ -124,7 +124,8 @@ void Voice::prepare(double sampleRate) {
     if (svFilter)
         svFilter->reset();
     driveSmoother.setSampleRate(sampleRate);
-    // Phase E (#265): per-voice pre-filter saturation + post-filter chorus.
+    // Phase E (#265): per-voice pre-filter chorus + saturation, in the
+    // #265 order oscillators → chorus → saturation → filter.
     // prepare() allocates both modules' state ONCE (chorus delay buffer,
     // tubesat HPF coefficient) so per-sample processing is allocation-free.
     tubeSat.prepare(sampleRate, /*channels*/ 2);
@@ -326,6 +327,22 @@ void Voice::renderStereo(float portamentoAlpha, float baseCutoffHz, float resona
         monoMix += oscSample * o.volume;
     }
 
+    // ── Phase E (#265): pre-filter chorus ─────────────────────────────────
+    // #265 specifies oscillators → chorus → tube saturation → filter (see
+    // PatchStruct.h). Chorus is a stereo block but the chain is still mono
+    // here, so run it on the mono osc sum replicated to L/R and fold the
+    // result back to mono. The filter (MoogLadder/SVFilter) is mono and
+    // intentionally mono-SUMS the ensemble — Voice stereo width is
+    // re-derived AFTER the filter from the per-osc pan weights (panWeightL/R
+    // below), which is the single documented pan stage. mix == 0 is a
+    // bit-exact bypass inside processStereo.
+    {
+        float chorusL = monoMix;
+        float chorusR = monoMix;
+        chorus.processStereo(&chorusL, &chorusR, 1);
+        monoMix = 0.5f * (chorusL + chorusR);
+    }
+
     // ── Phase E (#265): pre-filter tube saturation ────────────────────────
     // Memoryless asymmetric tanh + 20 Hz DC blocker. Runs on the MONO osc
     // sum before the filter so saw-stack harmonics get fused before the LP
@@ -388,13 +405,6 @@ void Voice::renderStereo(float portamentoAlpha, float baseCutoffHz, float resona
     // (osc 0 hard L, osc 1 hard R) the weights pull apart.
     float stereoL = filteredMono * panWeightL;
     float stereoR = filteredMono * panWeightR;
-
-    // ── Phase E (#265): post-filter chorus ───────────────────────────────
-    // Stereo 3-tap modulated delay line. Runs on the stereo pan-split so the
-    // wet width is preserved (each tap's per-channel LFO is offset by π →
-    // L and R get different modulation arrivals → ensemble width). Mix==0
-    // is a bit-exact bypass inside processStereo.
-    chorus.processStereo(&stereoL, &stereoR, 1);
 
     // ── Amp envelope × velocity × LFO amp mod ────────────────────────────
     // Phase 4: clamp (1 + lfoAmpMod) at 0 so two LFOs both targeting Amplitude
