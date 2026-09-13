@@ -2,7 +2,7 @@ import { makeDefaultPatch, type PatchParams } from '@agentic-synth/shared-types'
 
 // ── Starter Presets (Phase 6 + Phase 14 + sound-design spec rev) ─────
 //
-// Factory preset catalogue spanning all six TIMBRE tags
+// Factory preset catalogue spanning all six Tambra tags
 // (Bass, Lead, Pad, Pluck, Keys, FX). Each preset is a focused diff
 // over makeDefaultPatch(): we always rewrite the full state for the
 // three oscillators, filter, both envelopes, both LFOs, reverb, delay,

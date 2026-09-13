@@ -315,7 +315,7 @@ export function App() {
   const closeHood = useCallback(() => setHoodOpen(false), []);
 
   // ── UI audio settings (Phase 10 §17) ──────────────────────────────
-  // Both default OFF — TIMBRE is "mostly silent". Settings persist via
+  // Both default OFF — Tambra is "mostly silent". Settings persist via
   // localStorage. The voice pip fires after a fresh transcript arrives;
   // the tape-stop thunk fires on any patch-load token bump.
   const uiAudio = useUiAudioSettings();
@@ -569,7 +569,7 @@ export function App() {
     // No global toast plumbing at this layer — use console + a brief
     // alert affordance later. For MVP we log so power users can confirm.
     // eslint-disable-next-line no-console
-    console.info(`[TIMBRE] ${knobId} is mapped to CC${m.cc} (channel ${m.channel + 1})`);
+    console.info(`[Tambra] ${knobId} is mapped to CC${m.cc} (channel ${m.channel + 1})`);
   }, [midiMappings]);
 
   // ── Macro projection (Phase 13) ───────────────────────────────────

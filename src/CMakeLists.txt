@@ -26,7 +26,7 @@ add_library(agentic_synth_mapper STATIC
 )
 target_include_directories(agentic_synth_mapper PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 agentic_synth_configure_target(agentic_synth_mapper)
-# Bake the absolute path to the bundled TIMBRE sound-designer briefing
+# Bake the absolute path to the bundled Tambra sound-designer briefing
 # (src/mapper/system-prompt.md) into the mapper TU so GrammarSampler can
 # find it without relying on cwd. AgentBridge calls
 # GrammarSampler::loadSystemPromptFile() at startup.
@@ -151,7 +151,7 @@ add_library(agentic_synth_agent STATIC
     agent/MidiLearnStore.cpp
     # Phase G / #247 — autocorrelation pitch detector for "hum a note".
     agent/PitchDetector.cpp
-    # Phase B / TIMBRE simple-view (#249/#250/#263) — morph loop. Distinct
+    # Phase B / Tambra simple-view (#249/#250/#263) — morph loop. Distinct
     # from engine::MorphEngine (live MIDI-CC morph) — generates 5 candidate
     # variations from base + history + liked + archetype RAG.
     agent/MorphLoop.cpp
@@ -268,14 +268,14 @@ juce_add_binary_data(agentic_synth_ui_assets
 add_dependencies(agentic_synth_ui_assets agentic_synth_ui)
 
 juce_add_gui_app(AgenticSynth
-    PRODUCT_NAME "TIMBRE"
+    PRODUCT_NAME "Tambra"
     VERSION       ${PROJECT_VERSION}
     COMPANY_NAME  "Nous Research"
     COMPANY_WEBSITE "https://nousresearch.com"
     COMPANY_EMAIL "hello@nousresearch.com"
     COMPANY_COPYRIGHT "© 2024 Nous Research"
-    ICON_BIG      "${CMAKE_SOURCE_DIR}/design/timbre.iconset/icon_512x512.png"
-    ICON_SMALL    "${CMAKE_SOURCE_DIR}/design/timbre.iconset/icon_128x128.png"
+    ICON_BIG      "${CMAKE_SOURCE_DIR}/design/tambra.iconset/icon_512x512.png"
+    ICON_SMALL    "${CMAKE_SOURCE_DIR}/design/tambra.iconset/icon_128x128.png"
 )
 
 juce_generate_juce_header(AgenticSynth)
@@ -296,7 +296,7 @@ target_compile_definitions(AgenticSynth
         JUCE_APPLICATION_NAME_STRING="$<TARGET_PROPERTY:AgenticSynth,JUCE_PRODUCT_NAME>"
         JUCE_APPLICATION_VERSION_STRING="$<TARGET_PROPERTY:AgenticSynth,JUCE_VERSION>"
         AGENTIC_SYNTH_UI_DEV=$<BOOL:${AGENTIC_SYNTH_UI_DEV}>
-        AGENTIC_SYNTH_PROJECT_NAME="TIMBRE"
+        AGENTIC_SYNTH_PROJECT_NAME="Tambra"
         AGENTIC_SYNTH_VERSION_STRING="${PROJECT_VERSION}"
 )
 
@@ -314,11 +314,11 @@ target_link_libraries(AgenticSynth
 
 # ── Plugin (shared code) ─────────────────────────────────────────────────────
 juce_add_plugin(AgenticSynth_Plugin
-    PRODUCT_NAME            "TIMBRE"
+    PRODUCT_NAME            "Tambra"
     VERSION                 ${PROJECT_VERSION}
     PLUGIN_MANUFACTURER_CODE Nous
     PLUGIN_CODE             AgSy
-    PLUGIN_NAME             "TIMBRE"
+    PLUGIN_NAME             "Tambra"
     COMPANY_NAME            "Nous Research"
     COMPANY_WEBSITE         "https://nousresearch.com"
     COMPANY_EMAIL           "hello@nousresearch.com"
@@ -328,11 +328,11 @@ juce_add_plugin(AgenticSynth_Plugin
     NEEDS_MIDI_INPUT        TRUE
     NEEDS_MIDI_OUTPUT       FALSE
     FORMATS                 VST3 AU Standalone
-    PRODUCT_NAME             "TIMBRE"
-    ICON_BIG                 "${CMAKE_SOURCE_DIR}/design/timbre.iconset/icon_512x512.png"
-    ICON_SMALL               "${CMAKE_SOURCE_DIR}/design/timbre.iconset/icon_128x128.png"
+    PRODUCT_NAME             "Tambra"
+    ICON_BIG                 "${CMAKE_SOURCE_DIR}/design/tambra.iconset/icon_512x512.png"
+    ICON_SMALL               "${CMAKE_SOURCE_DIR}/design/tambra.iconset/icon_128x128.png"
     MICROPHONE_PERMISSION_ENABLED TRUE
-    MICROPHONE_PERMISSION_TEXT    "TIMBRE uses the microphone for push-to-talk prompting — you press a button, speak a sound description, and the agent generates a patch. Audio is processed on-device by the LLM pipeline; no recording is stored."
+    MICROPHONE_PERMISSION_TEXT    "Tambra uses the microphone for push-to-talk prompting — you press a button, speak a sound description, and the agent generates a patch. Audio is processed on-device by the LLM pipeline; no recording is stored."
 )
 
 juce_generate_juce_header(AgenticSynth_Plugin)
@@ -353,7 +353,7 @@ target_compile_definitions(AgenticSynth_Plugin
         JUCE_USE_CURL=0
         JUCE_VST3_CAN_REPLACE_VST2=0
         AGENTIC_SYNTH_UI_DEV=$<BOOL:${AGENTIC_SYNTH_UI_DEV}>
-        AGENTIC_SYNTH_PROJECT_NAME="TIMBRE"
+        AGENTIC_SYNTH_PROJECT_NAME="Tambra"
         AGENTIC_SYNTH_VERSION_STRING="${PROJECT_VERSION}"
 )
 
