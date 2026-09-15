@@ -1096,3 +1096,91 @@ TEST_CASE("VoiceManager attack_s=0 note-on: max sample-to-sample delta below thr
     INFO("max |sample-to-sample Δ| = " << maxDelta);
     REQUIRE(maxDelta < kMaxSampleToSampleDelta);
 }
+
+// ── #429 filter.key_track + #266 osc enabled hard-kill ───────────────────────
+
+TEST_CASE("VoiceManager filter key_track=1: closed LP note 48 vs 72 differs (#429)", "[filter][keytrack]") {
+    // Full tracking scales cutoff with pitch relative to C4. With a closed LP,
+    // C3 (48) closes further while C5 (72) opens — spectral brightness must
+    // diverge. (Plain RMS of two different pitches is a weak signal.)
+    auto render = [](int midiNote, float keyTrack) {
+        PatchStruct p = make_default_patch();
+        p.osc[0].type = agentic_synth::OscType::Sawtooth;
+        p.osc[0].enabled = 1;
+        p.osc[0].volume = 1.0f;
+        for (int i = 1; i < agentic_synth::kMaxOscillators; ++i) {
+            p.osc[i].enabled = 0;
+            p.osc[i].volume = 0.0f;
+        }
+        p.filter.cutoff_hz = 500.0f;
+        p.filter.resonance = 0.2f;
+        p.filter.env_mod = 0.0f;
+        p.filter.key_track = keyTrack;
+        p.filter.drive = 0.0f;
+        p.amp_env.attack_s = 0.001f;
+        p.amp_env.decay_s = 0.001f;
+        p.amp_env.sustain = 1.0f;
+        p.amp_env.release_s = 0.1f;
+        p.chorus.mix = 0.0f;
+        p.tubesat.drive = 0.0f;
+        p.delay.mix = 0.0f;
+        p.reverb.mix = 0.0f;
+
+        VoiceManager vm(1);
+        vm.prepare(44100.0);
+        vm.applyPatch(p);
+        vm.noteOn(midiNote, 1.0f);
+        constexpr int kSettle = 2048;
+        constexpr int kMeasure = 8192;
+        std::vector<float> buf(static_cast<std::size_t>(kSettle + kMeasure), 0.0f);
+        vm.renderBlock(buf.data(), kSettle + kMeasure);
+        return std::vector<float>(buf.begin() + kSettle, buf.end());
+    };
+
+    // Brightness proxy: mean |Δsample| — sensitive to HF harmonic content.
+    auto brightness = [](const std::vector<float>& buf) {
+        double acc = 0.0;
+        for (std::size_t i = 1; i < buf.size(); ++i)
+            acc += std::abs(static_cast<double>(buf[i] - buf[i - 1]));
+        return acc / static_cast<double>(buf.size() - 1);
+    };
+
+    const auto low = render(48, 1.0f);
+    const auto high = render(72, 1.0f);
+    const auto highNoTrack = render(72, 0.0f);
+    const double b48 = brightness(low);
+    const double b72 = brightness(high);
+    const double b72off = brightness(highNoTrack);
+    INFO("brightness48=" << b48 << " brightness72=" << b72 << " brightness72_kt0=" << b72off);
+
+    // C5 with full tracking opens the LP ~2× vs C4 reference; C3 closes it.
+    CHECK(b72 > b48 * 1.5);
+    // Same pitch: enabling key_track at C5 must brighten vs key_track off.
+    CHECK(b72 > b72off * 1.15);
+}
+
+TEST_CASE("VoiceManager osc enabled hard-kill: disabled + full volume is silent (#266)", "[osc][enabled]") {
+    PatchStruct p = make_default_patch();
+    p.osc[0].enabled = 0;
+    p.osc[0].volume = 1.0f; // must NOT resurrect the slot
+    p.osc[0].type = agentic_synth::OscType::Sawtooth;
+    for (int i = 1; i < agentic_synth::kMaxOscillators; ++i) {
+        p.osc[i].enabled = 0;
+        p.osc[i].volume = 0.0f;
+    }
+    p.filter.cutoff_hz = 18000.0f;
+    p.chorus.mix = 0.0f;
+    p.tubesat.drive = 0.0f;
+    p.delay.mix = 0.0f;
+    p.reverb.mix = 0.0f;
+
+    VoiceManager vm(1);
+    vm.prepare(44100.0);
+    vm.applyPatch(p);
+    vm.noteOn(60, 1.0f);
+    std::vector<float> buf(4096, 0.0f);
+    vm.renderBlock(buf.data(), static_cast<int>(buf.size()));
+    const float peak = bufferPeak(buf);
+    INFO("peak=" << peak);
+    CHECK(peak < 1.0e-5f);
+}

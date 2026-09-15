@@ -103,6 +103,10 @@ struct Voice {
     // domain: cutoff *= 2^(envOut * filterEnvMod * kFilterEnvMaxOctaves).
     float filterEnvMod{0.0f};
 
+    // Filter key-track amount (filter.key_track from patch, 0..1). Scales
+    // cutoff by (voiceFreq / midiNoteToHz(60))^key_track before LFO/env (#429).
+    float filterKeyTrack{0.0f};
+
     // Smoothed filter drive — block-rate writer (applyPatch), per-sample reader
     // (render). Kills zipper noise on knob-driven drive moves.
     ParamSmoother driveSmoother;

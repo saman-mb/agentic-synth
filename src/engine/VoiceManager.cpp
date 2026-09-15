@@ -221,10 +221,8 @@ void Voice::renderStereo(float portamentoAlpha, float baseCutoffHz, float resona
     float weightTotal = 0.0f;
     for (std::size_t i = 0; i < oscs.size(); ++i) {
         const auto& po = oscs[i];
-        // Producer-friendly: treat a non-trivial volume as enabled even when
-        // the explicit flag is false. Otherwise users who turn up OSC2/OSC3
-        // volume hear nothing because makeDefaultPatch ships them disabled.
-        if (!po.enabled && po.volume < 0.001f)
+        // Hard kill (#266): disabled slots stay silent regardless of volume.
+        if (!po.enabled)
             continue;
         float pPan = po.pan + pan; // voice-level pan stacks with per-osc pan
         pPan += lfoPanMod;
@@ -255,8 +253,8 @@ void Voice::renderStereo(float portamentoAlpha, float baseCutoffHz, float resona
     float monoMix = 0.0f;
     for (std::size_t i = 0; i < oscs.size(); ++i) {
         auto& o = oscs[i];
-        // Match the pan-weight loop: volume > 0 implies user wants the osc.
-        if (!o.enabled && o.volume < 0.001f)
+        // Hard kill (#266): match the pan-weight loop.
+        if (!o.enabled)
             continue;
 
         const float perOscFreq = voiceFreq * oscFrequencyMultiplier(o.semitoneOffset, o.detuneCents);
@@ -372,19 +370,22 @@ void Voice::renderStereo(float portamentoAlpha, float baseCutoffHz, float resona
     }
 
     // ── Filter modulation ────────────────────────────────────────────────
-    // LFO cutoff is a linear multiplicative offset around 1.0 (unchanged).
-    // The filter envelope is applied in the OCTAVE domain (#428): each unit
-    // of filter.env_mod buys a fixed number of octaves regardless of where
-    // cutoff_hz sits, so the knob and the envelope no longer interact.
-    // filterEnvMod is clamped -1..+1 by PatchValidator; filterEnvOut is the
-    // ADSR output in [0, 1]. env_mod = 0 → exp2(0) = 1 → the filter runs at
-    // exactly cutoff_hz; the envelope only opens (+) or closes (-) it while
-    // it is above zero. Velocity does NOT scale cutoff — it only scales the
-    // amplitude envelope peak below, so hard-played notes are not brighter
-    // unless a patch explicitly asks for it. See kFilterEnvMaxOctaves and
-    // the FilterParams contract in PatchStruct.h.
+    // Order (#428 / #429): base cutoff × key_track × LFO × 2^(env…) then
+    // clamp 20..20000. See FilterParams contract in PatchStruct.h.
+    // Key track (#429): reference MIDI 60 (C4). Prefer exp2(kt * log2(f/ref))
+    // and skip when key_track ≈ 0 so C4 / zero-track stays a no-op.
+    // LFO cutoff is a linear multiplicative offset around 1.0.
+    // Filter envelope is applied in the OCTAVE domain (#428).
+    // Velocity does NOT scale cutoff — only the amplitude envelope peak.
     const float filterEnvOut = filterEnv.process();
-    float effectiveCutoff = baseCutoffHz * (1.0f + lfoCutoffMod);
+    float effectiveCutoff = baseCutoffHz;
+    if (std::fabs(filterKeyTrack) > 1.0e-6f) {
+        // midiNoteToHz(60) at A440 = 440 * 2^((60-69)/12)
+        constexpr float kKeyTrackRefHz = 440.0f * 0.5946035575f; // ≈ 261.6256 Hz
+        const float ratio = std::max(voiceFreq, 1.0e-6f) / kKeyTrackRefHz;
+        effectiveCutoff *= std::exp2(filterKeyTrack * std::log2(ratio));
+    }
+    effectiveCutoff *= (1.0f + lfoCutoffMod);
     // Skip the exp2 entirely when the envelope or depth is zero — the common
     // case (env_mod == 0) must stay a bit-exact no-op and cost nothing.
     const float envOctaves = filterEnvOut * filterEnvMod * kFilterEnvMaxOctaves;
@@ -931,6 +932,7 @@ void VoiceManager::applyPatch(const PatchStruct& patch) noexcept {
     // semitone / detune across all three slots.
     for (auto& v : voices_) {
         v.filterEnvMod = patch.filter.env_mod;
+        v.filterKeyTrack = patch.filter.key_track;
         for (std::size_t i = 0; i < v.oscs.size() && static_cast<int>(i) < kMaxOscillators; ++i) {
             const auto& op = patch.osc[i];
             auto& os = v.oscs[i];
