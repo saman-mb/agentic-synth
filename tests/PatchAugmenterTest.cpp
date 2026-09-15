@@ -478,7 +478,7 @@ TEST_CASE("augmenter cinematic phase32: filter env_mod is POSITIVE (bloom opens 
     p.filter.cutoff_hz = 400.0f;
     REQUIRE(augmentPatch(p, "deep dark cinematic Kubrick pad"));
     REQUIRE(p.filter.env_mod > 0.0f);
-    REQUIRE(p.filter.env_mod >= 0.3f); // meaningful depth, not a token positive
+    REQUIRE(p.filter.env_mod >= 0.25f); // meaningful octave depth (~0.28 from linear 0.40)
 }
 
 TEST_CASE("augmenter cinematic phase32: osc[2] is inharmonic FM, not plain sine", "[augmenter][phase32]") {

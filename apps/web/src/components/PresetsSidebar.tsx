@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import './PresetsSidebar.css';
 import { makeDefaultPatch, type PatchParams } from '@agentic-synth/shared-types';
 import {
@@ -31,22 +31,11 @@ export interface PresetsSidebarProps {
   // selector mirrors it (#280). Plugin callers ignore it; loading the
   // init patch passes no name and the selector falls back to its label.
   onLoadPreset: (params: PatchParams, name?: string) => void;
-  // Phase 13 — hover-to-audition. Fires 300ms after pointer-enter; the
-  // preset is pushed ephemerally to the engine without history side
-  // effects. On pointer-leave, onAuditionEnd reverts engine state. On
-  // click, onAuditionCommit clears the revert latch so the normal
-  // onLoadPreset path commits cleanly.
-  onAuditionStart?: (params: PatchParams) => void;
-  onAuditionEnd?: () => void;
-  onAuditionCommit?: () => void;
 }
 
 export function PresetsSidebar({
   currentPatch,
   onLoadPreset,
-  onAuditionStart,
-  onAuditionEnd,
-  onAuditionCommit,
 }: PresetsSidebarProps) {
   const [search, setSearch] = useState('');
   const [activeTags, setActiveTags] = useState<Set<PresetTag>>(new Set());
@@ -108,65 +97,14 @@ export function PresetsSidebar({
     });
   }, []);
 
-  // ── Hover audition (Phase 13) ────────────────────────────────────
-  // 300ms after pointer-enter, ephemerally push the preset to the
-  // engine. On pointer-leave, revert. On click, commit + clear the
-  // revert latch so the normal load-with-history path takes over.
-  const hoverTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const auditioningIdRef = useRef<string | null>(null);
-
-  const clearHoverTimer = useCallback(() => {
-    if (hoverTimerRef.current) {
-      clearTimeout(hoverTimerRef.current);
-      hoverTimerRef.current = null;
-    }
-  }, []);
-
-  const handleRowEnter = useCallback(
-    (preset: PresetEntry) => {
-      if (!onAuditionStart) return;
-      clearHoverTimer();
-      hoverTimerRef.current = setTimeout(() => {
-        const cloned = JSON.parse(JSON.stringify(preset.params)) as PatchParams;
-        auditioningIdRef.current = preset.id;
-        onAuditionStart(cloned);
-      }, 300);
-    },
-    [onAuditionStart, clearHoverTimer],
-  );
-
-  const handleRowLeave = useCallback(() => {
-    clearHoverTimer();
-    if (auditioningIdRef.current && onAuditionEnd) {
-      onAuditionEnd();
-    }
-    auditioningIdRef.current = null;
-  }, [clearHoverTimer, onAuditionEnd]);
-
-  // Unmount safety: cancel any pending timer + revert any in-flight
-  // audition so the engine doesn't end up stuck on a preview state.
-  useEffect(() => {
-    return () => {
-      clearHoverTimer();
-      if (auditioningIdRef.current && onAuditionEnd) onAuditionEnd();
-      auditioningIdRef.current = null;
-    };
-  }, [clearHoverTimer, onAuditionEnd]);
-
   const handleSelectPreset = useCallback(
     (preset: PresetEntry) => {
-      // Confirm the audition: clear the revert latch so handleLoadPreset
-      // can commit the new patch as the canonical base.
-      clearHoverTimer();
-      auditioningIdRef.current = null;
-      if (onAuditionCommit) onAuditionCommit();
-
       setActivePresetId(preset.id);
       // Deep-clone so external edits to the patch don't mutate the catalogue entry.
       const cloned = JSON.parse(JSON.stringify(preset.params)) as PatchParams;
       onLoadPreset(cloned, preset.name);
     },
-    [onLoadPreset, onAuditionCommit, clearHoverTimer],
+    [onLoadPreset],
   );
 
   const handleInitPatch = useCallback(() => {
@@ -262,8 +200,6 @@ export function PresetsSidebar({
               aria-selected={isActive}
               className={`presets-item${isActive ? ' presets-item-active' : ''}`}
               onClick={() => handleSelectPreset(p)}
-              onPointerEnter={() => handleRowEnter(p)}
-              onPointerLeave={handleRowLeave}
             >
               <button
                 type="button"

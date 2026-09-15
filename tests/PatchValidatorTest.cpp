@@ -68,15 +68,28 @@ TEST_CASE("fuzz: amp envelope times within published bounds") {
     std::mt19937 rng(3u);
     for (int i = 0; i < 10'000; ++i) {
         auto v = validate_patch(make_random_patch(rng));
-        REQUIRE(v.amp_env.attack_s >= 0.0f);
+        REQUIRE(v.amp_env.attack_s >= kAmpEnvTimeFloorSeconds);
         REQUIRE(v.amp_env.attack_s <= 10.0f);
         REQUIRE(v.amp_env.decay_s >= 0.0f);
         REQUIRE(v.amp_env.decay_s <= 10.0f);
         REQUIRE(v.amp_env.sustain >= 0.0f);
         REQUIRE(v.amp_env.sustain <= 1.0f);
-        REQUIRE(v.amp_env.release_s >= 0.0f);
+        REQUIRE(v.amp_env.release_s >= kAmpEnvTimeFloorSeconds);
         REQUIRE(v.amp_env.release_s <= 20.0f);
     }
+}
+
+TEST_CASE("validate_patch: amp_env attack/release floored to kAmpEnvTimeFloorSeconds") {
+    PatchStruct p = make_default_patch();
+    p.amp_env.attack_s = 0.0f;
+    p.amp_env.release_s = 0.0f;
+    p.filter_env.attack_s = 0.0f; // filter_env floor is out of scope for validator
+    p.filter_env.release_s = 0.0f;
+    auto v = validate_patch(p);
+    REQUIRE(v.amp_env.attack_s == Catch::Approx(kAmpEnvTimeFloorSeconds));
+    REQUIRE(v.amp_env.release_s == Catch::Approx(kAmpEnvTimeFloorSeconds));
+    REQUIRE(v.filter_env.attack_s == Catch::Approx(0.0f));
+    REQUIRE(v.filter_env.release_s == Catch::Approx(0.0f));
 }
 
 TEST_CASE("fuzz: filter envelope times within published bounds") {

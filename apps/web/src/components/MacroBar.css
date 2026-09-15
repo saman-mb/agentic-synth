@@ -5,13 +5,23 @@
 .macro-bar {
   grid-row: 2;
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   gap: var(--sp-6);
-  padding: var(--sp-2) var(--sp-3);
+  /* Reserved 128px row in .app-layout. Extra space sits ABOVE the dials
+     (flex-end) so track rings never paint under the TopBar. */
+  padding: 16px var(--sp-3) 10px;
+  height: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
   background: var(--bg-panel);
   border-bottom: 1px solid var(--color-border);
   user-select: none;
-  flex-shrink: 0;
+  min-width: 0;
+}
+
+/* MacroBar renders its own labels — hide the Knob's empty name row. */
+.macro-bar .knob-name {
+  display: none;
 }
 
 .macro-bar-heading {

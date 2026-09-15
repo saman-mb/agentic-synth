@@ -44,7 +44,12 @@ export interface SynthEngine {
   noteOn(note: number, velocity: number): void;
   noteOff(note: number): void;
   playMidiNote(note: number, velocity: number, durationMs: number): void;
+  // Interleaved stereo time-domain samples: [L0, R0, L1, R1, ...], length
+  // 2*n (#435). Empty when the engine has no live tap yet.
   getScopeSamples(n: number): number[];
+  // The engine's real playback sample rate, so the spectrum axis and the
+  // wavetable cycle length are never computed from a hardcoded 44100 (#434).
+  getScopeSampleRate(): number;
   // Routes all output to the given device (AudioContext.setSinkId).
   // Throws when the browser lacks setSinkId or the switch fails — the
   // caller surfaces the message. Empty string restores the default.
@@ -123,7 +128,10 @@ export class WebSynthEngine implements SynthEngine {
   private manager: VoiceManager | null = null;
   private rack: EffectRack | null = null;
   private masterGain: GainNode | null = null;
-  private analyser: AnalyserNode | null = null;
+  private splitter: ChannelSplitterNode | null = null;
+  private merger: ChannelMergerNode | null = null;
+  private analyserL: AnalyserNode | null = null;
+  private analyserR: AnalyserNode | null = null;
   private tap: AudioWorkletNode | null = null;
   private startPromise: Promise<void> | null = null;
   private stopKeepAlive: (() => void) | null = null;
@@ -153,12 +161,24 @@ export class WebSynthEngine implements SynthEngine {
     const rack = createEffectRack(ctx);
     const masterGain = ctx.createGain();
     masterGain.gain.value = clamp01(this.patch.master_gain);
-    const analyser = ctx.createAnalyser();
-    analyser.fftSize = SCOPE_FFT_SIZE;
+    // Real stereo tap (#435): split L/R and analyse each channel separately.
+    // A single AnalyserNode downmixes to mono, which made XY mode fictitious.
+    const splitter = ctx.createChannelSplitter(2);
+    const merger = ctx.createChannelMerger(2);
+    const analyserL = ctx.createAnalyser();
+    const analyserR = ctx.createAnalyser();
+    analyserL.fftSize = SCOPE_FFT_SIZE;
+    analyserR.fftSize = SCOPE_FFT_SIZE;
 
     manager.output.connect(rack.input);
     rack.output.connect(masterGain);
-    masterGain.connect(analyser);
+    masterGain.connect(splitter);
+    splitter.connect(analyserL, 0);
+    splitter.connect(analyserR, 1);
+    // Analysers pass audio through; re-merge so the graph stays live to the
+    // destination (an AnalyserNode with no output path can read as silence).
+    analyserL.connect(merger, 0, 0);
+    analyserR.connect(merger, 0, 1);
 
     try {
       const url = URL.createObjectURL(new Blob([TAP_PROCESSOR_SOURCE], { type: 'text/javascript' }));
@@ -168,20 +188,23 @@ export class WebSynthEngine implements SynthEngine {
         URL.revokeObjectURL(url);
       }
       const tap = new AudioWorkletNode(ctx, 'engine-tap');
-      analyser.connect(tap);
+      merger.connect(tap);
       tap.connect(ctx.destination);
       this.tap = tap;
     } catch {
-      // Graceful degradation: no worklet support — the analyser feeds
-      // the destination directly and everything else still works.
-      analyser.connect(ctx.destination);
+      // Graceful degradation: no worklet support — the merged stereo signal
+      // feeds the destination directly and everything else still works.
+      merger.connect(ctx.destination);
     }
 
     this.ctx = ctx;
     this.manager = manager;
     this.rack = rack;
     this.masterGain = masterGain;
-    this.analyser = analyser;
+    this.splitter = splitter;
+    this.merger = merger;
+    this.analyserL = analyserL;
+    this.analyserR = analyserR;
     this.stopKeepAlive = keepAudioContextRunning(ctx);
     this.applyPatchToGraph();
   }
@@ -265,10 +288,21 @@ export class WebSynthEngine implements SynthEngine {
 
   getScopeSamples(n: number): number[] {
     const count = Math.max(0, Math.min(Math.floor(n), SCOPE_FFT_SIZE));
-    if (!this.analyser || count === 0) return new Array<number>(count).fill(0);
-    const buf = new Float32Array(count);
-    this.analyser.getFloatTimeDomainData(buf);
-    return Array.from(buf);
+    if (!this.analyserL || !this.analyserR || count === 0) return [];
+    const l = new Float32Array(count);
+    const r = new Float32Array(count);
+    this.analyserL.getFloatTimeDomainData(l);
+    this.analyserR.getFloatTimeDomainData(r);
+    const out = new Array<number>(count * 2);
+    for (let i = 0; i < count; i++) {
+      out[i * 2] = l[i];
+      out[i * 2 + 1] = r[i];
+    }
+    return out;
+  }
+
+  getScopeSampleRate(): number {
+    return this.ctx?.sampleRate ?? 48000;
   }
 
   async setOutputDevice(deviceId: string): Promise<void> {
@@ -297,8 +331,14 @@ export class WebSynthEngine implements SynthEngine {
     this.rack = null;
     this.tap?.disconnect();
     this.tap = null;
-    this.analyser?.disconnect();
-    this.analyser = null;
+    this.analyserL?.disconnect();
+    this.analyserL = null;
+    this.analyserR?.disconnect();
+    this.analyserR = null;
+    this.splitter?.disconnect();
+    this.splitter = null;
+    this.merger?.disconnect();
+    this.merger = null;
     this.masterGain?.disconnect();
     this.masterGain = null;
     const ctx = this.ctx;

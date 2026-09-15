@@ -322,12 +322,13 @@ void applyCinematicPadLayering(PatchStruct& p) noexcept {
     sub.enabled = 1;
 
     // Filter — moderate cutoff with POSITIVE env_mod (bloom OPENS on attack
-    // — the cinematic reveal). Drive bumped to 0.35 for Vangelis pre-filter
-    // saturation glue.
+    // — the cinematic reveal). Depth is octave-domain (#428): 0.28 ≈
+    // log2(1+3*0.40)/4 so peak excursion matches the pre-#428 linear 0.40.
+    // Drive bumped to 0.35 for Vangelis pre-filter saturation glue.
     p.filter.type = FilterType::LowPass;
     p.filter.cutoff_hz = 1400.0f;
     p.filter.resonance = 0.35f;
-    p.filter.env_mod = 0.40f; // POSITIVE: opens on attack, sustains brightness
+    p.filter.env_mod = 0.28f; // POSITIVE octave depth (~1.14 oct at peak)
     p.filter.drive = std::max(p.filter.drive, 0.35f);
 
     // Envelopes — long swell, long tail. Filter-env attack 1.8s so the
@@ -621,7 +622,7 @@ bool augmentPatch(PatchStruct& p, const std::string& prompt) noexcept {
     // for a cinematic-keyword prompt, and the result is structurally bass-
     // coded (closed filter < 1000 Hz or fewer than 3 audible oscs), we
     // rebuild around the cinematic-pad recipe (octave-spread, panned
-    // detune pair, sub anchor, NEGATIVE filter env_mod, two coprime LFOs,
+    // detune pair, sub anchor, POSITIVE filter env_mod, two coprime LFOs,
     // cathedral reverb).
     if (containsCinematicIntent(lower) && !containsFmIntent(lower)) {
         const int audibleCount = countAudibleOscs(p);

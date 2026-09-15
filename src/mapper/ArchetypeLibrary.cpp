@@ -22,6 +22,19 @@ namespace agentic_synth::mapper {
 // Values are hand-curated for §3 system-prompt fidelity + Phase 32's
 // cinematic gold standard (positive env_mod, asymmetric detune, inharmonic
 // FM anchor, cathedral verb mix 0.30..0.45).
+//
+// #428 retune: env_mod was voiced by ear against the old engine, which
+// multiplied cutoff linearly as (1 + env_mod * 3) at the envelope peak. The
+// engine now applies env_mod in the octave domain as
+// 2^(env_mod * kFilterEnvMaxOctaves) (PatchStruct.h). To keep the authored
+// attack sweep, each archetype's env_mod is converted to the octave depth
+// that reproduces the same PEAK cutoff excursion:
+//
+//     env_mod_new = log2(1 + 3 * env_mod_old) / kFilterEnvMaxOctaves
+//
+// The sustained corner necessarily moves closer to cutoff_hz than before –
+// that is the intended correction, not a regression. Archetypes whose
+// env_mod was 0 (sub_808_bass, default_init) are untouched.
 
 namespace {
 
@@ -36,7 +49,7 @@ constexpr const char* kCinematicKubrickPad = R"json(
     {"type": "Sawtooth", "semitone_offset": 0.0,   "detune_cents":  13.0, "wavetable_pos": 0.30, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.70, "pan": 0.6, "pulse_width": 0.5, "enabled": true},
     {"type": "FM",       "semitone_offset": -12.0, "detune_cents": 0.0, "wavetable_pos": 0.0, "fm_ratio": 2.73, "fm_depth": 0.35, "volume": 0.40, "pan": 0.0, "pulse_width": 0.5, "enabled": true}
   ],
-  "filter": {"type": "LowPass", "cutoff_hz": 1400.0, "resonance": 0.35, "env_mod": 0.40, "key_track": 0.0, "drive": 0.35},
+  "filter": {"type": "LowPass", "cutoff_hz": 1400.0, "resonance": 0.35, "env_mod": 0.30, "key_track": 0.0, "drive": 0.35},
   "filter_env": {"attack_s": 1.8, "decay_s": 5.0, "sustain": 0.55, "release_s": 5.0},
   "amp_env":    {"attack_s": 2.2, "decay_s": 1.5, "sustain": 0.85, "release_s": 6.0},
   "lfo": [
@@ -65,7 +78,7 @@ constexpr const char* kVangelisBladeRunnerPad = R"json(
     {"type": "Sawtooth", "semitone_offset": 0.0,   "detune_cents":  9.0, "wavetable_pos": 0.0, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.75, "pan":  0.5, "pulse_width": 0.5, "enabled": true},
     {"type": "Sine",     "semitone_offset": -12.0, "detune_cents":  0.0, "wavetable_pos": 0.0, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.45, "pan":  0.0, "pulse_width": 0.5, "enabled": true}
   ],
-  "filter": {"type": "LowPass", "cutoff_hz": 900.0, "resonance": 0.30, "env_mod": 0.45, "key_track": 0.1, "drive": 0.25},
+  "filter": {"type": "LowPass", "cutoff_hz": 900.0, "resonance": 0.30, "env_mod": 0.31, "key_track": 0.1, "drive": 0.25},
   "filter_env": {"attack_s": 2.0, "decay_s": 4.0, "sustain": 0.50, "release_s": 4.0},
   "amp_env":    {"attack_s": 2.0, "decay_s": 1.2, "sustain": 0.90, "release_s": 8.0},
   "lfo": [
@@ -94,7 +107,7 @@ constexpr const char* kAmbientDronePad = R"json(
     {"type": "Sawtooth",  "semitone_offset": 0.0,   "detune_cents":  7.0, "wavetable_pos": 0.0,  "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.55, "pan":  0.4, "pulse_width": 0.5, "enabled": true},
     {"type": "Sine",      "semitone_offset": -12.0, "detune_cents":  0.0, "wavetable_pos": 0.0,  "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.50, "pan":  0.0, "pulse_width": 0.5, "enabled": true}
   ],
-  "filter": {"type": "LowPass", "cutoff_hz": 2200.0, "resonance": 0.20, "env_mod": 0.25, "key_track": 0.0, "drive": 0.15},
+  "filter": {"type": "LowPass", "cutoff_hz": 2200.0, "resonance": 0.20, "env_mod": 0.20, "key_track": 0.0, "drive": 0.15},
   "filter_env": {"attack_s": 3.0, "decay_s": 4.0, "sustain": 0.70, "release_s": 6.0},
   "amp_env":    {"attack_s": 3.5, "decay_s": 1.5, "sustain": 0.90, "release_s": 9.0},
   "lfo": [
@@ -120,7 +133,7 @@ constexpr const char* kReeseDubstepBass = R"json(
     {"type": "Sawtooth", "semitone_offset": 0.0,   "detune_cents":  15.0, "wavetable_pos": 0.0, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.85, "pan":  0.2, "pulse_width": 0.5, "enabled": true},
     {"type": "Sine",     "semitone_offset": -12.0, "detune_cents": 0.0,   "wavetable_pos": 0.0, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.65, "pan": 0.0, "pulse_width": 0.5, "enabled": true}
   ],
-  "filter": {"type": "LowPass", "cutoff_hz": 350.0, "resonance": 0.50, "env_mod": 0.30, "key_track": 0.2, "drive": 0.50},
+  "filter": {"type": "LowPass", "cutoff_hz": 350.0, "resonance": 0.50, "env_mod": 0.23, "key_track": 0.2, "drive": 0.50},
   "filter_env": {"attack_s": 0.01, "decay_s": 0.25, "sustain": 0.20, "release_s": 0.15},
   "amp_env":    {"attack_s": 0.005, "decay_s": 0.20, "sustain": 0.90, "release_s": 0.20},
   "lfo": [
@@ -172,7 +185,7 @@ constexpr const char* kAcid303Bass = R"json(
     {"type": "Sawtooth", "semitone_offset": -12.0, "detune_cents": 0.0, "wavetable_pos": 0.0, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.35, "pan": 0.0, "pulse_width": 0.5, "enabled": true},
     {"type": "Sine",     "semitone_offset": -12.0, "detune_cents": 0.0, "wavetable_pos": 0.0, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.30, "pan": 0.0, "pulse_width": 0.5, "enabled": true}
   ],
-  "filter": {"type": "LowPass", "cutoff_hz": 400.0, "resonance": 0.85, "env_mod": 0.85, "key_track": 0.40, "drive": 0.50},
+  "filter": {"type": "LowPass", "cutoff_hz": 400.0, "resonance": 0.85, "env_mod": 0.46, "key_track": 0.40, "drive": 0.50},
   "filter_env": {"attack_s": 0.001, "decay_s": 0.15, "sustain": 0.0, "release_s": 0.08},
   "amp_env":    {"attack_s": 0.001, "decay_s": 0.10, "sustain": 0.60, "release_s": 0.10},
   "lfo": [
@@ -198,7 +211,7 @@ constexpr const char* kSupersawLead = R"json(
     {"type": "Sawtooth", "semitone_offset": 0.0, "detune_cents": -15.0, "wavetable_pos": 0.0, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.75, "pan": -0.5, "pulse_width": 0.5, "enabled": true},
     {"type": "Sawtooth", "semitone_offset": 0.0, "detune_cents":  15.0, "wavetable_pos": 0.0, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.75, "pan":  0.5, "pulse_width": 0.5, "enabled": true}
   ],
-  "filter": {"type": "LowPass", "cutoff_hz": 4500.0, "resonance": 0.30, "env_mod": 0.30, "key_track": 0.2, "drive": 0.15},
+  "filter": {"type": "LowPass", "cutoff_hz": 4500.0, "resonance": 0.30, "env_mod": 0.23, "key_track": 0.2, "drive": 0.15},
   "filter_env": {"attack_s": 0.01, "decay_s": 0.25, "sustain": 0.40, "release_s": 0.20},
   "amp_env":    {"attack_s": 0.005, "decay_s": 0.20, "sustain": 0.75, "release_s": 0.30},
   "lfo": [
@@ -224,7 +237,7 @@ constexpr const char* kDx7TineEp = R"json(
     {"type": "Sine", "semitone_offset": 0.0,  "detune_cents": 0.0, "wavetable_pos": 0.0, "fm_ratio": 1.0,  "fm_depth": 0.0,  "volume": 0.55, "pan": 0.0, "pulse_width": 0.5, "enabled": true},
     {"type": "Sine", "semitone_offset": 12.0, "detune_cents": 0.0, "wavetable_pos": 0.0, "fm_ratio": 1.0,  "fm_depth": 0.0,  "volume": 0.20, "pan": 0.0, "pulse_width": 0.5, "enabled": true}
   ],
-  "filter": {"type": "LowPass", "cutoff_hz": 14000.0, "resonance": 0.10, "env_mod": 0.10, "key_track": 0.2, "drive": 0.0},
+  "filter": {"type": "LowPass", "cutoff_hz": 14000.0, "resonance": 0.10, "env_mod": 0.09, "key_track": 0.2, "drive": 0.0},
   "filter_env": {"attack_s": 0.001, "decay_s": 0.30, "sustain": 0.10, "release_s": 0.20},
   "amp_env":    {"attack_s": 0.001, "decay_s": 0.40, "sustain": 0.40, "release_s": 0.50},
   "lfo": [
@@ -250,7 +263,7 @@ constexpr const char* kGlassBell = R"json(
     {"type": "Sine", "semitone_offset": 0.0,  "detune_cents": 0.0, "wavetable_pos": 0.0, "fm_ratio": 1.0,  "fm_depth": 0.0,  "volume": 0.55, "pan": 0.0, "pulse_width": 0.5, "enabled": true},
     {"type": "Sine", "semitone_offset": 19.0, "detune_cents": 0.0, "wavetable_pos": 0.0, "fm_ratio": 1.0,  "fm_depth": 0.0,  "volume": 0.30, "pan": 0.0, "pulse_width": 0.5, "enabled": true}
   ],
-  "filter": {"type": "LowPass", "cutoff_hz": 8000.0, "resonance": 0.10, "env_mod": 0.20, "key_track": 0.2, "drive": 0.0},
+  "filter": {"type": "LowPass", "cutoff_hz": 8000.0, "resonance": 0.10, "env_mod": 0.17, "key_track": 0.2, "drive": 0.0},
   "filter_env": {"attack_s": 0.001, "decay_s": 0.50, "sustain": 0.10, "release_s": 0.50},
   "amp_env":    {"attack_s": 0.001, "decay_s": 1.50, "sustain": 0.0,  "release_s": 1.50},
   "lfo": [
@@ -276,7 +289,7 @@ constexpr const char* kWarmAnalogPad = R"json(
     {"type": "Triangle", "semitone_offset": 0.0,  "detune_cents":  9.0, "wavetable_pos": 0.0, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.75, "pan":  0.4, "pulse_width": 0.5, "enabled": true},
     {"type": "Sine",     "semitone_offset": 12.0, "detune_cents":  0.0, "wavetable_pos": 0.0, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.40, "pan":  0.0, "pulse_width": 0.5, "enabled": true}
   ],
-  "filter": {"type": "LowPass", "cutoff_hz": 2500.0, "resonance": 0.15, "env_mod": 0.25, "key_track": 0.1, "drive": 0.10},
+  "filter": {"type": "LowPass", "cutoff_hz": 2500.0, "resonance": 0.15, "env_mod": 0.20, "key_track": 0.1, "drive": 0.10},
   "filter_env": {"attack_s": 1.5, "decay_s": 2.0, "sustain": 0.60, "release_s": 2.5},
   "amp_env":    {"attack_s": 1.2, "decay_s": 1.0, "sustain": 0.85, "release_s": 3.0},
   "lfo": [
@@ -302,7 +315,7 @@ constexpr const char* kPluckKeys = R"json(
     {"type": "Triangle", "semitone_offset": -12.0, "detune_cents":  0.0, "wavetable_pos": 0.0, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.45, "pan":  0.0, "pulse_width": 0.5, "enabled": true},
     {"type": "Sine",     "semitone_offset": 12.0,  "detune_cents":  0.0, "wavetable_pos": 0.0, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.25, "pan":  0.0, "pulse_width": 0.5, "enabled": true}
   ],
-  "filter": {"type": "LowPass", "cutoff_hz": 1800.0, "resonance": 0.30, "env_mod": 0.60, "key_track": 0.3, "drive": 0.05},
+  "filter": {"type": "LowPass", "cutoff_hz": 1800.0, "resonance": 0.30, "env_mod": 0.37, "key_track": 0.3, "drive": 0.05},
   "filter_env": {"attack_s": 0.001, "decay_s": 0.18, "sustain": 0.0, "release_s": 0.10},
   "amp_env":    {"attack_s": 0.001, "decay_s": 0.30, "sustain": 0.0, "release_s": 0.20},
   "lfo": [
@@ -328,7 +341,7 @@ constexpr const char* kGrittyLead = R"json(
     {"type": "Square",   "semitone_offset": 0.0,   "detune_cents":   8.0, "wavetable_pos": 0.0, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.55, "pan":  0.3, "pulse_width": 0.45, "enabled": true},
     {"type": "Sine",     "semitone_offset": -12.0, "detune_cents":   0.0, "wavetable_pos": 0.0, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.45, "pan":  0.0, "pulse_width": 0.5,  "enabled": true}
   ],
-  "filter": {"type": "LowPass", "cutoff_hz": 1200.0, "resonance": 0.55, "env_mod": 0.55, "key_track": 0.2, "drive": 0.50},
+  "filter": {"type": "LowPass", "cutoff_hz": 1200.0, "resonance": 0.55, "env_mod": 0.35, "key_track": 0.2, "drive": 0.50},
   "filter_env": {"attack_s": 0.005, "decay_s": 0.25, "sustain": 0.40, "release_s": 0.20},
   "amp_env":    {"attack_s": 0.005, "decay_s": 0.20, "sustain": 0.80, "release_s": 0.25},
   "lfo": [
@@ -354,7 +367,7 @@ constexpr const char* kEtherealChoirPad = R"json(
     {"type": "Sine",      "semitone_offset": 12.0, "detune_cents":  0.0, "wavetable_pos": 0.0,  "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.45, "pan":  0.4, "pulse_width": 0.5, "enabled": true},
     {"type": "Noise",     "semitone_offset": 0.0,  "detune_cents":  0.0, "wavetable_pos": 0.0,  "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.18, "pan":  0.0, "pulse_width": 0.5, "enabled": true}
   ],
-  "filter": {"type": "LowPass", "cutoff_hz": 3500.0, "resonance": 0.20, "env_mod": 0.30, "key_track": 0.1, "drive": 0.05},
+  "filter": {"type": "LowPass", "cutoff_hz": 3500.0, "resonance": 0.20, "env_mod": 0.23, "key_track": 0.1, "drive": 0.05},
   "filter_env": {"attack_s": 2.0, "decay_s": 3.0, "sustain": 0.70, "release_s": 4.0},
   "amp_env":    {"attack_s": 2.5, "decay_s": 1.5, "sustain": 0.90, "release_s": 5.0},
   "lfo": [
@@ -380,7 +393,7 @@ constexpr const char* kRiserSwell = R"json(
     {"type": "Sawtooth", "semitone_offset": 12.0,  "detune_cents":  7.0, "wavetable_pos": 0.0, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.60, "pan": -0.3, "pulse_width": 0.5, "enabled": true},
     {"type": "Noise",    "semitone_offset": 0.0,   "detune_cents":  0.0, "wavetable_pos": 0.0, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.30, "pan": 0.3,  "pulse_width": 0.5, "enabled": true}
   ],
-  "filter": {"type": "LowPass", "cutoff_hz": 80.0, "resonance": 0.40, "env_mod": 1.0, "key_track": 0.0, "drive": 0.20},
+  "filter": {"type": "LowPass", "cutoff_hz": 80.0, "resonance": 0.40, "env_mod": 0.50, "key_track": 0.0, "drive": 0.20},
   "filter_env": {"attack_s": 4.0, "decay_s": 0.10, "sustain": 1.0, "release_s": 0.50},
   "amp_env":    {"attack_s": 4.0, "decay_s": 0.10, "sustain": 1.0, "release_s": 0.50},
   "lfo": [

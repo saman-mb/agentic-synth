@@ -47,6 +47,9 @@ PatchStruct validate_patch(PatchStruct p, UnsafeModeFlags flags) noexcept {
 
     validate_env(p.filter_env);
     validate_env(p.amp_env);
+    // Amp VCA is post-filter: zero attack/release is a full-spectrum click.
+    p.amp_env.attack_s = std::max(p.amp_env.attack_s, kAmpEnvTimeFloorSeconds);
+    p.amp_env.release_s = std::max(p.amp_env.release_s, kAmpEnvTimeFloorSeconds);
 
     for (int i = 0; i < kMaxLfos; ++i) {
         p.lfo[i].rate_hz = clamp_f(p.lfo[i].rate_hz, 0.01f, 20.0f, 1.0f);

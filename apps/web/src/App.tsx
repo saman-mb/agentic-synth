@@ -844,55 +844,6 @@ export function App() {
     [handleLoadPreset],
   );
 
-  // ── Preset audition (Phase 13) ────────────────────────────────────
-  // Ephemerally push a preset to the engine WITHOUT touching React
-  // history/patch state. Used by PresetsSidebar's hover-preview: a
-  // 300ms timer fires after pointer-enter; on pointer-leave the prior
-  // engine state is restored via cancelAudition().
-  //
-  // We diff against `lastSentEffectiveRef` (what the engine currently
-  // hears) rather than `patch`, so subsequent macro changes or knob
-  // moves during audition don't double-overwrite.
-  const auditionRevertRef = useRef<Record<string, number> | null>(null);
-  const auditionPreset = useCallback(
-    (next: PatchParams) => {
-      const cur = lastSentEffectiveRef.current ?? patch;
-      // If a prior audition is still active, keep its revert map (we
-      // want to restore to the pre-audition state, not to the prior
-      // audition's preset).
-      if (!auditionRevertRef.current) {
-        const revert: Record<string, number> = {};
-        const curFlat = flattenPatch(cur);
-        const nextFlat = flattenPatch(next);
-        for (const k of Object.keys(nextFlat)) {
-          if (curFlat[k] !== nextFlat[k]) revert[k] = curFlat[k];
-        }
-        auditionRevertRef.current = revert;
-      }
-      // Push the preset values to the engine directly.
-      const diff = diffPatch(cur, next);
-      for (const [p, v] of Object.entries(diff)) {
-        sendMessage(JSON.stringify({ type: 'knob_tweak', param: p, value: v }));
-      }
-    },
-    [patch, sendMessage],
-  );
-
-  const cancelAudition = useCallback(() => {
-    const revert = auditionRevertRef.current;
-    if (!revert) return;
-    auditionRevertRef.current = null;
-    for (const [p, v] of Object.entries(revert)) {
-      sendMessage(JSON.stringify({ type: 'knob_tweak', param: p, value: v }));
-    }
-  }, [sendMessage]);
-
-  // When a hover audition is confirmed (click), forget the revert map
-  // so the normal handleLoadPreset path commits cleanly.
-  const commitAudition = useCallback(() => {
-    auditionRevertRef.current = null;
-  }, []);
-
   // Phase 10 §16 — RTFM easter egg. ChatInterface detects the prompt
   // locally and calls back here; we synthesise a gnarly FM patch from
   // the current patch baseline and route it through the standard preset
@@ -1143,9 +1094,6 @@ export function App() {
         <PresetsSidebar
           currentPatch={patch}
           onLoadPreset={handleLoadPreset}
-          onAuditionStart={auditionPreset}
-          onAuditionEnd={cancelAudition}
-          onAuditionCommit={commitAudition}
         />
         <ResizeHandle
           ariaLabel="Resize presets sidebar"

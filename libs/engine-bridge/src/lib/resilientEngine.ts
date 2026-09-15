@@ -161,7 +161,11 @@ export class ResilientSynthEngine implements SynthEngine {
 
   getScopeSamples(n: number): number[] {
     if (this.active) return this.active.getScopeSamples(n);
-    return new Array<number>(Math.max(0, Math.floor(n))).fill(0);
+    return [];
+  }
+
+  getScopeSampleRate(): number {
+    return this.active?.getScopeSampleRate() ?? 48000;
   }
 
   async setOutputDevice(deviceId: string): Promise<void> {

@@ -302,10 +302,18 @@ export function installWebDemoShim(): void {
     },
 
     // Called by Visualizer.tsx once per RAF — must stay allocation-light
-    // and synchronous (the shim resolves it in the same tick).
+    // and synchronous (the shim resolves it in the same tick). Returns the
+    // bridge's interleaved-stereo frame shape (#435): [L0,R0,L1,R1,...] plus
+    // the engine's real sample rate and the drop/stale counters.
     getScopeSamples: (params) => {
       const n = asInt(params[0]) ?? 0;
-      return engine.getScopeSamples(n);
+      return {
+        samples: engine.getScopeSamples(n),
+        sampleRate: engine.getScopeSampleRate(),
+        droppedFrames: 0,
+        staleWindows: 0,
+        stale: false,
+      };
     },
 
     open_external_url: (params) => openExternalUrl(params[0]),

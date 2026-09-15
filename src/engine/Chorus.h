@@ -14,6 +14,12 @@ namespace agentic_synth::engine {
 // from. Cubic-Hermite interpolation on the delay-line read keeps the LFO
 // modulation click-free even at low rates.
 //
+// Engine placement (#265): pre-filter, in the order oscillators → chorus →
+// tube saturation → filter. At that point the chain is mono, so
+// VoiceManager::renderStereo feeds the mono osc sum to both channels and folds
+// the stereo result back to mono — the mono filter intentionally mono-sums the
+// ensemble (see the comment there).
+//
 // Audio-thread contract:
 //   - prepare(sr, channels) allocates the delay buffer ONCE
 //   - setRate / setDepth / setMix can be called at block-rate; cheap atomic-

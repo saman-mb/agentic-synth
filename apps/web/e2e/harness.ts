@@ -39,8 +39,9 @@ async function run(engine: SynthEngine): Promise<HarnessResult> {
   let sampleCount = 0;
   while (Date.now() < deadline) {
     await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+    // getScopeSamples returns interleaved stereo since #435: 2 values/frame.
     const samples = engine.getScopeSamples(SCOPE_SAMPLES);
-    sampleCount = samples.length;
+    sampleCount = samples.length / 2;
     peak = Math.max(peak, peakOf(samples));
     if (peak > AUDIBLE_THRESHOLD) break;
   }

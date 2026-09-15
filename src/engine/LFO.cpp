@@ -5,11 +5,19 @@
 
 namespace agentic_synth::engine {
 
-LFO::LFO() { seed(1u); }
+LFO::LFO() {
+    seed(1u);
+    updateSlewCoeff();
+}
 
 void LFO::seed(uint32_t seed) { mRng.seed(seed ? seed : 1u); }
 
-void LFO::setSampleRate(double sampleRate) { mSampleRate = sampleRate; }
+void LFO::updateSlewCoeff() { mSlewCoeff = static_cast<float>(1.0 - std::exp(-1.0 / (kSlewTauSeconds * mSampleRate))); }
+
+void LFO::setSampleRate(double sampleRate) {
+    mSampleRate = sampleRate;
+    updateSlewCoeff();
+}
 
 void LFO::setShape(LfoShape shape) { mShape = shape; }
 
@@ -30,21 +38,24 @@ void LFO::trigger() {
     if (mKeyTrigger) {
         mPhase = 0.0;
         mPrevPhase = 1.0;
+        mSlewState = 0.0f;
     }
 }
 
 float LFO::processSample() {
-    float out = computeShape(mPhase) * mDepth;
+    float target = computeShape(mPhase) * mDepth;
     mPrevPhase = mPhase;
     mPhase += currentRateHz() / mSampleRate;
     if (mPhase >= 1.0)
         mPhase -= std::floor(mPhase);
-    return out;
+    mSlewState += mSlewCoeff * (target - mSlewState);
+    return mSlewState;
 }
 
 void LFO::reset() {
     mPhase = 0.0;
     mPrevPhase = 1.0;
+    mSlewState = 0.0f;
 }
 
 void LFO::setTargetSlot(int slot) { mTargetSlot = slot; }

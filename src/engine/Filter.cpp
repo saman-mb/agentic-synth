@@ -22,7 +22,14 @@ static constexpr double kDriveGainFactor = 4.0;
 static inline double driveCompensation(double driveGain) { return 1.0 / std::sqrt(driveGain); }
 
 void MoogLadder::prepare(double sampleRate) {
-    sampleRate_ = sampleRate;
+    baseSampleRate_ = sampleRate;
+    // Run the nonlinear ladder at 2x while the feedback tanh is live (resonance
+    // > 0); the ZDF coefficients are derived for the internal rate so the
+    // audible cutoff stays at the requested frequency. At k == 0 the tanh term
+    // is multiplied by zero, the ladder is linear, and the base rate is used.
+    oversamplingActive_ = (resonance_ > 0.0f);
+    sampleRate_ = baseSampleRate_ * (oversamplingActive_ ? 2.0 : 1.0);
+    oversampler_.prepare(baseSampleRate_);
     updateCoefficients();
     reset();
 }
@@ -42,6 +49,7 @@ void MoogLadder::setResonance(float resonance) {
     if (!std::isfinite(resonance))
         return;
     resonance_ = std::clamp(resonance, 0.0f, 1.0f);
+    setOversamplingActive(resonance_ > 0.0f);
     updateCoefficients();
 }
 
@@ -53,7 +61,21 @@ void MoogLadder::setDrive(float drive) {
     driveComp_ = driveCompensation(driveGain_);
 }
 
-void MoogLadder::reset() { s_.fill(0.0); }
+void MoogLadder::reset() {
+    s_.fill(0.0);
+    oversampler_.reset();
+}
+
+void MoogLadder::setOversamplingActive(bool active) noexcept {
+    if (active == oversamplingActive_)
+        return;
+    oversamplingActive_ = active;
+    sampleRate_ = baseSampleRate_ * (active ? 2.0 : 1.0);
+    // Clear FIR history *and* ZDF integrators: the rate change rewrites g/a/b,
+    // so leftover s_ from the other rate would click or blow up under mod.
+    oversampler_.reset();
+    s_.fill(0.0);
+}
 
 void MoogLadder::updateCoefficients() {
     double fc = std::clamp(static_cast<double>(cutoff_), 20.0, sampleRate_ * 0.49);
@@ -77,6 +99,24 @@ float MoogLadder::process(float input) {
         return 0.0f;
     }
 
+    // 2x oversampling around the in-loop tanh: upsample, run two ladder
+    // iterations at the internal rate, decimate back to the base rate. The
+    // half-band filter pair keeps the generated harmonics from folding into
+    // the passband while the ZDF integrators still see a well-behaved loop.
+    // At resonance == 0 the feedback branch is dead, so the base-rate path is
+    // bit-exact with the pre-oversampling ladder and skips the filter delay.
+    if (!oversamplingActive_)
+        return processInternal(static_cast<double>(input));
+
+    float up0 = 0.0f;
+    float up1 = 0.0f;
+    oversampler_.upsample(input, up0, up1);
+    const float out0 = processInternal(static_cast<double>(up0));
+    const float out1 = processInternal(static_cast<double>(up1));
+    return oversampler_.downsample(out0, out1);
+}
+
+float MoogLadder::processInternal(double x_in) noexcept {
     // Denormal protection: inject a tiny DC bias that cancels itself in the
     // sum but pushes integrator accumulators out of the subnormal range.
     // Portable, no SSE intrinsics required.
@@ -90,7 +130,7 @@ float MoogLadder::process(float input) {
     const double a4 = a3 * a;
 
     // Apply input drive (pre-ladder).
-    const double x = static_cast<double>(input) * driveGain_;
+    const double x = x_in * driveGain_;
 
     // Step 1 — Linear ZDF prediction of y4 (closed-form, one shot).
     //   This gives us the implicit feedback solution under the assumption that

@@ -7,7 +7,8 @@ namespace agentic_synth::engine {
 
 // Freeverb-style stereo Schroeder reverb. Designed for cheap, musical
 // "room" to "hall" tail; not concert-hall quality. Per-sample CPU cost is
-// roughly 8 comb reads + 4 allpass reads × 2 channels (~30 simple ops).
+// roughly 16 comb reads + 4 allpass reads for the stereo pair (~50 simple
+// ops) after the full 8-comb Freeverb bank is restored (#432).
 //
 // Lifetime:
 //   - Construct once
@@ -27,8 +28,9 @@ public:
     // Maps to comb-filter feedback gain.
     void setSize(float size01) noexcept;
 
-    // damp: 0 = bright tail, 1 = dark tail. Maps to one-pole lowpass
-    // inside each comb's feedback path.
+    // damp: 0 = bright tail, 1 = near-fully-damped dark tail. Maps to a
+    // one-pole lowpass inside each comb's feedback path; the user range is
+    // rescaled onto the full internal range (see kMaxInternalDamping).
     void setDamp(float damp01) noexcept;
 
     // Wet/dry mix. 0 = dry only, 1 = wet only.
@@ -41,8 +43,14 @@ public:
 
 private:
     // Implementation details visible only for sizing — caller doesn't touch.
-    static constexpr int kNumCombs = 4;
+    // kNumCombs matches Freeverb-original's per-channel comb count; the tail's
+    // modal density scales with it (#432).
+    static constexpr int kNumCombs = 8;
     static constexpr int kNumAllpasses = 2;
+    // Internal one-pole damping ceiling. Freeverb's original damp1 = damp*0.5
+    // could never fully darken the tail; 0.95 reaches a ~350 Hz feedback
+    // lowpass corner while staying just shy of the state-freezing d = 1.0.
+    static constexpr float kMaxInternalDamping = 0.95f;
 
     struct Comb {
         std::vector<float> buf;

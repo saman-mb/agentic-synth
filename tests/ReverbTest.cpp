@@ -3,7 +3,9 @@
 
 #include "engine/Reverb.h"
 
+#include <algorithm>
 #include <cmath>
+#include <complex>
 #include <cstddef>
 #include <limits>
 #include <vector>
@@ -13,6 +15,7 @@ using namespace agentic_synth::engine;
 namespace {
 
 constexpr double kSR = 44100.0;
+constexpr double kTwoPi = 6.283185307179586;
 
 float rms(const float* x, std::size_t n) {
     double acc = 0.0;
@@ -29,6 +32,106 @@ void render(Reverb& rev, std::vector<float>& outL, std::vector<float>& outR, std
     for (std::size_t i = 0; i < numSamples; ++i) {
         rev.process(inL, inR, outL[i], outR[i]);
     }
+}
+
+// Render a left-channel impulse response of `n` samples (impulse on sample 0).
+std::vector<float> impulseResponse(Reverb& rev, std::size_t n) {
+    std::vector<float> out(n, 0.0f);
+    float l = 0.0f, r = 0.0f;
+    rev.process(1.0f, 1.0f, l, r);
+    out[0] = l;
+    for (std::size_t i = 1; i < n; ++i) {
+        rev.process(0.0f, 0.0f, l, r);
+        out[i] = l;
+    }
+    return out;
+}
+
+// In-place iterative radix-2 Cooley-Tukey FFT. x.size() must be a power of two.
+void fft(std::vector<std::complex<float>>& a) {
+    const std::size_t n = a.size();
+    for (std::size_t i = 1, j = 0; i < n; ++i) {
+        std::size_t bit = n >> 1;
+        for (; j & bit; bit >>= 1)
+            j ^= bit;
+        j ^= bit;
+        if (i < j)
+            std::swap(a[i], a[j]);
+    }
+    for (std::size_t len = 2; len <= n; len <<= 1) {
+        const float ang = -static_cast<float>(kTwoPi) / static_cast<float>(len);
+        const std::complex<float> wlen(std::cos(ang), std::sin(ang));
+        for (std::size_t i = 0; i < n; i += len) {
+            std::complex<float> w(1.0f, 0.0f);
+            for (std::size_t j = 0; j < len / 2; ++j) {
+                const std::complex<float> u = a[i + j];
+                const std::complex<float> v = a[i + j + len / 2] * w;
+                a[i + j] = u + v;
+                a[i + j + len / 2] = u - v;
+                w *= wlen;
+            }
+        }
+    }
+}
+
+// Real cepstrum: IFFT(log|FFT(x)|). Comb filters with loop length L put a
+// strong peak at quefrency L (and its multiples), so counting peaks in the
+// comb-delay band measures how many distinct modal series the tail contains.
+std::vector<float> realCepstrum(const std::vector<float>& x) {
+    const std::size_t n = x.size();
+    std::vector<std::complex<float>> a(n);
+    for (std::size_t t = 0; t < n; ++t) {
+        const float win =
+            0.5f - 0.5f * std::cos(static_cast<float>(kTwoPi * static_cast<double>(t) / static_cast<double>(n)));
+        a[t] = std::complex<float>(x[t] * win, 0.0f);
+    }
+    fft(a);
+    for (std::size_t k = 0; k < n; ++k)
+        a[k] = std::complex<float>(std::log(std::abs(a[k]) + 1e-12f), 0.0f);
+
+    // Inverse FFT via conjugate symmetry: real part of conj(FFT(conj(a))) / n.
+    for (std::complex<float>& v : a)
+        v = std::conj(v);
+    fft(a);
+
+    std::vector<float> c(n, 0.0f);
+    for (std::size_t k = 0; k < n; ++k)
+        c[k] = std::real(a[k]) / static_cast<float>(n);
+    return c;
+}
+
+// Count resolved peaks of the cepstrum in [lo, hi] quefrency (samples) that
+// rise to at least `rel` of the band's maximum.
+std::size_t countCepstralPeaks(const std::vector<float>& c, std::size_t lo, std::size_t hi, float rel) {
+    const std::size_t k0 = std::max<std::size_t>(1, std::min(lo, c.size() - 2));
+    const std::size_t k1 = std::min(hi, c.size() - 2);
+    float maxv = 0.0f;
+    for (std::size_t k = k0; k <= k1; ++k)
+        maxv = std::max(maxv, c[k]);
+
+    std::size_t peaks = 0;
+    for (std::size_t k = k0; k <= k1; ++k) {
+        if (c[k] >= rel * maxv && c[k] > c[k - 1] && c[k] >= c[k + 1])
+            ++peaks;
+    }
+    return peaks;
+}
+
+// High-frequency decay proxy: first-difference (+6 dB/oct) RMS in a late window
+// divided by an early window. Lower = faster HF decay.
+float hfDecayRatio(const std::vector<float>& x) {
+    std::vector<float> diff(x.size(), 0.0f);
+    for (std::size_t i = 1; i < x.size(); ++i)
+        diff[i] = x[i] - x[i - 1];
+
+    auto bandRms = [&](double t0, double t1) {
+        const std::size_t a = static_cast<std::size_t>(t0 * kSR);
+        const std::size_t b = std::min(x.size(), static_cast<std::size_t>(t1 * kSR));
+        return rms(diff.data() + a, b - a);
+    };
+    const float early = bandRms(0.05, 0.15);
+    const float late = bandRms(0.30, 0.45);
+    return (early > 0.0f) ? (late / early) : 0.0f;
 }
 
 } // namespace
@@ -200,4 +303,63 @@ TEST_CASE("Reverb reset clears delay lines", "[reverb]") {
         REQUIRE(l == 0.0f);
         REQUIRE(r == 0.0f);
     }
+}
+
+// ---------------------------------------------------------------------------
+// 7) size=1.0 impulse tail has a dense modal spectrum (8-comb Freeverb).
+// ---------------------------------------------------------------------------
+TEST_CASE("Reverb size=1.0 tail has dense modal spectrum", "[reverb]") {
+    Reverb rev;
+    rev.prepare(kSR);
+    rev.setSize(1.0f);
+    rev.setDamp(0.5f);
+    rev.setMix(1.0f);
+    rev.reset();
+
+    const std::size_t skip = 4096; // ignore direct/early transient
+    const std::size_t n = 16384;   // ~372 ms analysis window
+    const auto out = impulseResponse(rev, skip + n);
+    const std::vector<float> seg(out.begin() + static_cast<std::ptrdiff_t>(skip), out.end());
+    const auto cep = realCepstrum(seg);
+
+    // Comb loop lengths span 1116..1617 samples; each comb contributes one
+    // cepstral peak there. Measured: 4-comb bank -> 4 peaks, restored 8-comb
+    // bank -> 8 peaks. Threshold 6 sits between them and tolerates one
+    // merged/marginal peak from platform FFT rounding.
+    const std::size_t peaks = countCepstralPeaks(cep, 1050, 1700, 0.4f);
+    constexpr std::size_t kMinModalPeaks = 6;
+    REQUIRE(peaks >= kMinModalPeaks);
+}
+
+// ---------------------------------------------------------------------------
+// 8) damping=1.0 darkens the tail — HF decays much faster than damping=0.
+// ---------------------------------------------------------------------------
+TEST_CASE("Reverb damping=1.0 darkens the high-frequency tail", "[reverb]") {
+    auto tail = [](float damp) {
+        Reverb rev;
+        rev.prepare(kSR);
+        rev.setSize(1.0f);
+        rev.setDamp(damp);
+        rev.setMix(1.0f);
+        rev.reset();
+        return impulseResponse(rev, static_cast<std::size_t>(kSR * 0.6));
+    };
+
+    const auto bright = tail(0.0f);
+    const auto dark = tail(1.0f);
+    const float brightRatio = hfDecayRatio(bright);
+    const float darkRatio = hfDecayRatio(dark);
+    const std::size_t lateStart = static_cast<std::size_t>(kSR * 0.2);
+    const float darkLateRms = rms(dark.data() + lateStart, dark.size() - lateStart);
+
+    // Measured (8-comb bank): damp=0.0 -> HF decay ratio 0.84; damp=1.0 ->
+    // 0.0014 after the rescale (the old Freeverb *0.5 cap only reached 0.056).
+    // Thresholds: the HF tail must fall below 2% of its early level, decay
+    // >20x faster than the bright setting, and the dark tail must remain
+    // audible rather than collapsing to silence.
+    constexpr float kMaxDarkHfRatio = 0.02f;
+    constexpr float kDarkTailFloor = 5e-4f;
+    REQUIRE(darkRatio < kMaxDarkHfRatio);
+    REQUIRE(darkRatio < brightRatio * 0.05f);
+    REQUIRE(darkLateRms > kDarkTailFloor);
 }
