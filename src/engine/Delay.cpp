@@ -33,6 +33,13 @@ void Delay::prepare(double sampleRate, double maxDelaySeconds) {
     if (delaySamples_ > maxDelay) {
         delaySamples_ = maxDelay;
     }
+    // Crossfade window for delay-time changes. At least one sample so the
+    // interpolation below is always well-defined; a sample-rate change resets
+    // the time pointer so the next setTimeSeconds() snaps to the new target.
+    timeCrossfadeTotal_ = std::max(1, static_cast<int>(std::lround(kTimeCrossfadeSeconds * sampleRate_)));
+    timeCrossfadeRemaining_ = 0;
+    timeCrossfadeFromSamples_ = delaySamples_;
+    timePrimed_ = false;
 }
 
 void Delay::setTimeSeconds(float seconds) noexcept {
@@ -48,7 +55,51 @@ void Delay::setTimeSeconds(float seconds) noexcept {
             samples = maxDelay;
         }
     }
+    if (!timePrimed_) {
+        // First set after prepare()/reset(): no prior audio to glide from, and
+        // offline/timing-accurate callers expect the exact requested delay.
+        delaySamples_ = samples;
+        timeCrossfadeFromSamples_ = samples;
+        timeCrossfadeRemaining_ = 0;
+        timePrimed_ = true;
+        return;
+    }
+    if (samples == delaySamples_) {
+        return; // no audible change; don't restart a crossfade
+    }
+    // Start (or restart) a crossfade from wherever the read pointer currently
+    // is. Folding an in-flight crossfade's current offset into the new start
+    // point keeps the pointer path continuous across rapid back-to-back changes
+    // (e.g. tempo automation) instead of snapping to either endpoint.
+    timeCrossfadeFromSamples_ = currentCrossfadeOffset();
     delaySamples_ = samples;
+    timeCrossfadeRemaining_ = timeCrossfadeTotal_;
+}
+
+float Delay::currentCrossfadeOffset() const noexcept {
+    if (timeCrossfadeRemaining_ <= 0 || timeCrossfadeTotal_ <= 0) {
+        return delaySamples_;
+    }
+    const float progress = 1.0f - static_cast<float>(timeCrossfadeRemaining_) / static_cast<float>(timeCrossfadeTotal_);
+    return timeCrossfadeFromSamples_ + progress * (delaySamples_ - timeCrossfadeFromSamples_);
+}
+
+float Delay::readTap(const std::vector<float>& buf, float delaySamples) const noexcept {
+    // Fractional read position.
+    const float readPos = static_cast<float>(writeIdx_) - delaySamples;
+    const float floorPos = std::floor(readPos);
+    int i0 = static_cast<int>(floorPos);
+    // Wrap into [0, bufferSize_).
+    i0 %= bufferSize_;
+    if (i0 < 0) {
+        i0 += bufferSize_;
+    }
+    int i1 = i0 + 1;
+    if (i1 >= bufferSize_) {
+        i1 -= bufferSize_;
+    }
+    const float frac = readPos - floorPos;
+    return buf[static_cast<std::size_t>(i0)] * (1.0f - frac) + buf[static_cast<std::size_t>(i1)] * frac;
 }
 
 void Delay::setFeedback(float fb01) noexcept { feedback_ = std::clamp(fb01, 0.0f, kMaxFeedback); }
@@ -64,26 +115,27 @@ void Delay::process(float inL, float inR, float& outL, float& outR) noexcept {
         return;
     }
 
-    // Fractional read position.
-    const float readPos = static_cast<float>(writeIdx_) - delaySamples_;
-    const float floorPos = std::floor(readPos);
-    int i0 = static_cast<int>(floorPos);
-    // Wrap into [0, bufferSize_).
-    i0 %= bufferSize_;
-    if (i0 < 0) {
-        i0 += bufferSize_;
+    // Resolve the delayed taps for this sample. During a time crossfade we read
+    // BOTH the old and new fractional read pointers and blend linearly; the two
+    // taps come from the same continuous ring buffer, so the blend is continuous
+    // and a patch/BPM time change no longer splices to an unrelated position
+    // (#433).
+    float delayedL;
+    float delayedR;
+    if (timeCrossfadeRemaining_ > 0 && timeCrossfadeTotal_ > 0) {
+        const float progress =
+            1.0f - static_cast<float>(timeCrossfadeRemaining_) / static_cast<float>(timeCrossfadeTotal_);
+        const float oldL = readTap(bufL_, timeCrossfadeFromSamples_);
+        const float oldR = readTap(bufR_, timeCrossfadeFromSamples_);
+        const float newL = readTap(bufL_, delaySamples_);
+        const float newR = readTap(bufR_, delaySamples_);
+        delayedL = oldL + progress * (newL - oldL);
+        delayedR = oldR + progress * (newR - oldR);
+        --timeCrossfadeRemaining_;
+    } else {
+        delayedL = readTap(bufL_, delaySamples_);
+        delayedR = readTap(bufR_, delaySamples_);
     }
-    int i1 = i0 + 1;
-    if (i1 >= bufferSize_) {
-        i1 -= bufferSize_;
-    }
-    const float frac = readPos - floorPos;
-    const float oneMinusFrac = 1.0f - frac;
-
-    const float delayedL =
-        bufL_[static_cast<std::size_t>(i0)] * oneMinusFrac + bufL_[static_cast<std::size_t>(i1)] * frac;
-    const float delayedR =
-        bufR_[static_cast<std::size_t>(i0)] * oneMinusFrac + bufR_[static_cast<std::size_t>(i1)] * frac;
 
     // Real ping-pong topology.
     //   stereo = 0: parallel mono-style lines (L→L line, R→R line).
@@ -118,6 +170,12 @@ void Delay::reset() noexcept {
     std::fill(bufL_.begin(), bufL_.end(), 0.0f);
     std::fill(bufR_.begin(), bufR_.end(), 0.0f);
     writeIdx_ = 0;
+    // Drop any in-flight time crossfade; the next setTimeSeconds() snaps so a
+    // cleared delay starts at the requested time rather than gliding from stale
+    // state.
+    timeCrossfadeRemaining_ = 0;
+    timeCrossfadeFromSamples_ = delaySamples_;
+    timePrimed_ = false;
 }
 
 } // namespace agentic_synth::engine
