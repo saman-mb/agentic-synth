@@ -23,6 +23,10 @@ void ADSREnvelope::setSampleRate(const double sampleRate) {
 
 void ADSREnvelope::setParams(const Params& params) {
     params_ = params;
+    // Floor attack/release so applyPatch-bypass (or raw setParams) cannot
+    // install a zero-step segment. Matches kAmpEnvTimeFloorSeconds.
+    params_.attackSeconds = std::max(params_.attackSeconds, kEnvSegmentTimeFloorSeconds);
+    params_.releaseSeconds = std::max(params_.releaseSeconds, kEnvSegmentTimeFloorSeconds);
     recalcCoefficients();
 }
 
@@ -43,7 +47,9 @@ void ADSREnvelope::noteOff() {
 
 void ADSREnvelope::rescaleReleaseFromCurrent() {
     const double tco = std::max(1.0e-6, static_cast<double>(params_.curvature));
-    const double N = static_cast<double>(params_.releaseSeconds) * sampleRate_;
+    const double releaseSec =
+        std::max(static_cast<double>(params_.releaseSeconds), static_cast<double>(kEnvSegmentTimeFloorSeconds));
+    const double N = releaseSec * sampleRate_;
     const double start = std::max(0.0, static_cast<double>(output_));
     if (N <= 0.0 || start <= 0.0) {
         releaseCoeff_ = 0.0F;
@@ -103,19 +109,19 @@ void ADSREnvelope::recalcCoefficients() {
     const double tco = std::max(1.0e-6, static_cast<double>(params_.curvature));
     const double sustain = std::clamp(static_cast<double>(params_.sustainLevel), 0.0, 1.0);
     const double sr = sampleRate_;
+    // Belt-and-suspenders with setParams: never derive a zero-step attack/release.
+    const double attackSec =
+        std::max(static_cast<double>(params_.attackSeconds), static_cast<double>(kEnvSegmentTimeFloorSeconds));
+    const double releaseSec =
+        std::max(static_cast<double>(params_.releaseSeconds), static_cast<double>(kEnvSegmentTimeFloorSeconds));
 
     // Attack: 0 → 1, fixed point = 1+tco
     {
-        const double N = static_cast<double>(params_.attackSeconds) * sr;
-        if (N <= 0.0) {
-            attackCoeff_ = 0.0F;
-            attackBase_ = static_cast<float>(1.0 + tco);
-        } else {
-            const double ratio = std::max(1e-10, (1.0 + tco) / tco);
-            const double c = std::exp(-std::log(ratio) / N);
-            attackCoeff_ = static_cast<float>(c);
-            attackBase_ = static_cast<float>((1.0 + tco) * (1.0 - c));
-        }
+        const double N = attackSec * sr;
+        const double ratio = std::max(1e-10, (1.0 + tco) / tco);
+        const double c = std::exp(-std::log(ratio) / N);
+        attackCoeff_ = static_cast<float>(c);
+        attackBase_ = static_cast<float>((1.0 + tco) * (1.0 - c));
     }
 
     // Decay: 1 → sustain, fixed point = sustain-tco
@@ -146,16 +152,11 @@ void ADSREnvelope::recalcCoefficients() {
     // The live pair stays exactly as noteOff() set it; release-knob edits
     // are picked up on the NEXT noteOff (start pair is always up to date).
     {
-        const double N = static_cast<double>(params_.releaseSeconds) * sr;
-        if (N <= 0.0) {
-            releaseCoeffStart_ = 0.0F;
-            releaseBaseStart_ = 0.0F;
-        } else {
-            const double ratio = std::max(1e-10, (1.0 + tco) / tco);
-            const double c = std::exp(-std::log(ratio) / N);
-            releaseCoeffStart_ = static_cast<float>(c);
-            releaseBaseStart_ = static_cast<float>(-tco * (1.0 - c));
-        }
+        const double N = releaseSec * sr;
+        const double ratio = std::max(1e-10, (1.0 + tco) / tco);
+        const double c = std::exp(-std::log(ratio) / N);
+        releaseCoeffStart_ = static_cast<float>(c);
+        releaseBaseStart_ = static_cast<float>(-tco * (1.0 - c));
         if (stage_ != Stage::Release) {
             releaseCoeff_ = releaseCoeffStart_;
             releaseBase_ = releaseBaseStart_;

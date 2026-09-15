@@ -39,6 +39,19 @@ void computePanGains(float pan, float& l, float& r) noexcept {
     r = std::sin(theta);
 }
 
+// Equal-power (raised-cosine) crossfade weights. progress ∈ [0, 1] maps to
+// θ ∈ [0, π/2]: progress=0 → (old=1, new=0); progress=1 → (old=0, new=1).
+// old²+new² = 1 for all progress, so total power is continuous (unlike a
+// linear fade, which dips to 0.5 at the midpoint and has slope discontinuities
+// at both endpoints — audible as crackle under dense voice-stealing).
+void equalPowerFadeWeights(float progress, float& oldGain, float& newGain) noexcept {
+    progress = std::clamp(progress, 0.0f, 1.0f);
+    constexpr float kHalfPi = 1.57079632679f;
+    const float theta = progress * kHalfPi;
+    oldGain = std::cos(theta);
+    newGain = std::sin(theta);
+}
+
 LfoShape toLfoShape(LfoWaveform w) noexcept {
     switch (w) {
     case LfoWaveform::Sine:
@@ -386,10 +399,11 @@ void Voice::renderStereo(float portamentoAlpha, float baseCutoffHz, float resona
         filter->setCutoff(effectiveCutoff);
         filter->setResonance(resonance);
         filter->setDrive(driveNow);
-        // Phase 4: filter type-swap crossfade. Both old + new filters consume
-        // the same input sample so the integrator states stay matched, then
-        // blend wet via a linear fadeOut/fadeIn ramp over kCrossfadeSamples.
-        // After the ramp the old filter is reset and dropped from the loop.
+        // Phase 4 / #430: filter type-swap crossfade. Both old + new filters
+        // consume the same input sample so the integrator states stay matched,
+        // then blend wet via an equal-power (cos/sin) ramp over
+        // kCrossfadeSamples. After the ramp the old filter is reset and
+        // dropped from the loop.
         if (crossfadeRemaining > 0 && crossfadeFromFilter != nullptr && crossfadeTotal > 0) {
             // Feed BOTH with identical drive/cutoff/resonance — applyPatch
             // installed the new filter as `filter`; the old filter retains its
@@ -401,8 +415,12 @@ void Voice::renderStereo(float portamentoAlpha, float baseCutoffHz, float resona
             crossfadeFromFilter->setDrive(driveNow);
             const float oldOut = crossfadeFromFilter->process(monoMix);
             const float newOut = filter->process(monoMix);
-            const float fadeOut = static_cast<float>(crossfadeRemaining) / static_cast<float>(crossfadeTotal);
-            const float fadeIn = 1.0f - fadeOut;
+            // remaining/total = 1 at start → progress = 0 → θ = 0 → old=1,new=0.
+            // remaining → 1 at end → progress ≈ 1 → θ ≈ π/2 → old=0,new=1.
+            const float progress = 1.0f - static_cast<float>(crossfadeRemaining) / static_cast<float>(crossfadeTotal);
+            float fadeOut = 0.0f;
+            float fadeIn = 0.0f;
+            equalPowerFadeWeights(progress, fadeOut, fadeIn);
             filteredMono = oldOut * fadeOut + newOut * fadeIn;
             --crossfadeRemaining;
             if (crossfadeRemaining == 0) {
@@ -429,10 +447,17 @@ void Voice::renderStereo(float portamentoAlpha, float baseCutoffHz, float resona
     const float lfoAmpGain = std::max(0.0f, 1.0f + lfoAmpMod);
     float gain = ampEnvOut * velocity * lfoAmpGain;
 
-    // Voice-steal fade-out ramp (linear).
+    // Voice-steal fade-out ramp (equal-power / raised-cosine, #430).
+    // progress 0→1 maps θ 0→π/2; multiply by cos(θ) so the outgoing voice
+    // starts at unity and lands at zero with continuous power (no linear-fade
+    // endpoint slope discontinuities).
     if (fadeOutSamplesRemaining > 0) {
-        const float rampGain = static_cast<float>(fadeOutSamplesRemaining) / static_cast<float>(fadeOutSamplesTotal);
-        gain *= rampGain;
+        const float progress =
+            1.0f - static_cast<float>(fadeOutSamplesRemaining) / static_cast<float>(fadeOutSamplesTotal);
+        float fadeOut = 0.0f;
+        float unused = 0.0f;
+        equalPowerFadeWeights(progress, fadeOut, unused);
+        gain *= fadeOut;
         --fadeOutSamplesRemaining;
         if (fadeOutSamplesRemaining == 0) {
             ampEnv.reset();
@@ -760,12 +785,13 @@ void VoiceManager::applyPatch(const PatchStruct& patch) noexcept {
             desired = v.svFilter.get();
         }
         if (v.filter != desired) {
-            // Phase 4: instead of an instant pointer swap (which produces a
-            // click because the new filter has zero integrator state and the
-            // old filter's running output abruptly disappears), kick off a
-            // short crossfade. renderStereo runs both filters in parallel for
-            // filterCrossfadeSamples_ samples, blends linearly, then resets
-            // the outgoing filter once the ramp completes.
+            // Phase 4 / #430: instead of an instant pointer swap (which
+            // produces a click because the new filter has zero integrator
+            // state and the old filter's running output abruptly disappears),
+            // kick off a short equal-power crossfade. renderStereo runs both
+            // filters in parallel for filterCrossfadeSamples_ samples, blends
+            // with cos/sin weights, then resets the outgoing filter once the
+            // ramp completes.
             //
             // If a crossfade was already in flight (rapid back-to-back type
             // changes) the incoming `v.filter` is only half-warmed. Naively

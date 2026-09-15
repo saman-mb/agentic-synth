@@ -80,11 +80,12 @@ struct Voice {
     std::unique_ptr<MoogLadder> moogFilter;
     std::unique_ptr<SVFilter> svFilter;
     Filter* filter{nullptr};
-    // Outgoing filter during a type-swap crossfade. Phase 4: when applyPatch
-    // changes filter.type we keep the previous filter alive and run both in
-    // parallel for kCrossfadeSamples samples, blending wet via fadeOut/fadeIn
-    // ramps. Avoids the audible click of a pointer-swap with reset integrator
-    // state. nullptr when not crossfading (steady state).
+    // Outgoing filter during a type-swap crossfade. Phase 4 / #430: when
+    // applyPatch changes filter.type we keep the previous filter alive and
+    // run both in parallel for kCrossfadeSamples samples, blending wet via
+    // equal-power (cos/sin) fadeOut/fadeIn weights. Avoids the audible click
+    // of a pointer-swap with reset integrator state. nullptr when not
+    // crossfading (steady state).
     Filter* crossfadeFromFilter{nullptr};
     int crossfadeRemaining{0};
     int crossfadeTotal{0};
@@ -119,8 +120,9 @@ struct Voice {
     TubeSat tubeSat;
     Chorus chorus;
 
-    // Voice-steal fade-out: when > 0, voice output is multiplied by a linear
-    // ramp from fadeOutSamplesRemaining_/fadeOutSamplesTotal_ → 0.
+    // Voice-steal fade-out: when > 0, voice output is multiplied by an
+    // equal-power (raised-cosine) ramp cos(θ), θ∈[0,π/2] over
+    // fadeOutSamplesTotal samples (#430).
     int fadeOutSamplesRemaining{0};
     int fadeOutSamplesTotal{0};
 

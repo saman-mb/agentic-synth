@@ -46,7 +46,7 @@ TEST_CASE("ADSREnvelope decay settles at sustain level") {
     env.setParams(makeParams(0.0F, 0.05F, 0.5F, 0.0F));
     env.noteOn();
 
-    // Skip past attack (instant) then wait through decay + extra
+    // Attack is floored to ~1 ms; wait through that + decay + extra
     const int samples = static_cast<int>(0.05 * kSR * 2);
     float last = 0.0F;
     for (int i = 0; i < samples; ++i)
@@ -137,7 +137,7 @@ TEST_CASE("ADSREnvelope release-from-sustain duration matches releaseSeconds") {
     ADSREnvelope env(kSR);
     env.setParams(makeParams(0.0F, 0.0F, 1.0F, releaseSec));
     env.noteOn();
-    // Reach steady sustain (attack/decay are zero, so first sample is at 1.0)
+    // Attack/release floored to ~1 ms; decay stays 0 → settle to sustain quickly
     for (int i = 0; i < static_cast<int>(0.1 * kSR); ++i)
         (void)env.process();
 
@@ -285,12 +285,29 @@ TEST_CASE("ADSREnvelope release rescale survives setParams (applyPatch-every-blo
     REQUIRE(total <= releaseSec * 1.1);
 }
 
-TEST_CASE("ADSREnvelope zero-time attack is sample-accurate") {
+TEST_CASE("ADSREnvelope zero attack_s is floored; no sample-0 full-scale step") {
+    // Documented threshold: with kEnvSegmentTimeFloorSeconds (1 ms) at 44.1 kHz
+    // and default curvature, the first-sample delta from idle is ~0.19 — well
+    // below the pre-floor instantaneous jump of 1.0. Bound at 0.25.
+    constexpr float kMaxFirstSampleJump = 0.25F;
+
     ADSREnvelope env(kSR);
-    env.setParams(makeParams(0.0F, 0.0F, 1.0F, 0.0F));
+    env.setParams(makeParams(0.0F, 0.0F, 1.0F, 0.1F));
     env.noteOn();
-    // First sample must already be at peak
-    REQUIRE(env.process() >= 1.0F);
+    const float first = env.process();
+    REQUIRE(first > 0.0F);
+    REQUIRE(first < kMaxFirstSampleJump);
+
+    // Still reaches peak within a few × the floor (not stuck).
+    const int budget = static_cast<int>(agentic_synth::engine::kEnvSegmentTimeFloorSeconds * kSR * 4);
+    bool reached = false;
+    for (int i = 0; i < budget; ++i) {
+        if (env.process() >= 1.0F) {
+            reached = true;
+            break;
+        }
+    }
+    REQUIRE(reached);
 }
 
 TEST_CASE("ADSREnvelope re-noteOff during release is idempotent", "[adsr][release][idempotent]") {

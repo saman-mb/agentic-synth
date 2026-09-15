@@ -1,6 +1,9 @@
 #include "engine/LFO.h"
+#include <algorithm>
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
+#include <cmath>
+#include <numbers>
 
 using namespace agentic_synth::engine;
 
@@ -137,13 +140,15 @@ TEST_CASE("LFO waveform output range", "[LFO][shapes]") {
         checkRange(-1.0f, 1.0f);
     }
 
-    SECTION("square is exactly +1 or -1") {
+    SECTION("square stays in [-1, 1] and settles near extremes") {
         lfo.setShape(LfoShape::Square);
         lfo.reset();
-        for (int i = 0; i < 44100; ++i) {
-            float v = lfo.processSample();
-            REQUIRE((v == 1.0f || v == -1.0f));
-        }
+        checkRange(-1.0f, 1.0f);
+        lfo.reset();
+        float peak = 0.0f;
+        for (int i = 0; i < 44100; ++i)
+            peak = std::max(peak, std::abs(lfo.processSample()));
+        REQUIRE(peak > 0.99f);
     }
 
     SECTION("S+H in [-1, 1]") {
@@ -205,4 +210,119 @@ TEST_CASE("LFO target slot routing", "[LFO][routing]") {
     REQUIRE(lfo.targetSlot() == 0);
     lfo.setTargetSlot(3);
     REQUIRE(lfo.targetSlot() == 3);
+}
+
+TEST_CASE("LFO output slew", "[LFO][slew]") {
+    constexpr double sr = 44100.0;
+
+    auto maxAbsDelta = [](LFO& lfo, int n) {
+        float prev = lfo.processSample();
+        float maxDelta = 0.0f;
+        for (int i = 1; i < n; ++i) {
+            float v = lfo.processSample();
+            maxDelta = std::max(maxDelta, std::abs(v - prev));
+            prev = v;
+        }
+        return maxDelta;
+    };
+
+    SECTION("square max sample-to-sample delta ≪ 2.0") {
+        LFO lfo;
+        lfo.setSampleRate(sr);
+        lfo.setShape(LfoShape::Square);
+        lfo.setFreeRate(20.0f);
+        lfo.setDepth(1.0f);
+        lfo.reset();
+        const float maxDelta = maxAbsDelta(lfo, static_cast<int>(sr));
+        REQUIRE(maxDelta < 0.1f);
+        REQUIRE(maxDelta > 0.001f);
+    }
+
+    SECTION("S&H max sample-to-sample delta ≪ 2.0") {
+        LFO lfo;
+        lfo.seed(7u);
+        lfo.setSampleRate(sr);
+        lfo.setShape(LfoShape::SampleAndHold);
+        lfo.setFreeRate(20.0f);
+        lfo.setDepth(1.0f);
+        lfo.reset();
+        const float maxDelta = maxAbsDelta(lfo, static_cast<int>(sr));
+        REQUIRE(maxDelta < 0.1f);
+    }
+
+    SECTION("sine highly correlated with ideal at 5 Hz") {
+        LFO lfo;
+        lfo.setSampleRate(sr);
+        lfo.setShape(LfoShape::Sine);
+        lfo.setFreeRate(5.0f);
+        lfo.setDepth(1.0f);
+        lfo.reset();
+
+        // One-pole τ≈1.5 ms adds ~atan(ωτ) lag (~2.7° at 5 Hz); still nearly identical.
+        const int n = static_cast<int>(sr);
+        constexpr int skip = 1000;
+        double sumXY = 0.0;
+        double sumX2 = 0.0;
+        double sumY2 = 0.0;
+        float maxAbsErr = 0.0f;
+        for (int i = 0; i < n; ++i) {
+            const double ideal = std::sin(2.0 * std::numbers::pi * 5.0 * static_cast<double>(i) / sr);
+            const double y = static_cast<double>(lfo.processSample());
+            if (i < skip)
+                continue;
+            sumXY += ideal * y;
+            sumX2 += ideal * ideal;
+            sumY2 += y * y;
+            maxAbsErr = std::max(maxAbsErr, static_cast<float>(std::abs(ideal - y)));
+        }
+        const double corr = sumXY / std::sqrt(sumX2 * sumY2);
+        REQUIRE(corr > 0.998);
+        REQUIRE(maxAbsErr < 0.05f);
+    }
+
+    SECTION("S&H holds plateaus between jumps") {
+        LFO lfo;
+        lfo.seed(42u);
+        lfo.setSampleRate(sr);
+        lfo.setShape(LfoShape::SampleAndHold);
+        lfo.setFreeRate(5.0f);
+        lfo.setDepth(1.0f);
+        lfo.reset();
+
+        const int samplesPerCycle = static_cast<int>(sr / 5.0);
+        constexpr int settle = 800; // ~18 ms ≈ 12τ — asymptotic remainder negligible
+        for (int cycle = 0; cycle < 5; ++cycle) {
+            float prev = lfo.processSample();
+            for (int i = 1; i < settle; ++i)
+                prev = lfo.processSample();
+
+            float maxPlateauDelta = 0.0f;
+            for (int i = settle; i < samplesPerCycle; ++i) {
+                const float v = lfo.processSample();
+                maxPlateauDelta = std::max(maxPlateauDelta, std::abs(v - prev));
+                prev = v;
+            }
+            REQUIRE(maxPlateauDelta < 1e-4f);
+        }
+    }
+
+    SECTION("reset and key-trigger clear slew state") {
+        LFO lfo;
+        lfo.setSampleRate(sr);
+        lfo.setShape(LfoShape::Square);
+        lfo.setFreeRate(1.0f);
+        lfo.setDepth(1.0f);
+        lfo.setKeyTrigger(true);
+        for (int i = 0; i < 1000; ++i)
+            lfo.processSample();
+
+        lfo.reset();
+        // After clear, first sample is coeff * target(+1), not a lingering plateau.
+        REQUIRE(std::abs(lfo.processSample()) < 0.05f);
+
+        for (int i = 0; i < 1000; ++i)
+            lfo.processSample();
+        lfo.trigger();
+        REQUIRE(std::abs(lfo.processSample()) < 0.05f);
+    }
 }

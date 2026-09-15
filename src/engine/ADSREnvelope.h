@@ -5,6 +5,12 @@ namespace agentic_synth::engine {
 // Per-voice ADSR envelope with exponential curve shaping.
 // All segment curves are computed via a leaky-integrator (coeff + base) recurrence.
 // curvature (TCO) controls how exponential the curves are: smaller = sharper.
+//
+// Attack/release are floored to kEnvSegmentTimeFloorSeconds (~1 ms) in
+// setParams / recalcCoefficients so a zero-time segment cannot become an
+// instantaneous step (matches agentic_synth::kAmpEnvTimeFloorSeconds).
+inline constexpr float kEnvSegmentTimeFloorSeconds = 0.001F;
+
 class ADSREnvelope {
 public:
     struct Params {
