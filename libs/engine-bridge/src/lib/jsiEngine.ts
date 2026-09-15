@@ -8,8 +8,6 @@ import type { SynthEngine } from './engine';
 import { packPatchParams } from './patchAbi';
 import { getPatchParam, macroTargetValue, setPatchParam } from './paramMap';
 
-const SCOPE_FFT_SIZE = 2048;
-
 /** C API `ags_engine_*` return codes, plus QUEUE for the JSI event path. */
 export const AGS_OK = 0;
 export const AGS_ERR_PARAM = 1;
@@ -99,6 +97,7 @@ export class JsiSynthEngine implements SynthEngine {
   private readonly binding: JsiNativeBinding;
   private readonly pendingNoteOffs = new Set<number>();
   private disposed = false;
+  private scopeSampleRate = 48000;
 
   constructor(binding: JsiNativeBinding) {
     if (binding == null) {
@@ -188,9 +187,16 @@ export class JsiSynthEngine implements SynthEngine {
     this.pendingNoteOffs.add(id);
   }
 
-  getScopeSamples(n: number): number[] {
-    const count = Math.max(0, Math.min(Math.floor(n), SCOPE_FFT_SIZE));
-    return new Array<number>(count).fill(0);
+  getScopeSamples(_n: number): number[] {
+    // This engine currently owns no scope tap (the native AudioStream renders
+    // off the JS thread). Return empty so the Visualizer shows "no signal"
+    // rather than a flat fake trace (#435); interleaved stereo when a tap
+    // lands is the shared contract.
+    return [];
+  }
+
+  getScopeSampleRate(): number {
+    return this.scopeSampleRate;
   }
 
   async setOutputDevice(_deviceId: string): Promise<void> {
@@ -206,6 +212,7 @@ export class JsiSynthEngine implements SynthEngine {
       throw new AgsynthError('PARAM', 'sampleRate must be a finite positive number');
     }
     mapNativeStatus(this.binding.recreate(sampleRate), 'recreate');
+    this.scopeSampleRate = sampleRate;
   }
 
   renderOffline(

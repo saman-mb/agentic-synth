@@ -212,10 +212,22 @@ export class WasmSynthEngine implements SynthEngine {
 
   getScopeSamples(n: number): number[] {
     const count = Math.max(0, Math.min(Math.floor(n), SCOPE_FFT_SIZE));
-    if (!this.analyser || count === 0) return new Array<number>(count).fill(0);
+    if (!this.analyser || count === 0) return [];
+    // The WASM worklet's single analyser tap is mono; duplicate it across L/R
+    // so the bridge shape stays interleaved stereo (#435). XY on this engine
+    // therefore draws the honest mono 45-degree line, not a fabricated one.
     const buf = new Float32Array(count);
     this.analyser.getFloatTimeDomainData(buf);
-    return Array.from(buf);
+    const out = new Array<number>(count * 2);
+    for (let i = 0; i < count; i++) {
+      out[i * 2] = buf[i];
+      out[i * 2 + 1] = buf[i];
+    }
+    return out;
+  }
+
+  getScopeSampleRate(): number {
+    return this.ctx?.sampleRate ?? 48000;
   }
 
   async setOutputDevice(deviceId: string): Promise<void> {
