@@ -1,15 +1,17 @@
 #pragma once
 
+#include "engine/Oversampler.h"
+
 namespace agentic_synth::engine {
 
 // Pre-filter soft-clip "tube" saturation stage with DC blocker.
 //
-// Audio path: input → asymmetric tanh waveshape → 1-pole HPF (≈20 Hz) → mix
-// with dry. Positive samples get a slightly more aggressive drive coefficient
-// than negative ones (1.10× / 0.90×) so the result is biased like a triode
-// stage rather than the perfectly-symmetric saturation of a pure tanh —
-// produces audible 2nd-harmonic energy on top of the 3rd/5th from the
-// symmetric clip, which is what "fuses" stacked saws.
+// Audio path: input → 2x upsample → asymmetric tanh waveshape → 2x downsample
+// → 1-pole HPF (≈20 Hz) → mix with dry. Positive samples get a slightly more
+// aggressive drive coefficient than negative ones (1.10× / 0.90×) so the result
+// is biased like a triode stage rather than the perfectly-symmetric saturation
+// of a pure tanh — produces audible 2nd-harmonic energy on top of the 3rd/5th
+// from the symmetric clip, which is what "fuses" stacked saws.
 //
 // Drive normalization: we scale the input by (1 + drive * kDriveScale) before
 // tanh, then divide by tanh(driveScale) so unity input stays near unity
@@ -17,10 +19,11 @@ namespace agentic_synth::engine {
 // bypass guarded explicitly in processStereo).
 //
 // Reference: Zölzer "DAFX" Ch. 4 ("Nonlinear processing"), Pirkle Ch. 14.
-// MVP: no oversampling — alias products live above ~10 kHz for the LF-rich
-// saw input the augmenter uses this on, and the downstream lowpass filter
-// then attenuates them. Future improvement: 2× polyphase oversampling around
-// the tanh stage.
+//
+// #431: at full drive the clipped saw harmonics run past Nyquist and fold back
+// into the passband as inharmonic tones. The tanh now runs at 2x with the
+// half-band filter pair in Oversampler2x (anti-imaging up, anti-aliasing
+// down); the linear DC blocker stays at the base rate after decimation.
 class TubeSat {
 public:
     TubeSat();
@@ -66,6 +69,10 @@ private:
 
     DcBlock blockL_{};
     DcBlock blockR_{};
+
+    // Half-band 2x oversampling around the tanh (one history per channel).
+    Oversampler2x oversamplerL_{};
+    Oversampler2x oversamplerR_{};
 };
 
 } // namespace agentic_synth::engine
