@@ -33,8 +33,7 @@ struct PluginFixture {
 // Render numBlocks of `samplesPerBlock` through the plugin, injecting a single
 // note-on at the start. Returns the concatenated stereo output buffer so
 // callers can byte-compare two renders.
-std::vector<float> renderWithNote(AgenticSynthPlugin& plug, int numBlocks, int samplesPerBlock,
-                                  int midiNote = 60) {
+std::vector<float> renderWithNote(AgenticSynthPlugin& plug, int numBlocks, int samplesPerBlock, int midiNote = 60) {
     auto& q = plug.auditionQueueForTest();
     (void)q.push(RawMidiMsg::noteOn(midiNote, 100));
     std::vector<float> out;
