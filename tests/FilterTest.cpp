@@ -1,8 +1,10 @@
 #include <catch2/catch_test_macros.hpp>
 #include <catch2/matchers/catch_matchers_floating_point.hpp>
 
+#include "SpectralHelpers.h"
 #include "engine/Filter.h"
 
+#include <algorithm>
 #include <cmath>
 #include <limits>
 #include <vector>
@@ -23,6 +25,123 @@ static float measureGain(Filter& filter, float freq, float sampleRate, int cycle
     }
     return peak;
 }
+
+namespace {
+
+// #431 aliasing baseline — faithful copy of the pre-#431 MoogLadder (base-rate
+// ZDF cascade with in-loop tanh). Frozen on purpose: it is the non-oversampled
+// reference the oversampling test discriminates against.
+struct LegacyMoogLadder {
+    static constexpr double kDriveGainFactor = 4.0;
+    static constexpr double kPi = 3.14159265358979323846;
+
+    double sampleRate{44100.0};
+    float cutoff{1000.0f};
+    float resonance{0.0f};
+    float drive{0.0f};
+    double g{0.0};
+    double a{0.0};
+    double b{0.0};
+    double k{0.0};
+    double driveGain{1.0};
+    double driveComp{1.0};
+    std::array<double, 4> s{};
+
+    void prepare(double sr) {
+        sampleRate = sr;
+        update();
+        reset();
+    }
+    void setCutoff(float hz) {
+        cutoff = hz;
+        update();
+    }
+    void setResonance(float r) {
+        resonance = std::clamp(r, 0.0f, 1.0f);
+        update();
+    }
+    void setDrive(float d) {
+        drive = std::clamp(d, 0.0f, 1.0f);
+        driveGain = 1.0 + static_cast<double>(drive) * kDriveGainFactor;
+        driveComp = 1.0 / std::sqrt(driveGain);
+    }
+    void reset() { s.fill(0.0); }
+    void update() {
+        const double fc = std::clamp(static_cast<double>(cutoff), 20.0, sampleRate * 0.49);
+        g = std::tan(kPi * fc / sampleRate);
+        a = g / (1.0 + g);
+        b = 1.0 - a;
+        k = static_cast<double>(resonance) * 4.1;
+    }
+    float process(float input) {
+        if (!std::isfinite(input)) {
+            reset();
+            return 0.0f;
+        }
+        constexpr double kAntiDenormal = 1.0e-20;
+        const double a2 = a * a;
+        const double a3 = a2 * a;
+        const double a4 = a3 * a;
+        const double x = static_cast<double>(input) * driveGain;
+
+        const double state_sum = b * (a3 * s[0] + a2 * s[1] + a * s[2] + s[3]);
+        const double y4_linear = (a4 * x + state_sum) / (1.0 + k * a4);
+        const double y4_fb = std::tanh(y4_linear);
+        const double x_eff = x - k * y4_fb;
+
+        const double y1 = a * x_eff + b * s[0];
+        s[0] = 2.0 * y1 - s[0] + kAntiDenormal;
+        const double y2 = a * y1 + b * s[1];
+        s[1] = 2.0 * y2 - s[1] + kAntiDenormal;
+        const double y3 = a * y2 + b * s[2];
+        s[2] = 2.0 * y3 - s[2] + kAntiDenormal;
+        const double y4 = a * y3 + b * s[3];
+        s[3] = 2.0 * y4 - s[3] + kAntiDenormal;
+        return static_cast<float>(y4 * driveComp);
+    }
+};
+
+constexpr double kAliasSr = 48000.0;
+constexpr double kAliasF0 = 7000.0;
+constexpr int kAliasSettle = 9600;
+constexpr int kAliasFft = 32768;
+constexpr float kAliasAmp = 0.9f;
+constexpr double kAliasToleranceHz = 20.0;
+
+std::vector<float> makeAliasTone(int n) {
+    std::vector<float> out(n);
+    for (int i = 0; i < n; ++i)
+        out[i] = kAliasAmp * static_cast<float>(std::sin(2.0 * 3.14159265358979 * kAliasF0 * i / kAliasSr));
+    return out;
+}
+
+std::vector<float> renderOversampledMoog() {
+    MoogLadder f;
+    f.prepare(kAliasSr);
+    f.setCutoff(10000.0f);
+    f.setResonance(0.5f);
+    f.setDrive(1.0f);
+    const int total = kAliasSettle + kAliasFft;
+    auto buf = makeAliasTone(total);
+    for (int i = 0; i < total; ++i)
+        buf[i] = f.process(buf[i]);
+    return std::vector<float>(buf.begin() + kAliasSettle, buf.end());
+}
+
+std::vector<float> renderLegacyMoog() {
+    LegacyMoogLadder f;
+    f.prepare(kAliasSr);
+    f.setCutoff(10000.0f);
+    f.setResonance(0.5f);
+    f.setDrive(1.0f);
+    const int total = kAliasSettle + kAliasFft;
+    auto buf = makeAliasTone(total);
+    for (int i = 0; i < total; ++i)
+        buf[i] = f.process(buf[i]);
+    return std::vector<float>(buf.begin() + kAliasSettle, buf.end());
+}
+
+} // namespace
 
 // ---------------------------------------------------------------------------
 // MoogLadder tests
@@ -412,6 +531,26 @@ TEST_CASE("MoogLadder — drive parameter adds harmonic energy", "[filter][moog]
     const double ratioHot = harmonicResidualRatio(fHot, fund, sampleRate);
 
     REQUIRE(ratioHot > ratioDry);
+}
+
+TEST_CASE("MoogLadder — 2x oversampling suppresses inharmonic aliasing at high drive", "[filter][moog][oversampling]") {
+    const auto oversampled = renderOversampledMoog();
+    const auto legacy = renderLegacyMoog();
+
+    const double ratioOversampled =
+        agentic_synth::test::inharmonicRatio(oversampled, kAliasF0, kAliasSr, kAliasToleranceHz);
+    const double ratioLegacy = agentic_synth::test::inharmonicRatio(legacy, kAliasF0, kAliasSr, kAliasToleranceHz);
+
+    INFO("oversampled inharmonic ratio = " << ratioOversampled);
+    INFO("non-oversampled inharmonic ratio = " << ratioLegacy);
+
+    // The in-loop tanh really aliases at the base rate, so the metric is
+    // measuring the aliasing #431 targets.
+    REQUIRE(ratioLegacy > 0.01);
+    // Documented bound: folded energy sits ≥ 40 dB below the fundamental.
+    REQUIRE(ratioOversampled < 0.005);
+    // Discriminating: the oversampled ladder strictly beats the base-rate one.
+    REQUIRE(ratioOversampled < ratioLegacy);
 }
 
 // ---------------------------------------------------------------------------

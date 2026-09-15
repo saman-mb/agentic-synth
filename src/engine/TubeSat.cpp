@@ -27,6 +27,8 @@ void TubeSat::prepare(double sampleRate, int channels) {
     constexpr float kHpfCutoffHz = 20.0f;
     const double r = 1.0 - (2.0 * 3.14159265358979 * kHpfCutoffHz) / sampleRate_;
     hpfCoeff_ = static_cast<float>(std::clamp(r, 0.0, 0.9999));
+    oversamplerL_.prepare(sampleRate_);
+    oversamplerR_.prepare(sampleRate_);
     reset();
     setDrive(drive_); // recompute shaping coefficients for the new SR
 }
@@ -49,6 +51,8 @@ void TubeSat::setMix(float mix01) noexcept { mix_ = std::clamp(mix01, 0.0f, 1.0f
 void TubeSat::reset() noexcept {
     blockL_ = DcBlock{};
     blockR_ = DcBlock{};
+    oversamplerL_.reset();
+    oversamplerR_.reset();
 }
 
 float TubeSat::saturate(float x, float drivePos, float driveNeg, float normPos, float normNeg) noexcept {
@@ -72,11 +76,25 @@ void TubeSat::processStereo(float* left, float* right, int numSamples) noexcept 
         const float inL = left[n];
         const float inR = right[n];
 
-        // Nonlinearity — asymmetric tanh.
-        const float satL = saturate(inL, drivePos_, driveNeg_, normPos_, normNeg_);
-        const float satR = saturate(inR, drivePos_, driveNeg_, normPos_, normNeg_);
+        // Nonlinearity — asymmetric tanh, run at 2x so the harmonics it
+        // generates stay below the internal Nyquist and the half-band
+        // decimation filter can absorb what remains instead of letting it
+        // fold back into the passband.
+        float upL0 = 0.0f;
+        float upL1 = 0.0f;
+        float upR0 = 0.0f;
+        float upR1 = 0.0f;
+        oversamplerL_.upsample(inL, upL0, upL1);
+        oversamplerR_.upsample(inR, upR0, upR1);
+        const float satL =
+            oversamplerL_.downsample(saturate(upL0, drivePos_, driveNeg_, normPos_, normNeg_),
+                                     saturate(upL1, drivePos_, driveNeg_, normPos_, normNeg_));
+        const float satR =
+            oversamplerR_.downsample(saturate(upR0, drivePos_, driveNeg_, normPos_, normNeg_),
+                                     saturate(upR1, drivePos_, driveNeg_, normPos_, normNeg_));
 
-        // DC blocker — 1-pole high-pass at ~20 Hz.
+        // DC blocker — 1-pole high-pass at ~20 Hz. Linear, so it stays at the
+        // base rate after decimation.
         //   y[n] = (x[n] - x[n-1]) + R * y[n-1]
         const float hpL = (satL - blockL_.xPrev) + hpfCoeff_ * blockL_.yPrev;
         const float hpR = (satR - blockR_.xPrev) + hpfCoeff_ * blockR_.yPrev;
