@@ -1,3 +1,4 @@
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include "engine/PatchStruct.h"
@@ -12,6 +13,7 @@ using agentic_synth::LfoTarget;
 using agentic_synth::LfoWaveform;
 using agentic_synth::make_default_patch;
 using agentic_synth::PatchStruct;
+using Catch::Approx;
 
 // ── Helpers ────────────────────────────────────────────────────────────────────
 
@@ -256,6 +258,105 @@ float bufferPeak(const std::vector<float>& buf) {
     for (float s : buf)
         p = std::max(p, std::abs(s));
     return p;
+}
+
+// ── Rendered filter-corner measurement (#428) ────────────────────────────────
+//
+// One voice, sine oscillator at a chosen probe frequency, FX and filter drive
+// bypassed, amplitude envelope held open. Sweeping the probe frequency and
+// measuring steady-state output gives the voice's rendered magnitude response;
+// the frequency where it falls 3 dB below the passband is the rendered corner.
+// This measures the cutoff the voice actually renders, not the patch field.
+
+PatchStruct makeCornerProbePatch(float cutoffHz, float envMod, float sustain) {
+    PatchStruct p = make_default_patch();
+    p.osc[0].type = agentic_synth::OscType::Sine;
+    p.osc[0].enabled = 1;
+    p.osc[0].volume = 1.0f;
+    for (int i = 1; i < agentic_synth::kMaxOscillators; ++i) {
+        p.osc[i].enabled = 0;
+        p.osc[i].volume = 0.0f;
+    }
+    p.filter.cutoff_hz = cutoffHz;
+    p.filter.resonance = 0.0f;
+    p.filter.env_mod = envMod;
+    p.filter.drive = 0.0f;
+    p.filter_env.attack_s = 0.001f;
+    p.filter_env.decay_s = 0.001f;
+    p.filter_env.sustain = sustain;
+    p.filter_env.release_s = 0.1f;
+    p.amp_env.attack_s = 0.001f;
+    p.amp_env.decay_s = 0.001f;
+    p.amp_env.sustain = 1.0f;
+    p.amp_env.release_s = 0.1f;
+    p.chorus.mix = 0.0f; // bit-exact bypass so the pre-filter stage is neutral
+    p.tubesat.drive = 0.0f;
+    p.delay.mix = 0.0f;
+    p.reverb.mix = 0.0f;
+    for (auto& lfo : p.lfo) {
+        lfo.target = LfoTarget::None;
+        lfo.depth = 0.0f;
+    }
+    return p;
+}
+
+constexpr double kRespSampleRate = 44100.0;
+
+// Steady-state RMS output for a sine probe at `probeHz`. The nearest MIDI note
+// is used and the residual interval is applied through osc[0].semitone_offset,
+// so the probe lands within a few cents of the requested frequency.
+double renderedAmplitudeAt(const PatchStruct& patch, float probeHz, float velocity) {
+    const int note = std::clamp(static_cast<int>(std::lround(69.0 + 12.0 * std::log2(probeHz / 440.0))), 0, 127);
+    const double noteHz = 440.0 * std::pow(2.0, (note - 69) / 12.0);
+    PatchStruct p = patch;
+    p.osc[0].semitone_offset = static_cast<float>(12.0 * std::log2(probeHz / noteHz));
+    p.osc[0].detune_cents = 0.0f;
+
+    VoiceManager vm(1);
+    vm.prepare(kRespSampleRate);
+    vm.applyPatch(p);
+    vm.noteOn(note, velocity);
+    constexpr int kSettle = 4096;
+    constexpr int kMeasure = 8192;
+    std::vector<float> buf(static_cast<std::size_t>(kSettle + kMeasure), 0.0f);
+    vm.renderBlock(buf.data(), kSettle + kMeasure);
+
+    double acc = 0.0;
+    for (int i = kSettle; i < kSettle + kMeasure; ++i)
+        acc += static_cast<double>(buf[static_cast<std::size_t>(i)]) * buf[static_cast<std::size_t>(i)];
+    return std::sqrt(acc / kMeasure);
+}
+
+// Frequency where the rendered response first falls to 1/√2 (−3 dB) of the
+// passband reference (mean amplitude over [refLo, refHi]). Returns 0 if it
+// never crosses.
+double renderedMinus3dBCorner(const PatchStruct& patch, float velocity = 1.0f, double refLo = 40.0,
+                              double refHi = 80.0) {
+    constexpr int kProbes = 72;
+    std::vector<double> probeHz(kProbes);
+    std::vector<double> amp(kProbes);
+    for (int i = 0; i < kProbes; ++i) {
+        probeHz[i] = 40.0 * std::pow(16000.0 / 40.0, static_cast<double>(i) / (kProbes - 1));
+        amp[i] = renderedAmplitudeAt(patch, static_cast<float>(probeHz[i]), velocity);
+    }
+    double refAcc = 0.0;
+    int refN = 0;
+    for (int i = 0; i < kProbes; ++i) {
+        if (probeHz[i] >= refLo && probeHz[i] <= refHi) {
+            refAcc += amp[i] * amp[i];
+            ++refN;
+        }
+    }
+    if (refN == 0)
+        return 0.0;
+    const double target = std::sqrt(refAcc / refN) / std::sqrt(2.0);
+    for (int i = 1; i < kProbes; ++i) {
+        if (amp[i - 1] >= target && amp[i] < target && target > 0.0) {
+            const double t = (std::log(target) - std::log(amp[i - 1])) / (std::log(amp[i]) - std::log(amp[i - 1]));
+            return probeHz[i - 1] * std::pow(probeHz[i] / probeHz[i - 1], t);
+        }
+    }
+    return 0.0;
 }
 
 } // namespace
@@ -775,4 +876,71 @@ TEST_CASE("VoiceManager delay mix=1 produces echoes after note off") {
     CHECK(wetRms > 10.0 * dryRms);
     CHECK(wetRms > 1e-4);
     CHECK(dryRms < 1e-3);
+}
+
+// ── Filter envelope → cutoff contract (#428) ─────────────────────────────────
+//
+// The filter envelope is applied to cutoff in the octave domain:
+//   cutoff_audible = cutoff_hz * 2^(env_mod * kFilterEnvMaxOctaves * env_out)
+// with kFilterEnvMaxOctaves = 4 (PatchStruct.h). Before #428 the engine used a
+// linear, velocity-scaled factor (1 + env_out * env_mod * velocity * 2), which
+// silently multiplied the sustained cutoff by up to 3x and made hard notes
+// brighter regardless of the patch. These tests render a held sine at a range
+// of frequencies and locate the resulting −3 dB corner, so they observe the
+// cutoff the engine actually produces.
+
+TEST_CASE("VoiceManager filter env_mod = 0: rendered -3 dB corner is set by cutoff_hz", "[filter][envmod]") {
+    // cutoff_hz is the MoogLadder pole frequency. A cascade of four one-pole
+    // sections is 3 dB down at (2^(1/4) - 1)^(1/2) ≈ 0.463 of the pole
+    // frequency; that fixed filter factor is all that separates the rendered
+    // corner from the patch value. With env_mod = 0 nothing else may move it.
+    constexpr double kMoog4Pole3dB = 0.463;
+    const float cutoff = 1000.0f;
+    const double corner = renderedMinus3dBCorner(makeCornerProbePatch(cutoff, 0.0f, 0.0f));
+    INFO("rendered corner=" << corner << " Hz, cutoff_hz=" << cutoff);
+    REQUIRE(corner > 0.0);
+    CHECK(corner == Approx(kMoog4Pole3dB * cutoff).epsilon(0.20));
+    // No hidden multiplier: the rendered corner never exceeds the knob.
+    CHECK(corner <= cutoff);
+}
+
+TEST_CASE("VoiceManager filter env_mod *sustain = 0: held cutoff returns to cutoff_hz", "[filter][envmod]") {
+    const float cutoff = 1000.0f;
+    const double base = renderedMinus3dBCorner(makeCornerProbePatch(cutoff, 0.0f, 0.0f));
+    const double held = renderedMinus3dBCorner(makeCornerProbePatch(cutoff, 1.0f, 0.0f));
+    INFO("base=" << base << " Hz, held=" << held << " Hz");
+    REQUIRE(base > 0.0);
+    // The envelope decays to 0, so 2^(env_mod * 4 * 0) = 1.
+    CHECK(held == Approx(base).epsilon(0.05));
+}
+
+TEST_CASE("VoiceManager filter env_mod scales cutoff by whole octaves", "[filter][envmod]") {
+    // Base cutoff low enough that the +4 octave peak stays clear of Nyquist.
+    const float cutoff = 250.0f;
+    const double base = renderedMinus3dBCorner(makeCornerProbePatch(cutoff, 0.0f, 0.0f));
+    REQUIRE(base > 0.0);
+
+    // sustain=1 holds env_out at 1.0, so the multiplier is exactly
+    // 2^(env_mod * 4): 0.5 -> 4x (+2 oct), 1.0 -> 16x (+4 oct). The old
+    // linear scaling gave 2.5x and 4x respectively, so both CHECKs below
+    // fail on the pre-#428 behaviour.
+    const double half = renderedMinus3dBCorner(makeCornerProbePatch(cutoff, 0.5f, 1.0f));
+    const double full = renderedMinus3dBCorner(makeCornerProbePatch(cutoff, 1.0f, 1.0f));
+    INFO("base=" << base << " half=" << half << " full=" << full);
+    // Compare in octaves so the fixed 4-pole corner-vs-pole offset cancels.
+    CHECK(std::log2(half / base) == Approx(2.0).margin(0.5));
+    CHECK(std::log2(full / base) == Approx(4.0).margin(0.5));
+}
+
+TEST_CASE("VoiceManager filter cutoff does not scale with velocity (#428)", "[filter][envmod]") {
+    const float cutoff = 250.0f;
+    const PatchStruct patch = makeCornerProbePatch(cutoff, 1.0f, 1.0f);
+    const double soft = renderedMinus3dBCorner(patch, 0.25f);
+    const double hard = renderedMinus3dBCorner(patch, 1.0f);
+    INFO("soft=" << soft << " Hz, hard=" << hard << " Hz");
+    REQUIRE(hard > 0.0);
+    // Velocity scales the amp envelope only. Before #428 it was folded into
+    // the filter env multiplier (1 + env * mod * velocity * 2), so a soft
+    // note rendered a markedly lower corner than a hard one.
+    CHECK(soft == Approx(hard).epsilon(0.05));
 }

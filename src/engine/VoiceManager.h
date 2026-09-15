@@ -66,7 +66,7 @@ struct Voice {
     bool noteIsOn{false}; // false = envelope releasing, true = held
     uint64_t noteOnOrder{0};
 
-    float velocity{1.0f}; // [0, 1] — scales amp env peak and filter env mod
+    float velocity{1.0f}; // [0, 1] — scales the amp env peak only (not cutoff, #428)
 
     float targetFrequency{440.0f};
     float currentFrequency{440.0f}; // slides toward target during portamento
@@ -98,7 +98,8 @@ struct Voice {
     std::array<LfoTarget, 2> lfoTargets{{LfoTarget::None, LfoTarget::None}};
     std::array<float, 2> lfoDepths{{0.0f, 0.0f}};
 
-    // Filter env modulation (filter.env_mod from patch).
+    // Filter env depth (filter.env_mod from patch), applied in the octave
+    // domain: cutoff *= 2^(envOut * filterEnvMod * kFilterEnvMaxOctaves).
     float filterEnvMod{0.0f};
 
     // Smoothed filter drive — block-rate writer (applyPatch), per-sample reader
