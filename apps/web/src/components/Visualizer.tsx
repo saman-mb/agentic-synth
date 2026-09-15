@@ -1,24 +1,34 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  computeSpectrumBands,
+  dbToNorm,
+  detectFundamental,
+  frequencyToX,
+  lissajousPoint,
+  parseScopeFrame,
+  SPECTRUM_FFT_SIZE,
+} from '@agentic-synth/engine-bridge';
 import './Visualizer.css';
 
-// ── Visualizer (Phase 5 + Phase 12) ─────────────────────────────────
+// ── Visualizer (Phase 5 + Phase 12 + #434/#435/#436) ────────────────
 //
 // Canvas-based oscilloscope / spectrum / XY / wavetable view.
 //
-// Phase 12 wired real audio: when running inside the JUCE WebView host the
-// component polls the `getScopeSamples` native function once per RAF, stores
-// the latest pulled buffer in a ref, and feeds it into the render loop.
-// When the bridge is absent (Vite dev / unit tests) we fall back to the
-// Phase-5 simulated source so the visuals stay alive.
+// Since #434/#435/#436 the component shows *real* audio or nothing:
+//  • The bridge pulls a contiguous, interleaved-stereo window per RAF (#436).
+//  • SCOPE/SPECTRUM/WT draw the left channel; XY draws real L against real R,
+//    where L and R reach us in one non-mono-summed frame (#435).
+//  • The spectrum is normalised to dBFS over a documented -90..0 dBFS window
+//    and scaled by the engine's real sample rate (#434).
+//  • The wavetable cycle length comes from autocorrelation pitch detection on
+//    the actual audio — never a hardcoded 220 Hz (#435).
 //
-// All modes share:
-//   • retina-aware canvas (window.devicePixelRatio)
-//   • single requestAnimationFrame loop driven by `mode`
-//   • cancelAnimationFrame on unmount (no leaks)
+// There is no simulated fallback. When no real source is connected (or the
+// producer overran the window) every mode draws an explicit "no signal" state
+// instead of a convincing fake.
 
-const SAMPLE_COUNT = 1024;
-const SAMPLE_RATE = 44_100;           // notional — purely for nice frequencies
-const FUNDAMENTAL_HZ = 220;
+const SAMPLE_COUNT = SPECTRUM_FFT_SIZE; // 1024 frames
+const DEFAULT_SAMPLE_RATE = 48_000; // only until the bridge reports the real one
 
 // JUCE bridge shapes — same wire format as useWebSocket.ts / useSynthBridge.ts.
 // We talk to the `getScopeSamples` native function by emitting __juce__invoke
@@ -73,12 +83,12 @@ function ensureScopeCompleteListener(juce: JuceGlobalForScope): void {
   });
 }
 
-function callGetScopeSamples(n: number): Promise<number[]> | null {
+function callGetScopeSamples(n: number): Promise<unknown> | null {
   const juce = getJuceForScope();
   if (!juce) return null;
   ensureScopeCompleteListener(juce);
   const id = nextScopePromiseId++;
-  return new Promise<number[]>((resolve) => {
+  return new Promise<unknown>((resolve) => {
     const timer = window.setTimeout(() => {
       // Settle only if the completion truly never arrived — the complete
       // listener deletes the entry before resolving. Resolving [] makes
@@ -88,9 +98,9 @@ function callGetScopeSamples(n: number): Promise<number[]> | null {
     }, SCOPE_PULL_TIMEOUT_MS);
     pendingScopePromises.set(id, (result) => {
       window.clearTimeout(timer);
-      // Result may be Array<number> (typical) or undefined (provider unset).
-      if (Array.isArray(result)) resolve(result as number[]);
-      else resolve([]);
+      // Result is `{ samples, sampleRate, ... }` (current) or an array
+      // (older shim). parseScopeFrame normalises both.
+      resolve(result);
     });
     juce.backend.emitEvent('__juce__invoke', {
       name: 'getScopeSamples',
@@ -100,19 +110,14 @@ function callGetScopeSamples(n: number): Promise<number[]> | null {
   });
 }
 
-// Evaluated per call, mirroring useSynthBridge.ts: the web-demo shim
-// installs at module-evaluation time (demo/bootstrap.ts), but a
-// module-scope capture here would still freeze the answer before that
-// import ran in older entry points — and per-call costs one property
-// read per frame (#280).
-
 type Mode = 'SCOPE' | 'SPECTRUM' | 'XY' | 'WT';
 const MODES: ReadonlyArray<Mode> = ['SCOPE', 'SPECTRUM', 'XY', 'WT'];
 
 export interface VisualizerProps {
-  // When a real audio pipeline arrives, callers can hand us a fresh
-  // 1024-sample float buffer per frame and we'll prefer it over the
-  // internal simulation.
+  // Optional real-audio hook for tests/parents: returns up to SAMPLE_COUNT
+  // mono float samples per frame. Treated as a real source (left channel);
+  // XY then falls back to L == R. The JUCE/browser bridge is preferred when
+  // both are present.
   sampleProvider?: () => Float32Array;
 }
 
@@ -125,40 +130,15 @@ function readVar(el: HTMLElement | null, name: string, fallback: string): string
   return v || fallback;
 }
 
-/** Tiny radix-2 in-place FFT. Real input (imag pre-zeroed). */
-function fftInPlace(re: Float32Array, im: Float32Array): void {
-  const n = re.length;
-  // bit-reverse permutation
-  for (let i = 1, j = 0; i < n; i++) {
-    let bit = n >> 1;
-    for (; j & bit; bit >>= 1) j ^= bit;
-    j ^= bit;
-    if (i < j) {
-      [re[i], re[j]] = [re[j], re[i]];
-      [im[i], im[j]] = [im[j], im[i]];
-    }
+/** Index of the first rising zero crossing at/after `start` (wraps). */
+function findRisingZeroCrossing(samples: Float32Array, start: number): number {
+  const n = samples.length;
+  for (let i = 1; i < n; i++) {
+    const idx = (start + i) % n;
+    const prev = (idx - 1 + n) % n;
+    if (samples[prev] <= 0 && samples[idx] > 0) return idx;
   }
-  for (let len = 2; len <= n; len <<= 1) {
-    const half = len >> 1;
-    const ang = (-2 * Math.PI) / len;
-    const wre = Math.cos(ang);
-    const wim = Math.sin(ang);
-    for (let i = 0; i < n; i += len) {
-      let cre = 1;
-      let cim = 0;
-      for (let k = 0; k < half; k++) {
-        const tre = cre * re[i + k + half] - cim * im[i + k + half];
-        const tim = cre * im[i + k + half] + cim * re[i + k + half];
-        re[i + k + half] = re[i + k] - tre;
-        im[i + k + half] = im[i + k] - tim;
-        re[i + k] += tre;
-        im[i + k] += tim;
-        const ncre = cre * wre - cim * wim;
-        cim = cre * wim + cim * wre;
-        cre = ncre;
-      }
-    }
-  }
+  return 0;
 }
 
 // ── component ─────────────────────────────────────────────────────────
@@ -174,70 +154,26 @@ export function Visualizer({ sampleProvider }: VisualizerProps) {
   const providerRef = useRef<VisualizerProps['sampleProvider']>(sampleProvider);
   providerRef.current = sampleProvider;
 
-  // Phase 12: bridge-pulled audio. Each RAF kicks off an async pull (resolved
-  // by the JUCE message thread); the render loop reads scopeBufRef.current
-  // synchronously. inFlightRef gates re-entry so we never queue a second
-  // request before the first resolves — drops a frame's worth of samples
-  // rather than letting the queue back up, matching the "lose visualizer
-  // frames before blocking" contract from the C++ side.
-  const scopeBufRef = useRef<Float32Array>(new Float32Array(SAMPLE_COUNT));
+  // Phase 12 / #436: bridge-pulled audio. Each RAF kicks off an async pull
+  // (resolved by the JUCE message thread); the render loop reads the latest
+  // stereo window synchronously. inFlightRef gates re-entry so we never queue
+  // a second request before the first resolves. A stale frame (producer
+  // overrun) is marked and skipped rather than FFT'd across a discontinuity.
+  const scopeLRef = useRef<Float32Array>(new Float32Array(SAMPLE_COUNT));
+  const scopeRRef = useRef<Float32Array>(new Float32Array(SAMPLE_COUNT));
   const scopeFilledRef = useRef<boolean>(false);
+  const scopeStaleRef = useRef<boolean>(false);
+  const scopeSampleRateRef = useRef<number>(DEFAULT_SAMPLE_RATE);
   const inFlightRef = useRef<boolean>(false);
 
   // Persistent scratch buffers — allocated once, mutated each frame.
   const bufs = useMemo(() => {
     return {
-      sample: new Float32Array(SAMPLE_COUNT),    // mono / scope / spectrum source
+      sample: new Float32Array(SAMPLE_COUNT),    // left / mono scope source
       sampleR: new Float32Array(SAMPLE_COUNT),   // right channel for XY
-      fftRe: new Float32Array(SAMPLE_COUNT),
-      fftIm: new Float32Array(SAMPLE_COUNT),
       peaks: new Float32Array(96),               // spectrum peak-hold
     };
   }, []);
-
-  // ── simulation ────────────────────────────────────────────────────
-  // tNow is in seconds. We synthesise SAMPLE_COUNT samples back-dated
-  // from the current time so the trace appears to scroll smoothly.
-  const synthesise = useCallback((tNow: number, currentMode: Mode) => {
-    const { sample, sampleR } = bufs;
-    // Wavetable morph position: 0=sine, 1=saw, 2=square, loops over 8 s.
-    const morph = ((tNow / 8) % 3 + 3) % 3;
-    const tremolo = 0.5 + 0.5 * Math.sin(2 * Math.PI * 2 * tNow); // 2 Hz LFO
-
-    for (let i = 0; i < SAMPLE_COUNT; i++) {
-      const t = tNow + (i - SAMPLE_COUNT) / SAMPLE_RATE;
-      const phase = 2 * Math.PI * FUNDAMENTAL_HZ * t;
-
-      // Base sine + a couple of harmonics that grow with morph for
-      // SPECTRUM. We keep WT visually distinct by also blending
-      // sine→saw→square shapes when in WT mode.
-      let s: number;
-      if (currentMode === 'WT') {
-        const ph = (FUNDAMENTAL_HZ * t) % 1;
-        const sine = Math.sin(2 * Math.PI * ph);
-        const saw = 2 * ph - 1;
-        const square = ph < 0.5 ? 1 : -1;
-        let a: number, b: number, w: number;
-        if (morph < 1) { a = sine; b = saw; w = morph; }
-        else if (morph < 2) { a = saw; b = square; w = morph - 1; }
-        else { a = square; b = sine; w = morph - 2; }
-        s = a * (1 - w) + b * w;
-      } else {
-        // SCOPE / SPECTRUM / XY source: sine + tremolo-amount of 2nd & 3rd
-        // harmonic + a sprinkle of noise. Harmonics give SPECTRUM bars to
-        // render; noise gives the trace texture.
-        const h2 = 0.35 * tremolo * Math.sin(2 * phase);
-        const h3 = 0.18 * tremolo * Math.sin(3 * phase);
-        const noise = (Math.random() - 0.5) * 0.03;
-        s = 0.7 * Math.sin(phase) + h2 + h3 + noise;
-      }
-
-      sample[i] = s * (0.6 + 0.3 * tremolo);
-
-      // XY right channel: same sine with phase offset → ellipse.
-      sampleR[i] = 0.7 * Math.sin(phase + Math.PI / 4 + 0.2 * Math.sin(2 * Math.PI * 0.3 * tNow));
-    }
-  }, [bufs]);
 
   // ── retina sizing ─────────────────────────────────────────────────
   const resize = useCallback(() => {
@@ -275,49 +211,45 @@ export function Visualizer({ sampleProvider }: VisualizerProps) {
     let raf = 0;
     let stopped = false;
 
-    // Cache theme tokens once per loop start; cheap and avoids
-    // hammering getComputedStyle every frame.
     const root = canvas;
     const accentPrimary = readVar(root, '--accent-primary', '#7C4DFF');
     const accentSecondary = readVar(root, '--accent-secondary', '#FF3D88');
     const accentGlow = readVar(root, '--accent-glow', 'rgba(124,77,255,0.45)');
     const bgInset = readVar(root, '--bg-inset', '#07080B');
+    const textTertiary = readVar(root, '--text-tertiary', 'rgba(255,255,255,0.45)');
     const gridStroke = 'rgba(255,255,255,0.03)';
 
     const draw = () => {
       if (stopped) return;
-      // A throw inside a frame would otherwise skip the
-      // requestAnimationFrame below and kill the loop permanently — a
-      // frozen canvas. Log and keep the loop alive instead; the next
-      // frame may well succeed.
+      // A throw inside a frame would otherwise skip the requestAnimationFrame
+      // below and kill the loop permanently — a frozen canvas. Log and keep
+      // the loop alive instead; the next frame may well succeed.
       try {
         const tNow = performance.now() / 1000;
         const currentMode = modeRef.current;
 
-        // 1. Fire-and-forget bridge pull once per frame. The promise resolves
-        //    on a future tick; while it does, the render loop reads the most
-        //    recent scopeBufRef.current synchronously. inFlightRef gates
-        //    re-entry so concurrent RAFs don't pile up requests.
+        // 1. Fire-and-forget bridge pull once per frame.
         if (scopeBridgeAvailable() && !inFlightRef.current) {
           inFlightRef.current = true;
           const p = callGetScopeSamples(SAMPLE_COUNT);
           if (p) {
-            p.then((arr) => {
-              if (arr.length > 0) {
-                // Shift-and-append into the rolling window. If the producer
-                // delivered a full window's worth, do a direct copy; otherwise
-                // shift the existing tail left and append the new samples on
-                // the right so the trace appears to scroll continuously.
-                const buf = scopeBufRef.current;
-                if (arr.length >= SAMPLE_COUNT) {
-                  for (let i = 0; i < SAMPLE_COUNT; i++) buf[i] = arr[arr.length - SAMPLE_COUNT + i];
-                } else {
-                  const keep = SAMPLE_COUNT - arr.length;
-                  buf.copyWithin(0, arr.length, SAMPLE_COUNT);
-                  for (let i = 0; i < arr.length; i++) buf[keep + i] = arr[i];
-                }
-                scopeFilledRef.current = true;
+            p.then((result) => {
+              const frame = parseScopeFrame(result, scopeSampleRateRef.current);
+              if (!frame) return;
+              scopeSampleRateRef.current = frame.sampleRate;
+              if (frame.stale) {
+                // Producer overran the window mid-copy: skip it entirely.
+                scopeStaleRef.current = true;
+                return;
               }
+              if (frame.samples.length < SAMPLE_COUNT * 2) return; // not enough yet
+              const interleaved = frame.samples;
+              for (let i = 0; i < SAMPLE_COUNT; i++) {
+                scopeLRef.current[i] = interleaved[i * 2];
+                scopeRRef.current[i] = interleaved[i * 2 + 1];
+              }
+              scopeFilledRef.current = true;
+              scopeStaleRef.current = false;
             }).finally(() => {
               inFlightRef.current = false;
             });
@@ -326,40 +258,49 @@ export function Visualizer({ sampleProvider }: VisualizerProps) {
           }
         }
 
-        // 2. Fill our sample buffers. Always run synthesise() first so
-        //    sampleR (used by XY) and baseline sample are populated, then
-        //    overwrite bufs.sample with real audio when available.
-        //    Priority order for bufs.sample:
-        //      a) explicit sampleProvider prop (parent wiring / tests)
-        //      b) JUCE bridge buffer (real audio from C++)
-        //      c) simulated source (already in place from synthesise)
-        synthesise(tNow, currentMode);
-        const provided = providerRef.current?.();
-        if (provided && provided.length >= SAMPLE_COUNT) {
-          bufs.sample.set(provided.subarray(0, SAMPLE_COUNT));
+        // 2. Select the real source. No simulated fallback exists.
+        const provider = providerRef.current;
+        let signal: 'ok' | 'none' | 'stale' = 'none';
+        if (provider) {
+          const provided = provider();
+          if (provided && provided.length >= SAMPLE_COUNT) {
+            bufs.sample.set(provided.subarray(0, SAMPLE_COUNT));
+            bufs.sampleR.set(bufs.sample); // mono test hook → L == R
+            signal = 'ok';
+          }
         } else if (scopeBridgeAvailable() && scopeFilledRef.current) {
-          bufs.sample.set(scopeBufRef.current);
+          if (scopeStaleRef.current) {
+            signal = 'stale';
+          } else {
+            bufs.sample.set(scopeLRef.current);
+            bufs.sampleR.set(scopeRRef.current);
+            signal = 'ok';
+          }
         }
 
         const dpr = window.devicePixelRatio || 1;
         const W = canvas.width;
         const H = canvas.height;
+        const colors = { accentPrimary, accentSecondary, accentGlow, bgInset, gridStroke, textTertiary };
 
-        switch (currentMode) {
-          case 'SCOPE':
-            drawScope(ctx, W, H, dpr, bufs.sample, { accentPrimary, accentGlow, bgInset, gridStroke });
-            break;
-          case 'SPECTRUM':
-            drawSpectrum(ctx, W, H, dpr, bufs, { accentPrimary, accentSecondary, bgInset, gridStroke });
-            break;
-          case 'XY':
-            drawXY(ctx, W, H, dpr, bufs.sample, bufs.sampleR, { accentPrimary, accentGlow, bgInset, gridStroke });
-            break;
-          case 'WT':
-            drawWavetable(ctx, W, H, dpr, bufs.sample, tNow, { accentPrimary, bgInset, gridStroke });
-            break;
+        if (signal !== 'ok') {
+          drawSignalState(ctx, W, H, dpr, colors, signal === 'stale' ? 'SIGNAL OVERRUN' : 'NO SIGNAL');
+        } else {
+          switch (currentMode) {
+            case 'SCOPE':
+              drawScope(ctx, W, H, dpr, bufs.sample, colors);
+              break;
+            case 'SPECTRUM':
+              drawSpectrum(ctx, W, H, dpr, bufs, scopeSampleRateRef.current, colors);
+              break;
+            case 'XY':
+              drawXY(ctx, W, H, dpr, bufs.sample, bufs.sampleR, colors);
+              break;
+            case 'WT':
+              drawWavetable(ctx, W, H, dpr, bufs.sample, scopeSampleRateRef.current, tNow, colors);
+              break;
+          }
         }
-
       } catch (err) {
         console.warn('[visualizer] draw frame failed:', err);
       }
@@ -371,7 +312,7 @@ export function Visualizer({ sampleProvider }: VisualizerProps) {
       stopped = true;
       cancelAnimationFrame(raf);
     };
-  }, [bufs, synthesise]);
+  }, [bufs]);
 
   return (
     <div className="visualizer">
@@ -400,9 +341,11 @@ export function Visualizer({ sampleProvider }: VisualizerProps) {
 
 interface ScopeColors {
   accentPrimary: string;
+  accentSecondary: string;
   accentGlow: string;
   bgInset: string;
   gridStroke: string;
+  textTertiary: string;
 }
 
 function drawGrid(
@@ -430,6 +373,23 @@ function drawGrid(
   ctx.stroke();
 }
 
+/** Centred status text used when there is no real, contiguous audio. */
+function drawSignalState(
+  ctx: CanvasRenderingContext2D,
+  W: number,
+  H: number,
+  dpr: number,
+  c: ScopeColors,
+  label: string,
+) {
+  drawGrid(ctx, W, H, dpr, c.bgInset, c.gridStroke);
+  ctx.fillStyle = c.textTertiary;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  ctx.font = `${11 * dpr}px "JetBrains Mono", monospace`;
+  ctx.fillText(label, W / 2, H / 2);
+}
+
 function drawScope(
   ctx: CanvasRenderingContext2D,
   W: number,
@@ -439,14 +399,11 @@ function drawScope(
   c: ScopeColors,
 ) {
   // Decay trail: draw last frame at 20% before redrawing this one.
-  // We accomplish that by painting a semi-transparent bg over the
-  // previous frame instead of clearing — cheap, no extra canvas.
   ctx.fillStyle = c.bgInset;
   ctx.globalAlpha = 0.8; // leaves 20% of previous frame visible
   ctx.fillRect(0, 0, W, H);
   ctx.globalAlpha = 1;
 
-  // Re-stamp the grid so it doesn't ghost out.
   ctx.strokeStyle = c.gridStroke;
   ctx.lineWidth = 1 * dpr;
   ctx.beginPath();
@@ -458,7 +415,6 @@ function drawScope(
   ctx.lineTo(W, (2 * H) / 3);
   ctx.stroke();
 
-  // Trace.
   ctx.shadowColor = c.accentGlow;
   ctx.shadowBlur = 6 * dpr;
   ctx.strokeStyle = c.accentPrimary;
@@ -476,13 +432,6 @@ function drawScope(
   ctx.shadowBlur = 0;
 }
 
-interface SpectrumColors {
-  accentPrimary: string;
-  accentSecondary: string;
-  bgInset: string;
-  gridStroke: string;
-}
-
 function drawSpectrum(
   ctx: CanvasRenderingContext2D,
   W: number,
@@ -490,30 +439,19 @@ function drawSpectrum(
   dpr: number,
   bufs: {
     sample: Float32Array;
-    fftRe: Float32Array;
-    fftIm: Float32Array;
     peaks: Float32Array;
   },
-  c: SpectrumColors,
+  sampleRate: number,
+  c: ScopeColors,
 ) {
   drawGrid(ctx, W, H, dpr, c.bgInset, c.gridStroke);
 
-  // Hann window + FFT.
-  const { sample, fftRe, fftIm, peaks } = bufs;
-  for (let i = 0; i < SAMPLE_COUNT; i++) {
-    const w = 0.5 * (1 - Math.cos((2 * Math.PI * i) / (SAMPLE_COUNT - 1)));
-    fftRe[i] = sample[i] * w;
-    fftIm[i] = 0;
-  }
-  fftInPlace(fftRe, fftIm);
-
-  // Log-spaced bands → magnitudes.
+  const { sample, peaks } = bufs;
   const BANDS = peaks.length; // 96
-  const halfN = SAMPLE_COUNT / 2;
-  const minBin = 2;
-  const maxBin = halfN - 1;
-  const logMin = Math.log(minBin);
-  const logMax = Math.log(maxBin);
+  // dBFS per log band, clamped to the documented -90..0 dBFS window
+  // (see engine-bridge scope.ts). A full-scale sine reads ~0; white noise at
+  // -50 dBFS RMS reads well above the floor instead of a sliver.
+  const db = computeSpectrumBands(sample, sampleRate, BANDS);
 
   // Gradient: violet → magenta → white at top.
   const grad = ctx.createLinearGradient(0, H, 0, 0);
@@ -525,18 +463,7 @@ function drawSpectrum(
   const bandWidth = (W - gap * (BANDS + 1)) / BANDS;
 
   for (let b = 0; b < BANDS; b++) {
-    const fLo = Math.exp(logMin + ((logMax - logMin) * b) / BANDS);
-    const fHi = Math.exp(logMin + ((logMax - logMin) * (b + 1)) / BANDS);
-    const lo = Math.max(minBin, Math.floor(fLo));
-    const hi = Math.max(lo + 1, Math.ceil(fHi));
-    let mag = 0;
-    for (let k = lo; k < hi && k < halfN; k++) {
-      const m = Math.hypot(fftRe[k], fftIm[k]);
-      if (m > mag) mag = m;
-    }
-    // Map to dB-ish then to 0..1.
-    const db = 20 * Math.log10(mag + 1e-6);
-    const norm = Math.max(0, Math.min(1, (db + 30) / 50));
+    const norm = dbToNorm(db[b]);
 
     // Peak hold — decays ~1s.
     const decay = 0.985;
@@ -547,10 +474,35 @@ function drawSpectrum(
     ctx.fillStyle = grad;
     ctx.fillRect(x, H - barH, bandWidth, barH);
 
-    // Peak line.
     const py = H - peaks[b] * (H - 4 * dpr);
     ctx.fillStyle = 'rgba(255,255,255,0.6)';
     ctx.fillRect(x, py - 1 * dpr, bandWidth, 1 * dpr);
+  }
+
+  // Frequency axis: faint octave gridlines + decade labels, positioned with
+  // the engine's real sample rate so the axis is honest (#434).
+  const fLo = (2 * sampleRate) / SPECTRUM_FFT_SIZE;
+  const fHi = ((SPECTRUM_FFT_SIZE / 2 - 1) * sampleRate) / SPECTRUM_FFT_SIZE;
+  const octaves = [50, 100, 200, 400, 800, 1600, 3200, 6400, 12800];
+  const decades = [100, 1000, 10000];
+  ctx.strokeStyle = 'rgba(255,255,255,0.08)';
+  ctx.lineWidth = 1 * dpr;
+  for (const f of octaves) {
+    if (f < fLo || f > fHi) continue;
+    const x = frequencyToX(f, sampleRate, W);
+    ctx.beginPath();
+    ctx.moveTo(x, 0);
+    ctx.lineTo(x, H);
+    ctx.stroke();
+  }
+  ctx.fillStyle = c.textTertiary;
+  ctx.textAlign = 'left';
+  ctx.textBaseline = 'bottom';
+  ctx.font = `${9 * dpr}px "JetBrains Mono", monospace`;
+  for (const f of decades) {
+    if (f < fLo || f > fHi) continue;
+    const x = frequencyToX(f, sampleRate, W);
+    ctx.fillText(f >= 1000 ? `${f / 1000}k` : `${f}`, x + 2 * dpr, H - 2 * dpr);
   }
 }
 
@@ -579,29 +531,19 @@ function drawXY(
   ctx.lineTo(W, H / 2);
   ctx.stroke();
 
-  // Lissajous.
+  // Lissajous: real left against real right (#435).
   ctx.shadowColor = c.accentGlow;
   ctx.shadowBlur = 4 * dpr;
   ctx.strokeStyle = c.accentPrimary;
   ctx.lineWidth = 1.5 * dpr;
   ctx.beginPath();
-  const cx = W / 2;
-  const cy = H / 2;
-  const scale = Math.min(W, H) * 0.42;
   for (let i = 0; i < SAMPLE_COUNT; i++) {
-    const x = cx + L[i] * scale;
-    const y = cy - R[i] * scale;
+    const { x, y } = lissajousPoint(L[i], R[i], W, H);
     if (i === 0) ctx.moveTo(x, y);
     else ctx.lineTo(x, y);
   }
   ctx.stroke();
   ctx.shadowBlur = 0;
-}
-
-interface WTColors {
-  accentPrimary: string;
-  bgInset: string;
-  gridStroke: string;
 }
 
 function drawWavetable(
@@ -610,21 +552,32 @@ function drawWavetable(
   H: number,
   dpr: number,
   sample: Float32Array,
+  sampleRate: number,
   tNow: number,
-  c: WTColors,
+  c: ScopeColors,
 ) {
+  // Cycle length from the actual playing fundamental (#435). No hardcoded
+  // 220 Hz: if the window is unpitched we say so rather than fake a cycle.
+  const { hz, confidence } = detectFundamental(sample, sampleRate);
   drawGrid(ctx, W, H, dpr, c.bgInset, c.gridStroke);
+  if (hz <= 0 || confidence < 0.5) {
+    ctx.fillStyle = c.textTertiary;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.font = `${11 * dpr}px "JetBrains Mono", monospace`;
+    ctx.fillText('NO PITCH', W / 2, H / 2);
+    return;
+  }
+
+  const cycleSamples = Math.max(8, Math.min(SAMPLE_COUNT, Math.round(sampleRate / hz)));
+  const start = findRisingZeroCrossing(sample, 0);
 
   // 7 layered curves, animated z-depth shifting — "tunnel of frames".
   const LAYERS = 7;
   const cx = W / 2;
   const cy = H / 2;
-  const cycleSamples = Math.floor(SAMPLE_RATE / FUNDAMENTAL_HZ); // ~200
-  const useSamples = Math.min(cycleSamples, SAMPLE_COUNT);
 
   for (let l = LAYERS - 1; l >= 0; l--) {
-    // Each layer offset in time (z-depth) and shrunk + shifted up the
-    // canvas to imply perspective.
     const depth = l / (LAYERS - 1);                       // 0..1
     const shift = ((tNow * 0.6) % 1 + 1 + depth) % 1;     // 0..1 looping
     const scale = 0.45 + 0.45 * (1 - shift);              // bigger when close
@@ -637,13 +590,20 @@ function drawWavetable(
     ctx.globalAlpha = opacity;
     ctx.lineWidth = 1.5 * dpr;
     ctx.beginPath();
-    for (let i = 0; i < useSamples; i++) {
-      const x = xL + (i / (useSamples - 1)) * xw;
-      const y = y0 - sample[i] * H * 0.22 * scale;
+    for (let i = 0; i < cycleSamples; i++) {
+      const x = xL + (i / (cycleSamples - 1)) * xw;
+      const y = y0 - sample[(start + i) % SAMPLE_COUNT] * H * 0.22 * scale;
       if (i === 0) ctx.moveTo(x, y);
       else ctx.lineTo(x, y);
     }
     ctx.stroke();
   }
   ctx.globalAlpha = 1;
+
+  // Honest readout of the detected fundamental driving the cycle length.
+  ctx.fillStyle = c.textTertiary;
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'bottom';
+  ctx.font = `${9 * dpr}px "JetBrains Mono", monospace`;
+  ctx.fillText(`${hz.toFixed(1)} Hz`, W - 4 * dpr, H - 3 * dpr);
 }

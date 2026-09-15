@@ -5,6 +5,7 @@
 #include "engine/MidiHandler.h"
 #include "engine/PatchStruct.h"
 #include "engine/SPSCQueue.h"
+#include "engine/ScopeRing.h"
 #include "engine/VoiceManager.h"
 
 #include <juce_audio_processors/juce_audio_processors.h>
@@ -53,23 +54,28 @@ public:
     static constexpr std::size_t kAuditionQueueCapacity = 256;
     static constexpr int kAuditionDrainBudget = 64;
 
-    // Phase 12: Visualizer audio tap.
+    // Phase 12 / #434-#436: Visualizer audio tap.
     //
-    // Audio thread pushes mono-summed post-amp samples into scopeQueue_ at
-    // audio rate (worst case ~96 kHz × 1 push/sample). The message thread
-    // drains the queue via pullScopeSamples() in response to a JS bridge
-    // call at ~60 Hz. Capacity must be large enough that at typical sample
-    // rates, one block (max ~1024) plus a 16ms-worth-of-samples margin fits
-    // without dropping. 4096 = ~85 ms of headroom at 48 kHz, comfortable
-    // versus 60 fps polling.
-    static constexpr std::size_t kScopeQueueCapacity = 4096;
-    using ScopeQueueT = agentic_synth::SPSCQueue<float, kScopeQueueCapacity>;
+    // Audio thread pushes post-amp *stereo* frames (interleaved L/R) into a
+    // lock-free scope ring at audio rate. The message thread pulls a
+    // contiguous window of the newest frames via pullScopeSamples() in
+    // response to a JS bridge call at ~60 Hz. ScopeRing drops the window when
+    // the producer overran it mid-copy, so the FFT never runs across a
+    // discontinuity. Capacity = ~85 ms of headroom at 48 kHz, comfortable
+    // versus 60 fps polling (1024-frame window).
+    static constexpr std::size_t kScopeCapacityFrames = agentic_synth::ScopeRing::kCapacityFrames;
 
-    // Message thread: drain up to `max` samples into `out`. Wait-free SPSC
-    // pop, no allocation, no lock. Returns the number of samples popped.
-    // `out` is cleared first via setSize. Safe to call concurrently with
-    // the audio thread (single producer / single consumer contract).
-    int pullScopeSamples(float* dest, int max) noexcept;
+    // Message thread: copy the newest `frames` interleaved L/R frames into
+    // `dest` (which must hold frames * 2 floats). Wait-free, no allocation,
+    // no lock. Returns the number of frames copied, or 0 when the window is
+    // stale/short and the caller must skip it.
+    int pullScopeSamples(float* dest, int frames) noexcept;
+
+    // Consumer-thread diagnostics surfaced over the JS bridge so the UI can
+    // distinguish "silent" from "dropped"/"stale".
+    [[nodiscard]] std::uint64_t scopeDroppedFrames() const noexcept { return scopeRing_.droppedFrames(); }
+    [[nodiscard]] std::uint64_t scopeStaleWindows() const noexcept { return scopeRing_.staleWindows(); }
+    [[nodiscard]] bool scopeLastPullStale() const noexcept { return scopeRing_.lastPullStale(); }
 
     // Phase 2 (Item #4): message-thread poll cadence for AgentBridge → APVTS.
     // 20 ms is well below the perceptual threshold for a "delayed" AI patch
@@ -123,12 +129,12 @@ private:
     // — satisfies the RT rule against locks and allocs.
     agentic_synth::SPSCQueue<agentic_synth::engine::RawMidiMsg, kAuditionQueueCapacity> auditionQueue_;
 
-    // Phase 12: post-amp visualizer tap. Producer = audio thread (push after
-    // master gain in processBlock). Consumer = message thread (drained from
-    // the WebView native `getScopeSamples` handler via pullScopeSamples).
-    // Drops silently when full — losing visualizer frames is preferable to
-    // blocking the audio thread.
-    ScopeQueueT scopeQueue_;
+    // Phase 12 / #434-#436: post-amp stereo visualizer tap. Producer = audio
+    // thread (push after master gain in processBlock). Consumer = message
+    // thread (pulled from the WebView native `getScopeSamples` handler via
+    // pullScopeSamples). The ring rejects a window rather than blocking the
+    // audio thread or feeding the FFT a discontinuous buffer.
+    agentic_synth::ScopeRing scopeRing_;
 
     // ── APVTS typed-pointer cache ───────────────────────────────────────────
     // Phase 2 follow-up (Code Fix 1): cache concrete parameter types instead
