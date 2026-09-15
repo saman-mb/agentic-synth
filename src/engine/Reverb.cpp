@@ -66,8 +66,10 @@ Reverb::Reverb() = default;
 void Reverb::prepare(double sampleRate) {
     sampleRate_ = (sampleRate > 0.0) ? sampleRate : 44100.0;
 
-    // Freeverb-original tunings (samples @ 44.1 kHz).
-    static constexpr int kCombL[kNumCombs] = {1116, 1188, 1277, 1356};
+    // Freeverb-original tunings (samples @ 44.1 kHz). The full 8-comb set
+    // restores the modal density Freeverb relies on for a diffused tail; the
+    // first four alone ring with sparse, audible modes at large sizes (#432).
+    static constexpr int kCombL[kNumCombs] = {1116, 1188, 1277, 1356, 1422, 1491, 1557, 1617};
     static constexpr int kAllpassL[kNumAllpasses] = {556, 441};
     static constexpr int kStereoSpread = 23;
 
@@ -107,8 +109,12 @@ void Reverb::setSize(float size01) noexcept {
 
 void Reverb::setDamp(float damp01) noexcept {
     damp_ = std::clamp(damp01, 0.0f, 1.0f);
-    // Gentle 0..0.5 mapping — Freeverb-original "damp1 = damp * 0.5"
-    const float d = damp_ * 0.5f;
+    // Freeverb-original caps internal damping at damp * 0.5, which leaves a
+    // permanently bright tail at damp = 1.0. Rescale the user range onto
+    // [0, kMaxInternalDamping] with a squared curve: low/mid settings track
+    // the original character closely (0.5 -> 0.24 vs 0.25), while the top of
+    // the knob reaches an audibly dark ~350 Hz feedback corner (#432).
+    const float d = kMaxInternalDamping * damp_ * damp_;
     for (auto& c : combsL_)
         c.damping = d;
     for (auto& c : combsR_)
@@ -137,9 +143,10 @@ void Reverb::process(float inL, float inR, float& outL, float& outR) noexcept {
     for (auto& ap : allpassesR_)
         wetR = ap.process(wetR);
 
-    // Equal-power-ish linear crossfade. The combs already add 4× gain;
-    // scale wet down so unity-mix output stays in sensible range.
-    constexpr float kWetGain = 0.25f; // 1 / kNumCombs
+    // Equal-power-ish linear crossfade. Scale by the comb-bank size so the
+    // restored 8-comb bank does not double the wet level versus the old
+    // 4-comb bank (see PR #432 for the measured CPU/level comparison).
+    constexpr float kWetGain = 1.0f / static_cast<float>(kNumCombs);
     const float wetGainL = wetL * kWetGain;
     const float wetGainR = wetR * kWetGain;
 
