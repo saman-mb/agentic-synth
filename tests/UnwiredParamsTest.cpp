@@ -33,9 +33,10 @@ struct PluginFixture {
 // Render numBlocks of `samplesPerBlock` through the plugin, injecting a single
 // note-on at the start. Returns the concatenated stereo output buffer so
 // callers can byte-compare two renders.
-std::vector<float> renderWithNote(AgenticSynthPlugin& plug, int numBlocks, int samplesPerBlock) {
+std::vector<float> renderWithNote(AgenticSynthPlugin& plug, int numBlocks, int samplesPerBlock,
+                                  int midiNote = 60) {
     auto& q = plug.auditionQueueForTest();
-    (void)q.push(RawMidiMsg::noteOn(60, 100));
+    (void)q.push(RawMidiMsg::noteOn(midiNote, 100));
     std::vector<float> out;
     out.reserve(static_cast<std::size_t>(numBlocks * samplesPerBlock * 2));
     juce::AudioBuffer<float> buf(2, samplesPerBlock);
@@ -88,6 +89,7 @@ bool paramChangesAudio(const juce::String& paramId, float value0to1Norm) {
 
 TEST_CASE("Phase-3 wiring: osc0_enabled toggle changes audio", "[unwired]") {
     // Default osc0 is enabled; setting it to false (0.0) should silence the voice.
+    // #266 hard-kill: disabled slots stay silent even when volume > 0.
     CHECK(paramChangesAudio("osc0_enabled", 0.0f));
 }
 
@@ -105,6 +107,41 @@ TEST_CASE("Phase-3 wiring: filter_type switch changes audio spectrum", "[unwired
     // Switch from LowPass (index 0) to HighPass (index 1). Choice param's
     // normalised value for index 1 across a 5-choice list is 0.25.
     CHECK(paramChangesAudio("filter_type", 0.25f));
+}
+
+TEST_CASE("#429 wiring: filter_key_track changes audio off C4", "[unwired][keytrack]") {
+    // CRITICAL: MIDI 60 (C4) is the key-track reference → ratio^kt = 1 for any
+    // kt, so a default renderWithNote would never differ. Use note 72 (C5) and
+    // a mid/closed LP cutoff so the octave of tracking is audible.
+    PluginFixture fix;
+
+    auto render = [](float keyTrackNorm) {
+        AgenticSynthPlugin p;
+        p.prepareToPlay(44100.0, 256);
+        auto& apvts = p.getAPVTS();
+        if (auto* c = apvts.getParameter("filterCutoff"))
+            c->setValueNotifyingHost(c->convertTo0to1(1000.0f));
+        if (auto* kt = apvts.getParameter("filter_key_track"))
+            kt->setValueNotifyingHost(keyTrackNorm);
+        // Zero env mod so only key_track moves the corner.
+        if (auto* em = apvts.getParameter("filter_env_mod"))
+            em->setValueNotifyingHost(em->convertTo0to1(0.0f));
+        const auto out = renderWithNote(p, 8, 256, /*midiNote=*/72);
+        p.agentBridge().setMidiNoteSink(nullptr);
+        return out;
+    };
+
+    const auto off = render(0.0f);
+    const auto on = render(1.0f);
+    REQUIRE(off.size() == on.size());
+    bool differs = false;
+    for (std::size_t i = 0; i < off.size(); ++i) {
+        if (off[i] != on[i]) {
+            differs = true;
+            break;
+        }
+    }
+    CHECK(differs);
 }
 
 TEST_CASE("Phase-3 wiring: reverb_width changes stereo image", "[unwired]") {
