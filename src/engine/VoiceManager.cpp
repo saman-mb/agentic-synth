@@ -359,9 +359,24 @@ void Voice::renderStereo(float portamentoAlpha, float baseCutoffHz, float resona
     }
 
     // ── Filter modulation ────────────────────────────────────────────────
+    // LFO cutoff is a linear multiplicative offset around 1.0 (unchanged).
+    // The filter envelope is applied in the OCTAVE domain (#428): each unit
+    // of filter.env_mod buys a fixed number of octaves regardless of where
+    // cutoff_hz sits, so the knob and the envelope no longer interact.
+    // filterEnvMod is clamped -1..+1 by PatchValidator; filterEnvOut is the
+    // ADSR output in [0, 1]. env_mod = 0 → exp2(0) = 1 → the filter runs at
+    // exactly cutoff_hz; the envelope only opens (+) or closes (-) it while
+    // it is above zero. Velocity does NOT scale cutoff — it only scales the
+    // amplitude envelope peak below, so hard-played notes are not brighter
+    // unless a patch explicitly asks for it. See kFilterEnvMaxOctaves and
+    // the FilterParams contract in PatchStruct.h.
     const float filterEnvOut = filterEnv.process();
     float effectiveCutoff = baseCutoffHz * (1.0f + lfoCutoffMod);
-    effectiveCutoff *= (1.0f + filterEnvOut * filterEnvMod * velocity * 2.0f);
+    // Skip the exp2 entirely when the envelope or depth is zero — the common
+    // case (env_mod == 0) must stay a bit-exact no-op and cost nothing.
+    const float envOctaves = filterEnvOut * filterEnvMod * kFilterEnvMaxOctaves;
+    if (envOctaves != 0.0f)
+        effectiveCutoff *= std::exp2(envOctaves);
     effectiveCutoff = std::clamp(effectiveCutoff, 20.0f, 20000.0f);
 
     // Drive smoothing — sample-rate consumer of the block-rate setDrive target.

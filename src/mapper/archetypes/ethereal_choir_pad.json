@@ -8,7 +8,7 @@
     {"type": "Sine",      "semitone_offset": 12.0, "detune_cents":  0.0, "wavetable_pos": 0.0,  "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.45, "pan":  0.4, "pulse_width": 0.5, "enabled": true},
     {"type": "Noise",     "semitone_offset": 0.0,  "detune_cents":  0.0, "wavetable_pos": 0.0,  "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.18, "pan":  0.0, "pulse_width": 0.5, "enabled": true}
   ],
-  "filter": {"type": "LowPass", "cutoff_hz": 3500.0, "resonance": 0.20, "env_mod": 0.30, "key_track": 0.1, "drive": 0.05},
+  "filter": {"type": "LowPass", "cutoff_hz": 3500.0, "resonance": 0.20, "env_mod": 0.23, "key_track": 0.1, "drive": 0.05},
   "filter_env": {"attack_s": 2.0, "decay_s": 3.0, "sustain": 0.70, "release_s": 4.0},
   "amp_env":    {"attack_s": 2.5, "decay_s": 1.5, "sustain": 0.90, "release_s": 5.0},
   "lfo": [

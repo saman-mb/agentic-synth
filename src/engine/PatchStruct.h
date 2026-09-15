@@ -75,12 +75,43 @@ struct EnvParams {
 };
 static_assert(sizeof(EnvParams) == 16);
 
+// Maximum filter-envelope → cutoff depth in octaves at env_mod = +1 and a
+// filter envelope at full output (1.0). Convention: 4 octaves = 16× cutoff.
+// Negative env_mod mirrors this (down to 1/16×). #428.
+inline constexpr float kFilterEnvMaxOctaves = 4.0f;
+
+// Filter cutoff contract (#428)
+// -----------------------------
+// `cutoff_hz` is the cutoff the filter runs at when the filter envelope is
+// at output 0 and no LFO is routed to FilterCutoff. When the filter envelope
+// is above 0 its output (0..1) modulates the cutoff multiplicatively in the
+// OCTAVE domain:
+//
+//     audible_cutoff = clamp(cutoff_hz
+//                            * 2^(env_mod * kFilterEnvMaxOctaves * env_out),
+//                            20 Hz, 20000 Hz)
+//
+// where env_out is the ADSR output shaped by filter_env.attack_s, decay_s,
+// sustain and release_s. Consequences:
+//   * env_mod =  1.0 → +4 octaves (16×) at the envelope peak (env_out = 1).
+//   * env_mod = -1.0 → -4 octaves (1/16×) at the envelope peak.
+//   * env_mod =  0.0 → no modulation; the filter stays at cutoff_hz.
+// During a held note the envelope settles at filter_env.sustain, so the
+// steady-state cutoff is cutoff_hz * 2^(env_mod * kFilterEnvMaxOctaves *
+// filter_env.sustain). With sustain = 0 the envelope decays back to 0 and
+// the sustained cutoff returns to cutoff_hz. Because the depth is in
+// octaves, env_mod buys the same interval at every cutoff_hz.
+//
+// Velocity is deliberately NOT part of this contract: it scales only the
+// amplitude envelope peak (VoiceManager::renderStereo). Velocity → cutoff is
+// not silently folded into env_mod — there is no velocity→cutoff field, so
+// hard-played notes are not brighter unless the patch itself asks for it.
 struct FilterParams {
     FilterType type;
     uint8_t _pad[3];
     float cutoff_hz; // 20 .. 20000
     float resonance; // 0 .. 1
-    float env_mod;   // -1 .. +1 (filter envelope depth)
+    float env_mod;   // -1 .. +1; octave depth, ±kFilterEnvMaxOctaves at env peak
     float key_track; // 0 .. 1
     float drive;     // 0 .. 1
 };
