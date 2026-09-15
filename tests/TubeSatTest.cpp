@@ -35,10 +35,10 @@ std::vector<float> makeSine(int n, float freqHz, float sr, float amp = 0.7f) {
 // non-integer multiples and are not mistaken for legitimate harmonic content.
 constexpr double kAliasSr = 48000.0;
 constexpr double kAliasF0 = 2500.0;
-constexpr int kAliasSettle = 9600;  // 200 ms to clear the filter transient
-constexpr int kAliasFft = 32768;    // power of two for the radix-2 FFT
+constexpr int kAliasSettle = 9600; // 200 ms to clear the filter transient
+constexpr int kAliasFft = 32768;   // power of two for the radix-2 FFT
 constexpr float kAliasAmp = 0.9f;
-constexpr float kFullDrive = 0.5f;  // PatchStruct clamp — the hottest setting
+constexpr float kFullDrive = 0.5f; // PatchStruct clamp — the hottest setting
 constexpr double kAliasToleranceHz = 20.0;
 
 std::vector<float> makeAliasTone(int n) {
@@ -115,7 +115,6 @@ std::vector<float> renderLegacyTubeSat(float drive) {
     return std::vector<float>(left.begin() + kAliasSettle, left.end());
 }
 } // namespace
-
 
 TEST_CASE("TubeSat::prepare + reset do not throw", "[tubesat][phaseE]") {
     TubeSat t;
@@ -266,7 +265,8 @@ TEST_CASE("Oversampler2x — upsample/downsample is unity-gain in the passband",
             ++measured;
         }
     }
-    const double gain = std::sqrt(outSq / static_cast<double>(measured)) / std::sqrt(inSq / static_cast<double>(measured));
+    const double gain =
+        std::sqrt(outSq / static_cast<double>(measured)) / std::sqrt(inSq / static_cast<double>(measured));
     INFO("round-trip gain = " << gain);
     REQUIRE(std::fabs(gain - 1.0) < 0.02);
 }

@@ -86,12 +86,10 @@ void TubeSat::processStereo(float* left, float* right, int numSamples) noexcept 
         float upR1 = 0.0f;
         oversamplerL_.upsample(inL, upL0, upL1);
         oversamplerR_.upsample(inR, upR0, upR1);
-        const float satL =
-            oversamplerL_.downsample(saturate(upL0, drivePos_, driveNeg_, normPos_, normNeg_),
-                                     saturate(upL1, drivePos_, driveNeg_, normPos_, normNeg_));
-        const float satR =
-            oversamplerR_.downsample(saturate(upR0, drivePos_, driveNeg_, normPos_, normNeg_),
-                                     saturate(upR1, drivePos_, driveNeg_, normPos_, normNeg_));
+        const float satL = oversamplerL_.downsample(saturate(upL0, drivePos_, driveNeg_, normPos_, normNeg_),
+                                                    saturate(upL1, drivePos_, driveNeg_, normPos_, normNeg_));
+        const float satR = oversamplerR_.downsample(saturate(upR0, drivePos_, driveNeg_, normPos_, normNeg_),
+                                                    saturate(upR1, drivePos_, driveNeg_, normPos_, normNeg_));
 
         // DC blocker — 1-pole high-pass at ~20 Hz. Linear, so it stays at the
         // base rate after decimation.
