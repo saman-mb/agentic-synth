@@ -9,6 +9,12 @@ inline constexpr float kFilterCutoffFloor = 20.0f;      // Hz
 inline constexpr float kFilterCutoffCeiling = 18000.0f; // Hz
 inline constexpr float kSafeResonanceCeiling = 0.85f;   // below Moog self-oscillation
 
+// Minimum amp_env attack_s / release_s (~1 ms / ~44 samples at 44.1 kHz).
+// Zero-length amp segments become an instantaneous post-filter gain step and
+// click through a closed filter; this floor is enforced in validate_patch and
+// mirrored by ADSREnvelope's segment-time floor for applyPatch-bypass paths.
+inline constexpr float kAmpEnvTimeFloorSeconds = 0.001f;
+
 // Clamp and sanitize all PatchStruct fields. NaN/Inf replaced with safe
 // defaults. Call before pushing any PatchStruct to the audio-thread SPSC queue.
 [[nodiscard]] PatchStruct validate_patch(PatchStruct p, UnsafeModeFlags flags = {}) noexcept;

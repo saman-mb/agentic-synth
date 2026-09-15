@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <complex>
 #include <vector>
 
 using namespace agentic_synth::engine;
@@ -943,4 +944,155 @@ TEST_CASE("VoiceManager filter cutoff does not scale with velocity (#428)", "[fi
     // the filter env multiplier (1 + env * mod * velocity * 2), so a soft
     // note rendered a markedly lower corner than a hard one.
     CHECK(soft == Approx(hard).epsilon(0.05));
+}
+
+// ── #430 post-filter gain-step acceptance ────────────────────────────────────
+
+namespace {
+
+// DFT band energy Σ|X[k]|² for bins whose centre frequency lies in [loHz, hiHz).
+// Reuses the same spectrum idea as renderedAmplitudeAt / bufferRms — measures
+// energy the closed filter must not leak when post-filter gains step.
+double bandEnergy(const std::vector<float>& x, double sampleRate, double loHz, double hiHz) {
+    const int n = static_cast<int>(x.size());
+    REQUIRE(n > 0);
+    double energy = 0.0;
+    for (int k = 0; k < n / 2; ++k) {
+        const double freq = static_cast<double>(k) * sampleRate / static_cast<double>(n);
+        if (freq < loHz || freq >= hiHz)
+            continue;
+        std::complex<double> acc(0.0, 0.0);
+        for (int i = 0; i < n; ++i) {
+            const double ang = -2.0 * 3.14159265358979323846 * static_cast<double>(k) * static_cast<double>(i) /
+                               static_cast<double>(n);
+            acc += std::complex<double>(std::cos(ang), std::sin(ang)) * static_cast<double>(x[static_cast<std::size_t>(i)]);
+        }
+        energy += std::norm(acc);
+    }
+    return energy;
+}
+
+PatchStruct makeClosedFilterAmpLfoPatch(float lfoDepth) {
+    PatchStruct p = make_default_patch();
+    // Noise fills the spectrum so any post-filter gain discontinuity shows up
+    // as broadband energy above the closed cutoff.
+    p.osc[0].type = agentic_synth::OscType::Noise;
+    p.osc[0].enabled = 1;
+    p.osc[0].volume = 1.0f;
+    for (int i = 1; i < agentic_synth::kMaxOscillators; ++i) {
+        p.osc[i].enabled = 0;
+        p.osc[i].volume = 0.0f;
+    }
+    p.filter.type = agentic_synth::FilterType::LowPass;
+    p.filter.cutoff_hz = 20.0f; // patch minimum
+    p.filter.resonance = 0.0f;
+    p.filter.env_mod = 0.0f;
+    p.filter.drive = 0.0f;
+    p.amp_env.attack_s = 0.01f;
+    p.amp_env.decay_s = 0.0f;
+    p.amp_env.sustain = 1.0f;
+    p.amp_env.release_s = 0.1f;
+    p.chorus.mix = 0.0f;
+    p.tubesat.drive = 0.0f;
+    p.delay.mix = 0.0f;
+    p.reverb.mix = 0.0f;
+    p.lfo[0].waveform = LfoWaveform::SampleAndHold;
+    p.lfo[0].rate_hz = 20.0f;
+    p.lfo[0].depth = lfoDepth;
+    p.lfo[0].target = LfoTarget::Amplitude;
+    p.lfo[1].target = LfoTarget::None;
+    p.lfo[1].depth = 0.0f;
+    return p;
+}
+
+std::vector<float> renderSettledMono(const PatchStruct& patch, int settle, int measure) {
+    VoiceManager vm(1);
+    vm.prepare(44100.0);
+    vm.applyPatch(patch);
+    vm.noteOn(60, 1.0f);
+    std::vector<float> buf(static_cast<std::size_t>(settle + measure), 0.0f);
+    vm.renderBlock(buf.data(), settle + measure);
+    return std::vector<float>(buf.begin() + settle, buf.end());
+}
+
+} // namespace
+
+TEST_CASE("VoiceManager closed filter + S&H Amplitude LFO: no excess broadband above cutoff (#430)",
+          "[voice][click][430]") {
+    // Acceptance: cutoff at the patch minimum + S&H @ 20 Hz → Amplitude must
+    // not inject broadband energy above the closed filter. Unit A slew-limits
+    // LFO output; this test locks the audible contract.
+    constexpr double kSr = 44100.0;
+    constexpr int kSettle = 4096;
+    constexpr int kMeasure = 4096; // power-of-two DFT window
+    // High band well above the 20 Hz cutoff (and above Moog 4-pole residual).
+    constexpr double kHighLo = 1000.0;
+    constexpr double kNyquist = kSr * 0.5;
+
+    const auto withLfo = renderSettledMono(makeClosedFilterAmpLfoPatch(1.0f), kSettle, kMeasure);
+    const auto quietRef = renderSettledMono(makeClosedFilterAmpLfoPatch(0.0f), kSettle, kMeasure);
+
+    const double highWith = bandEnergy(withLfo, kSr, kHighLo, kNyquist);
+    const double highRef = bandEnergy(quietRef, kSr, kHighLo, kNyquist);
+    const double totalWith = bandEnergy(withLfo, kSr, 0.0, kNyquist);
+    INFO("highWith=" << highWith << " highRef=" << highRef << " totalWith=" << totalWith);
+
+    // Absolute floor: closed Moog + noise is already tiny above 1 kHz; a
+    // stepped amp LFO would push this orders of magnitude higher. Bound the
+    // high band to a small fraction of total energy AND within a small factor
+    // of the depth=0 reference (slew may leave a slight residual).
+    REQUIRE(totalWith > 0.0);
+    CHECK(highWith / totalWith < 0.05);
+    CHECK(highWith <= highRef * 4.0 + 1e-6);
+}
+
+TEST_CASE("VoiceManager attack_s=0 note-on: max sample-to-sample delta below threshold (#430)",
+          "[voice][click][430]") {
+    // Documented threshold: Unit B floors amp attack/release to 1 ms, so the
+    // first-sample envelope jump is ~0.19 (see ADSREnvelopeTest). Through a
+    // near-open filter + sine osc the sample-to-sample output delta stays well
+    // below 0.5. Pre-floor instantaneous attack could produce deltas near 1.0+.
+    constexpr float kMaxSampleToSampleDelta = 0.5f;
+
+    VoiceManager vm(1);
+    vm.prepare(44100.0);
+    PatchStruct p = make_default_patch();
+    p.osc[0].type = agentic_synth::OscType::Sine;
+    p.osc[0].enabled = 1;
+    p.osc[0].volume = 1.0f;
+    for (int i = 1; i < agentic_synth::kMaxOscillators; ++i) {
+        p.osc[i].enabled = 0;
+        p.osc[i].volume = 0.0f;
+    }
+    p.filter.cutoff_hz = 18000.0f;
+    p.filter.resonance = 0.0f;
+    p.filter.env_mod = 0.0f;
+    p.amp_env.attack_s = 0.0f; // raw zero — envelope / validator floor must catch it
+    p.amp_env.decay_s = 0.0f;
+    p.amp_env.sustain = 1.0f;
+    p.amp_env.release_s = 0.1f;
+    p.chorus.mix = 0.0f;
+    p.tubesat.drive = 0.0f;
+    p.delay.mix = 0.0f;
+    p.reverb.mix = 0.0f;
+    for (auto& lfo : p.lfo) {
+        lfo.target = LfoTarget::None;
+        lfo.depth = 0.0f;
+    }
+    vm.applyPatch(p);
+    vm.noteOn(60, 1.0f);
+
+    constexpr int kWindow = 512; // covers the 1 ms floor (~44 samples) with margin
+    std::vector<float> buf(static_cast<std::size_t>(kWindow), 0.0f);
+    vm.renderBlock(buf.data(), kWindow);
+
+    float maxDelta = 0.0f;
+    float prev = 0.0f; // idle → first sample is itself a delta from silence
+    for (float s : buf) {
+        maxDelta = std::max(maxDelta, std::abs(s - prev));
+        prev = s;
+        REQUIRE(std::isfinite(s));
+    }
+    INFO("max |sample-to-sample Δ| = " << maxDelta);
+    REQUIRE(maxDelta < kMaxSampleToSampleDelta);
 }
