@@ -417,8 +417,7 @@ void Voice::renderStereo(float portamentoAlpha, float baseCutoffHz, float resona
             const float newOut = filter->process(monoMix);
             // remaining/total = 1 at start → progress = 0 → θ = 0 → old=1,new=0.
             // remaining → 1 at end → progress ≈ 1 → θ ≈ π/2 → old=0,new=1.
-            const float progress =
-                1.0f - static_cast<float>(crossfadeRemaining) / static_cast<float>(crossfadeTotal);
+            const float progress = 1.0f - static_cast<float>(crossfadeRemaining) / static_cast<float>(crossfadeTotal);
             float fadeOut = 0.0f;
             float fadeIn = 0.0f;
             equalPowerFadeWeights(progress, fadeOut, fadeIn);

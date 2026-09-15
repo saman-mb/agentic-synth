@@ -965,7 +965,8 @@ double bandEnergy(const std::vector<float>& x, double sampleRate, double loHz, d
         for (int i = 0; i < n; ++i) {
             const double ang = -2.0 * 3.14159265358979323846 * static_cast<double>(k) * static_cast<double>(i) /
                                static_cast<double>(n);
-            acc += std::complex<double>(std::cos(ang), std::sin(ang)) * static_cast<double>(x[static_cast<std::size_t>(i)]);
+            acc += std::complex<double>(std::cos(ang), std::sin(ang)) *
+                   static_cast<double>(x[static_cast<std::size_t>(i)]);
         }
         energy += std::norm(acc);
     }
@@ -1046,8 +1047,7 @@ TEST_CASE("VoiceManager closed filter + S&H Amplitude LFO: no excess broadband a
     CHECK(highWith <= highRef * 4.0 + 1e-6);
 }
 
-TEST_CASE("VoiceManager attack_s=0 note-on: max sample-to-sample delta below threshold (#430)",
-          "[voice][click][430]") {
+TEST_CASE("VoiceManager attack_s=0 note-on: max sample-to-sample delta below threshold (#430)", "[voice][click][430]") {
     // Documented threshold: Unit B floors amp attack/release to 1 ms, so the
     // first-sample envelope jump is ~0.19 (see ADSREnvelopeTest). Through a
     // near-open filter + sine osc the sample-to-sample output delta stays well
