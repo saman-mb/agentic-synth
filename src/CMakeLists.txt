@@ -255,12 +255,18 @@ add_custom_command(
     VERBATIM)
 add_custom_target(agentic_synth_ui ALL DEPENDS "${UI_DIST_DIR}/index.html")
 
+# Public Vite assets that BootSplash / favicon / STT tap need at runtime.
+# Absolute paths like /timbre-hero.gif are served from this BinaryData via
+# WebUiComponent::serveResource — omitting a file here shows as a broken
+# <img> in the embedded WebView (Finder/`open` has no disk public/ folder).
 file(GLOB_RECURSE UI_BINARY_ASSETS CONFIGURE_DEPENDS
      "${UI_DIST_DIR}/index.html"
      "${UI_DIST_DIR}/assets/*"
      "${UI_DIST_DIR}/pcm-tap.js"
      "${UI_DIST_DIR}/favicon.png"
-     "${UI_DIST_DIR}/favicon-64.png")
+     "${UI_DIST_DIR}/favicon-64.png"
+     "${UI_DIST_DIR}/og-image.png"
+     "${UI_DIST_DIR}/timbre-hero.gif")
 juce_add_binary_data(agentic_synth_ui_assets
     HEADER_NAME UiBinaryData.h
     NAMESPACE   UiBinaryData

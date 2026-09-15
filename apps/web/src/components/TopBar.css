@@ -16,6 +16,8 @@
   color: var(--text-secondary);
   user-select: none;
   flex-shrink: 0;
+  overflow: hidden;
+  z-index: 2;
 }
 
 .topbar-section {

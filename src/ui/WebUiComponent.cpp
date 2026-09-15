@@ -61,6 +61,10 @@ juce::String mimeForPath(const juce::String& path) {
         return "application/json";
     if (path.endsWithIgnoreCase(".png"))
         return "image/png";
+    if (path.endsWithIgnoreCase(".gif"))
+        return "image/gif";
+    if (path.endsWithIgnoreCase(".webp"))
+        return "image/webp";
     if (path.endsWithIgnoreCase(".jpg") || path.endsWithIgnoreCase(".jpeg"))
         return "image/jpeg";
     if (path.endsWithIgnoreCase(".ico"))
