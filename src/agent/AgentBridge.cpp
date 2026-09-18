@@ -272,7 +272,7 @@ juce::var AgentBridge::modulationPlanForPatch(const PatchStruct& p) {
 }
 
 AgentBridge::AgentBridge() {
-    // Load the bundled TIMBRE sound-designer briefing (system-prompt.md)
+    // Load the bundled Tambra sound-designer briefing (system-prompt.md)
     // and inject it into both samplers BEFORE wiring the Gemini key — the
     // GeminiSampler copies the prompt at setSystemPrompt() time, so we want
     // the rich briefing in place before that copy happens. Without this,
@@ -313,7 +313,7 @@ AgentBridge::AgentBridge() {
 
     // ── Two-step LLM flow: ENHANCER (translator) step ────────────────────────
     //
-    // Load the bundled TIMBRE translator briefing (enhancer-prompt.md, ~280
+    // Load the bundled Tambra translator briefing (enhancer-prompt.md, ~280
     // lines, 9 fixed sections, 6 worked examples) and inject it + the same
     // GEMINI_KEY into the PromptEnhancer. The enhancer rewrites a terse
     // producer prompt ("dark dubstep wobbly bass") into a 200–400-word

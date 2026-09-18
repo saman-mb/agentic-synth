@@ -239,7 +239,7 @@ public:
     [[nodiscard]] SubscriberHandle onMidiLearned(Callback cb);
     // Phase G / #247 — fires when push_audio_pcm contains a confident
     // monophonic pitch. Payload: { midi_note, confidence, frequency_hz }.
-    // UI shows a "TIMBRE heard a note around B♭3" chip near the textarea.
+    // UI shows a "Tambra heard a note around B♭3" chip near the textarea.
     [[nodiscard]] SubscriberHandle onHumPitch(Callback cb);
 
     // Test/integration emission helpers — visible so call sites in this

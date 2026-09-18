@@ -14,7 +14,7 @@ namespace agentic_synth::agent {
 // engine::MorphEngine (Issue #86 — MIDI-CC live-morph between 4 patch
 // targets) — same word, completely different concept.
 //
-// Phase B / TIMBRE simple-view (#249 / #250 / #263).
+// Phase B / Tambra simple-view (#249 / #250 / #263).
 struct MorphResult {
     std::array<PatchStruct, 5> variations;
     std::array<std::string, 5> labels;

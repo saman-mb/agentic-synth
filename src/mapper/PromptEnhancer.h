@@ -17,7 +17,7 @@ struct PromptEnhancerConfig {
     // enhancer is small-prompt + short-output so the lite tier is plenty.
     std::string model{"gemini-2.5-flash-lite"};
     // Concatenated with the user prompt as the single "text" part. The
-    // bundled TIMBRE translator prompt lives in src/mapper/enhancer-prompt.md
+    // bundled Tambra translator prompt lives in src/mapper/enhancer-prompt.md
     // and is loaded by loadEnhancerPromptFile() at AgentBridge ctor time.
     std::string system_prompt;
     // Wider creative latitude than the generator — translator wants
@@ -57,7 +57,7 @@ public:
     void setApiKey(std::string k) noexcept { cfg_.api_key = std::move(k); }
     void setSystemPrompt(std::string s) noexcept { cfg_.system_prompt = std::move(s); }
 
-    // Pull the bundled TIMBRE enhancer briefing from disk. Mirrors
+    // Pull the bundled Tambra enhancer briefing from disk. Mirrors
     // GrammarSampler::loadSystemPromptFile — tries an explicit override
     // first, then the compile-time-baked AGENTIC_SYNTH_ENHANCER_PROMPT_PATH,
     // then a dev-fallback cwd-relative path. Returns "" on all failures so

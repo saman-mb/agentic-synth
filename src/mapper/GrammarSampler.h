@@ -41,7 +41,7 @@ public:
     // Mirrors GeminiSampler::setSystemPrompt for symmetry.
     void setSystemPrompt(std::string sp) noexcept { cfg_.system_prompt = std::move(sp); }
 
-    // Read the bundled TIMBRE sound-design briefing (src/mapper/system-prompt.md)
+    // Read the bundled Tambra sound-design briefing (src/mapper/system-prompt.md)
     // from disk. Returns the file contents on success, empty string on
     // failure (missing file, IO error). AgentBridge calls this once at
     // startup and feeds the result into both samplers so the LLMs share

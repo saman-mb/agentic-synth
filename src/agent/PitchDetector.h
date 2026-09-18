@@ -3,7 +3,7 @@
 // Phase G / #247 — "Hum or tap a pitch". A small monophonic pitch detector
 // that runs over a recorded hum buffer (Int16 PCM @ 16 kHz mono — the same
 // shape the push-to-talk path hands to GeminiSTT). Output is a MIDI note
-// number + confidence + raw frequency so the UI can show "TIMBRE heard a
+// number + confidence + raw frequency so the UI can show "Tambra heard a
 // note around B♭3" without leaking "fundamental frequency 233.08 Hz" into
 // the musician-register copy.
 //

@@ -26,7 +26,7 @@ add_executable(agentic_synth_tests
     PatchValidatorTest.cpp
     PrePatchTest.cpp
     VariationEngineTest.cpp
-    # Phase B / TIMBRE simple-view (#249/#250/#263) — agent::morph() loop:
+    # Phase B / Tambra simple-view (#249/#250/#263) — agent::morph() loop:
     # 5-strategy variation generator distinct from engine::MorphEngine.
     MorphLoopTest.cpp
     # Phase H / #261 — append-only JSONL morph telemetry sink.
