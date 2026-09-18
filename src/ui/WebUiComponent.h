@@ -61,15 +61,32 @@ public:
     // pushed PCM is logged and dropped. The component does not own the client.
     void setWhisperClient(agent::WhisperClient* client) noexcept { whisperClient_ = client; }
 
-    // Phase 12: scope sample provider hookup. Caller (typically the
-    // AudioProcessor editor) wires this to AgenticSynthPlugin::pullScopeSamples.
-    // The provider is invoked synchronously from the `getScopeSamples` native
-    // function on the JUCE message thread: it MUST be wait-free w.r.t. the
-    // audio thread (the plugin's SPSC scope queue satisfies this). When unset
-    // the native function resolves with an empty array, which lets the JS
-    // Visualizer fall back to its simulated source path.
-    using ScopeSampleProvider = std::function<int(float* dest, int max)>;
+    // Phase 12 / #434-#436: scope sample provider hookup. Caller (typically
+    // the AudioProcessor editor) wires this to
+    // AgenticSynthPlugin::pullScopeSamples.
+    //
+    // `dest` receives `frames * 2` interleaved L/R samples. The provider
+    // returns the number of frames copied, or 0 when the producer overran the
+    // window and the caller must skip it. Invoked synchronously from the
+    // `getScopeSamples` native function on the JUCE message thread; it MUST be
+    // wait-free w.r.t. the audio thread (the plugin's ScopeRing satisfies
+    // this). When unset the native function resolves with an empty frame; the
+    // JS Visualizer then shows an explicit "no signal" state instead of a
+    // convincing fake.
+    using ScopeSampleProvider = std::function<int(float* dest, int frames)>;
     void setScopeSampleProvider(ScopeSampleProvider provider) { scopeProvider_ = std::move(provider); }
+
+    // Engine metadata attached to each scope frame: the real sample rate (so
+    // the spectrum frequency axis and wavetable cycle length are correct —
+    // never a hardcoded 44100) plus the ring's drop/stale counters.
+    struct ScopeInfo {
+        double sampleRate = 0.0;
+        std::uint64_t droppedFrames = 0;
+        std::uint64_t staleWindows = 0;
+        bool stale = false; // most recent pull was rejected as overrun
+    };
+    using ScopeInfoProvider = std::function<ScopeInfo()>;
+    void setScopeInfoProvider(ScopeInfoProvider provider) { scopeInfoProvider_ = std::move(provider); }
 
     // Audio-device settings hookup. JUCE puts its device picker behind an
     // "Options" button in the standalone window's title bar, which nobody
@@ -186,11 +203,13 @@ private:
     std::vector<agent::AgentBridge::SubscriberHandle> subs_;
     agent::WhisperClient* whisperClient_{nullptr};
 
-    // Phase 12: scope sample provider — set by the editor (which owns the
-    // AudioProcessor reference). Invoked on the message thread from the
-    // `getScopeSamples` native function. Default-empty so the JS bridge call
-    // returns an empty array when no provider is wired (browser dev / tests).
+    // Phase 12 / #434-#436: scope provider hooks — set by the editor (which
+    // owns the AudioProcessor reference). Invoked on the message thread from
+    // the `getScopeSamples` native function. Default-empty so the JS bridge
+    // call returns an empty frame when no provider is wired (browser dev /
+    // tests), and the Visualizer shows "no signal".
     ScopeSampleProvider scopeProvider_;
+    ScopeInfoProvider scopeInfoProvider_;
 
     // Audio-device settings hook — set by the editor when the host provides a
     // device settings UI (today: the JUCE standalone wrapper). Left unset in

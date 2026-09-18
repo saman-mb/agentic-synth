@@ -277,7 +277,9 @@ body {
 
 .app-layout {
   display: grid;
-  grid-template-rows: 48px auto 1fr auto;
+  /* Row 2 is a reserved strip so lg/md macro knobs cannot overflow into
+     the 48px TopBar (SVG rings paint outside the dial box). */
+  grid-template-rows: 48px 128px 1fr auto;
   height: 100vh;
   overflow: hidden;
   background: var(--bg-void);

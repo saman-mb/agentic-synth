@@ -29,8 +29,9 @@ registerHooks({
   },
 });
 
-const { createSynthEngine, WebSynthEngine } = await import('./engine.ts');
+const { WebSynthEngine } = await import('./engine.ts');
 const { WasmSynthEngine } = await import('./wasmEngine.ts');
+const { createSynthEngine } = await import('./resilientEngine.ts');
 
 type AudioGlobals = {
   AudioContext?: unknown;
@@ -151,10 +152,10 @@ describe('WasmSynthEngine', () => {
     });
   });
 
-  it('createSynthEngine() returns an object with ensureStarted', () => {
+  it('createSynthEngine() returns the resilient engine, not a bare WASM one', () => {
     const engine = createSynthEngine();
     assert.equal(typeof engine.ensureStarted, 'function');
-    assert.ok(engine instanceof WasmSynthEngine);
+    assert.equal(engine.constructor.name, 'ResilientSynthEngine');
   });
 
   it('WebSynthEngine is still constructible', () => {

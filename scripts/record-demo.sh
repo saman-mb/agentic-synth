@@ -14,6 +14,7 @@
 #
 # Env overrides:
 #   AUDIO_DEV   audio input name to record   (default: "BlackHole 2ch")
+#   AUDIO_GAIN_DB  input attenuation before encoding (default: -12)
 #   SCALE       output height, -1 for native (default: 1080)
 #   FPS         capture framerate            (default: 30)
 #   DURATION    auto-stop after N seconds    (default: unset = until q)
@@ -21,6 +22,7 @@ set -euo pipefail
 
 OUT="${1:-timbre-demo.mp4}"
 AUDIO_DEV="${AUDIO_DEV:-BlackHole 2ch}"
+AUDIO_GAIN_DB="${AUDIO_GAIN_DB:--12}"
 SCALE="${SCALE:-1080}"
 FPS="${FPS:-30}"
 DURATION="${DURATION:-}"
@@ -53,6 +55,7 @@ fi
 
 echo "screen : [$screen_idx] Capture screen 0"
 echo "audio  : [$audio_idx] $AUDIO_DEV"
+echo "gain   : ${AUDIO_GAIN_DB} dB before encoding"
 echo "output : $OUT"
 
 # An explicit duration keeps a demo honest about its length and means the
@@ -69,14 +72,15 @@ echo
 
 # Detect TIMBRE window bounds via Python Quartz API for window-only crop
 crop_filter=""
-win_bounds="$(python3 -c "
+win_bounds="$(python3 <<'EOF'
 import Quartz
 for w in Quartz.CGWindowListCopyWindowInfo(Quartz.kCGWindowListOptionOnScreenOnly, Quartz.kCGNullWindowID):
     if 'TIMBRE' in w.get('kCGWindowOwnerName', ''):
         b = w.get('kCGWindowBounds', {})
-        print(f\"{int(b['Width'])}:{int(b['Height'])}:{int(b['X'])}:{int(b['Y'])}\")
+        print(f"{int(b['Width'])}:{int(b['Height'])}:{int(b['X'])}:{int(b['Y'])}")
         break
-" 2>/dev/null || true)"
+EOF
+)"
 
 if [[ -n "$win_bounds" ]]; then
     IFS=':' read -r w h x y <<< "$win_bounds"
@@ -91,7 +95,7 @@ fi
 
 vf_args="scale=-2:${SCALE}"
 if [[ -n "$crop_filter" ]]; then
-    vf_args="${crop_filter}"
+    vf_args="${crop_filter},scale=-2:${SCALE}"
 fi
 
 # -capture_cursor 1  : include the pointer, so clicks are followable
@@ -107,6 +111,7 @@ exec ffmpeg -y -hide_banner \
     -c:v libx264 -preset veryfast -crf 20 \
     -vf "$vf_args" \
     -pix_fmt yuv420p \
+    -af "volume=${AUDIO_GAIN_DB}dB" \
     -c:a aac -b:a 256k \
     -movflags +faststart \
     "$OUT"

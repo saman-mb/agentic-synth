@@ -43,6 +43,12 @@ public:
     void setKeyTrigger(bool enabled);
     void trigger();
 
+    // ~1.5 ms one-pole slew on output after shape×depth
+    // (coeff = 1 - exp(-1/(τ·Fs)), τ ≈ 0.0015 s).
+    // Amplitude/Pan need slew for closed-filter clicks; FilterCutoff/Pitch are
+    // pre/at-filter so not required for leak but inherit this shared output slew
+    // (simpler than selective). Softens square/S&H edges ~1–2 ms; sine/triangle
+    // effectively unchanged at ≤20 Hz.
     float processSample();
     void reset();
 
@@ -53,6 +59,8 @@ public:
     [[nodiscard]] static double divisionBeatsPerCycle(LfoSyncDivision division);
 
 private:
+    static constexpr double kSlewTauSeconds = 0.0015;
+
     double mSampleRate{44100.0};
     LfoShape mShape{LfoShape::Sine};
     float mDepth{1.0f};
@@ -69,6 +77,10 @@ private:
     std::mt19937 mRng;
     std::uniform_real_distribution<float> mDist{-1.0f, 1.0f};
 
+    float mSlewState{0.0f};
+    float mSlewCoeff{0.0f};
+
+    void updateSlewCoeff();
     [[nodiscard]] float computeShape(double phase);
 };
 

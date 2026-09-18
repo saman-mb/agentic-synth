@@ -6,7 +6,8 @@ Audio I/O on native is a C++ AudioStream in `src/jsi/` (not Expo AV). Wiring tha
 
 ## Public surface
 
-- `SynthEngine` — `setPatch` (loadPatch), `noteOn` / `noteOff` / `playMidiNote` (trigger), `setParam` / `applyMacros` (render-params), plus `ensureStarted`, `getScopeSamples`, `setOutputDevice`, `dispose`.
+- `SynthEngine` — `setPatch` (loadPatch), `noteOn` / `noteOff` / `playMidiNote` (trigger), `setParam` / `applyMacros` (render-params), plus `ensureStarted`, `getScopeSamples` (interleaved stereo `[L0,R0,…]`, length `2*n`), `getScopeSampleRate`, `setOutputDevice`, `dispose`.
+- Scope/spectrum helpers (`computeSpectrumBands`, `detectFundamental`, `parseScopeFrame`, …) — pure math shared with the web Visualizer (#434/#435/#436); dBFS window is `-90..0`.
 - `createSynthEngine()` — returns the current implementation (`WasmSynthEngine`). Missing WASM or module-init failure rejects `ensureStarted()`; there is no silent WebAudio fallback.
 - `WebSynthEngine` — still constructible for #307 golden extraction. Not the factory default.
 - `JsiSynthEngine` / `AgsynthError` — native JSI sibling; construct from the RN harness. Not the factory default.

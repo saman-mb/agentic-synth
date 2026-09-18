@@ -153,6 +153,7 @@ GEMINI_KEY=your-key netlify dev      # http://localhost:8888
 | **Node.js 22** + npm | Builds the React UI (`nx test` uses `--experimental-strip-types`) |
 | **Gemini API key** | Required for LLM patch generation — see [step 3](#3-configure-your-api-key) |
 | **WebView runtime** | macOS: WKWebView (built in) · Windows: [WebView2](https://developer.microsoft.com/microsoft-edge/webview2/) · Linux: `libwebkit2gtk-4.1-0` + `-dev` |
+| **Emscripten** | Only for the browser demo — the desktop app and plugin run the C++ engine natively. Version pinned in `cmake/emscripten-version`. |
 
 ### 2. Build
 

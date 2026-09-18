@@ -39,6 +39,19 @@ void computePanGains(float pan, float& l, float& r) noexcept {
     r = std::sin(theta);
 }
 
+// Equal-power (raised-cosine) crossfade weights. progress ∈ [0, 1] maps to
+// θ ∈ [0, π/2]: progress=0 → (old=1, new=0); progress=1 → (old=0, new=1).
+// old²+new² = 1 for all progress, so total power is continuous (unlike a
+// linear fade, which dips to 0.5 at the midpoint and has slope discontinuities
+// at both endpoints — audible as crackle under dense voice-stealing).
+void equalPowerFadeWeights(float progress, float& oldGain, float& newGain) noexcept {
+    progress = std::clamp(progress, 0.0f, 1.0f);
+    constexpr float kHalfPi = 1.57079632679f;
+    const float theta = progress * kHalfPi;
+    oldGain = std::cos(theta);
+    newGain = std::sin(theta);
+}
+
 LfoShape toLfoShape(LfoWaveform w) noexcept {
     switch (w) {
     case LfoWaveform::Sine:
@@ -124,7 +137,8 @@ void Voice::prepare(double sampleRate) {
     if (svFilter)
         svFilter->reset();
     driveSmoother.setSampleRate(sampleRate);
-    // Phase E (#265): per-voice pre-filter saturation + post-filter chorus.
+    // Phase E (#265): per-voice pre-filter chorus + saturation, in the
+    // #265 order oscillators → chorus → saturation → filter.
     // prepare() allocates both modules' state ONCE (chorus delay buffer,
     // tubesat HPF coefficient) so per-sample processing is allocation-free.
     tubeSat.prepare(sampleRate, /*channels*/ 2);
@@ -207,10 +221,8 @@ void Voice::renderStereo(float portamentoAlpha, float baseCutoffHz, float resona
     float weightTotal = 0.0f;
     for (std::size_t i = 0; i < oscs.size(); ++i) {
         const auto& po = oscs[i];
-        // Producer-friendly: treat a non-trivial volume as enabled even when
-        // the explicit flag is false. Otherwise users who turn up OSC2/OSC3
-        // volume hear nothing because makeDefaultPatch ships them disabled.
-        if (!po.enabled && po.volume < 0.001f)
+        // Hard kill (#266): disabled slots stay silent regardless of volume.
+        if (!po.enabled)
             continue;
         float pPan = po.pan + pan; // voice-level pan stacks with per-osc pan
         pPan += lfoPanMod;
@@ -241,8 +253,8 @@ void Voice::renderStereo(float portamentoAlpha, float baseCutoffHz, float resona
     float monoMix = 0.0f;
     for (std::size_t i = 0; i < oscs.size(); ++i) {
         auto& o = oscs[i];
-        // Match the pan-weight loop: volume > 0 implies user wants the osc.
-        if (!o.enabled && o.volume < 0.001f)
+        // Hard kill (#266): match the pan-weight loop.
+        if (!o.enabled)
             continue;
 
         const float perOscFreq = voiceFreq * oscFrequencyMultiplier(o.semitoneOffset, o.detuneCents);
@@ -326,6 +338,22 @@ void Voice::renderStereo(float portamentoAlpha, float baseCutoffHz, float resona
         monoMix += oscSample * o.volume;
     }
 
+    // ── Phase E (#265): pre-filter chorus ─────────────────────────────────
+    // #265 specifies oscillators → chorus → tube saturation → filter (see
+    // PatchStruct.h). Chorus is a stereo block but the chain is still mono
+    // here, so run it on the mono osc sum replicated to L/R and fold the
+    // result back to mono. The filter (MoogLadder/SVFilter) is mono and
+    // intentionally mono-SUMS the ensemble — Voice stereo width is
+    // re-derived AFTER the filter from the per-osc pan weights (panWeightL/R
+    // below), which is the single documented pan stage. mix == 0 is a
+    // bit-exact bypass inside processStereo.
+    {
+        float chorusL = monoMix;
+        float chorusR = monoMix;
+        chorus.processStereo(&chorusL, &chorusR, 1);
+        monoMix = 0.5f * (chorusL + chorusR);
+    }
+
     // ── Phase E (#265): pre-filter tube saturation ────────────────────────
     // Memoryless asymmetric tanh + 20 Hz DC blocker. Runs on the MONO osc
     // sum before the filter so saw-stack harmonics get fused before the LP
@@ -342,9 +370,27 @@ void Voice::renderStereo(float portamentoAlpha, float baseCutoffHz, float resona
     }
 
     // ── Filter modulation ────────────────────────────────────────────────
+    // Order (#428 / #429): base cutoff × key_track × LFO × 2^(env…) then
+    // clamp 20..20000. See FilterParams contract in PatchStruct.h.
+    // Key track (#429): reference MIDI 60 (C4). Prefer exp2(kt * log2(f/ref))
+    // and skip when key_track ≈ 0 so C4 / zero-track stays a no-op.
+    // LFO cutoff is a linear multiplicative offset around 1.0.
+    // Filter envelope is applied in the OCTAVE domain (#428).
+    // Velocity does NOT scale cutoff — only the amplitude envelope peak.
     const float filterEnvOut = filterEnv.process();
-    float effectiveCutoff = baseCutoffHz * (1.0f + lfoCutoffMod);
-    effectiveCutoff *= (1.0f + filterEnvOut * filterEnvMod * velocity * 2.0f);
+    float effectiveCutoff = baseCutoffHz;
+    if (std::fabs(filterKeyTrack) > 1.0e-6f) {
+        // midiNoteToHz(60) at A440 = 440 * 2^((60-69)/12)
+        constexpr float kKeyTrackRefHz = 440.0f * 0.5946035575f; // ≈ 261.6256 Hz
+        const float ratio = std::max(voiceFreq, 1.0e-6f) / kKeyTrackRefHz;
+        effectiveCutoff *= std::exp2(filterKeyTrack * std::log2(ratio));
+    }
+    effectiveCutoff *= (1.0f + lfoCutoffMod);
+    // Skip the exp2 entirely when the envelope or depth is zero — the common
+    // case (env_mod == 0) must stay a bit-exact no-op and cost nothing.
+    const float envOctaves = filterEnvOut * filterEnvMod * kFilterEnvMaxOctaves;
+    if (envOctaves != 0.0f)
+        effectiveCutoff *= std::exp2(envOctaves);
     effectiveCutoff = std::clamp(effectiveCutoff, 20.0f, 20000.0f);
 
     // Drive smoothing — sample-rate consumer of the block-rate setDrive target.
@@ -354,10 +400,11 @@ void Voice::renderStereo(float portamentoAlpha, float baseCutoffHz, float resona
         filter->setCutoff(effectiveCutoff);
         filter->setResonance(resonance);
         filter->setDrive(driveNow);
-        // Phase 4: filter type-swap crossfade. Both old + new filters consume
-        // the same input sample so the integrator states stay matched, then
-        // blend wet via a linear fadeOut/fadeIn ramp over kCrossfadeSamples.
-        // After the ramp the old filter is reset and dropped from the loop.
+        // Phase 4 / #430: filter type-swap crossfade. Both old + new filters
+        // consume the same input sample so the integrator states stay matched,
+        // then blend wet via an equal-power (cos/sin) ramp over
+        // kCrossfadeSamples. After the ramp the old filter is reset and
+        // dropped from the loop.
         if (crossfadeRemaining > 0 && crossfadeFromFilter != nullptr && crossfadeTotal > 0) {
             // Feed BOTH with identical drive/cutoff/resonance — applyPatch
             // installed the new filter as `filter`; the old filter retains its
@@ -369,8 +416,12 @@ void Voice::renderStereo(float portamentoAlpha, float baseCutoffHz, float resona
             crossfadeFromFilter->setDrive(driveNow);
             const float oldOut = crossfadeFromFilter->process(monoMix);
             const float newOut = filter->process(monoMix);
-            const float fadeOut = static_cast<float>(crossfadeRemaining) / static_cast<float>(crossfadeTotal);
-            const float fadeIn = 1.0f - fadeOut;
+            // remaining/total = 1 at start → progress = 0 → θ = 0 → old=1,new=0.
+            // remaining → 1 at end → progress ≈ 1 → θ ≈ π/2 → old=0,new=1.
+            const float progress = 1.0f - static_cast<float>(crossfadeRemaining) / static_cast<float>(crossfadeTotal);
+            float fadeOut = 0.0f;
+            float fadeIn = 0.0f;
+            equalPowerFadeWeights(progress, fadeOut, fadeIn);
             filteredMono = oldOut * fadeOut + newOut * fadeIn;
             --crossfadeRemaining;
             if (crossfadeRemaining == 0) {
@@ -389,13 +440,6 @@ void Voice::renderStereo(float portamentoAlpha, float baseCutoffHz, float resona
     float stereoL = filteredMono * panWeightL;
     float stereoR = filteredMono * panWeightR;
 
-    // ── Phase E (#265): post-filter chorus ───────────────────────────────
-    // Stereo 3-tap modulated delay line. Runs on the stereo pan-split so the
-    // wet width is preserved (each tap's per-channel LFO is offset by π →
-    // L and R get different modulation arrivals → ensemble width). Mix==0
-    // is a bit-exact bypass inside processStereo.
-    chorus.processStereo(&stereoL, &stereoR, 1);
-
     // ── Amp envelope × velocity × LFO amp mod ────────────────────────────
     // Phase 4: clamp (1 + lfoAmpMod) at 0 so two LFOs both targeting Amplitude
     // at full depth cannot push gain negative (phase inversion). Trough is
@@ -404,10 +448,17 @@ void Voice::renderStereo(float portamentoAlpha, float baseCutoffHz, float resona
     const float lfoAmpGain = std::max(0.0f, 1.0f + lfoAmpMod);
     float gain = ampEnvOut * velocity * lfoAmpGain;
 
-    // Voice-steal fade-out ramp (linear).
+    // Voice-steal fade-out ramp (equal-power / raised-cosine, #430).
+    // progress 0→1 maps θ 0→π/2; multiply by cos(θ) so the outgoing voice
+    // starts at unity and lands at zero with continuous power (no linear-fade
+    // endpoint slope discontinuities).
     if (fadeOutSamplesRemaining > 0) {
-        const float rampGain = static_cast<float>(fadeOutSamplesRemaining) / static_cast<float>(fadeOutSamplesTotal);
-        gain *= rampGain;
+        const float progress =
+            1.0f - static_cast<float>(fadeOutSamplesRemaining) / static_cast<float>(fadeOutSamplesTotal);
+        float fadeOut = 0.0f;
+        float unused = 0.0f;
+        equalPowerFadeWeights(progress, fadeOut, unused);
+        gain *= fadeOut;
         --fadeOutSamplesRemaining;
         if (fadeOutSamplesRemaining == 0) {
             ampEnv.reset();
@@ -735,12 +786,13 @@ void VoiceManager::applyPatch(const PatchStruct& patch) noexcept {
             desired = v.svFilter.get();
         }
         if (v.filter != desired) {
-            // Phase 4: instead of an instant pointer swap (which produces a
-            // click because the new filter has zero integrator state and the
-            // old filter's running output abruptly disappears), kick off a
-            // short crossfade. renderStereo runs both filters in parallel for
-            // filterCrossfadeSamples_ samples, blends linearly, then resets
-            // the outgoing filter once the ramp completes.
+            // Phase 4 / #430: instead of an instant pointer swap (which
+            // produces a click because the new filter has zero integrator
+            // state and the old filter's running output abruptly disappears),
+            // kick off a short equal-power crossfade. renderStereo runs both
+            // filters in parallel for filterCrossfadeSamples_ samples, blends
+            // with cos/sin weights, then resets the outgoing filter once the
+            // ramp completes.
             //
             // If a crossfade was already in flight (rapid back-to-back type
             // changes) the incoming `v.filter` is only half-warmed. Naively
@@ -880,6 +932,7 @@ void VoiceManager::applyPatch(const PatchStruct& patch) noexcept {
     // semitone / detune across all three slots.
     for (auto& v : voices_) {
         v.filterEnvMod = patch.filter.env_mod;
+        v.filterKeyTrack = patch.filter.key_track;
         for (std::size_t i = 0; i < v.oscs.size() && static_cast<int>(i) < kMaxOscillators; ++i) {
             const auto& op = patch.osc[i];
             auto& os = v.oscs[i];

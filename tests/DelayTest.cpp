@@ -238,6 +238,63 @@ TEST_CASE("Delay: modulating delay time produces no zipper / no NaN") {
     REQUIRE(maxJump < 0.05f);
 }
 
+TEST_CASE("Delay: mid-render time change is crossfaded, not spliced (#433)") {
+    // Regression for #433. Before the fix, setTimeSeconds() wrote the read
+    // offset directly, so a patch/BPM change respliced the read pointer to an
+    // unrelated buffer position whose signal is uncorrelated with the previous
+    // sample -> broadband click. The fix crossfades between the old and new read
+    // pointers over ~10 ms.
+    //
+    // Discriminator: drive a steady 220 Hz tone through a 100 ms delay, then
+    // retarget to 20 ms mid-render (a -80 ms / -3528-sample move) once the
+    // first echo is running. With the old jump path the largest sample-to-sample
+    // delta across the change is the decorrelated splice magnitude (measured
+    // 0.24 for this setup); with the crossfade it stays at the tone's own
+    // per-sample slope (~0.016, i.e. 2π·220/44100 · 0.5). Threshold 0.05 is ~3x
+    // the steady-state slope and >3x below the measured click.
+    Delay d;
+    d.prepare(kSR);
+    d.setFeedback(0.5f);
+    d.setMix(1.0f);
+    d.setStereo(0.0f);
+    d.setTimeSeconds(0.1f); // first set after prepare -> snap
+
+    constexpr int kChangeAt = 8000; // first echo at 4410, so the line is running
+    constexpr int kTotal = 12000;
+    constexpr float kMaxDiscontinuity = 0.05f;
+
+    float prev = 0.0f;
+    float maxJumpBefore = 0.0f;
+    float maxJumpAfter = 0.0f;
+
+    for (int n = 0; n < kTotal; ++n) {
+        if (n == kChangeAt) {
+            d.setTimeSeconds(0.02f); // -80 ms: read pointer must glide, not splice
+        }
+        const float t = static_cast<float>(n) / static_cast<float>(kSR);
+        const float s = 0.5f * std::sin(2.0f * kPi * 220.0f * t);
+        float outL = 0.0f;
+        float outR = 0.0f;
+        d.process(s, s, outL, outR);
+
+        REQUIRE(std::isfinite(outL));
+        const float jump = std::abs(outL - prev);
+        if (n > 0 && n < kChangeAt) {
+            maxJumpBefore = std::max(maxJumpBefore, jump);
+        }
+        if (n >= kChangeAt) {
+            maxJumpAfter = std::max(maxJumpAfter, jump);
+        }
+        prev = outL;
+    }
+
+    INFO("maxJumpBefore = " << maxJumpBefore << " maxJumpAfter = " << maxJumpAfter);
+    // Both the steady-state region and the change window stay below the
+    // documented discontinuity bound.
+    REQUIRE(maxJumpBefore < kMaxDiscontinuity);
+    REQUIRE(maxJumpAfter < kMaxDiscontinuity);
+}
+
 TEST_CASE("Delay: stereo=0 mono regression — independent L/R lines") {
     // At stereo=0 the L and R delay lines run completely in parallel:
     // the L output is determined only by L input + L delayed feedback.

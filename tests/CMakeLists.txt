@@ -88,6 +88,8 @@ add_executable(agentic_synth_tests
     #
     MorphEngineTest.cpp
     SPSCQueueTest.cpp
+    # #434/#435/#436 — stereo contiguous scope delivery under consumer stalls.
+    ScopeRingTest.cpp
     # Phase 1 P0 ship-blocker verification: SPSC audition path,
     # releaseResources state-clear, primeSmoothers no-glide,
     # state-restore reapply. Needs AgenticSynthPlugin TUs, so CI's

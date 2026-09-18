@@ -22,7 +22,11 @@ AgenticSynthPluginEditor::AgenticSynthPluginEditor(AgenticSynthPlugin& p)
     // provider on the JUCE message thread (lock-free SPSC consumer side).
     // The lambda only references the AudioProcessor, whose lifetime strictly
     // outlives this editor (host-owned), so capture-by-reference is safe.
-    web_.setScopeSampleProvider([&p](float* dest, int max) noexcept { return p.pullScopeSamples(dest, max); });
+    web_.setScopeSampleProvider([&p](float* dest, int frames) noexcept { return p.pullScopeSamples(dest, frames); });
+    web_.setScopeInfoProvider([&p] {
+        return agentic_synth::ui::WebUiComponent::ScopeInfo{p.getSampleRate(), p.scopeDroppedFrames(),
+                                                            p.scopeStaleWindows(), p.scopeLastPullStale()};
+    });
     // Audio device picker. JUCE's standalone wrapper buries this behind an
     // "Options" text button in the title bar; surface it in the React SETTINGS
     // panel instead. Only the standalone wrapper has a device to configure —

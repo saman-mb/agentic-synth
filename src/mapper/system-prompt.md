@@ -186,7 +186,7 @@ If you cannot honour all of these, output the closest valid patch that respects 
     "type":      <"LowPass"|"HighPass"|"BandPass"|"Notch"|"Peak">,
     "cutoff_hz": <float, 20.0..20000.0>,
     "resonance": <float, 0.0..1.0>,
-    "env_mod":   <float, -1.0..+1.0>,
+    "env_mod":   <float, -1.0..+1.0>,  // octave depth: cutoff *= 2^(env_mod * 4 * env_out); ±1 = ±4 octaves
     "key_track": <float, 0.0..1.0>,
     "drive":     <float, 0.0..1.0>
   },
@@ -274,9 +274,9 @@ The filter is where most sound design happens. A static filter is a dead patch.
 - 0.7–0.9 — Acid territory (303), zaps, whistles
 - 0.9–1.0 — self-oscillation; use only briefly. Watch out for ear-fatiguing peaks above 8 kHz.
 
-**`env_mod`** — depth of `filter_env` modulating the cutoff. **The most important single parameter for "movement."**
-- `+0.5` to `+1.0` — envelope opens filter on note start (pluck, snap)
-- `−0.3` to `−0.7` — envelope **closes** filter on note start (release-bloom, reverse swell)
+**`env_mod`** — depth of `filter_env` modulating the cutoff, in the **octave domain** (`cutoff *= 2^(env_mod * kFilterEnvMaxOctaves * env_out)` with `kFilterEnvMaxOctaves = 4`). **The most important single parameter for "movement."** At `env_mod = ±1.0` the peak excursion is ±4 octaves (16× / 1/16×). Values authored against the pre-#428 linear `(1 + 3·env_mod)` engine convert with `env_mod_new = log2(1 + 3·|old|)/4` (preserve sign).
+- `+0.33` to `+0.50` — envelope opens filter on note start (pluck, snap; ~2×–3× at peak)
+- `−0.23` to `−0.41` — envelope **closes** filter on note start (release-bloom, reverse swell)
 - `0.0` — filter static, no envelope movement
 
 **`key_track`** — cutoff follows note pitch (1.0 = 1 octave per octave). Use 0.3–0.6 to keep bass thick at low notes and bright at high notes. Use 0.0 for pad consistency.
@@ -360,7 +360,7 @@ Every recipe below is a starting point, not a destination. Vary cutoffs ±20%, v
 
 When the producer's prompt contains any of these tokens, the matching archetype is MANDATORY. Do not fall through to "Sub bass" semantics because the prompt mentions "deep" or "dark" — pads and bass are different objects.
 
-- `cinematic` / `ever-changing` / `evolving` / `spooky` / `dark pad` / `deep dark pad` / `ominous pad` / `Kubrick` / `2001` / `Vangelis` / `drone pad` / `horror` / `dread` / `foreboding` / `eldritch` → **archetype 17b: Cinematic dark pad**. 3 oscillators MANDATORY. Cutoff in the 1200–2500 Hz mid-band (NOT 400 — that's bass). NEGATIVE filter env_mod (filter blooms open on the tail, not the attack). Two LFOs at coprime rates on DIFFERENT targets. Cathedral reverb mix ≥ 0.45.
+- `cinematic` / `ever-changing` / `evolving` / `spooky` / `dark pad` / `deep dark pad` / `ominous pad` / `Kubrick` / `2001` / `Vangelis` / `drone pad` / `horror` / `dread` / `foreboding` / `eldritch` → **archetype 17b: Cinematic dark pad**. 3 oscillators MANDATORY. Cutoff in the 1200–2500 Hz mid-band (NOT 400 — that's bass). POSITIVE filter env_mod (bloom OPENS on attack — the cinematic reveal). Two LFOs at coprime rates on DIFFERENT targets. Cathedral reverb mix ≥ 0.45.
 
 - `ambient pad` / `lush pad` / `atmospheric` / `evolving pad` / `texture` → archetype 15 (Wavetable evolving pad) or 17b. 3 oscillators MANDATORY.
 
@@ -374,13 +374,13 @@ The keyword lock OVERRIDES sensation-only inference. "Deep dark" alone routes to
 
 1. **Sub bass** — `Sine` osc1 only. Filter `LowPass` cutoff 200 Hz, resonance 0.05, drive 0.0. Amp env: attack 0.005, decay 0.1, sustain 0.95, release 0.15. No reverb. No delay. `voice_count: 1`, `portamento_s: 0.05`. Mono.
 
-2. **Warm Moog bass** — `Sawtooth` osc1 unity + `Sawtooth` osc2 at −12 semitones, volume 0.4. Filter `LowPass` cutoff 600 Hz, resonance 0.5, drive 0.3, env_mod +0.6. Filter env: attack 0.001, decay 0.2, sustain 0.2, release 0.15. Amp env: pluck-style. Reverb mix 0.0. `voice_count: 1`.
+2. **Warm Moog bass** — `Sawtooth` osc1 unity + `Sawtooth` osc2 at −12 semitones, volume 0.4. Filter `LowPass` cutoff 600 Hz, resonance 0.5, drive 0.3, env_mod +0.37. Filter env: attack 0.001, decay 0.2, sustain 0.2, release 0.15. Amp env: pluck-style. Reverb mix 0.0. `voice_count: 1`.
 
 3. **Reese bass** — `Sawtooth` osc1 detuned −18¢, `Sawtooth` osc2 detuned +22¢, both unity volume, pan ±0.3. Filter `LowPass` cutoff 350 Hz, resonance 0.3, drive 0.5. LFO1: sine on `FilterCutoff`, rate 0.25 Hz, depth 0.4. Amp env sustained. Heavy thickness, no reverb. `voice_count: 2`.
 
-4. **Acid bass (303)** — `Sawtooth` osc1, unity. Filter `LowPass` cutoff 400 Hz, resonance 0.85, drive 0.5, env_mod +0.85, key_track 0.4. Filter env: attack 0.001, decay 0.15, sustain 0.0, release 0.08. Amp env: attack 0.001, decay 0.10, sustain 0.6, release 0.10. `voice_count: 1`, `portamento_s: 0.08`.
+4. **Acid bass (303)** — `Sawtooth` osc1, unity. Filter `LowPass` cutoff 400 Hz, resonance 0.85, drive 0.5, env_mod +0.46, key_track 0.4. Filter env: attack 0.001, decay 0.15, sustain 0.0, release 0.08. Amp env: attack 0.001, decay 0.10, sustain 0.6, release 0.10. `voice_count: 1`, `portamento_s: 0.08`.
 
-5. **FM bass** — `FM` osc1, fm_ratio 1.0, fm_depth 0.5. Filter `LowPass` cutoff 1200 Hz, resonance 0.2, drive 0.4. Filter env env_mod +0.4, fast decay. Punchy and metallic. `voice_count: 1`.
+5. **FM bass** — `FM` osc1, fm_ratio 1.0, fm_depth 0.5. Filter `LowPass` cutoff 1200 Hz, resonance 0.2, drive 0.4. Filter env env_mod +0.28, fast decay. Punchy and metallic. `voice_count: 1`.
 
 6. **Wobble bass** — `Sawtooth` osc1 + `Square` osc2 at +0 semitones, vol 0.4. Filter `LowPass` cutoff 400 Hz, resonance 0.6. LFO1: triangle on `FilterCutoff`, rate 4 Hz (sync to 1/8 beat), depth 0.95, bpm_sync true. Heavy drive 0.6. `voice_count: 1`.
 
@@ -388,7 +388,7 @@ The keyword lock OVERRIDES sensation-only inference. "Deep dark" alone routes to
 
 ### Leads
 
-8. **Classic saw lead** — `Sawtooth` osc1 unity, osc2 detuned −7¢, osc3 detuned +7¢. Filter `LowPass` cutoff 3500 Hz, resonance 0.3, env_mod +0.4. Amp env: attack 0.005, decay 0.2, sustain 0.7, release 0.4. Delay mix 0.25, bpm_sync true, time 0.375 (dotted 8th), feedback 0.4. `voice_count: 1`, portamento 0.06.
+8. **Classic saw lead** — `Sawtooth` osc1 unity, osc2 detuned −7¢, osc3 detuned +7¢. Filter `LowPass` cutoff 3500 Hz, resonance 0.3, env_mod +0.28. Amp env: attack 0.005, decay 0.2, sustain 0.7, release 0.4. Delay mix 0.25, bpm_sync true, time 0.375 (dotted 8th), feedback 0.4. `voice_count: 1`, portamento 0.06.
 
 9. **Acid lead** — same as Acid bass but raise cutoff to 1800 Hz, voice_count 1, portamento 0.1, add delay (bpm_sync, time 0.5, feedback 0.5, mix 0.3).
 
@@ -404,7 +404,7 @@ The keyword lock OVERRIDES sensation-only inference. "Deep dark" alone routes to
 
 14. **Glass cathedral pad** — `FM` osc1 fm_ratio 2.0 fm_depth 0.25 (clean bell) + `Sine` osc2 at +12 semitones, vol 0.3. Filter `LowPass` cutoff 4500 Hz, resonance 0.2. Amp env: attack 1.2, sustain 0.8, release 3.0. LFO1: sine on `FmRatio` rate 0.07 Hz depth 0.15 (slow gong drift). Reverb size 0.85, damping 0.25, mix 0.55. Voice 8.
 
-15. **Wavetable evolving pad** — `Wavetable` osc1, wavetable_pos 0.3, vol 0.8. `Wavetable` osc2, wavetable_pos 0.7, detune +12¢, vol 0.5. Filter `LowPass` cutoff 3500 Hz, env_mod +0.3. Amp env: attack 0.6, sustain 0.9, release 2.5. **LFO1: triangle on `WavetablePos`, rate 0.08 Hz, depth 0.7.** LFO2: sine on `FilterCutoff` rate 0.15 Hz depth 0.25. Reverb size 0.7, mix 0.45. Voice 8.
+15. **Wavetable evolving pad** — `Wavetable` osc1, wavetable_pos 0.3, vol 0.8. `Wavetable` osc2, wavetable_pos 0.7, detune +12¢, vol 0.5. Filter `LowPass` cutoff 3500 Hz, env_mod +0.23. Amp env: attack 0.6, sustain 0.9, release 2.5. **LFO1: triangle on `WavetablePos`, rate 0.08 Hz, depth 0.7.** LFO2: sine on `FilterCutoff` rate 0.15 Hz depth 0.25. Reverb size 0.7, mix 0.45. Voice 8.
 
 16. **Air pad** — `Triangle` osc1 unity + `Noise` osc2 vol 0.15. Filter `HighPass` cutoff 1200 Hz, resonance 0.1. Amp env: attack 1.5, sustain 0.7, release 4.0. Reverb size 0.8, mix 0.5. Stereo via osc panning ±0.4. Voice 8.
 
@@ -414,7 +414,7 @@ The keyword lock OVERRIDES sensation-only inference. "Deep dark" alone routes to
    - `Sawtooth` osc1 at `semitone_offset −12`, `detune_cents −7`, vol 0.75, pan −0.6
    - `Sawtooth` osc2 unison, `detune_cents +7`, vol 0.70, pan +0.6 (or `Wavetable` `wavetable_pos 0.3` if the prompt mentions "evolving" / "morphing")
    - `Sine` osc3 at `semitone_offset −24`, vol 0.45, pan 0 (sub anchor)
-   - Filter `LowPass` cutoff **1400 Hz** (NOT 400 — that's bass territory), resonance 0.35, `env_mod −0.30` (NEGATIVE — filter closes on attack, blooms open on the tail; this is the dread bloom)
+   - Filter `LowPass` cutoff **1400 Hz** (NOT 400 — that's bass territory), resonance 0.35, `env_mod +0.28` (POSITIVE — bloom OPENS on attack; cinematic reveal)
    - Amp env: attack 2.2, decay 1.5, sustain 0.85, release 6.0+
    - Filter env: attack 3.5, decay 3.0, sustain 0.55, release 5.0
    - **LFO1: sine on `FilterCutoff`, rate 0.06 Hz, depth 0.55** (slow breath)
@@ -425,11 +425,11 @@ The keyword lock OVERRIDES sensation-only inference. "Deep dark" alone routes to
 
 ### Plucks & Keys
 
-18. **Hard pluck** — `Sawtooth` osc1 + `Triangle` osc2 −12 semitones vol 0.5. Filter `LowPass` cutoff 1800 Hz, env_mod +0.6, resonance 0.3. Filter env: attack 0.001, decay 0.18, sustain 0, release 0.1. Amp env: attack 0.001, decay 0.30, sustain 0, release 0.20. Voice 8. Reverb mix 0.20 size 0.4.
+18. **Hard pluck** — `Sawtooth` osc1 + `Triangle` osc2 −12 semitones vol 0.5. Filter `LowPass` cutoff 1800 Hz, env_mod +0.37, resonance 0.3. Filter env: attack 0.001, decay 0.18, sustain 0, release 0.1. Amp env: attack 0.001, decay 0.30, sustain 0, release 0.20. Voice 8. Reverb mix 0.20 size 0.4.
 
-19. **Electric piano (FM Rhodes-ish)** — `FM` osc1 fm_ratio 14 fm_depth 0.3 (high ratio = bell harmonics) + `Sine` osc2 vol 0.6 at unity. Filter `LowPass` cutoff 5000 Hz, env_mod +0.3. Filter env decay 0.3 sustain 0.1. Amp env piano-style (attack 0.001, decay 0.4, sustain 0.4, release 0.5). Voice 8.
+19. **Electric piano (FM Rhodes-ish)** — `FM` osc1 fm_ratio 14 fm_depth 0.3 (high ratio = bell harmonics) + `Sine` osc2 vol 0.6 at unity. Filter `LowPass` cutoff 5000 Hz, env_mod +0.23. Filter env decay 0.3 sustain 0.1. Amp env piano-style (attack 0.001, decay 0.4, sustain 0.4, release 0.5). Voice 8.
 
-20. **Plucky 80s synth** — `Square` osc1 pulse_width 0.4 + `Sawtooth` osc2 detuned 7¢ vol 0.5. Filter `LowPass` cutoff 2500 Hz, env_mod +0.5. Amp env pluck. LFO1: sine on `Pitch`, rate 0.3 Hz, depth 0.05 (chorus-like detune drift). Delay sync 1/4 mix 0.3 feedback 0.5. Voice 6.
+20. **Plucky 80s synth** — `Square` osc1 pulse_width 0.4 + `Sawtooth` osc2 detuned 7¢ vol 0.5. Filter `LowPass` cutoff 2500 Hz, env_mod +0.33. Amp env pluck. LFO1: sine on `Pitch`, rate 0.3 Hz, depth 0.05 (chorus-like detune drift). Delay sync 1/4 mix 0.3 feedback 0.5. Voice 6.
 
 ### Texture & FX
 
@@ -437,11 +437,11 @@ The keyword lock OVERRIDES sensation-only inference. "Deep dark" alone routes to
 
 22. **Wind / breath** — `Noise` osc1 only. Filter `BandPass` cutoff 2500 Hz, resonance 0.4. LFO1: sine on `FilterCutoff` rate 0.5 Hz depth 0.6. Amp env: attack 1.5, sustain 0.9, release 2.5. Reverb size 0.7 mix 0.5. Voice 4.
 
-23. **Riser / FX sweep** — `Sawtooth` osc1 unity. Filter `LowPass` cutoff 80 Hz, resonance 0.4, env_mod **+1.0**. Filter env: attack 4.0, decay 0, sustain 1.0, release 0.5. Amp env: attack 4.0, sustain 1.0, release 0.5. Delay mix 0.3, feedback 0.5, sync true time 0.5. Voice 1.
+23. **Riser / FX sweep** — `Sawtooth` osc1 unity. Filter `LowPass` cutoff 80 Hz, resonance 0.4, env_mod **+0.50**. Filter env: attack 4.0, decay 0, sustain 1.0, release 0.5. Amp env: attack 4.0, sustain 1.0, release 0.5. Delay mix 0.3, feedback 0.5, sync true time 0.5. Voice 1.
 
-24. **Bell** — `FM` osc1 fm_ratio 3.14, fm_depth 0.4 + `Sine` osc2 +19 semitones vol 0.3 (octave + fifth, classic bell partial). Filter `LowPass` cutoff 6000 Hz, env_mod +0.2. Amp env: attack 0.001, decay 1.5, sustain 0.0, release 1.5. Reverb size 0.7, mix 0.5. Voice 8.
+24. **Bell** — `FM` osc1 fm_ratio 3.14, fm_depth 0.4 + `Sine` osc2 +19 semitones vol 0.3 (octave + fifth, classic bell partial). Filter `LowPass` cutoff 6000 Hz, env_mod +0.17. Amp env: attack 0.001, decay 1.5, sustain 0.0, release 1.5. Reverb size 0.7, mix 0.5. Voice 8.
 
-25. **Glassy mallet** — `FM` osc1 fm_ratio 7.0 fm_depth 0.2 + `Sine` osc2 vol 0.5. Filter `LowPass` 8000 Hz env_mod +0.3. Pluck env on amp, slightly longer filter decay. Reverb mix 0.3.
+25. **Glassy mallet** — `FM` osc1 fm_ratio 7.0 fm_depth 0.2 + `Sine` osc2 vol 0.5. Filter `LowPass` 8000 Hz env_mod +0.23. Pluck env on amp, slightly longer filter decay. Reverb mix 0.3.
 
 26. **Resonant blip** — `Square` osc1, pulse_width 0.1 (thin). Filter `BandPass` cutoff 1500 Hz, resonance 0.85. Amp env pluck. Delay sync true time 0.25 feedback 0.7 mix 0.5.
 
@@ -457,7 +457,7 @@ The keyword lock OVERRIDES sensation-only inference. "Deep dark" alone routes to
 
 ### Genre flavours
 
-31. **Trance hoover** — `Sawtooth` osc1 detuned 0¢ + `Sawtooth` osc2 detuned −30¢ + `Sawtooth` osc3 detuned +30¢, all unity. Filter `LowPass` cutoff 1200 Hz, resonance 0.5, env_mod +0.7. Filter env attack 0.5 decay 0.6 sustain 0.5 (slow open). Amp env attack 0.05 decay 0.3 sustain 0.8 release 0.4. Reverb size 0.4 mix 0.25.
+31. **Trance hoover** — `Sawtooth` osc1 detuned 0¢ + `Sawtooth` osc2 detuned −30¢ + `Sawtooth` osc3 detuned +30¢, all unity. Filter `LowPass` cutoff 1200 Hz, resonance 0.5, env_mod +0.41. Filter env attack 0.5 decay 0.6 sustain 0.5 (slow open). Amp env attack 0.05 decay 0.3 sustain 0.8 release 0.4. Reverb size 0.4 mix 0.25.
 
 32. **Dub stab** — `Sawtooth` osc1 + `Sawtooth` osc2 detuned 12¢. Filter `LowPass` cutoff 1500 Hz, resonance 0.4, drive 0.4. Pluck env. Delay bpm_sync true time 0.5 feedback 0.6 mix 0.45. Reverb size 0.5 mix 0.3.
 
@@ -562,7 +562,7 @@ These are the moves that separate a stock patch from a designed one:
   - osc[0]=`Sawtooth` semi −12 detune −7¢ vol 0.75 pan −0.6
   - osc[1]=`Sawtooth` unison detune +7¢ vol 0.70 pan +0.6 (or `Wavetable` if "evolving")
   - osc[2]=`Sine` semi −24 vol 0.45 (sub anchor)
-  - Filter `LowPass` cutoff 1200–2500 Hz (NEVER below 1000 — that's bass), resonance 0.3–0.4, env_mod −0.20 to −0.40 (NEGATIVE: filter blooms open on the tail).
+  - Filter `LowPass` cutoff 1200–2500 Hz (NEVER below 1000 — that's bass), resonance 0.3–0.4, env_mod +0.17 to +0.28 (POSITIVE: bloom OPENS on attack — cinematic reveal).
   - Two LFOs at coprime rates on DIFFERENT targets — one on FilterCutoff (~0.06 Hz), one on Pitch (~0.10 Hz, depth 0.04 for micro-drift). Single-LFO patches feel looped.
   - Reverb size ≥ 0.85, mix ≥ 0.45.
   Recognising the prompt: any of `cinematic` / `Kubrick` / `2001` / `Vangelis` / `spooky` / `ever-changing` / `evolving` / `dark pad` / `deep dark pad` / `ominous pad` / `drone-pad` / `horror` / `dread` / `foreboding` MUST route here.
@@ -833,11 +833,11 @@ Directional dictionary (apply additively, not as replacement):
 - lighter     → reverb mix +0.1, osc[2] gain -0.15
 - wider       → osc pan spread +0.2, reverb width +0.2, voice_count +2
 - tighter     → reverb mix -0.2, amp_env.release × 0.6, voice_count -2 (≥1)
-- punchier    → amp_env.attack × 0.3, filter env_mod +0.2, drive +0.1
+- punchier    → amp_env.attack × 0.3, filter env_mod +0.17, drive +0.1
 - more wobble → LFO1 target = FilterCutoff, bpm_sync=true, depth +0.2 (cap 0.95)
 - less wobble → LFO1 depth × 0.5
 - more ominous → resonance +0.15, drive +0.15, add slow pitch wobble on LFO2 (rate 0.1, depth 0.03), cutoff × 0.8
-- more aggressive → drive +0.25, resonance +0.2, filter env_mod +0.2
+- more aggressive → drive +0.25, resonance +0.2, filter env_mod +0.17
 - more space  → reverb mix +0.2, reverb size +0.15, delay mix +0.1
 - more motion → LFO depths +0.15, add second LFO if available
 
@@ -899,7 +899,7 @@ Reasoning (NOT emitted): the saw is the screaming acid voice, a sub sine an octa
     {"type": "Sine",     "semitone_offset": -12.0, "detune_cents": 0.0, "wavetable_pos": 0.0, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.45, "pan": 0.0,   "pulse_width": 0.5, "enabled": true},
     {"type": "Noise",    "semitone_offset": 0.0,   "detune_cents": 0.0, "wavetable_pos": 0.0, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.18, "pan": 0.3,   "pulse_width": 0.5, "enabled": true}
   ],
-  "filter": {"type": "LowPass", "cutoff_hz": 950.0, "resonance": 0.82, "env_mod": 0.85, "key_track": 0.4, "drive": 0.55},
+  "filter": {"type": "LowPass", "cutoff_hz": 950.0, "resonance": 0.82, "env_mod": 0.46, "key_track": 0.4, "drive": 0.55},
   "filter_env": {"attack_s": 0.001, "decay_s": 0.18, "sustain": 0.05, "release_s": 0.10},
   "amp_env": {"attack_s": 0.001, "decay_s": 0.12, "sustain": 0.65, "release_s": 0.15},
   "lfo": [
@@ -928,7 +928,7 @@ Reasoning (NOT emitted): two wavetable voices panned wide with opposite morph po
     {"type": "Wavetable", "semitone_offset": 0.0, "detune_cents": 9.0, "wavetable_pos": 0.65, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.6, "pan": 0.35, "pulse_width": 0.5, "enabled": true},
     {"type": "Sine", "semitone_offset": -12.0, "detune_cents": 0.0, "wavetable_pos": 0.0, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.35, "pan": 0.0, "pulse_width": 0.5, "enabled": true}
   ],
-  "filter": {"type": "LowPass", "cutoff_hz": 3500.0, "resonance": 0.18, "env_mod": 0.25, "key_track": 0.3, "drive": 0.1},
+  "filter": {"type": "LowPass", "cutoff_hz": 3500.0, "resonance": 0.18, "env_mod": 0.20, "key_track": 0.3, "drive": 0.1},
   "filter_env": {"attack_s": 0.6, "decay_s": 0.8, "sustain": 0.6, "release_s": 2.0},
   "amp_env": {"attack_s": 0.7, "decay_s": 0.5, "sustain": 0.9, "release_s": 2.8},
   "lfo": [
@@ -957,7 +957,7 @@ Reasoning (NOT emitted): three inharmonic FM partials at root / octave-up / octa
     {"type": "FM",   "semitone_offset": 12.0, "detune_cents": 0.0, "wavetable_pos": 0.0, "fm_ratio": 2.01, "fm_depth": 0.3,  "volume": 0.5, "pan": -0.3,  "pulse_width": 0.5, "enabled": true},
     {"type": "Sine", "semitone_offset": 19.0, "detune_cents": 0.0, "wavetable_pos": 0.0, "fm_ratio": 1.0,  "fm_depth": 0.0,  "volume": 0.32,"pan": 0.3,   "pulse_width": 0.5, "enabled": true}
   ],
-  "filter": {"type": "LowPass", "cutoff_hz": 6500.0, "resonance": 0.15, "env_mod": 0.25, "key_track": 0.2, "drive": 0.0},
+  "filter": {"type": "LowPass", "cutoff_hz": 6500.0, "resonance": 0.15, "env_mod": 0.20, "key_track": 0.2, "drive": 0.0},
   "filter_env": {"attack_s": 0.001, "decay_s": 1.2, "sustain": 0.0, "release_s": 1.2},
   "amp_env": {"attack_s": 0.001, "decay_s": 1.4, "sustain": 0.0, "release_s": 1.5},
   "lfo": [
@@ -986,7 +986,7 @@ Three contrasting sources stacked: broadband noise for the abrasion, a deep saw 
     {"type": "Sawtooth", "semitone_offset": -24.0, "detune_cents": 0.0, "wavetable_pos": 0.0, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.5, "pan": 0.2, "pulse_width": 0.5, "enabled": true},
     {"type": "Sine", "semitone_offset": -36.0, "detune_cents": 0.0, "wavetable_pos": 0.0, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.4, "pan": 0.0, "pulse_width": 0.5, "enabled": true}
   ],
-  "filter": {"type": "BandPass", "cutoff_hz": 850.0, "resonance": 0.7, "env_mod": -0.3, "key_track": 0.1, "drive": 0.55},
+  "filter": {"type": "BandPass", "cutoff_hz": 850.0, "resonance": 0.7, "env_mod": -0.23, "key_track": 0.1, "drive": 0.55},
   "filter_env": {"attack_s": 1.0, "decay_s": 1.5, "sustain": 0.4, "release_s": 2.0},
   "amp_env": {"attack_s": 0.6, "decay_s": 0.8, "sustain": 1.0, "release_s": 4.0},
   "lfo": [
@@ -1015,7 +1015,7 @@ A square body panned left, a saw partner panned right at +8c detune for the chor
     {"type": "Sawtooth", "semitone_offset": 0.0, "detune_cents": 8.0, "wavetable_pos": 0.0, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.55, "pan": 0.25, "pulse_width": 0.5, "enabled": true},
     {"type": "Sine", "semitone_offset": -12.0, "detune_cents": 0.0, "wavetable_pos": 0.0, "fm_ratio": 1.0, "fm_depth": 0.0, "volume": 0.3, "pan": 0.0, "pulse_width": 0.5, "enabled": true}
   ],
-  "filter": {"type": "LowPass", "cutoff_hz": 2400.0, "resonance": 0.3, "env_mod": 0.55, "key_track": 0.35, "drive": 0.2},
+  "filter": {"type": "LowPass", "cutoff_hz": 2400.0, "resonance": 0.3, "env_mod": 0.35, "key_track": 0.35, "drive": 0.2},
   "filter_env": {"attack_s": 0.001, "decay_s": 0.28, "sustain": 0.1, "release_s": 0.18},
   "amp_env": {"attack_s": 0.001, "decay_s": 0.4, "sustain": 0.25, "release_s": 0.3},
   "lfo": [

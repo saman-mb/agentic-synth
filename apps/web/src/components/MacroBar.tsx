@@ -56,7 +56,7 @@ export function MacroBar({ macros, onMacroChange, onMacroRename }: MacroBarProps
             value={m.value}
             onChange={(v) => onMacroChange(i, v)}
             name=""
-            size="lg"
+            size="md"
             defaultValue={0}
             displayValue={`${Math.round(m.value * 100)}%`}
           />

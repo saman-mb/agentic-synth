@@ -74,7 +74,11 @@
 # GEMINI_KEY in the environment for generation to work.
 [dev]
   framework = "#custom"
-  command = "node scripts/sync-prompts.mjs && npx nx serve web"
+  # Must stay a single command with no shell operators: the CLI spawns this
+  # without a shell, so a "a && b" form silently runs only `a` and then
+  # exits 0, taking the whole dev server down with it. The prompt sync runs
+  # inside the nx target instead, where a shell is available.
+  command = "npx nx serve web"
   targetPort = 5173
   port = 8888
   autoLaunch = false

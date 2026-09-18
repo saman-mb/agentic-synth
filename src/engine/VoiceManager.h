@@ -66,7 +66,7 @@ struct Voice {
     bool noteIsOn{false}; // false = envelope releasing, true = held
     uint64_t noteOnOrder{0};
 
-    float velocity{1.0f}; // [0, 1] — scales amp env peak and filter env mod
+    float velocity{1.0f}; // [0, 1] — scales the amp env peak only (not cutoff, #428)
 
     float targetFrequency{440.0f};
     float currentFrequency{440.0f}; // slides toward target during portamento
@@ -80,11 +80,12 @@ struct Voice {
     std::unique_ptr<MoogLadder> moogFilter;
     std::unique_ptr<SVFilter> svFilter;
     Filter* filter{nullptr};
-    // Outgoing filter during a type-swap crossfade. Phase 4: when applyPatch
-    // changes filter.type we keep the previous filter alive and run both in
-    // parallel for kCrossfadeSamples samples, blending wet via fadeOut/fadeIn
-    // ramps. Avoids the audible click of a pointer-swap with reset integrator
-    // state. nullptr when not crossfading (steady state).
+    // Outgoing filter during a type-swap crossfade. Phase 4 / #430: when
+    // applyPatch changes filter.type we keep the previous filter alive and
+    // run both in parallel for kCrossfadeSamples samples, blending wet via
+    // equal-power (cos/sin) fadeOut/fadeIn weights. Avoids the audible click
+    // of a pointer-swap with reset integrator state. nullptr when not
+    // crossfading (steady state).
     Filter* crossfadeFromFilter{nullptr};
     int crossfadeRemaining{0};
     int crossfadeTotal{0};
@@ -98,24 +99,34 @@ struct Voice {
     std::array<LfoTarget, 2> lfoTargets{{LfoTarget::None, LfoTarget::None}};
     std::array<float, 2> lfoDepths{{0.0f, 0.0f}};
 
-    // Filter env modulation (filter.env_mod from patch).
+    // Filter env depth (filter.env_mod from patch), applied in the octave
+    // domain: cutoff *= 2^(envOut * filterEnvMod * kFilterEnvMaxOctaves).
     float filterEnvMod{0.0f};
+
+    // Filter key-track amount (filter.key_track from patch, 0..1). Scales
+    // cutoff by (voiceFreq / midiNoteToHz(60))^key_track before LFO/env (#429).
+    float filterKeyTrack{0.0f};
 
     // Smoothed filter drive — block-rate writer (applyPatch), per-sample reader
     // (render). Kills zipper noise on knob-driven drive moves.
     ParamSmoother driveSmoother;
 
-    // Phase E (#265): per-voice pre-filter saturation + post-filter chorus.
-    // TubeSat is mono (memoryless waveshape — runs on the mono osc sum before
-    // the filter so saw stack harmonics get glued before LP attenuation).
-    // Chorus is stereo (runs on the post-filter pan-split L/R so the wet
-    // width is preserved). Both default to bypass (no allocations either way
-    // — prepare() sized their buffers once in VoiceManager::prepare).
+    // Phase E (#265): per-voice pre-filter chorus + saturation. #265 places
+    // both BEFORE the filter in the order oscillators → chorus → saturation →
+    // filter. Chorus is a stereo DSP block but runs on the mono osc sum
+    // (replicated to L/R, then folded back to mono) because the filter is
+    // mono and intentionally mono-sums the ensemble; stereo width is
+    // re-derived post-filter from the per-osc pan weights. TubeSat is mono
+    // (memoryless waveshape) and follows chorus so saw-stack harmonics get
+    // glued before LP attenuation. Both default to bypass (no allocations
+    // either way — prepare() sized their buffers once in
+    // VoiceManager::prepare).
     TubeSat tubeSat;
     Chorus chorus;
 
-    // Voice-steal fade-out: when > 0, voice output is multiplied by a linear
-    // ramp from fadeOutSamplesRemaining_/fadeOutSamplesTotal_ → 0.
+    // Voice-steal fade-out: when > 0, voice output is multiplied by an
+    // equal-power (raised-cosine) ramp cos(θ), θ∈[0,π/2] over
+    // fadeOutSamplesTotal samples (#430).
     int fadeOutSamplesRemaining{0};
     int fadeOutSamplesTotal{0};
 
