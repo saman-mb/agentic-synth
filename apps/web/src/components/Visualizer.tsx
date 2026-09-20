@@ -30,84 +30,15 @@ import './Visualizer.css';
 const SAMPLE_COUNT = SPECTRUM_FFT_SIZE; // 1024 frames
 const DEFAULT_SAMPLE_RATE = 48_000; // only until the bridge reports the real one
 
-// JUCE bridge shapes — same wire format as useWebSocket.ts / useSynthBridge.ts.
-// We talk to the `getScopeSamples` native function by emitting __juce__invoke
-// with a positional-args params array and listening for __juce__complete
-// keyed by a numeric promiseId. ID-namespaced offset (1_000_000+) matches
-// useWebSocket.ts so we never collide with the bundled getNativeFunction
-// handler's IDs (which start from 0).
-interface JuceBackendForScope {
-  emitEvent: (name: string, payload: unknown) => void;
-  addEventListener: (name: string, cb: (payload: unknown) => void) => number;
-  removeEventListener: (id: number) => void;
-}
-interface JuceGlobalForScope {
-  backend: JuceBackendForScope;
-}
-function getJuceForScope(): JuceGlobalForScope | null {
-  const j = (window as unknown as { __JUCE__?: JuceGlobalForScope }).__JUCE__;
-  return j ?? null;
-}
+import { callNative, isJuceAvailable } from '../utils/juceBridge';
 
-// Evaluated per call: module-scope capture ran before demo/bootstrap.ts
-// installed the shim (#280).
-const scopeBridgeAvailable = (): boolean => getJuceForScope() !== null;
-
-// Module-scope promise plumbing for the scope pull. Module-scope (not
-// component-scope) so a remount doesn't double-register the __juce__complete
-// listener. ID offset 2_000_000 keeps our IDs distinct from both JUCE's
-// bundled handler (starts at 0) and useWebSocket's pool (starts at 1_000_000).
-const SCOPE_PROMISE_ID_OFFSET = 2_000_000;
-let nextScopePromiseId = SCOPE_PROMISE_ID_OFFSET;
-// One missed completion must not wedge the poll loop: inFlightRef only
-// clears when the pull's promise settles, so a lost __juce__complete
-// (WebView teardown mid-call, dropped native completion) would otherwise
-// stop every future pull — a frozen scope over audible audio. One missed
-// frame is invisible; that latch is not. Matches the timeout contract in
-// useWebSocket.callNative.
 const SCOPE_PULL_TIMEOUT_MS = 1_000;
-const pendingScopePromises = new Map<number, (v: unknown) => void>();
-let scopeCompleteWired = false;
-
-function ensureScopeCompleteListener(juce: JuceGlobalForScope): void {
-  if (scopeCompleteWired) return;
-  scopeCompleteWired = true;
-  juce.backend.addEventListener('__juce__complete', (payload) => {
-    const p = payload as { promiseId: number; result: unknown };
-    if (typeof p.promiseId !== 'number' || p.promiseId < SCOPE_PROMISE_ID_OFFSET) return;
-    const resolver = pendingScopePromises.get(p.promiseId);
-    if (resolver) {
-      pendingScopePromises.delete(p.promiseId);
-      resolver(p.result);
-    }
-  });
-}
 
 function callGetScopeSamples(n: number): Promise<unknown> | null {
-  const juce = getJuceForScope();
-  if (!juce) return null;
-  ensureScopeCompleteListener(juce);
-  const id = nextScopePromiseId++;
-  return new Promise<unknown>((resolve) => {
-    const timer = window.setTimeout(() => {
-      // Settle only if the completion truly never arrived — the complete
-      // listener deletes the entry before resolving. Resolving [] makes
-      // the caller drop the frame and clear inFlightRef, so the next RAF
-      // retries the pull instead of stalling forever.
-      if (pendingScopePromises.delete(id)) resolve([]);
-    }, SCOPE_PULL_TIMEOUT_MS);
-    pendingScopePromises.set(id, (result) => {
-      window.clearTimeout(timer);
-      // Result is `{ samples, sampleRate, ... }` (current) or an array
-      // (older shim). parseScopeFrame normalises both.
-      resolve(result);
-    });
-    juce.backend.emitEvent('__juce__invoke', {
-      name: 'getScopeSamples',
-      params: [n],
-      resultId: id,
-    });
-  });
+  if (!isJuceAvailable()) return null;
+  return callNative('getScopeSamples', [n], SCOPE_PULL_TIMEOUT_MS)
+    .then((result) => result)
+    .catch(() => []); // Fallback to [] on timeout/failure to unstick caller
 }
 
 type Mode = 'SCOPE' | 'SPECTRUM' | 'XY' | 'WT';
@@ -229,7 +160,7 @@ export function Visualizer({ sampleProvider }: VisualizerProps) {
         const currentMode = modeRef.current;
 
         // 1. Fire-and-forget bridge pull once per frame.
-        if (scopeBridgeAvailable() && !inFlightRef.current) {
+        if (isJuceAvailable() && !inFlightRef.current) {
           inFlightRef.current = true;
           const p = callGetScopeSamples(SAMPLE_COUNT);
           if (p) {
@@ -268,7 +199,7 @@ export function Visualizer({ sampleProvider }: VisualizerProps) {
             bufs.sampleR.set(bufs.sample); // mono test hook → L == R
             signal = 'ok';
           }
-        } else if (scopeBridgeAvailable() && scopeFilledRef.current) {
+        } else if (isJuceAvailable() && scopeFilledRef.current) {
           if (scopeStaleRef.current) {
             signal = 'stale';
           } else {

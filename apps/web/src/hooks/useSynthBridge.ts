@@ -6,6 +6,8 @@ export type BridgeStatus = 'connecting' | 'open' | 'closed' | 'error';
 const WS_URL = 'ws://localhost:8765';
 const RECONNECT_DELAY_MS = 3000;
 
+import { callNative, isJuceAvailable, getJuce } from '../utils/juceBridge';
+
 // Phase 4: JUCE 8's WebBrowserComponent with withNativeIntegrationEnabled(true)
 // injects `window.__JUCE__.backend` — verified against
 // third_party/JUCE/modules/juce_gui_extra/native/javascript/index.js. We switch
@@ -23,64 +25,12 @@ const RECONNECT_DELAY_MS = 3000;
 //       get_dictionary, save_dictionary,
 //       get_telemetry, set_telemetry_enabled,
 //       push_audio_pcm
-interface JuceBackend {
-  emitEvent: (name: string, payload: unknown) => void;
-  addEventListener: (name: string, cb: (payload: unknown) => void) => number;
-  removeEventListener: (id: number) => void;
-}
-interface JuceGlobal {
-  backend: JuceBackend;
-  initialisationData?: { __juce__functions?: string[] };
-}
-
-function getJuce(): JuceGlobal | null {
-  const j = (window as unknown as { __JUCE__?: JuceGlobal }).__JUCE__;
-  return j ?? null;
-}
-
-// Evaluated per call: JUCE injects __JUCE__ before page scripts run, but
-// the web-demo shim installs after module evaluation, so a module-scope
-// capture would permanently miss it in the browser (#280).
-const usingJuce = (): boolean => getJuce() !== null;
-
-// Promise-shaped native function shim. JUCE's bundled JS provides this via
-// getNativeFunction(name); we replicate the minimal behaviour here (matching
-// index.js promise plumbing) so callers see a Promise without importing the
-// JUCE module directly. The wire protocol is "__juce__invoke" with resultId,
-// resolved by "__juce__complete".
-const pendingPromises = new Map<number, (value: unknown) => void>();
-let nextPromiseId = 0;
-
-function ensurePromiseListener(juce: JuceGlobal): void {
-  // Wire once per page. Subsequent calls are no-ops.
-  if ((juce as unknown as { __ourCompleteWired__?: boolean }).__ourCompleteWired__) return;
-  (juce as unknown as { __ourCompleteWired__?: boolean }).__ourCompleteWired__ = true;
-  juce.backend.addEventListener('__juce__complete', (payload) => {
-    const p = payload as { promiseId: number; result: unknown };
-    const resolver = pendingPromises.get(p.promiseId);
-    if (resolver) {
-      pendingPromises.delete(p.promiseId);
-      resolver(p.result);
-    }
-  });
-}
-
-function callNative(name: string, args: unknown[]): Promise<unknown> {
-  const juce = getJuce();
-  if (!juce) return Promise.reject(new Error('JUCE backend not present'));
-  ensurePromiseListener(juce);
-  const id = nextPromiseId++;
-  return new Promise<unknown>((resolve) => {
-    pendingPromises.set(id, resolve);
-    juce.backend.emitEvent('__juce__invoke', { name, params: args, resultId: id });
-  });
-}
 
 // Phase D / #260 — promise-returning wrapper for `get_presets`. Consumers
 // that want the saved-sounds list call this directly rather than going
 // through `send({ type: 'get_presets' })` which drops the result.
 export async function fetchPresets(): Promise<unknown> {
-  if (!usingJuce()) return { presets: [] };
+  if (!isJuceAvailable()) return { presets: [] };
   return callNative('get_presets', []);
 }
 
@@ -90,7 +40,7 @@ export async function fetchPresets(): Promise<unknown> {
 // exists: false in the browser dev server, and false under VST3/AU where the
 // host owns audio I/O.
 export async function audioSettingsSupported(): Promise<boolean> {
-  if (!usingJuce()) return false;
+  if (!isJuceAvailable()) return false;
   try {
     return (await callNative('audio_settings_supported', [])) === true;
   } catch {
@@ -102,7 +52,7 @@ export async function audioSettingsSupported(): Promise<boolean> {
 // Opens the wrapper's device dialog. Resolves false when unavailable so the
 // caller can surface that rather than appearing to do nothing.
 export async function openAudioSettings(): Promise<boolean> {
-  if (!usingJuce()) return false;
+  if (!isJuceAvailable()) return false;
   try {
     return (await callNative('open_audio_settings', [])) === true;
   } catch {
@@ -123,7 +73,7 @@ export interface AudioOutputDevice {
 }
 
 export async function listAudioOutputDevices(): Promise<AudioOutputDevice[]> {
-  if (!usingJuce()) return [];
+  if (!isJuceAvailable()) return [];
   try {
     const res = await callNative('list_output_devices', []);
     if (!Array.isArray(res)) return [];
@@ -147,7 +97,7 @@ function isOutputDeviceShape(d: unknown): d is AudioOutputDevice {
 // Resolves false on unsupported browsers / failed switches so the panel
 // can surface its error state rather than appearing to do nothing.
 export async function setAudioOutputDevice(deviceId: string): Promise<boolean> {
-  if (!usingJuce()) return false;
+  if (!isJuceAvailable()) return false;
   try {
     return (await callNative('set_output_device', [deviceId])) === true;
   } catch {
@@ -176,7 +126,7 @@ function fireSync(msg: WireIncoming): void {
 export function useSynthBridge(): UseSynthBridgeReturn {
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const [status, setStatus] = useState<BridgeStatus>(usingJuce() ? 'open' : 'connecting');
+  const [status, setStatus] = useState<BridgeStatus>(isJuceAvailable() ? 'open' : 'connecting');
   const [lastMessage, setLastMessage] = useState<WireIncoming | null>(null);
   // Bridge messages may arrive in bursts (notifyPatch → notifyToken →
   // notifyRationale → notifyDone all in one C++ tick). React 18 batches
@@ -221,7 +171,7 @@ export function useSynthBridge(): UseSynthBridgeReturn {
 
   // ── JUCE native bridge path ────────────────────────────────────────────────
   useEffect(() => {
-    if (!usingJuce()) return;
+    if (!isJuceAvailable()) return;
     const juce = getJuce();
     if (!juce) return;
 
@@ -276,7 +226,7 @@ export function useSynthBridge(): UseSynthBridgeReturn {
 
   // ── WebSocket path (browser-only dev) ──────────────────────────────────────
   const connect = useCallback(() => {
-    if (usingJuce()) return;
+    if (isJuceAvailable()) return;
     if (wsRef.current?.readyState === WebSocket.OPEN) return;
 
     setStatus('connecting');
@@ -314,7 +264,7 @@ export function useSynthBridge(): UseSynthBridgeReturn {
   }, [connect]);
 
   const send = useCallback((msg: WireOutgoing) => {
-    if (usingJuce()) {
+    if (isJuceAvailable()) {
       // Map WireOutgoing variants onto registered native function names.
       switch (msg.type) {
         case 'generate': {
