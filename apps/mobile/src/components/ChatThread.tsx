@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, StyleSheet, FlatList } from 'react-native';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity } from 'react-native';
 import Animated, { useAnimatedStyle, withRepeat, withTiming, useSharedValue, withSequence, Easing } from 'react-native-reanimated';
 import { PatchCard } from './PatchCard';
 import type { ChatMessage } from '../state/mobileState';
@@ -13,6 +13,7 @@ export interface ChatThreadProps {
   onMacroChange: (messageId: string, index: number, value: number) => void;
   onActivatePatch: (messageId: string) => void;
   onSavePatch: (messageId: string) => void;
+  onDismiss?: () => void;
 }
 
 const TypingIndicator = () => {
@@ -56,6 +57,7 @@ export const ChatThread: React.FC<ChatThreadProps> = ({
   onMacroChange,
   onActivatePatch,
   onSavePatch,
+  onDismiss,
 }) => {
   
   const containerStyle = useAnimatedStyle(() => {
@@ -99,6 +101,19 @@ export const ChatThread: React.FC<ChatThreadProps> = ({
 
   return (
     <Animated.View style={[styles.container, containerStyle]}>
+      {onDismiss && (
+        <View style={styles.topBar}>
+          <TouchableOpacity
+            style={styles.dismissButton}
+            onPress={onDismiss}
+            accessibilityRole="button"
+            accessibilityLabel="Dismiss conversation"
+            hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}
+          >
+            <Text style={styles.dismissButtonText}>⌄ Dismiss</Text>
+          </TouchableOpacity>
+        </View>
+      )}
       <FlatList
         data={messages}
         keyExtractor={(item) => item.id}
@@ -122,6 +137,24 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: 'transparent',
+  },
+  topBar: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+    paddingHorizontal: space.sm,
+    paddingVertical: space.xs,
+  },
+  dismissButton: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+    backgroundColor: colors.bg.raised,
+  },
+  dismissButtonText: {
+    color: colors.text.secondary,
+    fontSize: 12,
+    fontWeight: '600',
   },
   listContent: {
     padding: space.md,

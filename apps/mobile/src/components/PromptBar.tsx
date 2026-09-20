@@ -1,11 +1,11 @@
 import React from 'react';
 import {
-  KeyboardAvoidingView,
   Platform,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  View,
 } from 'react-native';
 import Animated, { useAnimatedStyle, withTiming } from 'react-native-reanimated';
 import { colors, radius, space, typeScale } from '../theme/tokens';
@@ -40,10 +40,7 @@ export const PromptBar: React.FC<PromptBarProps> = ({
   }));
 
   return (
-    <KeyboardAvoidingView
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-      style={styles.keyboardView}
-    >
+    <View style={styles.keyboardView}>
       <Animated.View style={[styles.container, animatedStyle]}>
         <TouchableOpacity
           style={[
@@ -82,7 +79,7 @@ export const PromptBar: React.FC<PromptBarProps> = ({
           <Text style={styles.sendIcon}>↑</Text>
         </TouchableOpacity>
       </Animated.View>
-    </KeyboardAvoidingView>
+    </View>
   );
 };
 
