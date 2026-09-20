@@ -16,8 +16,6 @@
 #include "agent/AgentBridge.h"
 #include "engine/PatchStruct.h"
 
-
-
 namespace agentic_synth::ui {
 
 // Phase 4: WebUiComponent is the real bridge between the JUCE host (audio
@@ -54,8 +52,6 @@ public:
     ~WebUiComponent() override;
 
     void resized() override;
-
-
 
     // Phase 12 / #434-#436: scope sample provider hookup. Caller (typically
     // the AudioProcessor editor) wires this to
