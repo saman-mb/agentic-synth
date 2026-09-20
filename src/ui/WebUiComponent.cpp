@@ -5,7 +5,6 @@
 #include "agent/MorphLoop.h"
 #include "agent/PitchDetector.h"
 #include "agent/PromptHandler.h"
-#include "agent/WhisperClient.h"
 
 #include <array>
 #include <atomic>

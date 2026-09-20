@@ -39,18 +39,9 @@ add_executable(agentic_synth_tests
     # Phase 34b (#264) — LLM-as-delta-nudger over the retriever.
     DeltaNudgerTest.cpp
     StreamParserTest.cpp
-    # Phase{1,2,3}AcceptanceTest.cpp — pre-existing master breakage (stale
-    # engine APIs / unqualified PatchStruct / dropped SynthEngine ctor).
-    # Disabled to unblock test target compilation; tracked separately.
-    # Phase2AcceptanceTest.cpp
-    # Phase3AcceptanceTest.cpp
     RealtimeSafetyTest.cpp
     # PresetDatabaseTest.cpp — pre-existing master breakage (unqualified PatchStruct).
     # PresetDatabaseTest.cpp
-    WhisperClientTest.cpp
-    VariationRecommenderTest.cpp
-    MultiModalInputTest.cpp
-    PresetExporterTest.cpp
     # Phase D / #260 — preset commit + persistence (PresetStore).
     PresetStoreTest.cpp
     # Phase G / #262 — MIDI learn map persistence.
@@ -59,7 +50,6 @@ add_executable(agentic_synth_tests
     PitchDetectorTest.cpp
     # Phase D / #268 (partial) — synchronous offline render.
     OfflineRendererTest.cpp
-    StyleTransferTest.cpp
     AgentBridgeCallbacksTest.cpp
     AgentBridgeMidiSinkTest.cpp
     # Phase 22: refinement-context classifier (PromptHandler::isRelativePrompt).

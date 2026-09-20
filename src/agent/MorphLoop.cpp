@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstdlib>
 
+#include "agent/PrePatchPipeline.h"
 #include "engine/PatchValidator.h"
 #include "mapper/ArchetypeLibrary.h"
 #include "mapper/ArchetypeRetriever.h"
@@ -28,62 +29,7 @@ struct Lcg {
     float u01() noexcept { return static_cast<float>(next() >> 8) / 16777216.0f; }
 };
 
-// ── lerpPatch (local copy — PrePatchPipeline.cpp keeps it in anonymous-NS) ──
-// We duplicate the implementation rather than re-export it so this TU does not
-// need to depend on PrePatchPipeline.cpp's internals. Same semantics: snap
-// discrete fields at t>=0.5, lerp continuous params.
-float lerpf(float a, float b, float t) noexcept { return a + (b - a) * t; }
-
-PatchStruct lerpPatch(const PatchStruct& a, const PatchStruct& b, float t) noexcept {
-    PatchStruct out = (t >= 0.5f) ? b : a;
-
-    for (int i = 0; i < kMaxOscillators; ++i) {
-        out.osc[i].semitone_offset = lerpf(a.osc[i].semitone_offset, b.osc[i].semitone_offset, t);
-        out.osc[i].detune_cents = lerpf(a.osc[i].detune_cents, b.osc[i].detune_cents, t);
-        out.osc[i].wavetable_pos = lerpf(a.osc[i].wavetable_pos, b.osc[i].wavetable_pos, t);
-        out.osc[i].fm_ratio = lerpf(a.osc[i].fm_ratio, b.osc[i].fm_ratio, t);
-        out.osc[i].fm_depth = lerpf(a.osc[i].fm_depth, b.osc[i].fm_depth, t);
-        out.osc[i].volume = lerpf(a.osc[i].volume, b.osc[i].volume, t);
-        out.osc[i].pan = lerpf(a.osc[i].pan, b.osc[i].pan, t);
-        out.osc[i].pulse_width = lerpf(a.osc[i].pulse_width, b.osc[i].pulse_width, t);
-    }
-
-    out.filter.cutoff_hz = lerpf(a.filter.cutoff_hz, b.filter.cutoff_hz, t);
-    out.filter.resonance = lerpf(a.filter.resonance, b.filter.resonance, t);
-    out.filter.env_mod = lerpf(a.filter.env_mod, b.filter.env_mod, t);
-    out.filter.key_track = lerpf(a.filter.key_track, b.filter.key_track, t);
-    out.filter.drive = lerpf(a.filter.drive, b.filter.drive, t);
-
-    auto lerpEnv = [&](const EnvParams& ea, const EnvParams& eb, EnvParams& eo) {
-        eo.attack_s = lerpf(ea.attack_s, eb.attack_s, t);
-        eo.decay_s = lerpf(ea.decay_s, eb.decay_s, t);
-        eo.sustain = lerpf(ea.sustain, eb.sustain, t);
-        eo.release_s = lerpf(ea.release_s, eb.release_s, t);
-    };
-    lerpEnv(a.filter_env, b.filter_env, out.filter_env);
-    lerpEnv(a.amp_env, b.amp_env, out.amp_env);
-
-    for (int i = 0; i < kMaxLfos; ++i) {
-        out.lfo[i].rate_hz = lerpf(a.lfo[i].rate_hz, b.lfo[i].rate_hz, t);
-        out.lfo[i].depth = lerpf(a.lfo[i].depth, b.lfo[i].depth, t);
-        out.lfo[i].phase_offset = lerpf(a.lfo[i].phase_offset, b.lfo[i].phase_offset, t);
-    }
-
-    out.reverb.size = lerpf(a.reverb.size, b.reverb.size, t);
-    out.reverb.damping = lerpf(a.reverb.damping, b.reverb.damping, t);
-    out.reverb.width = lerpf(a.reverb.width, b.reverb.width, t);
-    out.reverb.mix = lerpf(a.reverb.mix, b.reverb.mix, t);
-
-    out.delay.time_s = lerpf(a.delay.time_s, b.delay.time_s, t);
-    out.delay.feedback = lerpf(a.delay.feedback, b.delay.feedback, t);
-    out.delay.mix = lerpf(a.delay.mix, b.delay.mix, t);
-    out.delay.stereo = lerpf(a.delay.stereo, b.delay.stereo, t);
-
-    out.master_gain = lerpf(a.master_gain, b.master_gain, t);
-    out.portamento_s = lerpf(a.portamento_s, b.portamento_s, t);
-
-    return out;
-}
+// ── lerpPatch is provided by PrePatchPipeline.h ──
 
 // ── Mutation strategy ────────────────────────────────────────────────────────
 // Uniform random perturbation in [-strength, +strength] of each continuous
