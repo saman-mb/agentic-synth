@@ -16,10 +16,6 @@
 #include "agent/AgentBridge.h"
 #include "engine/PatchStruct.h"
 
-namespace agentic_synth::agent {
-class WhisperClient;
-}
-
 namespace agentic_synth::ui {
 
 // Phase 4: WebUiComponent is the real bridge between the JUCE host (audio
@@ -56,10 +52,6 @@ public:
     ~WebUiComponent() override;
 
     void resized() override;
-
-    // Optional: route push_audio_pcm calls into a WhisperClient. If unset,
-    // pushed PCM is logged and dropped. The component does not own the client.
-    void setWhisperClient(agent::WhisperClient* client) noexcept { whisperClient_ = client; }
 
     // Phase 12 / #434-#436: scope sample provider hookup. Caller (typically
     // the AudioProcessor editor) wires this to
@@ -201,7 +193,6 @@ private:
     std::unique_ptr<TelemetryAwareBrowser> browser_;
     FallbackComponent fallback_;
     std::vector<agent::AgentBridge::SubscriberHandle> subs_;
-    agent::WhisperClient* whisperClient_{nullptr};
 
     // Phase 12 / #434-#436: scope provider hooks — set by the editor (which
     // owns the AudioProcessor reference). Invoked on the message thread from

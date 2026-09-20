@@ -96,9 +96,6 @@ add_library(agentic_synth_engine_core STATIC
     engine/VariationEngine.cpp
     engine/MidiHandler.cpp
     engine/MorphEngine.cpp
-    engine/StyleTransfer.cpp
-    engine/PresetExporter.cpp
-    engine/MultiModalInput.cpp
     # Phase D / #268 (partial) — synchronous off-thread offline bounce of a
     # patch through a fresh VoiceManager into a 24-bit stereo .wav. Powers
     # the "Bounce to wav" affordance on committed presets.
@@ -161,10 +158,7 @@ add_library(agentic_synth_agent STATIC
     agent/MorphTelemetry.cpp
     agent/StreamParser.cpp
     agent/Telemetry.cpp
-    agent/VariationRecommender.cpp
-    agent/WhisperClient.cpp
     agent/GeminiSTT.cpp
-    agent/GenerationService.cpp
 )
 target_include_directories(agentic_synth_agent PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
 agentic_synth_configure_target(agentic_synth_agent)
