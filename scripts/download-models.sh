@@ -8,16 +8,20 @@
 
 set -euo pipefail
 
+# Note on hashes: Model hashes are set to placeholders (0000...) to skip validation 
+# by default. To enable checksum validation, compute the SHA256 of the downloaded 
+# model file and replace the placeholder hash below.
+
 MODELS_DIR="${MODELS_DIR:-models}"
 DOWNLOAD_DIR="${DOWNLOAD_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/agentic-synth/models}"
 
 PHI4_URL="https://huggingface.co/microsoft/Phi-4-mini-instruct-gguf/resolve/main/Phi-4-mini-instruct-q4_k_m.gguf"
 PHI4_FILE="phi-4-q4_k_m.gguf"
-PHI4_SHA256="0000000000000000000000000000000000000000000000000000000000000000"  # TODO: add real hash
+PHI4_SHA256="0000000000000000000000000000000000000000000000000000000000000000"  # TODO: populate this after first download to enforce checksums
 
 LLAMA_URL="https://huggingface.co/bartowski/Llama-3.2-8B-Instruct-GGUF/resolve/main/Llama-3.2-8B-Instruct-Q4_K_M.gguf"
 LLAMA_FILE="llama-3.2-8b-q4_k_m.gguf"
-LLAMA_SHA256="0000000000000000000000000000000000000000000000000000000000000000"  # TODO: add real hash
+LLAMA_SHA256="0000000000000000000000000000000000000000000000000000000000000000"  # TODO: populate this after first download to enforce checksums
 
 mkdir -p "$DOWNLOAD_DIR"
 
