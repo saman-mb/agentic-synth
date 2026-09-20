@@ -38,6 +38,7 @@ CTestTestfile.cmake
 node_modules/
 apps/web/dist/
 apps/web/.vite/
+apps/mobile/.expo/
 .nx/
 *.tsbuildinfo
 npm-debug.log*

@@ -11,9 +11,9 @@ export {
   prepareAudioSession,
   keepAudioContextRunning,
 } from './lib/audioEnvironment';
-export { JsiSynthEngine, AgsynthError } from './lib/jsiEngine';
+export { JsiSynthEngine, AgsynthError, type JsiNativeBinding } from './lib/jsiEngine';
 export { packPatchParams, PATCH_STRUCT_SIZE } from './lib/patchAbi';
-export { setPatchParam } from './lib/paramMap';
+export { getPatchParam, setPatchParam } from './lib/paramMap';
 export {
   SPECTRUM_FLOOR_DB,
   SPECTRUM_CEIL_DB,
@@ -30,3 +30,4 @@ export {
   type ScopeFrame,
   type Fundamental,
 } from './lib/scope';
+

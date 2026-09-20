@@ -1,0 +1,17 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "jsx": "react-jsx",
+    "strict": true,
+    "noEmit": true,
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "types": ["react", "react-native"],
+    "paths": {
+      "@mobile/*": ["./src/*"]
+    }
+  },
+  "include": ["app/**/*.tsx", "app/**/*.ts", "src/**/*.tsx", "src/**/*.ts", "modules/**/*.ts"],
+  "exclude": ["node_modules", "tests"]
+}

@@ -1,0 +1,9 @@
+{
+  "platforms": ["ios", "android"],
+  "ios": {
+    "modules": ["AgsynthModule"]
+  },
+  "android": {
+    "modules": ["expo.modules.agsynth.AgsynthModule"]
+  }
+}
