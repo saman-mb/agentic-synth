@@ -1,4 +1,4 @@
-const DEFAULT_API_BASE = 'https://timbra-synth.netlify.app';
+const DEFAULT_API_BASE = 'https://timbre-synth.netlify.app';
 
 /** Netlify-hosted brief + generate endpoints (#293 / #317). */
 export function getApiBaseUrl(): string {

@@ -32,7 +32,7 @@ const config: ExpoConfig = {
     typedRoutes: true,
   },
   extra: {
-    apiBaseUrl: 'https://timbra-synth.netlify.app',
+    apiBaseUrl: 'https://timbre-synth.netlify.app',
     eas: {
       projectId: 'tambra-mobile-v1',
     },
