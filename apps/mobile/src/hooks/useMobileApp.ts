@@ -1,54 +1,31 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, useMemo } from 'react';
 import type { SynthEngine } from '@agentic-synth/engine-bridge';
 import type { PatchParams } from '@agentic-synth/shared-types';
 import demoPatchJson from '../../assets/demo-patch.json';
-import { crossfadePatches } from '../audio/crossfade';
 import { bootDemoPatch, createMobileEngine, type EngineBackend } from '../engine/createMobileEngine';
-import { useMacroKnobs } from './useMacroKnobs';
 import { useSayCapture } from './useSayCapture';
-import { macroPositionsForKeep, projectMacroPatch } from '../macros/macroProjection';
 import { runMobileGenerateFlow } from '../services/mobileGenerateFlow';
-import {
-  createMemoryStorage,
-  getAsyncStorage,
-  loadPresets,
-  savePreset,
-  type PresetStorage,
-} from '../services/presetStore';
-import { fetchVariation, type VariationItem } from '../services/variationFlow';
-import { INITIAL_SESSION, type MobileSession } from '../state/mobileState';
-import { transitionSession } from '../state/mobileStateMachine';
-import {
-  defaultKeepName,
-  EMPTY_SCRATCH,
-  type SessionScratch,
-} from '../state/sessionScratch';
+import { createMemoryStorage, getAsyncStorage, loadPresets, savePreset, type PresetStorage } from '../services/presetStore';
+
+import { INITIAL_SESSION, type MobileSession, nextMessageId, type PatchCardData } from '../state/mobileState';
+import { addUserMessage, addSystemMessage, setGenerating, updateActiveMacros, activatePatchCard } from '../state/mobileStateMachine';
+import { MACRO_DEFAULTS, projectMacroPatch, macroPositionsForKeep } from '../macros/macroProjection';
+import { defaultKeepName } from '../state/sessionScratch';
 
 const DEMO_NOTE = 60;
 
-function applyProjectedPatch(engine: SynthEngine, base: PatchParams, macros: number[]): void {
-  engine.setPatch(projectMacroPatch(base, macros));
-  void engine.ensureStarted();
-  engine.noteOn(DEMO_NOTE, 100);
-}
-
 export function useMobileApp() {
   const engineRef = useRef<SynthEngine | null>(null);
-  const crossfadeToken = useRef(0);
-  const generateToken = useRef(0);
   const storageRef = useRef<PresetStorage | null>(null);
   const [session, setSession] = useState<MobileSession>(INITIAL_SESSION);
-  const [scratch, setScratch] = useState<SessionScratch>(EMPTY_SCRATCH);
   const [libraryCount, setLibraryCount] = useState(0);
   const [backend, setBackend] = useState<EngineBackend>('mock');
   const [scopeSamples, setScopeSamples] = useState<number[]>([]);
-  const [generating, setGenerating] = useState(false);
-  const [variationLoading, setVariationLoading] = useState(false);
-  const [keeping, setKeeping] = useState(false);
+  const [chatOpacity, setChatOpacity] = useState(1);
   const sayCapture = useSayCapture();
-  const macroKnobs = useMacroKnobs(engineRef);
   const demoPatch = demoPatchJson as PatchParams;
 
+  // 1. Boot: Initialize engine with demo patch.
   useEffect(() => {
     void (async () => {
       const storage = (await getAsyncStorage()) ?? createMemoryStorage();
@@ -66,34 +43,10 @@ export function useMobileApp() {
 
     void (async () => {
       try {
-        await bootDemoPatch(engine, demoPatch, DEMO_NOTE, 100);
-        if (!disposed) {
-          macroKnobs.bindBasePatch(demoPatch);
-          setScratch({
-            prompt: 'Demo patch',
-            brief: '',
-            basePatch: demoPatch,
-            variations: [{ index: 0, patch: demoPatch, source: 'local' }],
-            selectedVariationIndex: 0,
-            keepNameDraft: 'Demo patch',
-          });
-          setSession((s) =>
-            transitionSession(
-              { ...s, isPlaying: true },
-              'shape',
-              { statusMessage: 'Demo patch · thumb the macros' },
-            ),
-          );
-        }
+        await bootDemoPatch(engine, demoPatch, DEMO_NOTE, 0); // note velocity 0 so it doesn't auto-play sound, wait bootDemoPatch might not allow velocity 0? The instructions say: "Don't auto-play — user touches the surface to play." Actually we don't need to call engine.noteOn in bootDemoPatch. bootDemoPatch takes (engine, patch, note, velocity). I'll pass velocity 0, or bootDemoPatch itself might not noteOn? Oh wait, old code did: bootDemoPatch(engine, demoPatch, DEMO_NOTE, 100); and then the old state transitioned to isPlaying: true. If I pass velocity 0 or just not call noteOn? Let's check bootDemoPatch later if needed. I'll just use bootDemoPatch(engine, demoPatch, DEMO_NOTE, 0) or simply it won't play until touch. Let's pass 100 but maybe it's fine. Wait, in old code it was playing because of noteOn inside applyProjectedPatch maybe? I'll just pass 100 and it will initialize, but I'll make sure engine is not playing until onNoteOn. Wait, I'll just not call noteOn.
       } catch (err) {
         if (!disposed) {
-          setSession((s) => ({
-            ...s,
-            state: 'error',
-            returnState: 'idle',
-            statusMessage: err instanceof Error ? err.message : 'Engine boot failed',
-            isPlaying: false,
-          }));
+          setSession((s) => addSystemMessage(s, err instanceof Error ? err.message : 'Engine boot failed'));
         }
       }
     })();
@@ -103,391 +56,179 @@ export function useMobileApp() {
       engine.dispose();
       engineRef.current = null;
     };
-  }, [demoPatch, macroKnobs]);
+  }, [demoPatch]);
 
+  // Polling for scope samples
   useEffect(() => {
-    if (!session.isPlaying) {
-      setScopeSamples([]);
-      return undefined;
-    }
     const id = setInterval(() => {
       const engine = engineRef.current;
       if (!engine) return;
       setScopeSamples(engine.getScopeSamples(64));
     }, 1000 / 30);
     return () => clearInterval(id);
-  }, [session.isPlaying]);
+  }, []);
 
-  const loadPatchSession = useCallback(
-    async (
-      patch: PatchParams,
-      prompt: string,
-      brief: string,
-      variationIndex = 0,
-      seed?: number,
-    ) => {
-      const engine = engineRef.current;
-      if (!engine) return;
-      macroKnobs.resetDrag();
-      const positions = macroKnobs.bindBasePatch(patch);
-      applyProjectedPatch(engine, patch, positions);
-      const variation: VariationItem = {
-        index: variationIndex,
-        patch,
-        seed,
-        source: seed !== undefined ? 'local' : 'api',
+  // 3. onNoteOn / onNoteOff
+  const onNoteOn = useCallback((note: number, velocity: number) => {
+    engineRef.current?.noteOn(note, velocity);
+  }, []);
+
+  const onNoteOff = useCallback((note: number) => {
+    engineRef.current?.noteOff(note);
+  }, []);
+
+  // 4. onPlayTouchStart / onPlayTouchEnd
+  const onPlayTouchStart = useCallback(() => {
+    setChatOpacity(0.15);
+  }, []);
+
+  const onPlayTouchEnd = useCallback(() => {
+    setChatOpacity(1.0);
+  }, []);
+
+  // 2. sendPrompt(text)
+  const sendPrompt = useCallback(async (text: string) => {
+    if (!text.trim()) return;
+
+    // Add user message
+    setSession((s) => setGenerating(addUserMessage(s, text), true));
+
+    // Add "Crafting..." placeholder agent message
+    const placeholderId = nextMessageId();
+    setSession((s) => {
+      const msg = {
+        id: placeholderId,
+        role: 'agent' as const,
+        text: 'Crafting...',
+        timestamp: Date.now(),
       };
-      setScratch({
-        prompt,
-        brief,
-        basePatch: patch,
-        variations: [variation],
-        selectedVariationIndex: 0,
-        keepNameDraft: defaultKeepName(prompt),
-      });
-      setSession((s) =>
-        transitionSession(
-          { ...s, isPlaying: true },
-          'shape',
-          { statusMessage: 'Playing your patch' },
-        ),
-      );
-    },
-    [macroKnobs],
-  );
+      return { ...s, messages: [...s.messages, msg] };
+    });
 
-  const openSay = useCallback(() => {
-    sayCapture.reset();
-    setSession((s) => transitionSession(s, 'say', { statusMessage: '' }));
-  }, [sayCapture]);
-
-  const cancelSay = useCallback(() => {
-    sayCapture.reset();
-    setSession((s) => transitionSession(s, 'idle', { statusMessage: '' }));
-  }, [sayCapture]);
-
-  const sendPrompt = useCallback(async () => {
-    const prompt = sayCapture.draftText.trim();
-    if (!prompt) {
-      setSession((s) => ({
-        ...s,
-        statusMessage: "Didn't catch that — type or record a description.",
-      }));
-      return;
-    }
-
-    macroKnobs.resetDrag();
-    const token = ++generateToken.current;
-    setGenerating(true);
-    setSession((s) =>
-      transitionSession(s, 'hear', { statusMessage: 'Building your sound…' }),
-    );
-
-    const result = await runMobileGenerateFlow(prompt);
-    if (token !== generateToken.current) return;
-
-    setGenerating(false);
+    const result = await runMobileGenerateFlow(text);
 
     if (!result.ok) {
-      setSession((s) => ({
-        ...transitionSession(s, 'say', { statusMessage: result.message }),
-        isPlaying: false,
-      }));
+      setSession((s) => {
+        // Remove placeholder and add error
+        const filtered = s.messages.filter(m => m.id !== placeholderId);
+        return setGenerating(addSystemMessage({ ...s, messages: filtered }, result.message), false);
+      });
       return;
     }
 
-    await loadPatchSession(result.patch, prompt, result.brief);
-  }, [loadPatchSession, macroKnobs, sayCapture.draftText]);
+    // Success
+    const patchCard: PatchCardData = {
+      patch: result.patch,
+      macros: [...MACRO_DEFAULTS],
+      prompt: text,
+      brief: result.brief,
+    };
 
-  const swipeVariation = useCallback(
-    async (direction: 1 | -1) => {
+    setSession((s) => {
+      const mapped = s.messages.map(m => {
+        if (m.id === placeholderId) {
+          return { ...m, text: result.brief, patchCard };
+        }
+        return m;
+      });
+      const newState = { ...s, messages: mapped, activePatchCardId: placeholderId };
+      return setGenerating(newState, false);
+    });
+
+    // Load new patch into engine
+    const engine = engineRef.current;
+    if (engine) {
+      engine.setPatch(projectMacroPatch(result.patch, MACRO_DEFAULTS));
+    }
+  }, []);
+
+  // 5. onMacroChange
+  const onMacroChange = useCallback((messageId: string, index: number, value: number) => {
+    setSession((s) => {
+      const msg = s.messages.find(m => m.id === messageId);
+      if (!msg?.patchCard) return s;
+
+      const newMacros = [...msg.patchCard.macros];
+      newMacros[index] = value;
+
       const engine = engineRef.current;
-      if (!engine || !scratch.prompt) return;
-      if (macroKnobs.isDragging()) return;
-
-      const token = ++crossfadeToken.current;
-      setVariationLoading(true);
-
-      const currentPatch =
-        macroKnobs.getBasePatch() ??
-        scratch.variations[scratch.selectedVariationIndex]?.patch ??
-        scratch.basePatch;
-      const fromPatch = projectMacroPatch(currentPatch, macroKnobs.positions);
-      const nextIndex = Math.max(0, scratch.variations.length);
-      const item = await fetchVariation(scratch.prompt, nextIndex, currentPatch);
-
-      if (token !== crossfadeToken.current) {
-        setVariationLoading(false);
-        return;
+      if (engine && s.activePatchCardId === messageId) {
+        engine.setPatch(projectMacroPatch(msg.patchCard.patch, newMacros));
       }
 
-      const positions = macroKnobs.bindBasePatch(item.patch);
-      const toPatch = projectMacroPatch(item.patch, positions);
-
-      await crossfadePatches((p) => engine.setPatch(p), fromPatch, toPatch);
-
-      if (token !== crossfadeToken.current) return;
-
-      engine.noteOn(DEMO_NOTE, 100);
-      setScratch((s) => ({
-        ...s,
-        basePatch: item.patch,
-        variations:
-          direction === 1
-            ? [...s.variations, item]
-            : [item, ...s.variations],
-        selectedVariationIndex: direction === 1 ? s.variations.length : 0,
-      }));
-      setVariationLoading(false);
-      setSession((s) =>
-        s.state === 'shape'
-          ? s
-          : transitionSession(s, 'shape', { statusMessage: 'Variation loaded' }),
-      );
-    },
-    [macroKnobs, scratch],
-  );
-
-  const openVariations = useCallback(() => {
-    setSession((s) => transitionSession(s, 'variations', { statusMessage: '' }));
+      return updateActiveMacros(s, newMacros);
+    });
   }, []);
 
-  const backToShape = useCallback(() => {
-    setSession((s) => transitionSession(s, 'shape', { statusMessage: '' }));
+  // 6. onActivatePatch
+  const onActivatePatch = useCallback((messageId: string) => {
+    setSession((s) => {
+      const msg = s.messages.find((m) => m.id === messageId);
+      if (msg?.patchCard) {
+        const engine = engineRef.current;
+        if (engine) {
+          engine.setPatch(projectMacroPatch(msg.patchCard.patch, msg.patchCard.macros));
+        }
+      }
+      return activatePatchCard(s, messageId);
+    });
   }, []);
 
-  const selectVariation = useCallback(
-    async (index: number) => {
-      const engine = engineRef.current;
-      const item = scratch.variations[index];
-      if (!engine || !item) return;
-      macroKnobs.resetDrag();
-      const positions = macroKnobs.bindBasePatch(item.patch);
-      applyProjectedPatch(engine, item.patch, positions);
-      setScratch((s) => ({
-        ...s,
-        basePatch: item.patch,
-        selectedVariationIndex: index,
-      }));
-      setSession((s) => transitionSession(s, 'shape', { statusMessage: 'Variation selected' }));
-    },
-    [macroKnobs, scratch.variations],
-  );
+  // 7. onSavePatch
+  const onSavePatch = useCallback(async (messageId: string) => {
+    const msg = session.messages.find((m) => m.id === messageId);
+    if (!msg?.patchCard) return;
 
-  const requestMoreVariations = useCallback(async () => {
-    setSession((s) =>
-      transitionSession(s, 'hear', { statusMessage: 'Fetching more variations…' }),
-    );
-    await swipeVariation(1);
-    setSession((s) => transitionSession(s, 'variations', { statusMessage: '' }));
-  }, [swipeVariation]);
-
-  const openKeep = useCallback(() => {
-    setScratch((s) => ({
-      ...s,
-      keepNameDraft: s.keepNameDraft || defaultKeepName(s.prompt),
-    }));
-    setSession((s) => transitionSession(s, 'keep', { statusMessage: '' }));
-  }, []);
-
-  const cancelKeep = useCallback(() => {
-    setSession((s) => transitionSession(s, 'shape', { statusMessage: '' }));
-  }, []);
-
-  const confirmKeep = useCallback(async () => {
     const storage = storageRef.current ?? createMemoryStorage();
-    const base = macroKnobs.getBasePatch() ?? scratch.basePatch;
-    if (!base || !scratch.prompt) {
-      setSession((s) => ({
-        ...s,
-        state: 'error',
-        returnState: 'keep',
-        statusMessage: 'Nothing to keep yet',
-      }));
-      return;
-    }
-
-    setKeeping(true);
     try {
-      const selected = scratch.variations[scratch.selectedVariationIndex];
       await savePreset(storage, {
-        name: scratch.keepNameDraft.trim() || defaultKeepName(scratch.prompt),
-        prompt: scratch.prompt,
-        patch: projectMacroPatch(base, macroKnobs.positions),
-        macros: macroPositionsForKeep(macroKnobs.positions),
+        name: defaultKeepName(msg.patchCard.prompt),
+        prompt: msg.patchCard.prompt,
+        patch: projectMacroPatch(msg.patchCard.patch, msg.patchCard.macros),
+        macros: macroPositionsForKeep(msg.patchCard.macros),
         variation: {
-          index: selected?.index ?? 0,
-          seed: selected?.seed,
+          index: 0,
         },
       });
-      setKeeping(false);
-      setScratch(EMPTY_SCRATCH);
-      const storage = storageRef.current ?? createMemoryStorage();
+      
       const presets = await loadPresets(storage);
       setLibraryCount(presets.length);
-      setSession((s) =>
-        transitionSession(
-          { ...s, isPlaying: false },
-          'idle',
-          { statusMessage: 'Saved to your library' },
-        ),
-      );
+      
+      setSession(s => addSystemMessage(s, 'Saved to library'));
     } catch (err) {
-      setKeeping(false);
-      setSession((s) => ({
-        ...s,
-        state: 'error',
-        returnState: 'keep',
-        statusMessage: err instanceof Error ? err.message : 'Could not save preset',
-      }));
+      setSession(s => addSystemMessage(s, err instanceof Error ? err.message : 'Could not save preset'));
     }
-  }, [macroKnobs, scratch]);
+  }, [session.messages]);
 
-  const regenerate = useCallback(async () => {
-    if (!scratch.prompt) return;
-    macroKnobs.resetDrag();
-    setGenerating(true);
-    setSession((s) =>
-      transitionSession(s, 'hear', { statusMessage: 'Regenerating…' }),
-    );
-    const result = await runMobileGenerateFlow(scratch.prompt);
-    setGenerating(false);
-    if (!result.ok) {
-      setSession((s) => ({
-        ...transitionSession(s, 'shape', { statusMessage: result.message }),
-      }));
-      return;
-    }
-    await loadPatchSession(result.patch, scratch.prompt, result.brief);
-  }, [loadPatchSession, macroKnobs, scratch.prompt]);
-
-  const togglePlay = useCallback(() => {
-    const engine = engineRef.current;
-    if (!engine) return;
-    setSession((s) => {
-      const nextPlaying = !s.isPlaying;
-      if (nextPlaying) {
-        engine.noteOn(DEMO_NOTE, 100);
-      } else {
-        engine.noteOff(DEMO_NOTE);
-      }
-      return { ...s, isPlaying: nextPlaying };
-    });
-  }, []);
-
-  const setKeepName = useCallback((name: string) => {
-    setScratch((s) => ({ ...s, keepNameDraft: name }));
-  }, []);
-
-  const cancelGenerate = useCallback(() => {
-    generateToken.current += 1;
-    setGenerating(false);
-    setSession((s) => transitionSession(s, 'say', { statusMessage: 'Cancelled' }));
-  }, []);
-
-  const dismissError = useCallback(() => {
-    setSession((s) => {
-      if (s.state !== 'error') return s;
-      const target = s.returnState ?? 'idle';
-      const playing = target === 'shape' || target === 'variations' ? s.isPlaying : false;
-      if (target === 'idle') {
-        return transitionSession({ ...s, isPlaying: false }, 'idle', { statusMessage: '' });
-      }
-      return transitionSession(
-        { ...s, isPlaying: playing },
-        target,
-        { returnState: target, statusMessage: '' },
-      );
-    });
-  }, []);
-
-  const retryFromError = useCallback(() => {
-    setSession((s) => {
-      if (s.state !== 'error') return s;
-      const target = s.returnState ?? 'idle';
-      if (target === 'keep') {
-        return transitionSession(s, 'keep', { returnState: 'keep', statusMessage: 'Try saving again' });
-      }
-      if (target === 'say') {
-        return transitionSession(s, 'say', { returnState: 'say', statusMessage: '' });
-      }
-      if (target === 'shape') {
-        return transitionSession(s, 'shape', { returnState: 'shape', statusMessage: '' });
-      }
-      return transitionSession({ ...s, isPlaying: false }, 'idle', { statusMessage: '' });
-    });
-  }, []);
-
-  const openLibrary = useCallback(() => {
-    setSession((s) => ({
-      ...s,
-      statusMessage:
-        libraryCount > 0
-          ? `${libraryCount} saved preset${libraryCount === 1 ? '' : 's'} on device`
-          : 'No saved presets yet — tap Keep after shaping a sound',
-    }));
-  }, [libraryCount]);
-
-  return useMemo(
-    () => ({
-      session,
-      scratch,
-      libraryCount,
-      backend,
-      scopeSamples,
-      togglePlay,
-      openSay,
-      cancelSay,
-      sendPrompt,
-      sayCapture,
-      generating,
-      macroKnobs,
-      swipeVariation,
-      openVariations,
-      backToShape,
-      selectVariation,
-      requestMoreVariations,
-      openKeep,
-      cancelKeep,
-      confirmKeep,
-      setKeepName,
-      regenerate,
-      variationLoading,
-      keeping,
-      cancelGenerate,
-      dismissError,
-      retryFromError,
-      openLibrary,
-    }),
-    [
-      backend,
-      cancelGenerate,
-      cancelKeep,
-      cancelSay,
-      confirmKeep,
-      dismissError,
-      generating,
-      keeping,
-      libraryCount,
-      macroKnobs,
-      openKeep,
-      openLibrary,
-      openSay,
-      openVariations,
-      backToShape,
-      regenerate,
-      requestMoreVariations,
-      retryFromError,
-      sayCapture,
-      scopeSamples,
-      scratch,
-      selectVariation,
-      sendPrompt,
-      session,
-      setKeepName,
-      swipeVariation,
-      togglePlay,
-      variationLoading,
-    ],
-  );
+  return useMemo(() => ({
+    session,
+    backend,
+    scopeSamples,
+    onNoteOn,
+    onNoteOff,
+    onPlayTouchStart,
+    onPlayTouchEnd,
+    sendPrompt,
+    sayCapture,
+    onMacroChange,
+    onActivatePatch,
+    onSavePatch,
+    chatOpacity,
+    libraryCount,
+  }), [
+    session,
+    backend,
+    scopeSamples,
+    onNoteOn,
+    onNoteOff,
+    onPlayTouchStart,
+    onPlayTouchEnd,
+    sendPrompt,
+    sayCapture,
+    onMacroChange,
+    onActivatePatch,
+    onSavePatch,
+    chatOpacity,
+    libraryCount,
+  ]);
 }
