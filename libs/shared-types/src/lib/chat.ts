@@ -103,7 +103,7 @@ export type WireIncoming =
   // covers both user cancel and write failure; UI distinguishes via `error`.
   | { type: 'bounce_complete'; ok: boolean; path?: string; error?: string }
   // Phase G / #247 — autocorrelation pitch detection over the PTT buffer.
-  // Confidence-gated on the C++ side at >0.7. UI shows a "TIMBRE heard a
+  // Confidence-gated on the C++ side at >0.7. UI shows a "Tambra heard a
   // note around B♭3" chip near the prompt textarea.
   | { type: 'hum_pitch_detected'; midi_note: number; confidence: number; frequency_hz: number }
   // Phase G / #262 — MidiLearnStore captured a CC for the learning knob.

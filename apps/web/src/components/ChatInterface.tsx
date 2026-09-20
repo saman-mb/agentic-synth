@@ -481,7 +481,7 @@ function ProactiveSuggestionStrip({ suggestions, onDismiss }: ProactiveSuggestio
 //                     We show neutral sensory-language placeholders that
 //                     match the §2 vocabulary of the translator prompt
 //                     (weight / temperature / texture / motion / light)
-//                     so the ticker reads like TIMBRE listening, not like
+//                     so the ticker reads like Tambra listening, not like
 //                     loading dots.
 //   SHAPING         — the ENHANCER returned a brief. We split it on its
 //                     fixed-section labels and scroll two lines at a time
@@ -879,7 +879,7 @@ export function ChatInterface({
           setIsGenerating(false);
           // Log original engineering detail for devs; never to UI.
           // eslint-disable-next-line no-console
-          console.debug('[TIMBRE] LLM error:', msg.message);
+          console.debug('[Tambra] LLM error:', msg.message);
           // Schedule on a microtask so lastPrompt is set by the time we
           // read it for the failure card. If we're already in a retry
           // cycle for the same prompt, increment the attempt counter

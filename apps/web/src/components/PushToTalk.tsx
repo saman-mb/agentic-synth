@@ -52,7 +52,7 @@ function openSystemSettings() {
     : '';
   if (!url) {
     // eslint-disable-next-line no-console
-    console.info('[TIMBRE] Open Settings: please enable microphone access.');
+    console.info('[Tambra] Open Settings: please enable microphone access.');
     return;
   }
   const juce = (window as unknown as { __JUCE__?: { backend?: { emitEvent?: (n: string, p: unknown) => void } } }).__JUCE__;
@@ -69,7 +69,7 @@ function openSystemSettings() {
     window.open(url, '_blank', 'noopener');
   } catch (e) {
     // eslint-disable-next-line no-console
-    console.info('[TIMBRE] Open Settings failed silently:', e);
+    console.info('[Tambra] Open Settings failed silently:', e);
   }
 }
 
@@ -168,7 +168,7 @@ export function PushToTalk({
       // anyone needs to debug.
       const name = e instanceof Error ? e.name : 'MicError';
       // eslint-disable-next-line no-console
-      console.debug('[TIMBRE] PushToTalk getUserMedia failed:', name, e);
+      console.debug('[Tambra] PushToTalk getUserMedia failed:', name, e);
       const kind: MicFailure =
         name === 'NotAllowedError' ? 'permission'
         : name === 'NotFoundError' ? 'no-device'
@@ -207,7 +207,7 @@ export function PushToTalk({
       setState('recording');
     } catch (e) {
       // eslint-disable-next-line no-console
-      console.debug('[TIMBRE] PushToTalk audio init failed:', e);
+      console.debug('[Tambra] PushToTalk audio init failed:', e);
       setFailure('audio-init');
       await teardown();
       setState('idle');
@@ -267,7 +267,7 @@ export function PushToTalk({
       onData(raw.buffer.slice(raw.byteOffset, raw.byteOffset + raw.byteLength));
     } catch (e) {
       // eslint-disable-next-line no-console
-      console.debug('[TIMBRE] PushToTalk resample failed:', e);
+      console.debug('[Tambra] PushToTalk resample failed:', e);
       setFailure('resample');
     }
 

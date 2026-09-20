@@ -2,7 +2,7 @@
 
 # 🎛️ Tambra
 
-<img src="docs/timbre-hero.gif" alt="Tambra — an animated explosion of energy bursting into a waveform, purple, pink and yellow, with the wordmark Tambra — Say it. Hear it." width="640" />
+<img src="docs/tambra-hero.gif" alt="Tambra — an animated explosion of energy bursting into a waveform, purple, pink and yellow, with the wordmark Tambra — Say it. Hear it." width="640" />
 
 ### **Say it. Hear it.**
 
@@ -153,6 +153,7 @@ GEMINI_KEY=your-key netlify dev      # http://localhost:8888
 | **Node.js 22** + npm | Builds the React UI (`nx test` uses `--experimental-strip-types`) |
 | **Gemini API key** | Required for LLM patch generation — see [step 3](#3-configure-your-api-key) |
 | **WebView runtime** | macOS: WKWebView (built in) · Windows: [WebView2](https://developer.microsoft.com/microsoft-edge/webview2/) · Linux: `libwebkit2gtk-4.1-0` + `-dev` |
+| **Emscripten** | Only for the browser demo — the desktop app and plugin run the C++ engine natively. Version pinned in `cmake/emscripten-version`. |
 
 ### 2. Build
 
@@ -194,7 +195,7 @@ three parent directories.
 
 ```sh
 cmake --build build --target AgenticSynth_Plugin_Standalone
-open build/src/AgenticSynth_Plugin_artefacts/Debug/Standalone/TIMBRE.app
+open build/src/AgenticSynth_Plugin_artefacts/Debug/Standalone/Tambra.app
 ```
 
 On first launch, open **Settings → Audio device → Open** to choose your output
@@ -206,10 +207,10 @@ device, sample rate, and MIDI input.
 
 | Path | What it is |
 |---|---|
-| `build/src/AgenticSynth_Plugin_artefacts/<config>/Standalone/TIMBRE.app` | **Standalone app with audio** — start here |
+| `build/src/AgenticSynth_Plugin_artefacts/<config>/Standalone/Tambra.app` | **Standalone app with audio** — start here |
 | `build/src/AgenticSynth_Plugin_artefacts/<config>/VST3/` | VST3 plugin |
 | `build/src/AgenticSynth_Plugin_artefacts/<config>/AU/` | Audio Unit (macOS) |
-| `build/src/AgenticSynth_artefacts/<config>/TIMBRE.app` | UI-only shell — **no audio**, for front-end work |
+| `build/src/AgenticSynth_artefacts/<config>/Tambra.app` | UI-only shell — **no audio**, for front-end work |
 
 ---
 
@@ -227,7 +228,7 @@ npx nx serve web                # http://localhost:5173
 # Terminal 2
 cmake -B build -DAGENTIC_SYNTH_UI_DEV=ON
 cmake --build build --target AgenticSynth_Plugin_Standalone
-open build/src/AgenticSynth_Plugin_artefacts/Debug/Standalone/TIMBRE.app
+open build/src/AgenticSynth_Plugin_artefacts/Debug/Standalone/Tambra.app
 ```
 
 Component edits hot-reload in place. The native bridge behaves exactly as in

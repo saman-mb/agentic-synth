@@ -51,6 +51,8 @@ jobs:
 
       - name: Build web
         run: npx nx build web
+        env:
+          AGSYNTH_REQUIRE_WASM: '1'
 
       - name: Verify wasm artefacts
         run: |

@@ -1,6 +1,6 @@
 // ── UI Audio (Phase 10 §17) ─────────────────────────────────────────
 //
-// TIMBRE is "mostly silent" — only two opt-in confirmation sounds:
+// Tambra is "mostly silent" — only two opt-in confirmation sounds:
 //   • voice-transcribe pip   (40ms sine at A4, ~−30dBFS)
 //   • patch-load tape-stop   (~200ms sine ramp 220Hz → 40Hz)
 //

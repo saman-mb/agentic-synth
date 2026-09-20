@@ -9,6 +9,7 @@
     "build": {
       "executor": "nx:run-commands",
       "outputs": ["{projectRoot}/dist"],
+      "inputs": ["default", "^default", { "env": "AGSYNTH_REQUIRE_WASM" }],
       "options": {
         "command": "npx vite build",
         "cwd": "apps/web"
@@ -17,7 +18,7 @@
     "serve": {
       "executor": "nx:run-commands",
       "options": {
-        "command": "npx vite",
+        "command": "node ../../scripts/sync-prompts.mjs && npx vite",
         "cwd": "apps/web"
       }
     },
@@ -31,6 +32,12 @@
       "executor": "nx:run-commands",
       "options": {
         "command": "node -e \"console.log('web: no unit tests yet')\""
+      }
+    },
+    "test-e2e": {
+      "executor": "nx:run-commands",
+      "options": {
+        "command": "node --test apps/web/e2e/crossBrowserAudio.test.mjs"
       }
     }
   }

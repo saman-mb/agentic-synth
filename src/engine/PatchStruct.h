@@ -62,7 +62,10 @@ struct OscParams {
     float volume;          // 0 .. 1
     float pan;             // -1 (L) .. +1 (R)
     float pulse_width;     // 0.01 .. 0.99 (pulse/square)
-    uint8_t enabled;       // bool flag
+    // Hard mute (#266): when enabled==0 the slot is skipped regardless of
+    // volume — volume does not resurrect a disabled slot. Audible ≈
+    // enabled && volume > ε (augmenter uses ε = 0.15 for layering heuristics).
+    uint8_t enabled;
     uint8_t _pad2[3];
 };
 static_assert(sizeof(OscParams) == 40);
@@ -75,13 +78,53 @@ struct EnvParams {
 };
 static_assert(sizeof(EnvParams) == 16);
 
+// Maximum filter-envelope → cutoff depth in octaves at env_mod = +1 and a
+// filter envelope at full output (1.0). Convention: 4 octaves = 16× cutoff.
+// Negative env_mod mirrors this (down to 1/16×). #428.
+inline constexpr float kFilterEnvMaxOctaves = 4.0f;
+
+// Filter cutoff contract (#428 / #429)
+// ------------------------------------
+// `cutoff_hz` is the base cutoff when the filter envelope is at output 0,
+// key_track is 0, and no LFO is routed to FilterCutoff. Modulation stacks
+// multiplicatively in this order (VoiceManager::renderStereo):
+//
+//     audible_cutoff = clamp(
+//         cutoff_hz
+//         * (voiceFreq / midiNoteToHz(60))^key_track   // #429 key track
+//         * (1 + lfo_cutoff_mod)                       // LFO FilterCutoff
+//         * 2^(env_mod * kFilterEnvMaxOctaves * env_out),
+//         20 Hz, 20000 Hz)
+//
+// Key-track decision (#429): reference MIDI note is 60 (C4 ≈ 261.63 Hz at
+// A440). key_track = 0 → identity (bit-exact skip); key_track = 1 → cutoff
+// scales 1:1 with voice fundamental relative to C4
+// (exp2(key_track * log2(voiceFreq / ref))). Partial tracking (0..1) is a
+// fractional exponent on that ratio.
+//
+// where env_out is the ADSR output shaped by filter_env.attack_s, decay_s,
+// sustain and release_s. Consequences:
+//   * env_mod =  1.0 → +4 octaves (16×) at the envelope peak (env_out = 1).
+//   * env_mod = -1.0 → -4 octaves (1/16×) at the envelope peak.
+//   * env_mod =  0.0 → no envelope modulation of cutoff.
+// During a held note the envelope settles at filter_env.sustain, so the
+// steady-state cutoff (with key_track = 0) is cutoff_hz *
+// 2^(env_mod * kFilterEnvMaxOctaves * filter_env.sustain). With sustain = 0
+// the envelope decays back to 0 and the sustained cutoff returns to
+// cutoff_hz (× key-track term). Because the depth is in octaves, env_mod
+// buys the same interval at every cutoff_hz.
+//
+// Velocity is deliberately NOT part of this contract: it scales only the
+// amplitude envelope peak (VoiceManager::renderStereo). Velocity → cutoff is
+// not silently folded into env_mod — there is no velocity→cutoff field, so
+// hard-played notes are not brighter unless the patch itself asks for it.
 struct FilterParams {
     FilterType type;
     uint8_t _pad[3];
     float cutoff_hz; // 20 .. 20000
     float resonance; // 0 .. 1
-    float env_mod;   // -1 .. +1 (filter envelope depth)
-    float key_track; // 0 .. 1
+    float env_mod;   // -1 .. +1; octave depth, ±kFilterEnvMaxOctaves at env peak
+    float key_track; // 0 .. 1; fraction of pitch→cutoff tracking vs MIDI 60
     float drive;     // 0 .. 1
 };
 static_assert(sizeof(FilterParams) == 24);
@@ -108,6 +151,8 @@ static_assert(sizeof(ReverbParams) == 16);
 
 // Phase E (#265): pre-filter chorus + tube saturation + reverb-send HPF.
 //
+// #265 places chorus and saturation BEFORE the filter, in the order
+// oscillators → chorus → saturation → filter (see VoiceManager::renderStereo).
 // The augmenter writes these for the cinematic recipe; LLM grammar emits
 // them as well so the same patch JSON round-trips. All POD, fixed size,
 // trivially copyable — no allocation, no juce::var, no std::string.
@@ -180,9 +225,11 @@ struct PatchStruct {
     DelayParams delay;
 
     // Phase E (#265): pre-filter chorus + tube saturation. Inserted in the
-    // per-voice signal chain BEFORE the filter (see VoiceManager.cpp). Both
-    // default to bypass (chorus.mix==0, tubesat.drive==0) so older patches
-    // and the augmenter's non-cinematic paths leave the audio untouched.
+    // per-voice signal chain BEFORE the filter, chorus first, then saturation
+    // (oscillators → chorus → saturation → filter — see VoiceManager.cpp).
+    // Both default to bypass (chorus.mix==0, tubesat.drive==0) so older
+    // patches and the augmenter's non-cinematic paths leave the audio
+    // untouched.
     ChorusParams chorus;
     TubeSatParams tubesat;
     // Reverb auxiliary-send HPF cutoff (Hz). 0 = bypass; 60..200 Hz = clean

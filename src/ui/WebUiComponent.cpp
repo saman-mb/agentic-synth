@@ -5,7 +5,6 @@
 #include "agent/MorphLoop.h"
 #include "agent/PitchDetector.h"
 #include "agent/PromptHandler.h"
-#include "agent/WhisperClient.h"
 
 #include <array>
 #include <atomic>
@@ -61,6 +60,10 @@ juce::String mimeForPath(const juce::String& path) {
         return "application/json";
     if (path.endsWithIgnoreCase(".png"))
         return "image/png";
+    if (path.endsWithIgnoreCase(".gif"))
+        return "image/gif";
+    if (path.endsWithIgnoreCase(".webp"))
+        return "image/webp";
     if (path.endsWithIgnoreCase(".jpg") || path.endsWithIgnoreCase(".jpeg"))
         return "image/jpeg";
     if (path.endsWithIgnoreCase(".ico"))
@@ -237,7 +240,7 @@ juce::String WebUiComponent::buildFallbackMessage(const juce::String& errorInfo)
     // string stays in sync with project(... VERSION X.Y.Z) at root level.
     // Test target also defines these (see tests/CMakeLists.txt).
 #ifndef AGENTIC_SYNTH_PROJECT_NAME
-#define AGENTIC_SYNTH_PROJECT_NAME "TIMBRE"
+#define AGENTIC_SYNTH_PROJECT_NAME "Tambra"
 #endif
 #ifndef AGENTIC_SYNTH_VERSION_STRING
 #define AGENTIC_SYNTH_VERSION_STRING "0.0.0"
@@ -928,7 +931,7 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
         // commit_preset). Promise resolves immediately; the actual render
         // emits `bounce_complete` when the wav is on disk.
         const auto& patchVar = argOr(args, 0, juce::var{});
-        const auto suggested = argOr(args, 1, juce::var{"timbre-bounce"}).toString();
+        const auto suggested = argOr(args, 1, juce::var{"tambra-bounce"}).toString();
         completion(juce::var{});
 
         PatchStruct patch = make_default_patch();
@@ -946,11 +949,11 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
         // FileChooser must run on the message thread; we're already there.
         auto safeName = suggested.replaceCharacters(" /\\:?*\"<>|", "__________");
         if (safeName.isEmpty())
-            safeName = "timbre-bounce";
+            safeName = "tambra-bounce";
         auto defaultLoc =
             juce::File::getSpecialLocation(juce::File::userMusicDirectory).getChildFile(safeName + ".wav");
         auto chooser =
-            std::make_shared<juce::FileChooser>(juce::String("Save TIMBRE bounce"), defaultLoc, juce::String("*.wav"));
+            std::make_shared<juce::FileChooser>(juce::String("Save Tambra bounce"), defaultLoc, juce::String("*.wav"));
         chooser->launchAsync(juce::FileBrowserComponent::saveMode | juce::FileBrowserComponent::canSelectFiles |
                                  juce::FileBrowserComponent::warnAboutOverwriting,
                              [this, chooser, patch](const juce::FileChooser& fc) {
@@ -977,40 +980,46 @@ WebUiComponent::WebUiComponent(agent::AgentBridge& bridge)
 
     options = options.withNativeFunction(
         juce::Identifier{"getScopeSamples"}, [this](const juce::Array<juce::var>& args, NativeFnCompletion completion) {
-            // Phase 12: visualizer audio tap. JS asks for up to N samples
-            // (default 1024); we pull lock-free from the plugin's SPSC scope
-            // queue on the message thread, pack into a juce::var Array of
-            // numbers and resolve the JS promise. If no provider is wired
-            // (browser dev, headless tests) we resolve with an empty array so
-            // the React side cleanly falls back to its simulated synth path.
-            int maxSamples = static_cast<int>(argOr(args, 0, juce::var{1024}));
-            if (maxSamples <= 0) {
-                completion(juce::var{juce::Array<juce::var>{}});
-                return;
+            // Phase 12 / #434-#436: visualizer audio tap. JS asks for up to N
+            // *frames* (default 1024); we pull the newest contiguous stereo
+            // window from the plugin's lock-free ScopeRing on the message
+            // thread, pack it as interleaved L/R plus the engine's real sample
+            // rate and the ring's drop/stale counters, and resolve the JS
+            // promise with one object. If no provider is wired (browser dev,
+            // headless tests) we resolve an empty frame so the React side
+            // shows "no signal" instead of a fabricated trace.
+            int maxFrames = static_cast<int>(argOr(args, 0, juce::var{1024}));
+            if (maxFrames <= 0) {
+                maxFrames = 0;
             }
-            // Cap at scope queue capacity so a runaway JS request can never
-            // ask us to drain more than the audio thread could ever have
-            // produced. 4096 mirrors AgenticSynthPlugin::kScopeQueueCapacity.
-            constexpr int kHardCap = 4096;
-            if (maxSamples > kHardCap)
-                maxSamples = kHardCap;
+            // Cap at ring capacity so a runaway JS request can never ask us to
+            // copy more than the audio thread could ever have produced. 4096
+            // mirrors AgenticSynthPlugin::kScopeCapacityFrames.
+            constexpr int kHardCapFrames = 4096;
+            if (maxFrames > kHardCapFrames)
+                maxFrames = kHardCapFrames;
 
-            if (!scopeProvider_) {
-                completion(juce::var{juce::Array<juce::var>{}});
-                return;
-            }
-
-            // Scratch buffer on the stack — small (≤4096 floats = 16 KB),
+            // Scratch buffer on the stack — ≤4096 frames × 2 ch × 4 B = 32 KB,
             // well within the 8 MB message-thread stack budget. No heap
             // allocation in the audio-bridge path.
-            std::array<float, kHardCap> scratch{};
-            const int n = scopeProvider_(scratch.data(), maxSamples);
+            std::array<float, kHardCapFrames * 2> scratch{};
+            const int frames = scopeProvider_ ? scopeProvider_(scratch.data(), maxFrames) : 0;
 
-            juce::Array<juce::var> out;
-            out.ensureStorageAllocated(n);
-            for (int i = 0; i < n; ++i)
-                out.add(juce::var{static_cast<double>(scratch[static_cast<size_t>(i)])});
-            completion(juce::var{std::move(out)});
+            // Info after the pull: `stale` describes the pull we just made.
+            const auto info = scopeInfoProvider_ ? scopeInfoProvider_() : ScopeInfo{};
+
+            juce::Array<juce::var> samples;
+            samples.ensureStorageAllocated(frames * 2);
+            for (int i = 0; i < frames * 2; ++i)
+                samples.add(juce::var{static_cast<double>(scratch[static_cast<size_t>(i)])});
+
+            auto* root = new juce::DynamicObject{};
+            root->setProperty("samples", juce::var{std::move(samples)});
+            root->setProperty("sampleRate", info.sampleRate);
+            root->setProperty("droppedFrames", static_cast<juce::int64>(info.droppedFrames));
+            root->setProperty("staleWindows", static_cast<juce::int64>(info.staleWindows));
+            root->setProperty("stale", info.stale);
+            completion(juce::var{root});
         });
 
     // ── Construct the WebView with the fully-built options ───────────────────

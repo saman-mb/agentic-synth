@@ -11,7 +11,7 @@ pluginval --strictness-level 10 --validate "$PLUGIN_PATH" || echo "pluginval: FA
 if [[ "$(uname)" == "Darwin" ]]; then
     AU_PATH="${PLUGIN_PATH%.vst3}.component"
     echo "=== auval ==="
-    auval -v aumu Vst3 Agnt || echo "auval: FAILED or not found"
+    auval -v aumu Vst3 Tmbr || echo "auval: FAILED or not found"
 fi
 
 echo "=== Done ==="

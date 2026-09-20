@@ -35,6 +35,8 @@ export default [
       'apps/web/node_modules/**',
       'apps/mobile/.expo/**',
       'apps/mobile/node_modules/**',
+      // Bundled function output written by `netlify dev`.
+      '**/.netlify/**',
     ],
   },
   js.configs.recommended,

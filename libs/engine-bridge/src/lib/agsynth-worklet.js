@@ -6,8 +6,35 @@ const AGS_EVENT_NOTE_ON = 1;
 const AGS_EVENT_NOTE_OFF = 2;
 const EVENT_SIZE = 12;
 
+// AudioWorkletGlobalScope has no TextEncoder in Chromium or Firefox
+// (WebKit is the odd one out), so the NUL-terminated encoding is done by
+// hand. Parameter paths are ASCII, but the full range is handled anyway.
+function encodeUtf8(str) {
+  const out = [];
+  for (let i = 0; i < str.length; i++) {
+    let cp = str.codePointAt(i);
+    if (cp > 0xffff) i++;
+    if (cp < 0x80) {
+      out.push(cp);
+    } else if (cp < 0x800) {
+      out.push(0xc0 | (cp >> 6), 0x80 | (cp & 0x3f));
+    } else if (cp < 0x10000) {
+      out.push(0xe0 | (cp >> 12), 0x80 | ((cp >> 6) & 0x3f), 0x80 | (cp & 0x3f));
+    } else {
+      out.push(
+        0xf0 | (cp >> 18),
+        0x80 | ((cp >> 12) & 0x3f),
+        0x80 | ((cp >> 6) & 0x3f),
+        0x80 | (cp & 0x3f),
+      );
+    }
+  }
+  out.push(0);
+  return new Uint8Array(out);
+}
+
 function writeUtf8(mod, str) {
-  const bytes = new TextEncoder().encode(`${str}\0`);
+  const bytes = encodeUtf8(str);
   const ptr = mod._malloc(bytes.length);
   if (!ptr) return 0;
   mod.HEAPU8.set(bytes, ptr);
@@ -34,8 +61,13 @@ function writeEvent(mod, kind, note, velocity) {
 }
 
 class AgsynthProcessor extends AudioWorkletProcessor {
-  constructor() {
-    super();
+  constructor(options) {
+    super(options);
+    // Asset URLs come from the main thread: this scope has no `location`
+    // and, outside WebKit, no `URL` to resolve them with.
+    const opts = (options && options.processorOptions) || {};
+    this.glueUrl = typeof opts.glueUrl === 'string' ? opts.glueUrl : '';
+    this.wasmUrl = typeof opts.wasmUrl === 'string' ? opts.wasmUrl : '';
     this.mod = null;
     this.engine = 0;
     this.renderPtr = 0;
@@ -49,15 +81,22 @@ class AgsynthProcessor extends AudioWorkletProcessor {
   async boot() {
     try {
       const maxBlock = Math.min(MAX_BLOCK, Math.max(MIN_BLOCK, 128));
-      const glueHref = new URL('agsynth.js', `${self.location.origin}/`).href;
-      const glue = await import(glueHref);
+      if (!this.glueUrl) throw new Error('agsynth glue URL was not supplied');
+      // NOTE: import() is disallowed in AudioWorkletGlobalScope in every
+      // engine, and the Emscripten ES6 glue needs fetch/URL which are also
+      // absent here, so this path cannot succeed until the loader is
+      // reworked to instantiate a main-thread-compiled WebAssembly.Module.
+      // Failing here is safe: the host probes this worklet and falls back
+      // to the pure-WebAudio engine. See issue #404.
+      const glue = await import(this.glueUrl);
       const createAgsynthModule = glue.default ?? glue.createAgsynthModule;
       if (typeof createAgsynthModule !== 'function') {
-        throw new Error('createAgsynthModule missing from /agsynth.js');
+        throw new Error(`createAgsynthModule missing from ${this.glueUrl}`);
       }
+      const wasmUrl = this.wasmUrl;
       const mod = await createAgsynthModule({
         locateFile(file) {
-          if (String(file).endsWith('.wasm')) return '/agsynth.wasm';
+          if (String(file).endsWith('.wasm') && wasmUrl) return wasmUrl;
           return `/${file}`;
         },
       });

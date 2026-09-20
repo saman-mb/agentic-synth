@@ -315,7 +315,7 @@ export function App() {
   const closeHood = useCallback(() => setHoodOpen(false), []);
 
   // ── UI audio settings (Phase 10 §17) ──────────────────────────────
-  // Both default OFF — TIMBRE is "mostly silent". Settings persist via
+  // Both default OFF — Tambra is "mostly silent". Settings persist via
   // localStorage. The voice pip fires after a fresh transcript arrives;
   // the tape-stop thunk fires on any patch-load token bump.
   const uiAudio = useUiAudioSettings();
@@ -569,7 +569,7 @@ export function App() {
     // No global toast plumbing at this layer — use console + a brief
     // alert affordance later. For MVP we log so power users can confirm.
     // eslint-disable-next-line no-console
-    console.info(`[TIMBRE] ${knobId} is mapped to CC${m.cc} (channel ${m.channel + 1})`);
+    console.info(`[Tambra] ${knobId} is mapped to CC${m.cc} (channel ${m.channel + 1})`);
   }, [midiMappings]);
 
   // ── Macro projection (Phase 13) ───────────────────────────────────
@@ -844,55 +844,6 @@ export function App() {
     [handleLoadPreset],
   );
 
-  // ── Preset audition (Phase 13) ────────────────────────────────────
-  // Ephemerally push a preset to the engine WITHOUT touching React
-  // history/patch state. Used by PresetsSidebar's hover-preview: a
-  // 300ms timer fires after pointer-enter; on pointer-leave the prior
-  // engine state is restored via cancelAudition().
-  //
-  // We diff against `lastSentEffectiveRef` (what the engine currently
-  // hears) rather than `patch`, so subsequent macro changes or knob
-  // moves during audition don't double-overwrite.
-  const auditionRevertRef = useRef<Record<string, number> | null>(null);
-  const auditionPreset = useCallback(
-    (next: PatchParams) => {
-      const cur = lastSentEffectiveRef.current ?? patch;
-      // If a prior audition is still active, keep its revert map (we
-      // want to restore to the pre-audition state, not to the prior
-      // audition's preset).
-      if (!auditionRevertRef.current) {
-        const revert: Record<string, number> = {};
-        const curFlat = flattenPatch(cur);
-        const nextFlat = flattenPatch(next);
-        for (const k of Object.keys(nextFlat)) {
-          if (curFlat[k] !== nextFlat[k]) revert[k] = curFlat[k];
-        }
-        auditionRevertRef.current = revert;
-      }
-      // Push the preset values to the engine directly.
-      const diff = diffPatch(cur, next);
-      for (const [p, v] of Object.entries(diff)) {
-        sendMessage(JSON.stringify({ type: 'knob_tweak', param: p, value: v }));
-      }
-    },
-    [patch, sendMessage],
-  );
-
-  const cancelAudition = useCallback(() => {
-    const revert = auditionRevertRef.current;
-    if (!revert) return;
-    auditionRevertRef.current = null;
-    for (const [p, v] of Object.entries(revert)) {
-      sendMessage(JSON.stringify({ type: 'knob_tweak', param: p, value: v }));
-    }
-  }, [sendMessage]);
-
-  // When a hover audition is confirmed (click), forget the revert map
-  // so the normal handleLoadPreset path commits cleanly.
-  const commitAudition = useCallback(() => {
-    auditionRevertRef.current = null;
-  }, []);
-
   // Phase 10 §16 — RTFM easter egg. ChatInterface detects the prompt
   // locally and calls back here; we synthesise a gnarly FM patch from
   // the current patch baseline and route it through the standard preset
@@ -1143,9 +1094,6 @@ export function App() {
         <PresetsSidebar
           currentPatch={patch}
           onLoadPreset={handleLoadPreset}
-          onAuditionStart={auditionPreset}
-          onAuditionEnd={cancelAudition}
-          onAuditionCommit={commitAudition}
         />
         <ResizeHandle
           ariaLabel="Resize presets sidebar"

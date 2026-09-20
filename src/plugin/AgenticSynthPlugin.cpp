@@ -305,10 +305,9 @@ void AgenticSynthPlugin::prepareToPlay(double sampleRate, int samplesPerBlock) {
     voiceManager_.prepare(sampleRate);
     while (auditionQueue_.pop().has_value()) {
     }
-    // Drain any stale scope samples left over from a previous sample rate /
+    // Drop any stale scope history left over from a previous sample rate /
     // block size so the visualizer never paints across a rate boundary.
-    while (scopeQueue_.pop().has_value()) {
-    }
+    scopeRing_.reset();
     // Push APVTS state to the engine via the single-source-of-truth path.
     applyParameters();
     voiceManager_.primeSmoothers();
@@ -318,8 +317,7 @@ void AgenticSynthPlugin::releaseResources() {
     voiceManager_.releaseResources();
     while (auditionQueue_.pop().has_value()) {
     }
-    while (scopeQueue_.pop().has_value()) {
-    }
+    scopeRing_.reset();
 }
 
 //==============================================================================
@@ -594,40 +592,33 @@ void AgenticSynthPlugin::processBlock(juce::AudioBuffer<float>& buffer, juce::Mi
         voiceManager_.renderBlock(buffer.getWritePointer(0), numSamples);
     }
 
-    // Phase 12: post-amp visualizer tap. Master gain is already folded into
-    // the buffer by VoiceManager::renderBlock (gainSmoother applied per
-    // sample inside the voice mix). Push mono-sum (L+R)*0.5 — or just L on
-    // a mono bus — into the scope ring buffer. Push is wait-free SPSC and
-    // drops on full (no audio-thread stall). Bounded loop, no alloc, no lock.
+    // Phase 12 / #434-#436: post-amp stereo visualizer tap. Master gain is
+    // already folded into the buffer by VoiceManager::renderBlock
+    // (gainSmoother applied per sample inside the voice mix). Push both
+    // channels interleaved (L,R) so XY mode draws real L against real R — not
+    // a mono sum painted on both axes. Push is wait-free and rejects overflow
+    // on the consumer side; no audio-thread stall. Bounded loop, no alloc.
     if (numChannels >= 2) {
         const float* L = buffer.getReadPointer(0);
         const float* R = buffer.getReadPointer(1);
-        for (int n = 0; n < numSamples; ++n) {
-            const float mono = 0.5f * (L[n] + R[n]);
-            (void)scopeQueue_.push(mono);
-        }
+        for (int n = 0; n < numSamples; ++n)
+            scopeRing_.push(L[n], R[n]);
     } else if (numChannels == 1) {
         const float* L = buffer.getReadPointer(0);
         for (int n = 0; n < numSamples; ++n)
-            (void)scopeQueue_.push(L[n]);
+            scopeRing_.push(L[n], L[n]); // mono bus → duplicate so L == R
     }
 }
 
 //==============================================================================
-int AgenticSynthPlugin::pullScopeSamples(float* dest, int max) noexcept {
-    // Message thread: drain up to `max` samples from the SPSC scope queue
-    // into `dest`. Lock-free pop, no allocation — safe to call from the
-    // native bridge handler (WebUiComponent message-thread context).
-    if (dest == nullptr || max <= 0)
+int AgenticSynthPlugin::pullScopeSamples(float* dest, int frames) noexcept {
+    // Message thread: copy the newest contiguous stereo window into `dest`
+    // (frames * 2 floats, interleaved L/R). Lock-free, no allocation — safe
+    // to call from the native bridge handler (WebUiComponent message-thread
+    // context). Returns 0 when the window is stale or history is short.
+    if (dest == nullptr || frames <= 0)
         return 0;
-    int n = 0;
-    while (n < max) {
-        const auto popped = scopeQueue_.pop();
-        if (!popped.has_value())
-            break;
-        dest[n++] = *popped;
-    }
-    return n;
+    return static_cast<int>(scopeRing_.pullLatest(dest, static_cast<std::size_t>(frames)));
 }
 
 //==============================================================================
@@ -636,7 +627,7 @@ juce::AudioProcessorEditor* AgenticSynthPlugin::createEditor() { return new Agen
 bool AgenticSynthPlugin::hasEditor() const { return true; }
 
 //==============================================================================
-const juce::String AgenticSynthPlugin::getName() const { return "TIMBRE"; }
+const juce::String AgenticSynthPlugin::getName() const { return "Tambra"; }
 
 bool AgenticSynthPlugin::acceptsMidi() const { return true; }
 bool AgenticSynthPlugin::producesMidi() const { return false; }
