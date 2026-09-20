@@ -1,8 +1,10 @@
 #include "agsynth.h"
 
+#include "engine/MidiHandler.h"
 #include "engine/PatchStruct.h"
 #include "engine/PatchValidator.h"
 #include "engine/RealtimeSafety.h"
+#include "engine/ScopeRing.h"
 #include "engine/VoiceManager.h"
 
 #include <algorithm>
@@ -34,6 +36,8 @@ struct Engine {
     double sample_rate{44100.0};
     uint32_t max_block{512};
     VoiceManager vm{VoiceManager::kDefaultVoiceCount};
+    agentic_synth::engine::MidiHandler midi_handler{vm};
+    agentic_synth::ScopeRing scope_ring{};
     PatchStruct patch{};
     ags_event events[kMaxQueuedEvents]{};
     uint32_t event_count{0};
@@ -373,7 +377,7 @@ void apply_event(Engine& e, const ags_event& ev) {
         e.vm.noteOff(static_cast<int>(ev.note));
         break;
     case AGS_EVENT_CC:
-        // CC mapping lives in MidiHandler; ignored here (safe no-op).
+        e.midi_handler.process(agentic_synth::engine::RawMidiMsg::cc(ev.cc, ev.velocity));
         break;
     default:
         break;
@@ -421,6 +425,7 @@ int render_into(Engine& e, float* out, uint32_t frames, uint32_t channels) {
         for (uint32_t s = 0; s < n; ++s) {
             const float l = e.scratch_l[s];
             const float r = e.scratch_r[s];
+            e.scope_ring.push(l, r);
             if (channels == 2) {
                 out[(i + s) * 2u] = l;
                 out[(i + s) * 2u + 1u] = r;
@@ -552,6 +557,13 @@ int ags_engine_render(ags_engine* engine, float* out_interleaved, uint32_t frame
     if (engine == nullptr)
         return AGS_ERR_NULL;
     return render_into(*reinterpret_cast<Engine*>(engine), out_interleaved, frames, channels);
+}
+
+int ags_engine_get_scope(ags_engine* engine, float* out_interleaved, uint32_t frames) {
+    if (engine == nullptr || out_interleaved == nullptr)
+        return 0;
+    auto& e = *reinterpret_cast<Engine*>(engine);
+    return static_cast<int>(e.scope_ring.pullLatest(out_interleaved, frames));
 }
 
 int ags_render_offline(const void* patch_bytes, uint32_t patch_len, const ags_event* events, uint32_t event_count,

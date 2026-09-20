@@ -46,6 +46,10 @@ int ags_engine_push_events(ags_engine*, const ags_event* events, uint32_t count)
    Contract: no allocation, no locks, no syscalls inside this call. */
 int ags_engine_render(ags_engine*, float* out_interleaved, uint32_t frames, uint32_t channels);
 
+/* Scope: pull latest rendered stereo frames into out_interleaved (capacity: frames * 2 floats).
+   Returns number of frames copied (0 on underrun/stale). Contract: wait-free, no allocations. */
+int ags_engine_get_scope(ags_engine*, float* out_interleaved, uint32_t frames);
+
 /* Deterministic offline render for parity tests (fresh engine per call). */
 int ags_render_offline(const void* patch_bytes, uint32_t patch_len, const ags_event* events, uint32_t event_count,
                        double sample_rate, uint32_t frames, float* out_interleaved);

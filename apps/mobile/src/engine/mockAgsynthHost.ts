@@ -51,6 +51,16 @@ export function createMockAgsynthHost(): JsiNativeBinding & { state: MockHostSta
       state.started = true;
       return 0;
     },
+    getScopeSamples(n: number): number[] {
+      if (state.notesOn.length > 0) {
+        const out = new Array(n * 2);
+        for (let i = 0; i < n * 2; ++i) {
+          out[i] = Math.sin(i * 0.1) * 0.4;
+        }
+        return out;
+      }
+      return new Array(n * 2).fill(0);
+    },
   };
 
   return binding;

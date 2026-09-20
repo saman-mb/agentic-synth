@@ -13,6 +13,7 @@ import { colors, radius, space, typeScale } from '../theme/tokens';
 export interface PromptBarProps {
   onSend: (text: string) => void;
   onMicPress: () => void;
+  onFocus?: () => void;
   isRecording: boolean;
   micDisabled: boolean;
   isGenerating: boolean;
@@ -22,6 +23,7 @@ export interface PromptBarProps {
 export const PromptBar: React.FC<PromptBarProps> = ({
   onSend,
   onMicPress,
+  onFocus,
   isRecording,
   micDisabled,
   isGenerating,
@@ -63,6 +65,7 @@ export const PromptBar: React.FC<PromptBarProps> = ({
           placeholderTextColor={colors.text.tertiary}
           value={text}
           onChangeText={setText}
+          onFocus={onFocus}
           onSubmitEditing={handleSend}
           returnKeyType="send"
         />

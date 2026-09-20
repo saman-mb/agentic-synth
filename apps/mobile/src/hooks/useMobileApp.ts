@@ -22,8 +22,11 @@ export function useMobileApp() {
   const [backend, setBackend] = useState<EngineBackend>('mock');
   const [scopeSamples, setScopeSamples] = useState<number[]>([]);
   const [chatOpacity, setChatOpacity] = useState(1);
+  const [activeMacros, setActiveMacros] = useState<number[]>([...MACRO_DEFAULTS]);
+  const [octaveOffset, setOctaveOffset] = useState<number>(0);
   const sayCapture = useSayCapture();
   const demoPatch = demoPatchJson as PatchParams;
+  const activePatchRef = useRef<PatchParams>(demoPatch);
 
   // 1. Boot: Initialize engine with demo patch.
   useEffect(() => {
@@ -136,13 +139,15 @@ export function useMobileApp() {
     });
 
     // Load new patch into engine
+    activePatchRef.current = result.patch;
+    setActiveMacros([...MACRO_DEFAULTS]);
     const engine = engineRef.current;
     if (engine) {
       engine.setPatch(projectMacroPatch(result.patch, MACRO_DEFAULTS));
     }
   }, []);
 
-  // 5. onMacroChange
+  // 5. onMacroChange (from chat card)
   const onMacroChange = useCallback((messageId: string, index: number, value: number) => {
     setSession((s) => {
       const msg = s.messages.find(m => m.id === messageId);
@@ -154,8 +159,31 @@ export function useMobileApp() {
       const engine = engineRef.current;
       if (engine && s.activePatchCardId === messageId) {
         engine.setPatch(projectMacroPatch(msg.patchCard.patch, newMacros));
+        setActiveMacros(newMacros);
       }
 
+      return updateActiveMacros(s, newMacros);
+    });
+  }, []);
+
+  // 5b. onGlobalMacroChange (from SoundShaper)
+  const onGlobalMacroChange = useCallback((index: number, value: number) => {
+    setActiveMacros((prev) => {
+      const next = [...prev];
+      next[index] = value;
+      const engine = engineRef.current;
+      if (engine) {
+        engine.setPatch(projectMacroPatch(activePatchRef.current, next));
+      }
+      return next;
+    });
+
+    setSession((s) => {
+      if (!s.activePatchCardId) return s;
+      const msg = s.messages.find(m => m.id === s.activePatchCardId);
+      if (!msg?.patchCard) return s;
+      const newMacros = [...msg.patchCard.macros];
+      newMacros[index] = value;
       return updateActiveMacros(s, newMacros);
     });
   }, []);
@@ -165,6 +193,8 @@ export function useMobileApp() {
     setSession((s) => {
       const msg = s.messages.find((m) => m.id === messageId);
       if (msg?.patchCard) {
+        activePatchRef.current = msg.patchCard.patch;
+        setActiveMacros([...msg.patchCard.macros]);
         const engine = engineRef.current;
         if (engine) {
           engine.setPatch(projectMacroPatch(msg.patchCard.patch, msg.patchCard.macros));
@@ -204,6 +234,10 @@ export function useMobileApp() {
     session,
     backend,
     scopeSamples,
+    activeMacros,
+    onGlobalMacroChange,
+    octaveOffset,
+    setOctaveOffset,
     onNoteOn,
     onNoteOff,
     onPlayTouchStart,
@@ -219,6 +253,10 @@ export function useMobileApp() {
     session,
     backend,
     scopeSamples,
+    activeMacros,
+    onGlobalMacroChange,
+    octaveOffset,
+    setOctaveOffset,
     onNoteOn,
     onNoteOff,
     onPlayTouchStart,

@@ -36,9 +36,12 @@ CTestTestfile.cmake
 
 # UI dependencies and outputs
 node_modules/
+node_modules
 apps/web/dist/
 apps/web/.vite/
 apps/mobile/.expo/
+apps/mobile/ios/
+apps/mobile/android/
 .nx/
 *.tsbuildinfo
 npm-debug.log*

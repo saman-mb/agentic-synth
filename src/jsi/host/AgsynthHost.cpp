@@ -174,6 +174,12 @@ int AgsynthHost::renderOffline(const void* patch_bytes, uint32_t patch_len, cons
     return ags_render_offline(patch_bytes, patch_len, events, event_count, sample_rate, frames, out_interleaved);
 }
 
+int AgsynthHost::getScope(float* out_interleaved, uint32_t frames) {
+    if (impl_ == nullptr || impl_->engine == nullptr)
+        return 0;
+    return ags_engine_get_scope(impl_->engine, out_interleaved, frames);
+}
+
 int AgsynthHost::start() {
     if (impl_ == nullptr || impl_->engine == nullptr)
         return AGS_ERR_NULL;

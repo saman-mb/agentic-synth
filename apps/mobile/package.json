@@ -11,6 +11,7 @@
   "dependencies": {
     "@react-native-async-storage/async-storage": "1.23.1",
     "@shopify/react-native-skia": "1.5.0",
+    "agsynth": "file:./modules/agsynth",
     "expo": "~52.0.28",
     "expo-asset": "~11.0.5",
     "expo-av": "~15.0.2",

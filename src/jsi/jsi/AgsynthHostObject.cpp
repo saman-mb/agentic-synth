@@ -4,10 +4,13 @@
 
 #include "jsi/host/AgsynthHost.h"
 
+#include <algorithm>
 #include <cstdint>
 #include <cstring>
 #include <memory>
+#include <vector>
 
+using facebook::jsi::Array;
 using facebook::jsi::ArrayBuffer;
 using facebook::jsi::Function;
 using facebook::jsi::HostObject;
@@ -51,6 +54,7 @@ bool pcm_buffer_short(size_t byte_len, uint32_t frames, uint32_t channels) {
 
 class AgsynthHostObject final : public HostObject {
 public:
+    AgsynthHostObject() : host_(AgsynthHost::create(48000.0, 8192)) {}
     ~AgsynthHostObject() override { AgsynthHost::destroy(host_); }
 
     Value get(Runtime& rt, const PropNameID& name) override {
@@ -68,12 +72,46 @@ public:
                     return Value(host_ != nullptr ? AGS_OK : AGS_ERR_PARAM);
                 });
         }
-        if (key == "destroy") {
+        if (key == "destroy" || key == "dispose") {
             return Function::createFromHostFunction(rt, name, 0, [this](Runtime&, const Value&, const Value*, size_t) {
                 AgsynthHost::destroy(host_);
                 host_ = nullptr;
                 return Value(AGS_OK);
             });
+        }
+        if (key == "noteOn") {
+            return Function::createFromHostFunction(
+                rt, name, 2, [this](Runtime&, const Value&, const Value* args, size_t count) {
+                    if (host_ == nullptr)
+                        return Value(AGS_ERR_NULL);
+                    if (count < 2 || !args[0].isNumber() || !args[1].isNumber())
+                        return Value(AGS_ERR_PARAM);
+                    ags_event ev{};
+                    ev.kind = AGS_EVENT_NOTE_ON;
+                    ev.note = static_cast<uint8_t>(std::clamp(args[0].asNumber(), 0.0, 127.0));
+                    ev.velocity = static_cast<uint8_t>(std::clamp(args[1].asNumber(), 0.0, 127.0));
+                    ev.cc = 0;
+                    ev._pad = 0;
+                    ev.sample_offset = 0;
+                    return Value(host_->pushEvents(&ev, 1));
+                });
+        }
+        if (key == "noteOff") {
+            return Function::createFromHostFunction(
+                rt, name, 1, [this](Runtime&, const Value&, const Value* args, size_t count) {
+                    if (host_ == nullptr)
+                        return Value(AGS_ERR_NULL);
+                    if (count < 1 || !args[0].isNumber())
+                        return Value(AGS_ERR_PARAM);
+                    ags_event ev{};
+                    ev.kind = AGS_EVENT_NOTE_OFF;
+                    ev.note = static_cast<uint8_t>(std::clamp(args[0].asNumber(), 0.0, 127.0));
+                    ev.velocity = 0;
+                    ev.cc = 0;
+                    ev._pad = 0;
+                    ev.sample_offset = 0;
+                    return Value(host_->pushEvents(&ev, 1));
+                });
         }
         if (key == "setPatch") {
             return Function::createFromHostFunction(rt, name, 1,
@@ -162,8 +200,31 @@ public:
                                                             args[2].asNumber(), frames, reinterpret_cast<float*>(out)));
                 });
         }
+        if (key == "getScopeSamples") {
+            return Function::createFromHostFunction(
+                rt, name, 1, [this](Runtime& rt, const Value&, const Value* args, size_t count) {
+                    if (host_ == nullptr)
+                        return Value(Array(rt, 0));
+                    uint32_t frames =
+                        (count > 0 && args[0].isNumber()) ? static_cast<uint32_t>(args[0].asNumber()) : 256;
+                    if (frames > 1024)
+                        frames = 1024;
+                    if (frames == 0)
+                        return Value(Array(rt, 0));
+                    std::vector<float> buf(frames * 2, 0.0f);
+                    const int got = host_->getScope(buf.data(), frames);
+                    const uint32_t outFloats = got > 0 ? static_cast<uint32_t>(got * 2) : 0;
+                    Array arr(rt, outFloats);
+                    for (size_t i = 0; i < outFloats; ++i) {
+                        arr.setValueAtIndex(rt, i, Value(static_cast<double>(buf[i])));
+                    }
+                    return Value(std::move(arr));
+                });
+        }
         if (key == "start") {
             return Function::createFromHostFunction(rt, name, 0, [this](Runtime&, const Value&, const Value*, size_t) {
+                if (host_ == nullptr)
+                    host_ = AgsynthHost::create(48000.0, 8192);
                 return Value(host_ != nullptr ? host_->start() : AGS_ERR_NULL);
             });
         }

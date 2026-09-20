@@ -41,6 +41,9 @@ public:
     static int renderOffline(const void* patch_bytes, uint32_t patch_len, const ags_event* events, uint32_t event_count,
                              double sample_rate, uint32_t frames, float* out_interleaved);
 
+    // Pull latest rendered stereo frames (interleaved float L/R).
+    int getScope(float* out_interleaved, uint32_t frames);
+
     // Lifecycle (control thread). stop joins the optional AudioStream stub
     // before any C API call. recreate is stop → save → destroy → create → load.
     int start();
