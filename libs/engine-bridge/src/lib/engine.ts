@@ -135,7 +135,7 @@ export class WebSynthEngine implements SynthEngine {
   private tap: AudioWorkletNode | null = null;
   private startPromise: Promise<void> | null = null;
   private stopKeepAlive: (() => void) | null = null;
-  private readonly pendingNoteOffs = new Set<number>();
+  private readonly pendingNoteOffs = new Set<ReturnType<typeof setTimeout>>();
   private disposed = false;
 
   async ensureStarted(): Promise<void> {

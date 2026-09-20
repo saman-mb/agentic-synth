@@ -95,7 +95,7 @@ function mapNativeStatus(status: number | void, action: string): void {
 export class JsiSynthEngine implements SynthEngine {
   private patch: PatchParams = makeFallbackPatch();
   private readonly binding: JsiNativeBinding;
-  private readonly pendingNoteOffs = new Set<number>();
+  private readonly pendingNoteOffs = new Set<ReturnType<typeof setTimeout>>();
   private disposed = false;
   private scopeSampleRate = 48000;
 

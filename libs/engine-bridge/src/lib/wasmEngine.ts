@@ -95,7 +95,7 @@ export class WasmSynthEngine implements SynthEngine {
   private analyser: AnalyserNode | null = null;
   private startPromise: Promise<void> | null = null;
   private stopKeepAlive: (() => void) | null = null;
-  private readonly pendingNoteOffs = new Set<number>();
+  private readonly pendingNoteOffs = new Set<ReturnType<typeof setTimeout>>();
   private disposed = false;
 
   async ensureStarted(): Promise<void> {
