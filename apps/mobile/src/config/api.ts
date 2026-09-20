@@ -12,7 +12,7 @@ export function getApiBaseUrl(): string {
       expoConfig?: { extra?: { apiBaseUrl?: string } };
     };
     const fromExtra = Constants.expoConfig?.extra?.apiBaseUrl?.trim();
-    if (fromExtra) return fromExtra.replace(/\/$/, '');
+    if (fromExtra && !fromExtra.includes('timbra-synth')) return fromExtra.replace(/\/$/, '');
   } catch {
     // Node tests / no Expo runtime
   }

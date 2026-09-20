@@ -1,4 +1,13 @@
-import { Animated, KeyboardAvoidingView, Platform, StyleSheet, Text, View } from 'react-native';
+import { useState } from 'react';
+import {
+  Animated,
+  KeyboardAvoidingView,
+  Platform,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { PlaySurface } from '../src/components/PlaySurface';
 import { ChatThread } from '../src/components/ChatThread';
@@ -8,16 +17,28 @@ import { colors, space } from '../src/theme/tokens';
 
 export default function HomeScreen() {
   const app = useMobileApp();
+  const [isChatVisible, setIsChatVisible] = useState(true);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <View style={styles.root}>
-        {/* Minimal wordmark */}
+        {/* Minimal wordmark with chat toggle */}
         <View style={styles.header}>
           <Text style={styles.wordmark}>Tambra</Text>
-          {app.libraryCount > 0 && (
-            <Text style={styles.libraryBadge}>{app.libraryCount}</Text>
-          )}
+          <View style={styles.headerRight}>
+            <TouchableOpacity
+              onPress={() => setIsChatVisible((v) => !v)}
+              style={styles.chatToggleBtn}
+              accessibilityRole="button"
+              accessibilityLabel={isChatVisible ? 'Hide conversation' : 'Show conversation'}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            >
+              <Text style={styles.chatToggleText}>{isChatVisible ? 'Hide Chat' : '💬 Chat'}</Text>
+            </TouchableOpacity>
+            {app.libraryCount > 0 && (
+              <Text style={styles.libraryBadge}>{app.libraryCount}</Text>
+            )}
+          </View>
         </View>
 
         {/* Full-screen play surface (Z-layer 0) */}
@@ -32,20 +53,23 @@ export default function HomeScreen() {
           />
 
           {/* Chat overlay (Z-layer 1) */}
-          <Animated.View
-            style={[styles.chatOverlay, { opacity: app.chatOpacity }]}
-            pointerEvents={app.chatOpacity < 0.5 ? 'none' : 'auto'}
-          >
-            <ChatThread
-              messages={app.session.messages}
-              activePatchCardId={app.session.activePatchCardId}
-              isGenerating={app.session.isGenerating}
-              opacity={1}
-              onMacroChange={app.onMacroChange}
-              onActivatePatch={app.onActivatePatch}
-              onSavePatch={app.onSavePatch}
-            />
-          </Animated.View>
+          {isChatVisible && (
+            <Animated.View
+              style={[styles.chatOverlay, { opacity: app.chatOpacity }]}
+              pointerEvents={app.chatOpacity < 0.5 ? 'none' : 'auto'}
+            >
+              <ChatThread
+                messages={app.session.messages}
+                activePatchCardId={app.session.activePatchCardId}
+                isGenerating={app.session.isGenerating}
+                opacity={1}
+                onMacroChange={app.onMacroChange}
+                onActivatePatch={app.onActivatePatch}
+                onSavePatch={app.onSavePatch}
+                onDismiss={() => setIsChatVisible(false)}
+              />
+            </Animated.View>
+          )}
         </View>
 
         {/* Prompt bar (Z-layer 2) */}
@@ -55,7 +79,10 @@ export default function HomeScreen() {
         >
           <Animated.View style={{ opacity: app.chatOpacity }}>
             <PromptBar
-              onSend={app.sendPrompt}
+              onSend={(text) => {
+                setIsChatVisible(true);
+                app.sendPrompt(text);
+              }}
               onMicPress={app.sayCapture.tapRecord}
               isRecording={app.sayCapture.isRecording}
               micDisabled={app.sayCapture.micDisabled}
@@ -83,6 +110,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: space['2'],
     paddingHorizontal: space.chromePadX,
+    position: 'relative',
   },
   wordmark: {
     color: colors.accent.primary,
@@ -91,9 +119,25 @@ const styles = StyleSheet.create({
     letterSpacing: 1.5,
     textTransform: 'uppercase',
   },
-  libraryBadge: {
+  headerRight: {
     position: 'absolute',
     right: space.chromePadX,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: space['2'],
+  },
+  chatToggleBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 14,
+    backgroundColor: colors.bg.raised,
+  },
+  chatToggleText: {
+    color: colors.text.secondary,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  libraryBadge: {
     color: colors.text.secondary,
     fontSize: 12,
     fontWeight: '600',
@@ -107,7 +151,7 @@ const styles = StyleSheet.create({
     bottom: 0,
     left: 0,
     right: 0,
-    height: '45%',
+    height: '48%',
     paddingHorizontal: space.chromePadX,
   },
 });
