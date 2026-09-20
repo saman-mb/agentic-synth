@@ -39,15 +39,16 @@ const demoPatch = JSON.parse(
   readFileSync(path.join(repoRoot, 'apps/mobile/assets/demo-patch.json'), 'utf8'),
 );
 const { bootDemoPatch, createMobileEngine } = await import('./engine/createMobileEngine.ts');
-const { canTransition } = await import('./state/mobileStateMachine.ts');
+const { INITIAL_SESSION } = await import('./state/mobileState.ts');
+const { addUserMessage, addAgentMessage } = await import('./state/mobileStateMachine.ts');
 
 describe('mobileStateMachine', () => {
-  it('allows idle → hear for boot demo path', () => {
-    assert.equal(canTransition('idle', 'hear'), true);
-  });
-
-  it('forbids say → shape on first generate', () => {
-    assert.equal(canTransition('say', 'shape'), false);
+  it('appends messages and tracks session flow', () => {
+    let session = addUserMessage(INITIAL_SESSION, 'Hello');
+    session = addAgentMessage(session, 'Hi there');
+    assert.equal(session.messages.length, 3);
+    assert.equal(session.messages[1].text, 'Hello');
+    assert.equal(session.messages[2].text, 'Hi there');
   });
 });
 

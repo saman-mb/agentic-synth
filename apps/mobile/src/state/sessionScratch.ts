@@ -1,23 +1,9 @@
-import type { AgentModulationPlan, PatchParams } from '@agentic-synth/shared-types';
-
-import type { VariationItem } from '../services/variationFlow';
-
+/** Minimal session scratch for keep-flow. Chat history is the primary state now. */
 export interface SessionScratch {
-  prompt: string;
-  brief: string;
-  basePatch: PatchParams;
-  modulation?: AgentModulationPlan;
-  variations: VariationItem[];
-  selectedVariationIndex: number;
   keepNameDraft: string;
 }
 
 export const EMPTY_SCRATCH: SessionScratch = {
-  prompt: '',
-  brief: '',
-  basePatch: {} as PatchParams,
-  variations: [],
-  selectedVariationIndex: 0,
   keepNameDraft: '',
 };
 
