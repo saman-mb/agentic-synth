@@ -108,7 +108,7 @@ const styles = StyleSheet.create({
     marginBottom: space.sm,
   },
   sliderLabel: {
-    ...typeScale.macroLabel,
+    ...typeScale.macroLabelStyle,
     color: colors.text.secondary,
     marginBottom: space.xs,
   },
