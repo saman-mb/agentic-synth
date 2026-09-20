@@ -126,7 +126,7 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
     borderRadius: radius.md,
     padding: space['3'],
-    fontSize: typeScale.body,
+    fontSize: typeScale.body.size,
   },
   sendButton: {
     width: 44,

@@ -154,12 +154,12 @@ const styles = StyleSheet.create({
     marginVertical: space.md,
   },
   systemText: {
-    ...typeScale.body,
+    ...typeScale.bodyStyle,
     color: colors.text.tertiary,
     fontStyle: 'italic',
   },
   messageText: {
-    ...typeScale.body,
+    ...typeScale.bodyStyle,
   },
   messageTextUser: {
     color: colors.text.primary,
