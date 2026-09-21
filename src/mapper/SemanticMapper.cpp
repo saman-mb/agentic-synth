@@ -160,7 +160,7 @@ std::string SemanticMapper::http_post_embedding(const std::string& text) const {
     }
     const std::string path = "/embedding";
 
-    struct addrinfo hints{};
+    struct addrinfo hints {};
     hints.ai_family = AF_UNSPEC;
     hints.ai_socktype = SOCK_STREAM;
     struct addrinfo* res = nullptr;
@@ -183,7 +183,7 @@ std::string SemanticMapper::http_post_embedding(const std::string& text) const {
     }
     freeaddrinfo(res);
 
-    struct timeval tv{};
+    struct timeval tv {};
     tv.tv_sec = cfg_.timeout_ms / 1000;
     tv.tv_usec = (cfg_.timeout_ms % 1000) * 1000;
     setsockopt(fd, SOL_SOCKET, SO_RCVTIMEO, reinterpret_cast<const char*>(&tv), sizeof(tv));
@@ -546,7 +546,7 @@ juce::var deltaToVar(const PatchDelta& d) {
 
 #define EMIT_F(name, member)                                                                                           \
     if (d.member)                                                                                                      \
-        obj->setProperty(juce::Identifier{#name}, static_cast<double>(*d.member));
+        obj->setProperty(juce::Identifier { #name }, static_cast<double>(*d.member));
 
     EMIT_F(osc0_volume, osc0_volume)
     EMIT_F(osc0_semitone, osc0_semitone)
