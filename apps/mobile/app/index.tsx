@@ -12,33 +12,26 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { PlaySurface } from '../src/components/PlaySurface';
 import { ChatThread } from '../src/components/ChatThread';
 import { PromptBar } from '../src/components/PromptBar';
+import { SoundShaper } from '../src/components/SoundShaper';
 import { useMobileApp } from '../src/hooks/useMobileApp';
 import { colors, space } from '../src/theme/tokens';
 
 export default function HomeScreen() {
   const app = useMobileApp();
-  const [isChatVisible, setIsChatVisible] = useState(true);
+  const [isChatVisible, setIsChatVisible] = useState(false);
+  const [isShaperVisible, setIsShaperVisible] = useState(false);
 
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <View style={styles.root}>
-        {/* Minimal wordmark with chat toggle */}
+        {/* Minimal wordmark */}
         <View style={styles.header}>
           <Text style={styles.wordmark}>Tambra</Text>
-          <View style={styles.headerRight}>
-            <TouchableOpacity
-              onPress={() => setIsChatVisible((v) => !v)}
-              style={styles.chatToggleBtn}
-              accessibilityRole="button"
-              accessibilityLabel={isChatVisible ? 'Hide conversation' : 'Show conversation'}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Text style={styles.chatToggleText}>{isChatVisible ? 'Hide Chat' : '💬 Chat'}</Text>
-            </TouchableOpacity>
-            {app.libraryCount > 0 && (
+          {app.libraryCount > 0 && (
+            <View style={styles.headerRight}>
               <Text style={styles.libraryBadge}>{app.libraryCount}</Text>
-            )}
-          </View>
+            </View>
+          )}
         </View>
 
         {/* Full-screen play surface (Z-layer 0) */}
@@ -48,6 +41,7 @@ export default function HomeScreen() {
             onNoteOff={app.onNoteOff}
             isPlaying={app.session.isPlaying}
             scopeSamples={app.scopeSamples}
+            octaveOffset={app.octaveOffset}
             onTouchStart={app.onPlayTouchStart}
             onTouchEnd={app.onPlayTouchEnd}
           />
@@ -72,13 +66,26 @@ export default function HomeScreen() {
           )}
         </View>
 
-        {/* Prompt bar (Z-layer 2) */}
+        {/* Sound Shaper Controls (Z-layer 2) */}
+        {!isChatVisible && (
+          <SoundShaper
+            macros={app.activeMacros}
+            onMacroChange={app.onGlobalMacroChange}
+            octaveOffset={app.octaveOffset}
+            onOctaveChange={app.setOctaveOffset}
+            isVisible={isShaperVisible}
+            onToggleVisible={() => setIsShaperVisible((v) => !v)}
+          />
+        )}
+
+        {/* Prompt bar (Z-layer 3) */}
         <KeyboardAvoidingView
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={0}
         >
           <Animated.View style={{ opacity: app.chatOpacity }}>
             <PromptBar
+              onFocus={() => setIsChatVisible(true)}
               onSend={(text) => {
                 setIsChatVisible(true);
                 app.sendPrompt(text);
@@ -125,17 +132,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: space['2'],
-  },
-  chatToggleBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: 14,
-    backgroundColor: colors.bg.raised,
-  },
-  chatToggleText: {
-    color: colors.text.secondary,
-    fontSize: 12,
-    fontWeight: '600',
   },
   libraryBadge: {
     color: colors.text.secondary,

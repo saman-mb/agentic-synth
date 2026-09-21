@@ -44,6 +44,7 @@ export interface JsiNativeBinding {
   dispose(): number | void;
   recreate(sampleRate: number): number | void;
   start?(): number | void | Promise<number | void>;
+  getScopeSamples?(n: number): number[] | Float32Array;
   renderOffline?(
     patchBytes: ArrayBuffer,
     events: unknown,
@@ -187,11 +188,13 @@ export class JsiSynthEngine implements SynthEngine {
     this.pendingNoteOffs.add(id);
   }
 
-  getScopeSamples(_n: number): number[] {
-    // This engine currently owns no scope tap (the native AudioStream renders
-    // off the JS thread). Return empty so the Visualizer shows "no signal"
-    // rather than a flat fake trace (#435); interleaved stereo when a tap
-    // lands is the shared contract.
+  getScopeSamples(n: number): number[] {
+    if (this.disposed) return [];
+    if (typeof this.binding.getScopeSamples === 'function') {
+      const res = this.binding.getScopeSamples(n);
+      if (Array.isArray(res)) return res;
+      if (res instanceof Float32Array) return Array.from(res);
+    }
     return [];
   }
 

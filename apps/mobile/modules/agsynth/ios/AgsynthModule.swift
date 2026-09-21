@@ -1,13 +1,23 @@
 import ExpoModulesCore
+import AVFoundation
 
-// Stub: returns nil until C++ JSI host is linked (#316 follow-up).
 public class AgsynthModule: Module {
   public func definition() -> ModuleDefinition {
     Name("Agsynth")
 
-    Function("install") { () -> [String: Any]? in
-      // Native JSI binding will be returned as a HostObject when wired.
-      return nil
+    Function("install") { () -> Bool in
+      do {
+        let session = AVAudioSession.sharedInstance()
+        try session.setCategory(.playback, mode: .default, options: [.mixWithOthers])
+        try session.setActive(true)
+      } catch {
+        print("[Agsynth] AVAudioSession configuration warning: \(error)")
+      }
+
+      if let context = self.appContext {
+        return AgsynthBridge.install(context)
+      }
+      return false
     }
   }
 }

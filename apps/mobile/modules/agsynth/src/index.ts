@@ -6,7 +6,7 @@ import { requireNativeModule } from 'expo-modules-core';
 import type { JsiNativeBinding } from '@agentic-synth/engine-bridge';
 
 export interface AgsynthModuleType {
-  install(): JsiNativeBinding;
+  install(): boolean | JsiNativeBinding;
 }
 
 let cached: AgsynthModuleType | null = null;
@@ -23,6 +23,9 @@ export function getAgsynthModule(): AgsynthModuleType | null {
 
 export function installNativeHost(): JsiNativeBinding | null {
   const mod = getAgsynthModule();
-  if (!mod || typeof mod.install !== 'function') return null;
-  return mod.install();
+  if (!mod || typeof mod.install !== 'function') {
+    return (globalThis as unknown as { __AgsynthHost?: JsiNativeBinding }).__AgsynthHost ?? null;
+  }
+  mod.install();
+  return (globalThis as unknown as { __AgsynthHost?: JsiNativeBinding }).__AgsynthHost ?? null;
 }

@@ -66,6 +66,7 @@ set(AGENTIC_SYNTH_DSP_SOURCES
     engine/Chorus.cpp
     engine/TubeSat.cpp
     engine/HighPassFilter.cpp
+    engine/MidiHandler.cpp
 )
 add_library(agentic_synth_dsp OBJECT ${AGENTIC_SYNTH_DSP_SOURCES})
 target_include_directories(agentic_synth_dsp PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
@@ -94,7 +95,6 @@ if(NOT EMSCRIPTEN)
 # bounce and mapper still pull juce_core / juce_audio_formats (plugin path).
 add_library(agentic_synth_engine_core STATIC
     engine/VariationEngine.cpp
-    engine/MidiHandler.cpp
     engine/MorphEngine.cpp
     # Phase D / #268 (partial) — synchronous off-thread offline bounce of a
     # patch through a fresh VoiceManager into a 24-bit stereo .wav. Powers

@@ -4,14 +4,31 @@
     "jsx": "react-jsx",
     "strict": true,
     "noEmit": true,
+    "module": "esnext",
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
-    "types": ["react", "react-native"],
+    "types": [
+      "react",
+      "react-native"
+    ],
     "paths": {
-      "@mobile/*": ["./src/*"]
+      "@mobile/*": [
+        "./src/*"
+      ]
     }
   },
-  "include": ["app/**/*.tsx", "app/**/*.ts", "src/**/*.tsx", "src/**/*.ts", "modules/**/*.ts"],
-  "exclude": ["node_modules", "tests"]
+  "include": [
+    "app/**/*.tsx",
+    "app/**/*.ts",
+    "src/**/*.tsx",
+    "src/**/*.ts",
+    "modules/**/*.ts",
+    ".expo/types/**/*.ts",
+    "expo-env.d.ts"
+  ],
+  "exclude": [
+    "node_modules",
+    "tests"
+  ]
 }

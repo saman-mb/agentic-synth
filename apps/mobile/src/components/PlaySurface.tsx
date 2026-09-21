@@ -38,6 +38,7 @@ export interface PlaySurfaceProps {
   onNoteOff: (note: number) => void;
   isPlaying: boolean;
   scopeSamples?: number[];
+  octaveOffset?: number;
   onTouchStart?: () => void;
   onTouchEnd?: () => void;
 }
@@ -47,6 +48,7 @@ export function PlaySurface({
   onNoteOff,
   isPlaying,
   scopeSamples,
+  octaveOffset = 0,
   onTouchStart,
   onTouchEnd,
 }: PlaySurfaceProps) {
@@ -112,11 +114,11 @@ export function PlaySurface({
       const row = Math.min(ROWS - 1, Math.max(0, Math.floor(y / Math.max(rowHeight, 1))));
       // row 0 at bottom, row 3 at top
       const pitchRow = ROWS - 1 - row;
-      const note = gridToMidi(col, pitchRow, BASE_OCTAVE);
+      const note = gridToMidi(col, pitchRow, BASE_OCTAVE + octaveOffset);
       const velocity = Math.min(127, Math.max(40, Math.round(40 + (1 - y / Math.max(layout.height, 1)) * 87)));
       return { col, row, note, velocity };
     },
-    [layout],
+    [layout, octaveOffset],
   );
 
   const handleTouchStart = useCallback(
